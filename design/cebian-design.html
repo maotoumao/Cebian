@@ -1,0 +1,1918 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cebian — 侧边栏 AI Agent 视觉设计稿</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+  /* =========================================
+     DESIGN TOKENS
+     ========================================= */
+  :root {
+    /* Surface */
+    --bg-deep:        #09090c;
+    --bg-base:        #0f1014;
+    --bg-elevated:    #16171d;
+    --bg-card:        #1c1d25;
+    --bg-hover:       #22232e;
+    --bg-input:       #1a1b22;
+
+    /* Border */
+    --border-subtle:  #ffffff0a;
+    --border-default: #ffffff12;
+    --border-strong:  #ffffff1f;
+
+    /* Text */
+    --text-primary:   #e8e4df;
+    --text-secondary: #8a8d9b;
+    --text-muted:     #54566a;
+    --text-inverse:   #0f1014;
+
+    /* Accent — warm amber */
+    --accent:         #e8a43a;
+    --accent-soft:    #e8a43a20;
+    --accent-glow:    #e8a43a40;
+    --accent-hover:   #f0b050;
+
+    /* Semantic */
+    --success:        #3dd68c;
+    --success-soft:   #3dd68c18;
+    --error:          #f05868;
+    --error-soft:     #f0586818;
+    --warning:        #f0c040;
+    --info:           #5a9cf0;
+    --info-soft:      #5a9cf018;
+
+    /* Spacing */
+    --sidebar-w:      380px;
+    --radius-sm:      6px;
+    --radius-md:      10px;
+    --radius-lg:      16px;
+    --radius-xl:      20px;
+
+    /* Typography scale */
+    --font-display:   'Syne', sans-serif;
+    --font-body:      'DM Sans', sans-serif;
+    --font-mono:      'JetBrains Mono', monospace;
+  }
+
+  /* =========================================
+     RESET & BASE
+     ========================================= */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    background: #1a1a22;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 40px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* =========================================
+     LAYOUT WRAPPER — simulating browser + sidebar
+     ========================================= */
+  .browser-frame {
+    width: 1200px;
+    max-width: 100%;
+    height: 720px;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    display: flex;
+    box-shadow:
+      0 0 0 1px var(--border-default),
+      0 40px 80px -20px rgba(0,0,0,.6),
+      0 0 120px -40px var(--accent-glow);
+    position: relative;
+  }
+
+  /* Fake webpage area */
+  .webpage-area {
+    flex: 1;
+    background:
+      linear-gradient(135deg, #181828 0%, #10101a 100%);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .webpage-topbar {
+    height: 38px;
+    background: var(--bg-deep);
+    border-bottom: 1px solid var(--border-default);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot.r { background: #f05868; }
+  .dot.y { background: #f0c040; }
+  .dot.g { background: #3dd68c; }
+
+  .url-bar {
+    flex: 1;
+    height: 22px;
+    background: var(--bg-elevated);
+    border-radius: 4px;
+    margin-left: 12px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    letter-spacing: .3px;
+  }
+
+  .url-bar .lock {
+    color: var(--success);
+    margin-right: 6px;
+    font-size: 10px;
+  }
+
+  .webpage-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    opacity: .25;
+    position: relative;
+  }
+
+  .webpage-content::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 30% 40%, #e8a43a08 0%, transparent 70%),
+      radial-gradient(ellipse 40% 60% at 70% 60%, #5a9cf008 0%, transparent 70%);
+  }
+
+  .webpage-placeholder {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+  }
+
+  .webpage-placeholder-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    opacity: .6;
+  }
+
+  /* =========================================
+     SIDEBAR — the main design
+     ========================================= */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: var(--bg-base);
+    border-left: 1px solid var(--border-default);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  /* Ambient glow */
+  .sidebar::before {
+    content: '';
+    position: absolute;
+    top: -60px;
+    right: -60px;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* --- HEADER --- */
+  .sidebar-header {
+    padding: 16px 18px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-default);
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+  }
+
+  .sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .sidebar-logo {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, var(--accent) 0%, #d08820 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 14px;
+    color: var(--text-inverse);
+    box-shadow: 0 2px 12px var(--accent-glow);
+  }
+
+  .sidebar-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: .5px;
+    color: var(--text-primary);
+  }
+
+  .sidebar-title span {
+    color: var(--accent);
+  }
+
+  .sidebar-actions {
+    display: flex;
+    gap: 4px;
+  }
+
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .2s;
+    font-size: 14px;
+  }
+
+  .icon-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+  }
+
+  .icon-btn.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: var(--accent-glow);
+  }
+
+  /* --- TAB BAR (context tabs) --- */
+  .tab-bar {
+    display: flex;
+    padding: 0 18px;
+    gap: 2px;
+    border-bottom: 1px solid var(--border-default);
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+  }
+
+  .tab-item {
+    padding: 10px 14px 9px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+    letter-spacing: .3px;
+  }
+
+  .tab-item:hover { color: var(--text-secondary); }
+
+  .tab-item.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* --- MODEL SELECTOR --- */
+  .model-selector {
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--border-default);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+  }
+
+  .model-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px 5px 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: 20px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all .2s;
+  }
+
+  .model-chip:hover {
+    border-color: var(--border-strong);
+    background: var(--bg-hover);
+  }
+
+  .model-chip .model-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 6px var(--success);
+  }
+
+  .model-chip .chevron {
+    font-size: 9px;
+    margin-left: 2px;
+    opacity: .5;
+  }
+
+  .token-info {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-left: auto;
+    font-family: var(--font-mono);
+  }
+
+  /* --- CHAT AREA --- */
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .chat-area::-webkit-scrollbar { width: 4px; }
+  .chat-area::-webkit-scrollbar-track { background: transparent; }
+  .chat-area::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 2px;
+  }
+
+  /* Message bubbles */
+  .msg {
+    display: flex;
+    gap: 10px;
+    animation: msgIn .4s cubic-bezier(.16,1,.3,1) both;
+  }
+
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg.user { flex-direction: row-reverse; }
+
+  .msg-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+
+  .msg.assistant .msg-avatar {
+    background: linear-gradient(135deg, var(--accent) 0%, #d08820 100%);
+    color: var(--text-inverse);
+    font-family: var(--font-display);
+  }
+
+  .msg.user .msg-avatar {
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    color: var(--text-secondary);
+  }
+
+  .msg-body {
+    max-width: 85%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .msg-bubble {
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-primary);
+  }
+
+  .msg.assistant .msg-bubble {
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-top-left-radius: 2px;
+  }
+
+  .msg.user .msg-bubble {
+    background: linear-gradient(135deg, #2a2520 0%, #1e1c1a 100%);
+    border: 1px solid var(--accent-soft);
+    border-top-right-radius: 2px;
+  }
+
+  .msg-time {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .msg.user .msg-time { text-align: right; }
+
+  /* --- TOOL CALL CARD --- */
+  .tool-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    font-size: 12px;
+  }
+
+  .tool-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .tool-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+  }
+
+  .tool-icon.dom {
+    background: var(--info-soft);
+    color: var(--info);
+  }
+
+  .tool-icon.exec {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .tool-icon.style {
+    background: #c084fc18;
+    color: #c084fc;
+  }
+
+  .tool-card-name {
+    font-weight: 500;
+    color: var(--text-secondary);
+    flex: 1;
+  }
+
+  .tool-card-status {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-family: var(--font-mono);
+  }
+
+  .tool-card-status.success {
+    background: var(--success-soft);
+    color: var(--success);
+  }
+
+  .tool-card-status.running {
+    background: var(--accent-soft);
+    color: var(--accent);
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .5; }
+  }
+
+  .tool-card-body {
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    max-height: 80px;
+    overflow-y: auto;
+  }
+
+  .tool-card-body .highlight { color: var(--accent); }
+  .tool-card-body .str { color: var(--success); }
+  .tool-card-body .keyword { color: var(--info); }
+
+  /* --- CODE PREVIEW BLOCK --- */
+  .code-block {
+    background: var(--bg-deep);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    font-size: 11px;
+    margin-top: 4px;
+  }
+
+  .code-block-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+
+  .code-block-header .lang {
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+  }
+
+  .code-block-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .code-action-btn {
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-default);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 10px;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: var(--font-body);
+  }
+
+  .code-action-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+  }
+
+  .code-action-btn.run {
+    border-color: var(--accent-glow);
+    color: var(--accent);
+  }
+
+  .code-action-btn.run:hover {
+    background: var(--accent-soft);
+  }
+
+  .code-block pre {
+    padding: 10px 14px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    overflow-x: auto;
+  }
+
+  .code-block pre .comment { color: var(--text-muted); font-style: italic; }
+  .code-block pre .fn { color: #a78bfa; }
+  .code-block pre .str { color: var(--success); }
+  .code-block pre .keyword { color: var(--info); }
+  .code-block pre .var { color: var(--accent); }
+
+  /* --- QUICK ACTIONS --- */
+  .quick-actions {
+    padding: 8px 18px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+  }
+
+  .quick-chip {
+    padding: 5px 12px;
+    border-radius: 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all .2s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .quick-chip:hover {
+    border-color: var(--accent-glow);
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .quick-chip .emoji { font-size: 12px; }
+
+  /* --- INPUT AREA --- */
+  .input-area {
+    padding: 12px 18px 16px;
+    border-top: 1px solid var(--border-default);
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+  }
+
+  .input-wrapper {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: 8px 12px;
+    transition: border-color .2s, box-shadow .2s;
+  }
+
+  .input-wrapper:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft), 0 0 20px -5px var(--accent-glow);
+  }
+
+  .input-wrapper textarea {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--text-primary);
+    line-height: 1.5;
+    min-height: 20px;
+    max-height: 80px;
+  }
+
+  .input-wrapper textarea::placeholder {
+    color: var(--text-muted);
+  }
+
+  .input-attach {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: all .15s;
+  }
+
+  .input-attach:hover { color: var(--text-secondary); }
+
+  .send-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: linear-gradient(135deg, var(--accent) 0%, #d08820 100%);
+    color: var(--text-inverse);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: all .2s;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px var(--accent-glow);
+  }
+
+  .send-btn:hover {
+    transform: scale(1.06);
+    box-shadow: 0 4px 16px var(--accent-glow);
+  }
+
+  .input-hints {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 6px;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .input-hints kbd {
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    font-family: var(--font-mono);
+    font-size: 9px;
+  }
+
+  /* =========================================
+     OVERLAY PANELS
+     ========================================= */
+
+  /* --- SETTINGS PANEL --- */
+  .panel-overlay {
+    position: absolute;
+    inset: 0;
+    background: var(--bg-base);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .35s cubic-bezier(.16,1,.3,1);
+  }
+
+  .panel-overlay.visible {
+    transform: translateX(0);
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 18px 14px;
+    border-bottom: 1px solid var(--border-default);
+    flex-shrink: 0;
+  }
+
+  .panel-back {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    transition: all .15s;
+  }
+
+  .panel-back:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .panel-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+  }
+
+  .panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .settings-section label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+  }
+
+  .settings-input {
+    width: 100%;
+    padding: 9px 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    outline: none;
+    transition: border-color .2s;
+  }
+
+  .settings-input:focus {
+    border-color: var(--accent);
+  }
+
+  .settings-input::placeholder { color: var(--text-muted); }
+
+  .provider-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .provider-card {
+    padding: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all .2s;
+    text-align: center;
+  }
+
+  .provider-card:hover {
+    border-color: var(--border-strong);
+    background: var(--bg-hover);
+  }
+
+  .provider-card.selected {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .provider-card .provider-icon {
+    font-size: 22px;
+    margin-bottom: 6px;
+  }
+
+  .provider-card .provider-name {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .provider-card.selected .provider-name { color: var(--accent); }
+
+  .provider-card .provider-sub {
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* Toggle switch */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+  }
+
+  .toggle-row .toggle-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .toggle-row .toggle-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .toggle-switch {
+    width: 36px;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    cursor: pointer;
+    position: relative;
+    transition: all .2s;
+    flex-shrink: 0;
+  }
+
+  .toggle-switch::after {
+    content: '';
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    transition: all .2s;
+  }
+
+  .toggle-switch.on {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .toggle-switch.on::after {
+    background: var(--text-inverse);
+    left: 18px;
+  }
+
+  /* =========================================
+     TASK PANEL
+     ========================================= */
+  .task-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .task-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    transition: all .2s;
+  }
+
+  .task-item:hover {
+    border-color: var(--border-strong);
+  }
+
+  .task-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+
+  .task-status-dot.active {
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+    animation: pulse 2s infinite;
+  }
+
+  .task-status-dot.scheduled {
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent-glow);
+  }
+
+  .task-status-dot.paused {
+    background: var(--text-muted);
+  }
+
+  .task-detail { flex: 1; }
+
+  .task-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+  }
+
+  .task-meta {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .task-action-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: 1px solid var(--border-subtle);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    transition: all .15s;
+  }
+
+  .task-action-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+  }
+
+  /* =========================================
+     EXECUTION CONFIRM DIALOG
+     ========================================= */
+  .confirm-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(9,9,12,.75);
+    backdrop-filter: blur(4px);
+    z-index: 20;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .confirm-backdrop.visible { display: flex; }
+
+  .confirm-dialog {
+    width: 100%;
+    max-width: 320px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    animation: dialogIn .3s cubic-bezier(.16,1,.3,1) both;
+  }
+
+  @keyframes dialogIn {
+    from { opacity: 0; transform: scale(.95) translateY(8px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  .confirm-dialog .confirm-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    background: var(--accent-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    margin-bottom: 14px;
+  }
+
+  .confirm-dialog h3 {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .confirm-dialog p {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 16px;
+  }
+
+  .confirm-dialog .confirm-code {
+    padding: 8px 12px;
+    background: var(--bg-deep);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 16px;
+    border: 1px solid var(--border-subtle);
+    max-height: 60px;
+    overflow-y: auto;
+  }
+
+  .confirm-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 9px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .15s;
+    text-align: center;
+    font-family: var(--font-body);
+    border: none;
+  }
+
+  .btn-ghost {
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    color: var(--text-secondary);
+  }
+
+  .btn-ghost:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent) 0%, #d08820 100%);
+    color: var(--text-inverse);
+    font-weight: 600;
+    box-shadow: 0 2px 8px var(--accent-glow);
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 4px 16px var(--accent-glow);
+    transform: translateY(-1px);
+  }
+
+  /* =========================================
+     RESPONSIVE STATUS BAR
+     ========================================= */
+  .status-bar {
+    padding: 6px 18px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .status-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 4px var(--success);
+  }
+
+  /* =========================================
+     PAGE MODE LABELS
+     ========================================= */
+  .design-label {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: 10px 16px;
+    z-index: 100;
+    font-size: 11px;
+    color: var(--text-secondary);
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .design-label strong {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--accent);
+  }
+
+  /* Navigation for panels */
+  .panel-nav {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: 28px;
+    padding: 6px 8px;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+  }
+
+  .panel-nav-btn {
+    padding: 7px 16px;
+    border-radius: 20px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .2s;
+    font-family: var(--font-body);
+  }
+
+  .panel-nav-btn:hover {
+    color: var(--text-secondary);
+    background: var(--bg-hover);
+  }
+
+  .panel-nav-btn.active {
+    background: var(--accent);
+    color: var(--text-inverse);
+    box-shadow: 0 2px 8px var(--accent-glow);
+  }
+
+  /* =========================================
+     THINKING / STREAMING INDICATOR
+     ========================================= */
+  .thinking-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .thinking-dots {
+    display: flex;
+    gap: 3px;
+  }
+
+  .thinking-dots span {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: bounce .8s infinite;
+  }
+
+  .thinking-dots span:nth-child(2) { animation-delay: .15s; }
+  .thinking-dots span:nth-child(3) { animation-delay: .3s; }
+
+  @keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: .4; }
+    40% { transform: translateY(-5px); opacity: 1; }
+  }
+
+  /* =========================================
+     DOM HIGHLIGHT OVERLAY (on webpage)
+     ========================================= */
+  .dom-highlight {
+    position: absolute;
+    border: 2px solid var(--accent);
+    background: var(--accent-soft);
+    border-radius: 3px;
+    pointer-events: none;
+    animation: highlightPulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes highlightPulse {
+    0%, 100% { opacity: .6; }
+    50% { opacity: 1; }
+  }
+
+  .dom-highlight-label {
+    position: absolute;
+    top: -22px;
+    left: -2px;
+    background: var(--accent);
+    color: var(--text-inverse);
+    font-size: 9px;
+    font-family: var(--font-mono);
+    padding: 2px 6px;
+    border-radius: 3px 3px 0 0;
+    white-space: nowrap;
+  }
+
+  /* Webpage mock elements */
+  .mock-element {
+    position: absolute;
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+  }
+
+  .mock-nav {
+    top: 48px;
+    left: 20px;
+    right: 20px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 20px;
+  }
+
+  .mock-nav-item {
+    width: 50px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--border-strong);
+  }
+
+  .mock-hero {
+    top: 110px;
+    left: 40px;
+    width: 300px;
+  }
+
+  .mock-hero-title {
+    height: 20px;
+    width: 240px;
+    background: var(--border-strong);
+    border-radius: 4px;
+    margin-bottom: 10px;
+  }
+
+  .mock-hero-text {
+    height: 8px;
+    background: var(--border-default);
+    border-radius: 4px;
+    margin-bottom: 6px;
+  }
+
+  .mock-hero-text:last-child { width: 70%; }
+
+  .mock-card-grid {
+    position: absolute;
+    top: 300px;
+    left: 40px;
+    right: 40px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .mock-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+  }
+
+  .mock-card-img {
+    height: 60px;
+    background: var(--bg-elevated);
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+
+  .mock-card-line {
+    height: 6px;
+    background: var(--border-default);
+    border-radius: 3px;
+    margin-bottom: 5px;
+  }
+
+  .mock-card-line:last-child { width: 60%; }
+
+  /* DOM highlight on the mock hero */
+  .webpage-content .dom-highlight {
+    top: 106px;
+    left: 36px;
+    width: 310px;
+    height: 130px;
+  }
+
+  /* =========================================
+     NOTIFICATION TOAST
+     ========================================= */
+  .toast {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-card);
+    border: 1px solid var(--success);
+    border-radius: var(--radius-md);
+    padding: 8px 16px;
+    font-size: 11px;
+    color: var(--success);
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 4px 16px rgba(61,214,140,.15);
+    animation: toastIn .4s cubic-bezier(.16,1,.3,1) both;
+  }
+
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Design Label -->
+<div class="design-label">
+  <strong>Cebian 视觉设计稿</strong>
+  <span>Chrome 侧边栏 AI Agent</span>
+</div>
+
+<!-- Browser Frame -->
+<div class="browser-frame" id="browserFrame">
+
+  <!-- Fake webpage -->
+  <div class="webpage-area">
+    <div class="webpage-topbar">
+      <div class="dot r"></div>
+      <div class="dot y"></div>
+      <div class="dot g"></div>
+      <div class="url-bar">
+        <span class="lock">🔒</span>
+        example.com/dashboard
+      </div>
+    </div>
+    <div class="webpage-content">
+      <!-- Mock webpage elements -->
+      <div class="mock-nav mock-element">
+        <div class="mock-nav-item" style="width:30px"></div>
+        <div class="mock-nav-item"></div>
+        <div class="mock-nav-item" style="width:40px"></div>
+        <div class="mock-nav-item" style="width:60px"></div>
+      </div>
+
+      <div class="mock-hero mock-element" style="padding:16px">
+        <div class="mock-hero-title"></div>
+        <div class="mock-hero-text"></div>
+        <div class="mock-hero-text" style="width:90%"></div>
+        <div class="mock-hero-text"></div>
+      </div>
+
+      <!-- DOM highlight overlay -->
+      <div class="dom-highlight" id="domHighlight">
+        <div class="dom-highlight-label">div.hero-section</div>
+      </div>
+
+      <div class="mock-card-grid">
+        <div class="mock-card">
+          <div class="mock-card-img"></div>
+          <div class="mock-card-line"></div>
+          <div class="mock-card-line"></div>
+        </div>
+        <div class="mock-card">
+          <div class="mock-card-img"></div>
+          <div class="mock-card-line"></div>
+          <div class="mock-card-line"></div>
+        </div>
+        <div class="mock-card">
+          <div class="mock-card-img"></div>
+          <div class="mock-card-line"></div>
+          <div class="mock-card-line"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SIDEBAR ============ -->
+  <div class="sidebar" id="sidebar">
+
+    <!-- Success toast -->
+    <div class="toast" id="toast" style="display:none">
+      <span>✓</span> 样式修改已应用
+    </div>
+
+    <!-- Header -->
+    <div class="sidebar-header">
+      <div class="sidebar-brand">
+        <div class="sidebar-logo">C</div>
+        <div class="sidebar-title">Ce<span>bian</span></div>
+      </div>
+      <div class="sidebar-actions">
+        <button class="icon-btn" title="新对话" onclick="showView('chat')">✦</button>
+        <button class="icon-btn" title="任务调度" id="taskBtn" onclick="showView('tasks')">⏱</button>
+        <button class="icon-btn" title="设置" id="settingsBtn" onclick="showView('settings')">⚙</button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tab-bar">
+      <div class="tab-item active" onclick="switchTab(this)">对话</div>
+      <div class="tab-item" onclick="switchTab(this)">历史</div>
+      <div class="tab-item" onclick="switchTab(this)">工具</div>
+    </div>
+
+    <!-- Model Selector -->
+    <div class="model-selector">
+      <div class="model-chip" onclick="toggleModelMenu()">
+        <span class="model-dot"></span>
+        GPT-4o (Copilot)
+        <span class="chevron">▾</span>
+      </div>
+      <span class="token-info">~3.2k tokens</span>
+    </div>
+
+    <!-- Chat Area -->
+    <div class="chat-area" id="chatArea">
+
+      <!-- Assistant greeting -->
+      <div class="msg assistant" style="animation-delay:.1s">
+        <div class="msg-avatar">C</div>
+        <div class="msg-body">
+          <div class="msg-bubble">
+            你好！我是 Cebian，你的浏览器 AI 副驾。我可以帮你读取和修改页面元素、执行自动化脚本、分析页面性能等。有什么需要帮忙的？
+          </div>
+          <div class="msg-time">10:24</div>
+        </div>
+      </div>
+
+      <!-- User message -->
+      <div class="msg user" style="animation-delay:.2s">
+        <div class="msg-avatar">U</div>
+        <div class="msg-body">
+          <div class="msg-bubble">帮我读取页面上 .hero-section 的内容，并把标题颜色改成橙色</div>
+          <div class="msg-time">10:25</div>
+        </div>
+      </div>
+
+      <!-- Assistant with tool calls -->
+      <div class="msg assistant" style="animation-delay:.3s">
+        <div class="msg-avatar">C</div>
+        <div class="msg-body">
+          <div class="msg-bubble">正在读取元素并修改样式，请确认以下操作：</div>
+
+          <!-- Tool call: readDOM -->
+          <div class="tool-card">
+            <div class="tool-card-header">
+              <div class="tool-icon dom">◉</div>
+              <span class="tool-card-name">readDOM</span>
+              <span class="tool-card-status success">✓ 完成</span>
+            </div>
+            <div class="tool-card-body"><span class="keyword">selector:</span> <span class="str">".hero-section"</span>
+<span class="keyword">result:</span> <span class="highlight">&lt;div class="hero-section"&gt;</span>
+  &lt;h1&gt;Build something great&lt;/h1&gt;
+  &lt;p&gt;Start your journey today...&lt;/p&gt;</div>
+          </div>
+
+          <!-- Tool call: modifyStyle -->
+          <div class="tool-card">
+            <div class="tool-card-header">
+              <div class="tool-icon style">◆</div>
+              <span class="tool-card-name">modifyStyle</span>
+              <span class="tool-card-status running">⟳ 待确认</span>
+            </div>
+            <div class="tool-card-body"><span class="keyword">target:</span> <span class="str">".hero-section h1"</span>
+<span class="keyword">style:</span> { <span class="highlight">color</span>: <span class="str">"#e8a43a"</span> }</div>
+          </div>
+
+          <div class="msg-time">10:25</div>
+        </div>
+      </div>
+
+      <!-- Code preview -->
+      <div class="msg assistant" style="animation-delay:.4s">
+        <div class="msg-avatar">C</div>
+        <div class="msg-body">
+          <div class="msg-bubble">以下是即将执行的代码：</div>
+          <div class="code-block">
+            <div class="code-block-header">
+              <span class="lang">JavaScript</span>
+              <div class="code-block-actions">
+                <button class="code-action-btn" onclick="copyCode()">复制</button>
+                <button class="code-action-btn run" onclick="showConfirm()">▶ 执行</button>
+              </div>
+            </div>
+            <pre><span class="keyword">const</span> <span class="var">el</span> = <span class="fn">document.querySelector</span>(<span class="str">'.hero-section h1'</span>);
+<span class="keyword">if</span> (<span class="var">el</span>) {
+  <span class="var">el</span>.style.color = <span class="str">'#e8a43a'</span>;
+  <span class="comment">// 应用渐变过渡效果</span>
+  <span class="var">el</span>.style.transition = <span class="str">'color 0.3s ease'</span>;
+}</pre>
+          </div>
+          <div class="msg-time">10:25</div>
+        </div>
+      </div>
+
+      <!-- Thinking indicator -->
+      <div class="msg assistant" style="animation-delay:.5s">
+        <div class="msg-avatar">C</div>
+        <div class="msg-body">
+          <div class="thinking-indicator">
+            <div class="thinking-dots">
+              <span></span><span></span><span></span>
+            </div>
+            正在分析页面结构...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+      <div class="quick-chip"><span class="emoji">📄</span> 总结页面</div>
+      <div class="quick-chip"><span class="emoji">🔍</span> 分析性能</div>
+      <div class="quick-chip"><span class="emoji">🎨</span> 修改样式</div>
+      <div class="quick-chip"><span class="emoji">📋</span> 填写表单</div>
+      <div class="quick-chip"><span class="emoji">⏰</span> 定时任务</div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="input-area">
+      <div class="input-wrapper">
+        <button class="input-attach" title="附加截图">📎</button>
+        <textarea rows="1" placeholder="输入指令，让我帮你操控浏览器..."></textarea>
+        <button class="send-btn" title="发送">↑</button>
+      </div>
+      <div class="input-hints">
+        <span><kbd>Enter</kbd> 发送 · <kbd>Shift+Enter</kbd> 换行</span>
+        <span>GPT-4o</span>
+      </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <div class="status-indicator">
+        <div class="status-dot"></div>
+        <span>已连接 · 当前标签页</span>
+      </div>
+      <span>v0.1.0</span>
+    </div>
+
+    <!-- ============ SETTINGS PANEL ============ -->
+    <div class="panel-overlay" id="settingsPanel">
+      <div class="panel-header">
+        <button class="panel-back" onclick="showView('chat')">←</button>
+        <span class="panel-title">设置</span>
+      </div>
+      <div class="panel-body">
+
+        <!-- Provider selection -->
+        <div class="settings-section">
+          <label>模型提供商</label>
+          <div class="provider-grid">
+            <div class="provider-card selected" onclick="selectProvider(this)">
+              <div class="provider-icon">🤖</div>
+              <div class="provider-name">GitHub Copilot</div>
+              <div class="provider-sub">Device Flow</div>
+            </div>
+            <div class="provider-card" onclick="selectProvider(this)">
+              <div class="provider-icon">◈</div>
+              <div class="provider-name">OpenAI</div>
+              <div class="provider-sub">API Key</div>
+            </div>
+            <div class="provider-card" onclick="selectProvider(this)">
+              <div class="provider-icon">◇</div>
+              <div class="provider-name">Anthropic</div>
+              <div class="provider-sub">API Key</div>
+            </div>
+            <div class="provider-card" onclick="selectProvider(this)">
+              <div class="provider-icon">🦙</div>
+              <div class="provider-name">Ollama</div>
+              <div class="provider-sub">本地模型</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- API Config -->
+        <div class="settings-section">
+          <label>API 配置</label>
+          <input class="settings-input" type="text" placeholder="API Base URL" value="https://api.githubcopilot.com" style="margin-bottom:8px">
+          <input class="settings-input" type="password" placeholder="API Key (自动通过 Device Flow 获取)">
+        </div>
+
+        <!-- Model selection -->
+        <div class="settings-section">
+          <label>模型选择</label>
+          <input class="settings-input" type="text" placeholder="模型名称" value="gpt-4o">
+        </div>
+
+        <!-- Toggles -->
+        <div class="settings-section">
+          <label>功能设置</label>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">代码执行前确认</div>
+              <div class="toggle-sub">执行脚本前弹窗确认</div>
+            </div>
+            <div class="toggle-switch on" onclick="toggleSwitch(this)"></div>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">流式输出</div>
+              <div class="toggle-sub">实时显示 AI 回复</div>
+            </div>
+            <div class="toggle-switch on" onclick="toggleSwitch(this)"></div>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">后台任务持久化</div>
+              <div class="toggle-sub">使用 Offscreen Document 保持定时任务</div>
+            </div>
+            <div class="toggle-switch on" onclick="toggleSwitch(this)"></div>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">深色模式</div>
+              <div class="toggle-sub">侧边栏主题</div>
+            </div>
+            <div class="toggle-switch on" onclick="toggleSwitch(this)"></div>
+          </div>
+        </div>
+
+        <!-- Token status -->
+        <div class="settings-section">
+          <label>Copilot 认证状态</label>
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:var(--radius-md);">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 6px var(--success);"></div>
+            <div style="flex:1">
+              <div style="font-size:12px;color:var(--text-primary);">已认证</div>
+              <div style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);">Token 有效至 10:55 · 自动刷新</div>
+            </div>
+            <button class="code-action-btn" style="font-size:10px;">刷新</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TASKS PANEL ============ -->
+    <div class="panel-overlay" id="tasksPanel">
+      <div class="panel-header">
+        <button class="panel-back" onclick="showView('chat')">←</button>
+        <span class="panel-title">定时任务 & 自动化</span>
+      </div>
+      <div class="panel-body">
+        <div class="settings-section">
+          <label>活跃任务</label>
+          <div class="task-list">
+            <div class="task-item">
+              <div class="task-status-dot active"></div>
+              <div class="task-detail">
+                <div class="task-name">大麦网演唱会抢票</div>
+                <div class="task-meta">每 200ms 轮询 · 已运行 4m 32s</div>
+              </div>
+              <button class="task-action-btn" title="暂停">⏸</button>
+            </div>
+            <div class="task-item">
+              <div class="task-status-dot scheduled"></div>
+              <div class="task-detail">
+                <div class="task-name">商品价格监控</div>
+                <div class="task-meta">每 30 分钟 · 下次 11:00</div>
+              </div>
+              <button class="task-action-btn" title="编辑">✎</button>
+            </div>
+            <div class="task-item">
+              <div class="task-status-dot paused"></div>
+              <div class="task-detail">
+                <div class="task-name">表单自动提交</div>
+                <div class="task-meta">已暂停 · 上次运行 09:30</div>
+              </div>
+              <button class="task-action-btn" title="恢复">▶</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <label>新建任务</label>
+          <input class="settings-input" type="text" placeholder="任务描述（自然语言）" style="margin-bottom:8px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <input class="settings-input" type="text" placeholder="间隔 (如 200ms)">
+            <input class="settings-input" type="text" placeholder="目标 URL">
+          </div>
+          <button class="btn btn-primary" style="margin-top:10px;width:100%;">创建任务</button>
+        </div>
+
+        <div class="settings-section">
+          <label>运行日志</label>
+          <div style="padding:10px 12px;background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);font-family:var(--font-mono);font-size:10px;color:var(--text-muted);line-height:1.8;max-height:120px;overflow-y:auto;">
+            <div><span style="color:var(--text-secondary);">[10:28:32]</span> <span style="color:var(--success);">✓</span> 抢票任务：页面已刷新，未放票</div>
+            <div><span style="color:var(--text-secondary);">[10:28:32]</span> <span style="color:var(--success);">✓</span> 等待 200ms 后重试...</div>
+            <div><span style="color:var(--text-secondary);">[10:28:02]</span> <span style="color:var(--success);">✓</span> 抢票任务：页面已刷新，未放票</div>
+            <div><span style="color:var(--text-secondary);">[10:27:32]</span> <span style="color:var(--info);">ℹ</span> 价格监控：¥2,999 → ¥2,899 (降价 ¥100)</div>
+            <div><span style="color:var(--text-secondary);">[10:27:00]</span> <span style="color:var(--success);">✓</span> 抢票任务启动，间隔 200ms</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CONFIRM DIALOG ============ -->
+    <div class="confirm-backdrop" id="confirmDialog">
+      <div class="confirm-dialog">
+        <div class="confirm-icon">⚡</div>
+        <h3>确认执行脚本</h3>
+        <p>以下代码将在当前页面执行，请检查后确认：</p>
+        <div class="confirm-code">el.style.color = '#e8a43a';
+el.style.transition = 'color 0.3s ease';</div>
+        <div class="confirm-actions">
+          <button class="btn btn-ghost" onclick="hideConfirm()">取消</button>
+          <button class="btn btn-primary" onclick="executeConfirm()">确认执行</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Panel Navigation -->
+<nav class="panel-nav">
+  <button class="panel-nav-btn active" onclick="showView('chat')">💬 对话</button>
+  <button class="panel-nav-btn" onclick="showView('settings')">⚙ 设置</button>
+  <button class="panel-nav-btn" onclick="showView('tasks')">⏱ 任务</button>
+  <button class="panel-nav-btn" onclick="toggleConfirm()">⚡ 确认弹窗</button>
+</nav>
+
+<script>
+  // =========================================
+  // INTERACTIVE CONTROLS
+  // =========================================
+
+  function showView(view) {
+    const settings = document.getElementById('settingsPanel');
+    const tasks = document.getElementById('tasksPanel');
+    const navBtns = document.querySelectorAll('.panel-nav-btn');
+
+    settings.classList.remove('visible');
+    tasks.classList.remove('visible');
+
+    document.getElementById('settingsBtn').classList.remove('active');
+    document.getElementById('taskBtn').classList.remove('active');
+
+    navBtns.forEach(b => b.classList.remove('active'));
+
+    if (view === 'settings') {
+      settings.classList.add('visible');
+      document.getElementById('settingsBtn').classList.add('active');
+      navBtns[1].classList.add('active');
+    } else if (view === 'tasks') {
+      tasks.classList.add('visible');
+      document.getElementById('taskBtn').classList.add('active');
+      navBtns[2].classList.add('active');
+    } else {
+      navBtns[0].classList.add('active');
+    }
+  }
+
+  function switchTab(el) {
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  function selectProvider(el) {
+    document.querySelectorAll('.provider-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  function toggleSwitch(el) {
+    el.classList.toggle('on');
+  }
+
+  function toggleModelMenu() {
+    // placeholder for model dropdown
+  }
+
+  function showConfirm() {
+    document.getElementById('confirmDialog').classList.add('visible');
+  }
+
+  function hideConfirm() {
+    document.getElementById('confirmDialog').classList.remove('visible');
+  }
+
+  function toggleConfirm() {
+    const d = document.getElementById('confirmDialog');
+    d.classList.toggle('visible');
+    const navBtns = document.querySelectorAll('.panel-nav-btn');
+    navBtns[3].classList.toggle('active');
+  }
+
+  function executeConfirm() {
+    hideConfirm();
+    // Show success toast
+    const toast = document.getElementById('toast');
+    toast.style.display = 'flex';
+    setTimeout(() => { toast.style.display = 'none'; }, 2500);
+  }
+
+  function copyCode() {
+    // placeholder
+  }
+
+  // Auto-resize textarea
+  document.querySelector('textarea').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 80) + 'px';
+  });
+
+  // Animate DOM highlight on webpage
+  const highlight = document.getElementById('domHighlight');
+  let hlVisible = true;
+  setInterval(() => {
+    highlight.style.opacity = hlVisible ? '0' : '1';
+    hlVisible = !hlVisible;
+  }, 3000);
+</script>
+
+</body>
+</html>

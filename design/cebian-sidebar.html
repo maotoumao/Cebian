@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cebian Sidebar Prototype</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            /* Neo-Brutalist / Modern Refined Dark Theme */
+            --bg-body: #000000;
+            --bg-panel: #09090b;
+            --bg-surface: #18181b;
+            --bg-elevated: #27272a;
+            
+            --text-primary: #fafafa;
+            --text-secondary: #a1a1aa;
+            --text-tertiary: #71717a;
+            
+            --accent: #f97316; /* Clean Orange for AI Action */
+            --accent-glow: rgba(249, 115, 22, 0.15);
+            --accent-muted: #431407;
+            
+            --danger: #ef4444;
+            --success: #10b981;
+            --info: #3b82f6;
+            
+            --border: #27272a;
+            --border-hover: #3f3f46;
+            
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 16px;
+            --radius-pill: 999px;
+            
+            --font-ui: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Light Mode Theme */
+        body[data-theme='light'] {
+            --bg-body: #f4f4f5;
+            --bg-panel: #ffffff;
+            --bg-surface: #f4f4f5;
+            --bg-elevated: #ffffff;
+            
+            --text-primary: #09090b;
+            --text-secondary: #52525b;
+            --text-tertiary: #a1a1aa;
+            
+            --accent: #ea580c; 
+            --accent-glow: rgba(234, 88, 12, 0.1);
+            --accent-muted: #ffedd5;
+            
+            --danger: #dc2626;
+            --success: #059669;
+            --info: #008ecc;
+            --border: #dedee5;
+            --border-hover: #bcbcc6;
+        }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            font-family: var(--font-ui);
+            display: flex;
+            justify-content: flex-end;
+            align-items: flex-start;
+            height: 100vh;
+            overflow: hidden;
+            /* subtle noise overlay for texture */
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+        }
+
+        /* 模拟 Chrome Side Panel 容器 */
+        .side-panel {
+            width: 380px;
+            min-width: 300px;
+            max-width: 800px;
+            height: 100vh;
+            background-color: var(--bg-panel);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: -10px 0 40px rgba(0,0,0,0.5); /* 阴影朝左，凸显层级 */
+            position: relative;
+        }
+
+        /* 拖拽边缘热区 */
+        .resize-handle {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            cursor: ew-resize;
+            background: transparent;
+            z-index: 100;
+            transition: background 0.2s ease, width 0.2s ease;
+        }
+        .resize-handle:hover, .resize-handle.active {
+            background: var(--accent);
+            width: 6px;
+        }
+
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: var(--radius-pill);
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-tertiary);
+        }
+
+        /* 1. Header 区域 */
+        .header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(13, 13, 18, 0.8);
+            backdrop-filter: blur(12px);
+            z-index: 10;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            letter-spacing: -0.5px;
+        }
+
+        .brand-logo {
+            width: 20px;
+            height: 20px;
+            background: var(--accent);
+            border-radius: 4px;
+            display: grid;
+            place-items: center;
+            color: #000;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .model-selector {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            padding: 4px 10px;
+            border-radius: var(--radius-pill);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .model-selector:hover {
+            border-color: var(--text-tertiary);
+            color: var(--text-primary);
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.4); }
+            70% { box-shadow: 0 0 0 4px rgba(0, 230, 118, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0); }
+        }
+
+        .icon-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+            display: grid;
+            place-items: center;
+            border-radius: 4px;
+            transition: color 0.2s, background 0.2s;
+        }
+        .icon-btn:hover {
+            color: var(--text-primary);
+            background: var(--bg-surface);
+        }
+
+        /* 2. Main Chat Area */
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            scroll-behavior: smooth;
+        }
+
+        /* 快捷指令横滑区 */
+        .quick-actions {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 12px;
+            margin-bottom: 4px;
+            scrollbar-width: none;
+        }
+        .quick-actions::-webkit-scrollbar { display: none; }
+        
+        .action-chip {
+            white-space: nowrap;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            padding: 6px 12px;
+            border-radius: var(--radius-pill);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        .action-chip:hover {
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            border-color: var(--border-hover);
+        }
+        .action-chip.accent {
+            color: var(--accent);
+            border-color: var(--accent-muted);
+            background: var(--accent-glow);
+        }
+
+        /* 对话气泡 */
+        .message {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-width: 95%;
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        @keyframes slideUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .msg-user {
+            align-self: flex-end;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            padding: 12px 16px;
+            border-radius: 16px 16px 4px 16px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .msg-agent {
+            align-self: flex-start;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            width: 100%;
+        }
+
+        .agent-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .agent-header svg {
+            color: var(--accent);
+        }
+
+        .msg-content {
+            line-height: 1.6;
+        }
+        .msg-content p {
+            margin-bottom: 12px;
+        }
+
+        /* 开发者工具组件：代码注入/执行卡片 */
+        .tool-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            margin: 12px 0;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+
+        .tool-header {
+            background: var(--bg-elevated);
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: var(--text-secondary);
+        }
+        
+        .tool-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--accent);
+        }
+        .spinner {
+            width: 12px;
+            height: 12px;
+            border: 2px solid var(--accent-glow);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .tool-body {
+            padding: 12px;
+            background: #0a0a0d;
+            color: #a9a9b3;
+            overflow-x: auto;
+        }
+        .tool-body .keyword { color: #ff7b72; }
+        .tool-body .string { color: #a5d6ff; }
+        .tool-body .variable { color: #d2a8ff; }
+
+        .tool-actions {
+            padding: 8px 12px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 8px;
+            background: var(--bg-surface);
+        }
+        .btn-sm {
+            background: transparent;
+            border: 1px solid var(--border-hover);
+            color: var(--text-primary);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font-ui);
+        }
+        .btn-sm:hover {
+            background: var(--bg-elevated);
+            border-color: var(--text-tertiary);
+        }
+        .btn-sm.primary {
+            background: var(--accent);
+            color: #ffffff;
+            border-color: var(--accent);
+        }
+        .btn-sm.primary:hover {
+            background: var(--accent-glow);
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        /* 思维链 (Chain of Thought / Background Work) */
+        .thought-process {
+            margin-bottom: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            font-size: 0.8rem;
+            overflow: hidden;
+        }
+        .thought-summary {
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-tertiary);
+            user-select: none;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            transition: background 0.2s;
+        }
+        .thought-summary:hover {
+            color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.04);
+        }
+        /* Hide default arrow */
+        .thought-summary::-webkit-details-marker { display: none; }
+        .thought-summary svg { transition: transform 0.2s; }
+        details[open] .thought-summary svg:first-child { transform: rotate(90deg); }
+        
+        .thought-content {
+            padding: 12px;
+            border-top: 1px dashed var(--border);
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            line-height: 1.6;
+            background: var(--bg-surface);
+        }
+        .step { display: flex; gap: 8px; margin-bottom: 6px; }
+        .step::before { content: '>'; color: var(--text-tertiary); }
+
+        /* 澄清问题弹窗 (Clarifying Question) */
+        .clarification-box {
+            margin-top: 14px;
+            padding: 14px;
+            border: 1px solid var(--accent-muted);
+            background: var(--accent-glow);
+            border-radius: var(--radius-md);
+            position: relative;
+        }
+        .clarification-box::before {
+            content: '';
+            position: absolute;
+            left: -1px;
+            top: 10px;
+            bottom: 10px;
+            width: 2px;
+            background: var(--accent);
+            border-radius: 0 2px 2px 0;
+            box-shadow: 0 0 8px var(--accent-glow);
+        }
+        .clarification-title {
+            font-weight: 500;
+            color: var(--accent);
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .clarification-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        /* 模式切换 (Agent vs Ask) Removed for Dropdown style */
+        /* 3. Input Area & Settings */
+        .input-area {
+            padding: 16px;
+            border-top: 1px solid var(--border);
+            background: var(--bg-panel);
+            position: relative;
+        }
+        
+        /* Settings Overlay (Slide-in from right) */
+        .settings-overlay {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            right: -100%;
+            width: 100%;
+            background: var(--bg-panel);
+            z-index: 100;
+            transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+            box-shadow: -10px 0 40px rgba(0,0,0,0.5);
+        }
+        .settings-overlay.open {
+            right: 0;
+        }
+        .settings-header {
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+        }
+        .settings-body {
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .form-group label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .form-group select, .form-group input, .form-group textarea {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 10px 12px;
+            border-radius: var(--radius-md);
+            font-family: var(--font-ui);
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .form-group select:focus, .form-group input:focus, .form-group textarea:focus {
+            border-color: var(--accent);
+        }
+        
+        /* Checkbox to Switch Toggle */
+        .switch-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+        .switch-text {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .switch-title {
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+        .switch-desc {
+            color: var(--text-tertiary);
+            font-size: 0.75rem;
+        }
+        .switch-input {
+            display: none;
+        }
+        .switch-label {
+            cursor: pointer;
+            width: 44px;
+            height: 24px;
+            background: var(--border-hover);
+            display: block;
+            border-radius: 100px;
+            position: relative;
+            transition: background 0.3s;
+        }
+        .switch-label::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s;
+        }
+        .switch-input:checked + .switch-label {
+            background: var(--accent); 
+        }
+        .switch-input:checked + .switch-label::after {
+            transform: translateX(20px);
+            background: #ffffff;
+        }
+
+        .slash-menu {
+            position: absolute;
+            bottom: calc(100% + 12px);
+            left: 16px;
+            right: 16px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 6px;
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+            z-index: 50;
+        }
+        .slash-menu.active {
+            display: flex;
+            animation: slideUp 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .slash-item {
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--text-primary);
+            transition: background 0.2s;
+        }
+        .slash-item:hover {
+            background: var(--bg-surface);
+        }
+        .slash-icon {
+            font-size: 1rem;
+            opacity: 0.8;
+            background: rgba(255,255,255,0.05);
+            width: 28px; height: 28px;
+            display: grid; place-items: center;
+            border-radius: 4px;
+        }
+        .slash-text { display: flex; flex-direction: column; justify-content: center; }
+        .slash-name { font-size: 0.85rem; font-weight: 500; font-family: var(--font-mono); }
+        .slash-desc { font-size: 0.7rem; color: var(--text-tertiary); }
+        
+        .mode-dropdown {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            padding: 4px 8px;
+            border-radius: var(--radius-md);
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .mode-dropdown.agent { color: var(--accent); border-color: var(--accent-muted); }
+        .mode-dropdown.ask { color: var(--info); border-color: rgba(0,191,255,0.3); }
+
+        /* Context Badges (挂载的上下文) */
+        .context-drawer {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        .context-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(0, 191, 255, 0.1);
+            color: var(--info);
+            border: 1px solid rgba(0, 191, 255, 0.2);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-family: var(--font-mono);
+        }
+        .context-badge button {
+            background: none;
+            border: none;
+            color: inherit;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+        .context-badge button:hover { opacity: 1; }
+
+        .input-box {
+            display: flex;
+            align-items: flex-end;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 8px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .input-box:focus-within {
+            border-color: var(--border-hover);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+        }
+
+        .input-actions-left {
+            display: flex;
+            padding-bottom: 4px;
+        }
+
+        textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-family: var(--font-ui);
+            font-size: 0.9rem;
+            resize: none;
+            padding: 8px;
+            min-height: 40px;
+            max-height: 120px;
+            outline: none;
+            line-height: 1.5;
+        }
+        textarea::placeholder {
+            color: var(--text-tertiary);
+        }
+
+        .send-btn {
+            background: var(--text-primary);
+            color: var(--bg-body);
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            margin-bottom: 4px;
+            margin-right: 4px;
+        }
+        .send-btn:hover {
+            transform: scale(1.05);
+            background: var(--accent);
+        }
+        .send-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="side-panel">
+        <div class="resize-handle"></div>
+        <!-- Header -->
+        <header class="header">
+            <div class="brand">
+                <div class="brand-logo">C</div>
+                Cebian
+            </div>
+            
+            <div style="display:flex; gap:8px;">
+                <button class="icon-btn" id="theme-toggle" title="Toggle Theme">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                </button>
+                <button class="icon-btn" id="settings-open" title="Settings">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Chat Area -->
+        <main class="chat-container">
+            <!-- User Message -->
+            <div class="message msg-user" style="animation-delay: 0.1s;">
+                帮我分析一下当前页面的表单，找出所有带 name 属性的输入框，并用红框高亮出来。
+            </div>
+
+            <!-- Agent Message (Chain of Thought & Clarification) -->
+            <div class="message msg-agent" style="animation-delay: 0.2s;">
+                <div class="agent-header">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7v1a4 4 0 0 1-4 4h-1c-.55 0-1-.45-1-1v-2c0-.55.45-1 1-1h1a2 2 0 0 0 2-2v-1a5 5 0 0 0-5-5h-1v2.27A2 2 0 0 1 14 14a2 2 0 0 1-2 2 2 2 0 0 1-2-2 2 2 0 0 1 1-1.73V9H10a5 5 0 0 0-5 5v1a2 2 0 0 0 2 2h1c.55 0 1 .45 1 1v2c0 .55-.45 1-1 1H7a4 4 0 0 1-4-4v-1a7 7 0 0 1 7-7h1V5.73C10.4 5.39 10 4.74 10 4a2 2 0 0 1 2-2z"></path></svg>
+                    Cebian Agent
+                </div>
+                <div class="msg-content">
+                    <!-- 思维链 (CoT) 折叠面板 -->
+                    <details class="thought-process">
+                        <summary class="thought-summary">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent);"><path d="M9 18h6M10 22h4M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9 8.5 8.5 0 0 1-4.7-7.6 8.38 8.38 0 0 1 .9-3.8 8.5 8.5 0 0 1 7.6-4.7 8.38 8.38 0 0 1 3.8.9 8.5 8.5 0 0 1 4.7 7.6z"></path></svg>
+                            Thinking Process (Analyzed DOM)
+                        </summary>
+                        <div class="thought-content">
+                            <div class="step">Reading document structure...</div>
+                            <div class="step">Querying for `form` tags: Found 3 matches.</div>
+                            <div class="step">Filtering forms: Two contain `input[name]`.</div>
+                            <div class="step">Discovered: #login-form (4 inputs) and #newsletter-sub (1 input).</div>
+                        </div>
+                    </details>
+                    
+                    <p>我扫描了当前页面，发现有两个不同的表单区域（顶部的<strong>登录表单</strong>，以及侧边栏的<strong>订阅表单</strong>）。</p>
+
+                    <!-- 澄清问题弹窗 (Clarification Question) -->
+                    <div class="clarification-box">
+                        <div class="clarification-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                            需要更明确的目标
+                        </div>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary);">你想让我高亮哪一个？</p>
+                        <div class="clarification-options">
+                            <button class="btn-sm">仅高亮 #login-form</button>
+                            <button class="btn-sm">仅高亮 #newsletter-sub</button>
+                            <button class="btn-sm primary">全部高亮 (All)</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Picked Option Msg -->
+            <div class="message msg-user" style="animation-delay: 0.4s;">
+                全部高亮 (All)
+            </div>
+
+            <!-- Agent Message (Action Execution) -->
+            <div class="message msg-agent" style="animation-delay: 0.5s;">
+                <div class="agent-header">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7v1a4 4 0 0 1-4 4h-1c-.55 0-1-.45-1-1v-2c0-.55.45-1 1-1h1a2 2 0 0 0 2-2v-1a5 5 0 0 0-5-5h-1v2.27A2 2 0 0 1 14 14a2 2 0 0 1-2 2 2 2 0 0 1-2-2 2 2 0 0 1 1-1.73V9H10a5 5 0 0 0-5 5v1a2 2 0 0 0 2 2h1c.55 0 1 .45 1 1v2c0 .55-.45 1-1 1H7a4 4 0 0 1-4-4v-1a7 7 0 0 1 7-7h1V5.73C10.4 5.39 10 4.74 10 4a2 2 0 0 1 2-2z"></path></svg>
+                    Cebian Agent
+                </div>
+                <div class="msg-content">
+                    <p>没问题，我将通过注入 DOM 脚本为它们添加红色高亮边框。稍等...</p>
+                    
+                    <!-- Execution Block -->
+                    <div class="tool-card">
+                        <div class="tool-header">
+                            <span style="display:flex; align-items:center; gap:6px;">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                                executeScript
+                            </span>
+                            <div class="tool-status">
+                                <span class="spinner"></span>
+                                Running...
+                            </div>
+                        </div>
+                        <div class="tool-body">
+<pre><code><span class="keyword">const</span> inputs = document.querySelectorAll(
+  <span class="string">'input[name], select[name], textarea[name]'</span>
+);
+inputs.forEach(<span class="keyword">el</span> => {
+  el.style.border = <span class="string">'2px solid red'</span>;
+  el.style.boxShadow = <span class="string">'0 0 8px rgba(255,0,0,0.5)'</span>;
+});
+<span class="keyword">return</span> inputs.length;</code></pre>
+                        </div>
+                    </div>
+
+                    <p style="color: var(--success); font-size: 0.85rem; margin-top: 12px; display: flex; align-items: center; gap: 6px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                        执行完毕。在页面中找到了 5 个匹配的表单载体，并已作高亮处理。
+                    </p>
+                    
+                    <div class="tool-actions" style="background:transparent; padding:4px 0; border:none;">
+                        <button class="btn-sm primary">View Extracted JSON</button>
+                        <button class="btn-sm">Clear Styles</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Input Area -->
+        <footer class="input-area">
+            
+            <!-- Slash Commands Pop-up Menu -->
+            <div class="slash-menu" id="slash-menu">
+                <div class="slash-item">
+                    <div class="slash-icon">⚡️</div>
+                    <div class="slash-text">
+                        <span class="slash-name">/profile</span>
+                        <span class="slash-desc">Intercept & Profile Network (CDP)</span>
+                    </div>
+                </div>
+                <div class="slash-item">
+                    <div class="slash-icon">📋</div>
+                    <div class="slash-text">
+                        <span class="slash-name">/summarize</span>
+                        <span class="slash-desc">Extract & Summarize current page</span>
+                    </div>
+                </div>
+                <div class="slash-item">
+                    <div class="slash-icon">⏱️</div>
+                    <div class="slash-text">
+                        <span class="slash-name">/rpa</span>
+                        <span class="slash-desc">Set background timer loop via SW</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="input-box" style="flex-direction: column; align-items: stretch; position: relative;">
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px 0;">
+                    <div class="context-drawer" style="margin:0;">
+                        <div class="context-badge" style="margin-bottom:0;">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            #login-form
+                            <button>✕</button>
+                        </div>
+                    </div>
+                    <!-- Mode Toggle (Agent vs Ask dropdown) -->
+                    <button class="mode-dropdown agent" id="mode-dropdown" title="Toggle Mode">
+                        ✨ Agent <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                </div>
+                
+                <textarea id="main-input" placeholder="Type '/' for commands..." style="min-height: 48px; border:none; background:transparent; max-height: 150px; font-size: 0.9rem; padding: 12px; margin-top: 4px;"></textarea>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px 8px;">
+                    <div class="input-actions-left" style="display: flex; align-items: center; gap: 4px;">
+                        <button class="icon-btn" title="Pick Element" style="color:var(--accent); background: rgba(204, 255, 0, 0.05); padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; display: flex; gap: 6px; align-items: center; border: 1px solid rgba(204, 255, 0, 0.1);">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                            Pick Element
+                        </button>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <button class="icon-btn" title="Voice Input">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line><line x1="8" y1="22" x2="16" y2="22"></line></svg>
+                        </button>
+                        
+                        <button class="send-btn" style="margin:0;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="text-align:center; font-size: 0.65rem; color: var(--text-tertiary); margin-top: 10px;">
+                Cebian has CDP and script injection permissions active.
+            </div>
+        </footer>
+        
+        <!-- Settings Slide-in Overlay -->
+        <div class="settings-overlay" id="settings-panel" style="padding-bottom: 20px;">
+            <div class="settings-header" style="justify-content: flex-start; gap: 12px;">
+                <button class="icon-btn" id="settings-close" style="margin-left: -8px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                </button>
+                <div style="font-weight: 600; font-size: 1rem; color: var(--text-primary);">设置</div>
+            </div>
+            <div class="settings-body" style="gap:24px; padding-top: 10px;">
+                <div class="form-group">
+                    <label style="color: var(--text-tertiary); font-size: 0.75rem; letter-spacing: 0.5px;">LLM 模型配置</label>
+                    <div style="color:var(--text-primary); font-size:0.9rem; margin-bottom:4px;">切换模型提供商</div>
+                    <select style="background:var(--bg-panel);">
+                        <option>GitHub Copilot Device Flow</option>
+                        <option>OpenAI API</option>
+                        <option>Anthropic Claude</option>
+                        <option>Local Ollama</option>
+                    </select>
+                </div>
+                
+                <hr style="border:none; border-top:1px solid var(--border); margin:0;">
+                
+                <div class="form-group">
+                    <label style="color: var(--text-tertiary); font-size: 0.75rem; letter-spacing: 0.5px; margin-bottom: 12px;">功能设置</label>
+                    
+                    <div class="switch-container">
+                        <div class="switch-text">
+                            <span class="switch-title">代码执行前确认</span>
+                            <span class="switch-desc">执行脚本前弹窗确认</span>
+                        </div>
+                        <div>
+                            <input type="checkbox" id="sw-confirm" class="switch-input" checked>
+                            <label for="sw-confirm" class="switch-label"></label>
+                        </div>
+                    </div>
+                    
+                    <div class="switch-container" style="margin-top: 12px;">
+                        <div class="switch-text">
+                            <span class="switch-title">流式输出</span>
+                            <span class="switch-desc">实时显示 AI 回复</span>
+                        </div>
+                        <div>
+                            <input type="checkbox" id="sw-stream" class="switch-input" checked>
+                            <label for="sw-stream" class="switch-label"></label>
+                        </div>
+                    </div>
+                    
+                    <div class="switch-container" style="margin-top: 12px;">
+                        <div class="switch-text">
+                            <span class="switch-title">后台任务持久化</span>
+                            <span class="switch-desc">使用 Offscreen Document 保持定时任务</span>
+                        </div>
+                        <div>
+                            <input type="checkbox" id="sw-background" class="switch-input" checked>
+                            <label for="sw-background" class="switch-label"></label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 拖拽缩放逻辑
+        const panel = document.querySelector('.side-panel');
+        const handle = document.querySelector('.resize-handle');
+        let isResizing = false;
+
+        handle.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            handle.classList.add('active');
+            document.body.style.cursor = 'ew-resize';
+            e.preventDefault(); // 防止拖拽时意外选中文本
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            // 面板吸附在右侧，宽度 = 视口宽度 - 鼠标X坐标
+            const newWidth = window.innerWidth - e.clientX;
+            panel.style.width = newWidth + 'px';
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                handle.classList.remove('active');
+                document.body.style.cursor = '';
+            }
+        });
+
+        // Mode Dropdown Toggle (Agent/Ask)
+        const modeBtn = document.getElementById('mode-dropdown');
+        if (modeBtn) {
+            modeBtn.addEventListener('click', () => {
+                if(modeBtn.classList.contains('agent')) {
+                    modeBtn.classList.remove('agent');
+                    modeBtn.classList.add('ask');
+                    modeBtn.innerHTML = '💬 Ask <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
+                    modeBtn.title = "Current Mode: Ask (No execution)";
+                } else {
+                    modeBtn.classList.remove('ask');
+                    modeBtn.classList.add('agent');
+                    modeBtn.innerHTML = '✨ Agent <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
+                    modeBtn.title = "Current Mode: Agent (Execution capable)";
+                }
+            });
+        }
+
+        // Settings Panel Logic
+        const settingsBtn = document.getElementById('settings-open');
+        const settingsClose = document.getElementById('settings-close');
+        const settingsPanel = document.getElementById('settings-panel');
+        
+        if (settingsBtn && settingsPanel) {
+            settingsBtn.addEventListener('click', () => settingsPanel.classList.add('open'));
+            settingsClose.addEventListener('click', () => settingsPanel.classList.remove('open'));
+        }
+
+        // Theme Toggle Logic
+        const themeToggle = document.getElementById('theme-toggle');
+        let currentTheme = 'dark';
+        if (themeToggle) {
+            themeToggle.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>'; // Sun icon initially
+            
+            themeToggle.addEventListener('click', () => {
+                if(currentTheme === 'dark') {
+                    document.body.setAttribute('data-theme', 'light');
+                    themeToggle.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>'; // Moon icon
+                    currentTheme = 'light';
+                } else {
+                    document.body.removeAttribute('data-theme');
+                    themeToggle.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>'; // Sun icon
+                    currentTheme = 'dark';
+                }
+            });
+        }
+
+        // Slash Menu Demo
+        const inputField = document.getElementById('main-input');
+        const slashMenu = document.getElementById('slash-menu');
+        
+        if (inputField && slashMenu) {
+            inputField.addEventListener('input', (e) => {
+                if(e.target.value.startsWith('/')) {
+                    slashMenu.classList.add('active');
+                } else {
+                    slashMenu.classList.remove('active');
+                }
+            });
+            
+            // Allow clicking slash items to close and populate
+            document.querySelectorAll('.slash-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const name = item.querySelector('.slash-name').innerText;
+                    inputField.value = name + ' ';
+                    slashMenu.classList.remove('active');
+                    inputField.focus();
+                });
+            });
+        }
+    </script>
+</body>
+</html>
