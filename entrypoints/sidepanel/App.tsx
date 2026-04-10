@@ -43,7 +43,7 @@ const DEMO_MESSAGES: ChatMessage[] = [
     id: 2,
     role: 'agent',
     content:
-      '我扫描了当前页面，发现有两个不同的表单区域（顶部的<strong>登录表单</strong>，以及侧边栏的<strong>订阅表单</strong>）。',
+      '我扫描了当前页面，发现有两个不同的表单区域（顶部的登录表单，以及侧边栏的订阅表单）。',
     thinking: {
       title: 'Thinking Process (Analyzed DOM)',
       steps: [
@@ -101,7 +101,6 @@ function App() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : '');
     if (theme === 'light') {
       document.documentElement.setAttribute('data-theme', 'light');
     } else {
@@ -155,7 +154,7 @@ function App() {
                     />
                   )}
 
-                  <p dangerouslySetInnerHTML={{ __html: msg.content }} />
+                  <p>{msg.content}</p>
 
                   {msg.clarification && (
                     <ClarificationBox

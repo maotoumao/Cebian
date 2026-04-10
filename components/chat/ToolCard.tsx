@@ -10,7 +10,7 @@ export function ToolCard({ name, status, code }: ToolCardProps) {
   return (
     <div className="border border-border rounded-lg overflow-hidden my-3 font-mono text-xs">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 bg-accent border-b border-border text-muted-foreground">
+      <div className="flex items-center justify-between px-3 py-2 bg-card border-b border-border text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <Code className="size-3" />
           {name}
