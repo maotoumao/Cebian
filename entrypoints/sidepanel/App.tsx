@@ -1,18 +1,17 @@
 import { useState } from 'react';
-import './App.css';
 
 function App() {
   const [count, setCount] = useState(0);
 
   return (
-    <>
+    <div className="max-w-5xl mx-auto p-8 text-center">
       <h1>Cebian Side Panel</h1>
-      <div className="card">
+      <div className="p-8 bg-amber-200">
         <button onClick={() => setCount((count) => count + 1)}>
           count is {count}
         </button>
       </div>
-    </>
+    </div>
   );
 }
 
