@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 
 function App() {
@@ -7,10 +8,12 @@ function App() {
     <div className="max-w-5xl mx-auto p-8 text-center">
       <h1>Cebian Side Panel</h1>
       <div className="p-8 bg-amber-200">
-        <button onClick={() => setCount((count) => count + 1)}>
+        <Button onClick={() => setCount((count) => count + 1)}>
           count is {count}
-        </button>
+        </Button>
       </div>
+        <Button>haha</Button>
+
     </div>
   );
 }
