@@ -5,7 +5,8 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: {
-    permissions: ['sidePanel'],
+    permissions: ['sidePanel', 'activeTab', 'tabs', 'scripting', 'storage', 'alarms', 'offscreen', 'debugger'],
+    host_permissions: ['<all_urls>'],
     action: {
       default_title: '点击打开侧边栏',
     },
