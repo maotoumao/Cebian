@@ -19,7 +19,7 @@ import {
   systemPrompt as systemPromptStorage,
   maxRounds as maxRoundsStorage,
 } from '@/lib/storage';
-import { createCebianAgent } from '@/lib/agent';
+import { createCebianAgent, DEFAULT_SYSTEM_PROMPT } from '@/lib/agent';
 import { mergeCustomProviders, isCustomProvider, findCustomModel } from '@/lib/custom-models';
 import { PRESET_PROVIDERS } from '@/lib/constants';
 import { createSession, ThrottledSessionWriter, type SessionRecord } from '@/lib/db';
@@ -75,6 +75,35 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
   const [currentSystemPrompt] = useStorageItem(systemPromptStorage, '');
   const [currentMaxRounds] = useStorageItem(maxRoundsStorage, 200);
 
+  // Refs for config values (avoid agent rebuild on config change)
+  const systemPromptRef = useRef(currentSystemPrompt);
+  const thinkingLevelRef = useRef(currentThinkingLevel);
+  const maxRoundsRef = useRef(currentMaxRounds);
+  const currentModelRef = useRef(currentModel);
+
+  // Sync refs + dynamically update agent state
+  useEffect(() => {
+    systemPromptRef.current = currentSystemPrompt;
+    if (agentRef.current) {
+      agentRef.current.state.systemPrompt = currentSystemPrompt || DEFAULT_SYSTEM_PROMPT;
+    }
+  }, [currentSystemPrompt]);
+
+  useEffect(() => {
+    thinkingLevelRef.current = currentThinkingLevel;
+    if (agentRef.current) {
+      agentRef.current.state.thinkingLevel = currentThinkingLevel as 'off' | 'minimal' | 'low' | 'medium' | 'high';
+    }
+  }, [currentThinkingLevel]);
+
+  useEffect(() => {
+    maxRoundsRef.current = currentMaxRounds;
+  }, [currentMaxRounds]);
+
+  useEffect(() => {
+    currentModelRef.current = currentModel;
+  }, [currentModel]);
+
   const allCustomProviders = useMemo(() =>
     mergeCustomProviders(PRESET_PROVIDERS, customProviderList),
   [customProviderList]);
@@ -100,15 +129,15 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // Create / update agent when config changes
+  // Create agent (only when model or conversation changes)
   useEffect(() => {
     if (!modelObj) return;
 
     const agent = createCebianAgent({
       model: modelObj,
-      systemPrompt: currentSystemPrompt,
-      thinkingLevel: currentThinkingLevel as 'off' | 'minimal' | 'low' | 'medium' | 'high',
-      maxRounds: currentMaxRounds,
+      systemPrompt: systemPromptRef.current,
+      thinkingLevel: thinkingLevelRef.current as 'off' | 'minimal' | 'low' | 'medium' | 'high',
+      maxRounds: maxRoundsRef.current,
       messages,
     });
 
@@ -119,26 +148,13 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
           break;
 
         case 'message_start':
-          setMessages([...agent.state.messages]);
-          break;
-
         case 'message_update':
-          if ('role' in event.message && event.message.role === 'assistant') {
-            setMessages(prev => {
-              const updated = [...prev];
-              updated[updated.length - 1] = event.message;
-              return updated;
-            });
-          }
-          break;
-
-        case 'message_end': {
+        case 'message_end':
           setMessages([...agent.state.messages]);
-          if (sessionCreated.current) {
+          if (event.type === 'message_end' && sessionCreated.current) {
             writerRef.current.schedule(conversationId, agent.state.messages);
           }
           break;
-        }
 
         case 'agent_end': {
           setIsAgentRunning(false);
@@ -151,10 +167,10 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
             const session: SessionRecord = {
               id: conversationId,
               title: title || '新对话',
-              model: currentModel?.modelId ?? '',
-              provider: currentModel?.provider ?? '',
-              systemPrompt: currentSystemPrompt,
-              thinkingLevel: currentThinkingLevel,
+              model: currentModelRef.current?.modelId ?? '',
+              provider: currentModelRef.current?.provider ?? '',
+              systemPrompt: systemPromptRef.current,
+              thinkingLevel: thinkingLevelRef.current,
               messageCount: agent.state.messages.length,
               totalInputTokens: 0,
               totalOutputTokens: 0,
@@ -178,8 +194,9 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
       unsubscribe();
       agent.abort();
     };
+    // Only rebuild agent when model or conversation changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelObj, currentSystemPrompt, currentThinkingLevel, currentMaxRounds, conversationId]);
+  }, [modelObj, conversationId]);
 
   // Cleanup writer on unmount
   useEffect(() => {
