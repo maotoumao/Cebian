@@ -9,15 +9,10 @@ import { useStorageItem } from '@/hooks/useStorageItem';
 import {
   providerCredentials,
   cebianSettings,
-  type CebianSettings,
+  DEFAULT_SETTINGS,
 } from '@/lib/storage';
 import { ProviderSummary } from '@/components/settings/provider/ProviderSummary';
 import { ProviderManagerDialog } from '@/components/settings/provider/ProviderManagerDialog';
-
-const DEFAULT_SETTINGS: CebianSettings = {
-  proxy: { enabled: false, url: '' },
-  behavior: { confirmBeforeExec: true, streaming: true, backgroundPersist: true },
-};
 
 interface SettingsPanelProps {
   open: boolean;

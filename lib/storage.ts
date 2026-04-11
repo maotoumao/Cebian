@@ -49,6 +49,11 @@ export interface CebianSettings {
   behavior: BehaviorSettings;
 }
 
+export const DEFAULT_SETTINGS: CebianSettings = {
+  proxy: { enabled: false, url: '' },
+  behavior: { confirmBeforeExec: true, streaming: true, backgroundPersist: true },
+};
+
 // ─── Storage items (WXT defineItem) ───
 
 export const providerCredentials = storage.defineItem<ProviderCredentials>(
@@ -73,10 +78,5 @@ export const themePreference = storage.defineItem<'dark' | 'light'>(
 
 export const cebianSettings = storage.defineItem<CebianSettings>(
   'local:settings',
-  {
-    fallback: {
-      proxy: { enabled: false, url: '' },
-      behavior: { confirmBeforeExec: true, streaming: true, backgroundPersist: true },
-    },
-  },
+  { fallback: DEFAULT_SETTINGS },
 );
