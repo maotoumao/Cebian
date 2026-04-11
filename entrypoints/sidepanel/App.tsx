@@ -9,10 +9,13 @@ import { TasksPage } from './pages/tasks';
 type Theme = 'dark' | 'light';
 
 function App() {
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>(
+    () => (localStorage.getItem('cebian-theme') as Theme) || 'dark',
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
+    localStorage.setItem('cebian-theme', theme);
     if (theme === 'light') {
       document.documentElement.setAttribute('data-theme', 'light');
     } else {
