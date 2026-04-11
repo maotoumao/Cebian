@@ -43,8 +43,12 @@ export function ModelSelector({
 
   const activeModelName = useMemo(() => {
     if (!activeModel) return null;
-    const models = getModels(activeModel.provider as KnownProvider);
-    return models.find(m => m.id === activeModel.modelId)?.name ?? activeModel.modelId;
+    try {
+      const models = getModels(activeModel.provider as KnownProvider);
+      return models.find(m => m.id === activeModel.modelId)?.name ?? activeModel.modelId;
+    } catch {
+      return null;
+    }
   }, [activeModel]);
 
   return (

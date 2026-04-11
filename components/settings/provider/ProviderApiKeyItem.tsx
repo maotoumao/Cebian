@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Eye, EyeOff, Check, X } from 'lucide-react';
 import { getModels, complete, type KnownProvider } from '@mariozechner/pi-ai';
 import { Input } from '@/components/ui/input';
@@ -29,9 +29,14 @@ export function ProviderApiKeyItem({
     { type: 'success'; message: string } | { type: 'error'; message: string } | null
   >(null);
 
-  const models = getModels(provider as KnownProvider);
-  const firstModel = models[0];
-  const modelCount = models.length;
+  const { firstModel, modelCount } = useMemo(() => {
+    try {
+      const models = getModels(provider as KnownProvider);
+      return { firstModel: models[0], modelCount: models.length };
+    } catch {
+      return { firstModel: undefined, modelCount: 0 };
+    }
+  }, [provider]);
 
   const handleSave = async () => {
     if (!firstModel || !key.trim()) return;
@@ -47,8 +52,8 @@ export function ProviderApiKeyItem({
       onSave({ authType: 'apiKey', apiKey: key, verified: true });
       setStatus({ type: 'success', message: `已连接 · ${modelCount} 个模型` });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setStatus({ type: 'error', message: `连接失败: ${message}` });
+      console.error(`[ApiKey Verify] ${provider}:`, err);
+      setStatus({ type: 'error', message: '连接失败: 请检查 API Key 是否正确' });
     } finally {
       setSaving(false);
     }

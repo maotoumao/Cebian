@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, useMemo, type KeyboardEvent } from 'react';
 import { Send, Mic, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,12 @@ interface ChatInputProps {
   onOpenSettings?: () => void;
 }
 
+const SLASH_COMMANDS = [
+  { icon: '⚡️', name: '/profile', desc: 'Intercept & Profile Network (CDP)' },
+  { icon: '📋', name: '/summarize', desc: 'Extract & Summarize current page' },
+  { icon: '⏱️', name: '/rpa', desc: 'Set background timer loop via SW' },
+] as const;
+
 export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [mode, setMode] = useState<'agent' | 'ask'>('agent');
@@ -23,9 +29,15 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
   const [currentThinkingLevel, setCurrentThinkingLevel] = useStorageItem(thinkingLevel, 'medium');
   const [providers] = useStorageItem(providerCredentials, {});
 
-  const isReasoningModel = currentModel
-    ? (() => { try { return getModel(currentModel.provider as KnownProvider, currentModel.modelId as never)?.reasoning ?? false; } catch { return false; } })()
-    : false;
+  const isReasoningModel = useMemo(() => {
+    if (!currentModel) return false;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- modelId is dynamic, pi-ai expects string literal
+      return (getModel as any)(currentModel.provider, currentModel.modelId)?.reasoning ?? false;
+    } catch {
+      return false;
+    }
+  }, [currentModel]);
 
   const handleModelSelect = (provider: string, modelId: string) => {
     setCurrentModel({ provider, modelId });
@@ -63,18 +75,14 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
     setShowSlash(val.startsWith('/'));
   };
 
-  const slashCommands = [
-    { icon: '⚡️', name: '/profile', desc: 'Intercept & Profile Network (CDP)' },
-    { icon: '📋', name: '/summarize', desc: 'Extract & Summarize current page' },
-    { icon: '⏱️', name: '/rpa', desc: 'Set background timer loop via SW' },
-  ];
+
 
   return (
     <footer className="px-4 py-4 border-t border-border bg-background relative">
       {/* Slash menu */}
       {showSlash && (
         <div className="absolute bottom-full left-4 right-4 mb-3 bg-accent border border-border rounded-lg p-1.5 shadow-xl z-50 animate-in slide-in-from-bottom-1 fade-in duration-150">
-          {slashCommands.map((cmd) => (
+          {SLASH_COMMANDS.map((cmd) => (
             <button
               key={cmd.name}
               className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-card transition-colors text-left"
