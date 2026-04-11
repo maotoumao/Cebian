@@ -29,9 +29,9 @@ export function ProviderOAuthItem({
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium">{label}</p>
             {isLoggedIn ? (
-              <Badge variant="outline" className="text-success border-success/20 bg-success/5 text-[0.65rem] h-4 px-1.5">已登录</Badge>
+              <Badge role="status" variant="outline" className="text-success border-success/20 bg-success/5 text-[0.65rem] h-4 px-1.5">已登录</Badge>
             ) : (
-              <Badge variant="outline" className="text-muted-foreground border-border text-[0.65rem] h-4 px-1.5">未登录</Badge>
+              <Badge role="status" variant="outline" className="text-muted-foreground border-border text-[0.65rem] h-4 px-1.5">未登录</Badge>
             )}
           </div>
           <p className="text-xs text-muted-foreground">{description}</p>

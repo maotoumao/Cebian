@@ -59,12 +59,15 @@ export function ProviderApiKeyItem({
 
   const statusBadge = () => {
     if (status?.type === 'error') {
-      return <Badge variant="outline" className="text-destructive border-destructive/20 bg-destructive/5 text-[0.65rem] h-4 px-1.5">连接失败</Badge>;
+      return <Badge role="status" variant="outline" className="text-destructive border-destructive/20 bg-destructive/5 text-[0.65rem] h-4 px-1.5">连接失败</Badge>;
     }
     if (status?.type === 'success' || credential?.verified) {
-      return <Badge variant="outline" className="text-success border-success/20 bg-success/5 text-[0.65rem] h-4 px-1.5">已连接</Badge>;
+      return <Badge role="status" variant="outline" className="text-success border-success/20 bg-success/5 text-[0.65rem] h-4 px-1.5">已连接</Badge>;
     }
-    return <Badge variant="outline" className="text-muted-foreground border-border text-[0.65rem] h-4 px-1.5">未配置</Badge>;
+    if (credential && !credential.verified) {
+      return <Badge role="status" variant="outline" className="text-yellow-500 border-yellow-500/20 bg-yellow-500/5 text-[0.65rem] h-4 px-1.5">未验证</Badge>;
+    }
+    return <Badge role="status" variant="outline" className="text-muted-foreground border-border text-[0.65rem] h-4 px-1.5">未配置</Badge>;
   };
 
   if (!firstModel) {
