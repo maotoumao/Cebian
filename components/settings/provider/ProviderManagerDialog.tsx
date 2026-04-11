@@ -88,7 +88,6 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
               <ProviderApiKeyItem
                 provider={p.provider}
                 label={p.label}
-                description={p.description}
                 credential={providers[p.provider] as ApiKeyCredential | undefined}
                 onSave={(cred) => handleApiKeySave(p.provider, cred)}
               />

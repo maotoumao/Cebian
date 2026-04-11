@@ -1,16 +1,15 @@
 import { useState, useMemo } from 'react';
-import { Eye, EyeOff, Check, X } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { getModels, complete, type KnownProvider } from '@mariozechner/pi-ai';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 import type { ApiKeyCredential } from '@/lib/storage';
 
 interface ProviderApiKeyItemProps {
   provider: string;
   label: string;
-  description: string;
   credential?: ApiKeyCredential;
   onSave: (credential: ApiKeyCredential) => void;
 }
@@ -18,7 +17,6 @@ interface ProviderApiKeyItemProps {
 export function ProviderApiKeyItem({
   provider,
   label,
-  description,
   credential,
   onSave,
 }: ProviderApiKeyItemProps) {
@@ -53,62 +51,36 @@ export function ProviderApiKeyItem({
       setStatus({ type: 'success', message: `已连接 · ${modelCount} 个模型` });
     } catch (err) {
       console.error(`[ApiKey Verify] ${provider}:`, err);
-      setStatus({ type: 'error', message: '连接失败: 请检查 API Key 是否正确' });
+      setStatus({ type: 'error', message: '连接失败' });
     } finally {
       setSaving(false);
     }
   };
 
-  const renderStatus = () => {
-    if (status) {
-      return status.type === 'success' ? (
-        <p className="flex items-center gap-1 text-xs text-success">
-          <Check className="size-3" />
-          {status.message}
-        </p>
-      ) : (
-        <p className="flex items-center gap-1 text-xs text-destructive">
-          <X className="size-3" />
-          {status.message}
-        </p>
-      );
+  const statusBadge = () => {
+    if (status?.type === 'error') {
+      return <Badge variant="outline" className="text-destructive border-destructive/20 bg-destructive/5 text-[0.65rem] h-4 px-1.5">连接失败</Badge>;
     }
-
-    if (credential?.verified) {
-      return (
-        <p className="flex items-center gap-1 text-xs text-success">
-          <Check className="size-3" />
-          已连接 · {modelCount} 个模型
-        </p>
-      );
+    if (status?.type === 'success' || credential?.verified) {
+      return <Badge variant="outline" className="text-success border-success/20 bg-success/5 text-[0.65rem] h-4 px-1.5">已连接</Badge>;
     }
-
-    if (credential && !credential.verified) {
-      return (
-        <p className="text-xs text-yellow-500">
-          凭据未验证
-        </p>
-      );
-    }
-
-    return <p className="text-xs text-muted-foreground">未配置</p>;
+    return <Badge variant="outline" className="text-muted-foreground border-border text-[0.65rem] h-4 px-1.5">未配置</Badge>;
   };
 
   if (!firstModel) {
     return (
-      <div className="space-y-1">
+      <div className="flex items-center gap-2">
         <p className="text-sm font-medium">{label}</p>
-        <p className="text-xs text-muted-foreground">{description}</p>
-        <p className="text-xs text-muted-foreground">无可用模型</p>
+        <Badge variant="outline" className="text-muted-foreground border-border text-[0.65rem] h-4 px-1.5">无可用模型</Badge>
       </div>
     );
   }
 
   return (
     <div className="space-y-2">
-      <div>
+      <div className="flex items-center gap-2">
         <p className="text-sm font-medium">{label}</p>
-        <p className="text-xs text-muted-foreground">{description}</p>
+        {statusBadge()}
       </div>
 
       <div className="flex items-center gap-2">
@@ -147,8 +119,6 @@ export function ProviderApiKeyItem({
           )}
         </Button>
       </div>
-
-      {renderStatus()}
     </div>
   );
 }
