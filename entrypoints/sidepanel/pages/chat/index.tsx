@@ -22,7 +22,7 @@ import {
 import { createCebianAgent } from '@/lib/agent';
 import { mergeCustomProviders, isCustomProvider, findCustomModel } from '@/lib/custom-models';
 import { PRESET_PROVIDERS } from '@/lib/constants';
-import { createConversation, saveMessage } from '@/lib/db';
+import { createSession, ThrottledSessionWriter, type SessionRecord } from '@/lib/db';
 import { getModels, type KnownProvider, type Api, type Model } from '@mariozechner/pi-ai';
 
 // ─── Helpers ───
@@ -60,13 +60,12 @@ function extractUserText(msg: AgentMessageType): string {
 export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
   const [conversationId] = useState(() => crypto.randomUUID());
   const [messages, setMessages] = useState<AgentMessageType[]>([]);
-  const [streamingMessage, setStreamingMessage] = useState<AssistantMessage | null>(null);
   const [isAgentRunning, setIsAgentRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const agentRef = useRef<Agent | null>(null);
-  const conversationCreated = useRef(false);
+  const sessionCreated = useRef(false);
+  const writerRef = useRef(new ThrottledSessionWriter());
 
   // Storage values
   const [currentModel] = useStorageItem(activeModel, null);
@@ -86,11 +85,20 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
     return getModelForProvider(currentModel.provider, currentModel.modelId, allCustomProviders);
   }, [currentModel, allCustomProviders]);
 
-  // Auto-scroll on message changes
+  // Auto-scroll helper
+  const scrollToBottom = useCallback(() => {
+    requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (!el) return;
+      // ScrollArea viewport is the first child with data-slot="scroll-area-viewport"
+      const viewport = el.querySelector('[data-slot="scroll-area-viewport"]') as HTMLElement | null;
+      if (viewport) viewport.scrollTop = viewport.scrollHeight;
+    });
+  }, []);
+
   useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, streamingMessage]);
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
 
   // Create / update agent when config changes
   useEffect(() => {
@@ -108,44 +116,76 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
       switch (event.type) {
         case 'agent_start':
           setIsAgentRunning(true);
-          setError(null);
+          break;
+
+        case 'message_start':
+          setMessages([...agent.state.messages]);
           break;
 
         case 'message_update':
-          if ('role' in event.message && (event.message as AssistantMessage).role === 'assistant') {
-            setStreamingMessage(event.message as AssistantMessage);
+          if ('role' in event.message && event.message.role === 'assistant') {
+            setMessages(prev => {
+              const updated = [...prev];
+              updated[updated.length - 1] = event.message;
+              return updated;
+            });
           }
           break;
 
-        case 'message_end':
-          setStreamingMessage(null);
+        case 'message_end': {
           setMessages([...agent.state.messages]);
-          // Create conversation on first persisted message
-          if (!conversationCreated.current) {
-            conversationCreated.current = true;
-            const firstUserText = extractUserText(agent.state.messages[0]);
-            const title = firstUserText.slice(0, 50) + (firstUserText.length > 50 ? '...' : '');
-            await createConversation(conversationId, title || '新对话', currentModel?.modelId ?? '', currentModel?.provider ?? '');
+          if (sessionCreated.current) {
+            writerRef.current.schedule(conversationId, agent.state.messages);
           }
-          await saveMessage(conversationId, event.message);
           break;
+        }
 
-        case 'agent_end':
+        case 'agent_end': {
           setIsAgentRunning(false);
           setMessages([...agent.state.messages]);
+
+          if (!sessionCreated.current && agent.state.messages.length > 0) {
+            sessionCreated.current = true;
+            const firstUserText = extractUserText(agent.state.messages[0]);
+            const title = firstUserText.slice(0, 50) + (firstUserText.length > 50 ? '...' : '');
+            const session: SessionRecord = {
+              id: conversationId,
+              title: title || '新对话',
+              model: currentModel?.modelId ?? '',
+              provider: currentModel?.provider ?? '',
+              systemPrompt: currentSystemPrompt,
+              thinkingLevel: currentThinkingLevel,
+              messageCount: agent.state.messages.length,
+              totalInputTokens: 0,
+              totalOutputTokens: 0,
+              totalCost: 0,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              messages: agent.state.messages,
+            };
+            await createSession(session);
+          } else {
+            await writerRef.current.flush();
+          }
           break;
+        }
       }
     });
 
     agentRef.current = agent;
 
     return () => {
-      setStreamingMessage(null);
       unsubscribe();
       agent.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelObj, currentSystemPrompt, currentThinkingLevel, currentMaxRounds, conversationId]);
+
+  // Cleanup writer on unmount
+  useEffect(() => {
+    const writer = writerRef.current;
+    return () => writer.dispose();
+  }, []);
 
   // Send message
   const handleSend = useCallback(async (text: string) => {
@@ -154,10 +194,9 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
     try {
       await agentRef.current.prompt(text);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '发送失败');
       setIsAgentRunning(false);
     }
-  }, [modelObj, conversationId, currentModel]);
+  }, [modelObj]);
 
   return (
     <>
@@ -178,13 +217,21 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
               const assistantMsg = msg as AssistantMessage;
               const thinkingBlocks = getThinkingBlocks(assistantMsg);
               const text = getAssistantText(assistantMsg);
+              const isLast = idx === messages.length - 1;
+              const isStreaming = isLast && isAgentRunning;
+              const isError = assistantMsg.stopReason === 'error';
 
               return (
-                <AgentMessage key={`msg-${idx}`}>
+                <AgentMessage key={`msg-${idx}`} isStreaming={isStreaming}>
                   {thinkingBlocks.map((block, i) => (
-                    <ThinkingBlock key={i} content={block.thinking} />
+                    <ThinkingBlock key={`t-${idx}-${i}`} content={block.thinking} isLive={isStreaming} />
                   ))}
                   {text && <AgentTextBlock content={text} />}
+                  {isError && (
+                    <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 mt-2">
+                      {assistantMsg.errorMessage ?? '模型返回错误'}
+                    </div>
+                  )}
                 </AgentMessage>
               );
             }
@@ -192,21 +239,9 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
             return null;
           })}
 
-          {streamingMessage && (
-            <AgentMessage isStreaming>
-              {getThinkingBlocks(streamingMessage).map((block, i) => (
-                <ThinkingBlock key={i} content={block.thinking} />
-              ))}
-              {getAssistantText(streamingMessage) && (
-                <AgentTextBlock content={getAssistantText(streamingMessage)} />
-              )}
-            </AgentMessage>
-          )}
-
-          {error && (
-            <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-3">
-              {error}
-            </div>
+          {/* Waiting placeholder: show after user sends, before assistant responds */}
+          {isAgentRunning && messages.length > 0 && 'role' in messages[messages.length - 1] && messages[messages.length - 1].role === 'user' && (
+            <AgentMessage isStreaming />
           )}
 
           {!modelObj && messages.length === 0 && (

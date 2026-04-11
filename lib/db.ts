@@ -1,88 +1,118 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
+import type { AssistantMessage } from '@mariozechner/pi-ai';
 
 // ─── Schema ───
 
-export interface ConversationRecord {
+export interface SessionRecord {
   id: string;
   title: string;
   model: string;
   provider: string;
+  systemPrompt: string;
+  thinkingLevel: string;
+  messageCount: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCost: number;
   createdAt: number;
   updatedAt: number;
-}
-
-export interface MessageRecord {
-  id?: number;
-  conversationId: string;
-  message: AgentMessage;
-  timestamp: number;
+  messages: AgentMessage[];
 }
 
 // ─── Database ───
 
 const db = new Dexie('cebian') as Dexie & {
-  conversations: EntityTable<ConversationRecord, 'id'>;
-  messages: EntityTable<MessageRecord, 'id'>;
+  sessions: EntityTable<SessionRecord, 'id'>;
 };
 
 db.version(1).stores({
-  conversations: 'id, updatedAt',
-  messages: '++id, conversationId, timestamp',
+  sessions: 'id, updatedAt',
 });
 
-// ─── Conversations ───
+// ─── Session CRUD ───
 
-export async function createConversation(
+export async function createSession(session: SessionRecord): Promise<void> {
+  await db.sessions.add(session);
+}
+
+export async function getSession(id: string): Promise<SessionRecord | undefined> {
+  return db.sessions.get(id);
+}
+
+export async function listSessions(): Promise<SessionRecord[]> {
+  return db.sessions.orderBy('updatedAt').reverse().toArray();
+}
+
+export async function updateSessionMessages(
   id: string,
-  title: string,
-  model: string,
-  provider: string,
+  messages: AgentMessage[],
 ): Promise<void> {
-  const now = Date.now();
-  await db.conversations.add({ id, title, model, provider, createdAt: now, updatedAt: now });
-}
+  // Aggregate usage from assistant messages
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let totalCost = 0;
 
-export async function getConversation(id: string): Promise<ConversationRecord | undefined> {
-  return db.conversations.get(id);
-}
+  for (const msg of messages) {
+    if ('role' in msg && msg.role === 'assistant') {
+      const am = msg as AssistantMessage;
+      if (am.usage) {
+        totalInputTokens += am.usage.input ?? 0;
+        totalOutputTokens += am.usage.output ?? 0;
+        totalCost += am.usage.cost?.total ?? 0;
+      }
+    }
+  }
 
-export async function listConversations(): Promise<ConversationRecord[]> {
-  return db.conversations.orderBy('updatedAt').reverse().toArray();
-}
-
-export async function updateConversation(
-  id: string,
-  updates: Partial<Pick<ConversationRecord, 'title' | 'model' | 'provider'>>,
-): Promise<void> {
-  await db.conversations.update(id, { ...updates, updatedAt: Date.now() });
-}
-
-export async function deleteConversation(id: string): Promise<void> {
-  await db.transaction('rw', db.conversations, db.messages, async () => {
-    await db.messages.where('conversationId').equals(id).delete();
-    await db.conversations.delete(id);
+  await db.sessions.update(id, {
+    messages,
+    messageCount: messages.length,
+    totalInputTokens,
+    totalOutputTokens,
+    totalCost,
+    updatedAt: Date.now(),
   });
 }
 
-// ─── Messages ───
-
-export async function saveMessage(conversationId: string, message: AgentMessage): Promise<void> {
-  const ts = 'timestamp' in message && typeof (message as { timestamp: unknown }).timestamp === 'number'
-    ? (message as { timestamp: number }).timestamp
-    : Date.now();
-  await db.messages.add({ conversationId, message, timestamp: ts });
-  await db.conversations.update(conversationId, { updatedAt: Date.now() });
+export async function updateSessionTitle(id: string, title: string): Promise<void> {
+  await db.sessions.update(id, { title, updatedAt: Date.now() });
 }
 
-export async function getMessages(conversationId: string): Promise<AgentMessage[]> {
-  const records = await db.messages
-    .where('conversationId')
-    .equals(conversationId)
-    .sortBy('timestamp');
-  return records.map(r => r.message);
+export async function deleteSession(id: string): Promise<void> {
+  await db.sessions.delete(id);
 }
 
-export async function clearMessages(conversationId: string): Promise<void> {
-  await db.messages.where('conversationId').equals(conversationId).delete();
+// ─── Throttled writer ───
+
+export class ThrottledSessionWriter {
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private pending: { id: string; messages: AgentMessage[] } | null = null;
+
+  constructor(private delayMs = 3000) {}
+
+  schedule(id: string, messages: AgentMessage[]): void {
+    this.pending = { id, messages: [...messages] };
+    if (this.timer) return; // Already scheduled
+    this.timer = setTimeout(() => this.flush(), this.delayMs);
+  }
+
+  async flush(): Promise<void> {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    if (this.pending) {
+      const { id, messages } = this.pending;
+      this.pending = null;
+      await updateSessionMessages(id, messages);
+    }
+  }
+
+  dispose(): void {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    this.pending = null;
+  }
 }

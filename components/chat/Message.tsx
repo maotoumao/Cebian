@@ -1,12 +1,12 @@
 import { Bot, ChevronRight, Lightbulb, CircleHelp, CheckCircle } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
 
 /* ─── User Message ─── */
 export function UserMessageBubble({ children }: { children: ReactNode }) {
   return (
-    <div className="self-end max-w-[95%] animate-in slide-in-from-bottom-2 fade-in duration-300">
+    <div className="self-end max-w-[95%]">
       <div className="bg-card border border-border px-4 py-3 rounded-2xl rounded-br-sm text-[0.9rem] leading-relaxed">
         {children}
       </div>
@@ -15,11 +15,11 @@ export function UserMessageBubble({ children }: { children: ReactNode }) {
 }
 
 /* ─── Agent Message ─── */
-export function AgentMessage({ children, isStreaming }: { children: ReactNode; isStreaming?: boolean }) {
+export function AgentMessage({ children, isStreaming }: { children?: ReactNode; isStreaming?: boolean }) {
   return (
-    <div className="self-start w-full animate-in slide-in-from-bottom-2 fade-in duration-300">
+    <div className="self-start w-full">
       <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground font-medium">
-        <Bot className="size-[14px] text-primary" />
+        <Bot className="size-3.5 text-primary" />
         Cebian Agent
       </div>
       <div className="text-[0.9rem] leading-relaxed space-y-3">
@@ -38,26 +38,43 @@ export function AgentTextBlock({ content }: { content: string }) {
 }
 
 /* ─── Thinking Block (renders pi-ai ThinkingContent) ─── */
-export function ThinkingBlock({ content }: { content: string }) {
-  const [open, setOpen] = useState(false);
+export function ThinkingBlock({ content, isLive }: { content: string; isLive?: boolean }) {
+  const [manualOpen, setManualOpen] = useState(false);
+  const wasLive = useRef(false);
+
+  // Auto-collapse when transitioning from live to done
+  useEffect(() => {
+    if (wasLive.current && !isLive) {
+      setManualOpen(false);
+    }
+    wasLive.current = !!isLive;
+  }, [isLive]);
+
+  const isOpen = isLive || manualOpen;
 
   return (
     <div className="border border-border rounded-lg overflow-hidden text-xs bg-card/30">
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => !isLive && setManualOpen(!manualOpen)}
         className="w-full flex items-center gap-2 px-3 py-2 text-muted-foreground font-mono text-[0.75rem] hover:text-foreground hover:bg-card/40 transition-colors"
       >
         <ChevronRight
-          className={`size-[10px] transition-transform duration-200 ${open ? 'rotate-90' : ''}`}
+          className={`size-2.5 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}
         />
         <Lightbulb className="size-3 text-primary" />
-        Thinking Process
+        {isLive ? 'Thinking...' : 'Thinking Process'}
       </button>
-      {open && (
-        <div className="px-3 py-3 border-t border-dashed border-border text-muted-foreground font-mono text-[0.75rem] leading-relaxed bg-card/50">
-          <MarkdownRenderer content={content} className="prose-xs" />
+      <div
+        className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+          isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        }`}
+      >
+        <div className="overflow-hidden">
+          <div className="px-3 py-3 border-t border-dashed border-border text-muted-foreground font-mono text-[0.75rem] leading-relaxed bg-card/50">
+            <MarkdownRenderer content={content} className="prose-xs" />
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
