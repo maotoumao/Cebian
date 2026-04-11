@@ -14,6 +14,9 @@ export const APIKEY_PROVIDERS = [
   { provider: 'groq', label: 'Groq' },
   { provider: 'openrouter', label: 'OpenRouter' },
   { provider: 'mistral', label: 'Mistral' },
+  { provider: 'minimax', label: 'MiniMax' },
+  { provider: 'minimax-cn', label: 'MiniMax (CN)' },
+  { provider: 'kimi-coding', label: 'Kimi' },
 ] as const;
 
 // ─── Slash commands ───

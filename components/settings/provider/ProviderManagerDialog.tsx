@@ -29,6 +29,12 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
     setProviders({ ...providers, [provider]: credential });
   };
 
+  const handleApiKeyRemove = (provider: string) => {
+    const next: ProviderCredentials = { ...providers };
+    delete next[provider];
+    setProviders(next);
+  };
+
   const handleOAuthLogin = (provider: string) => {
     console.log(`[OAuth] Login requested for ${provider}`);
   };
@@ -75,6 +81,7 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
                 label={p.label}
                 credential={providers[p.provider] as ApiKeyCredential | undefined}
                 onSave={(cred) => handleApiKeySave(p.provider, cred)}
+                onRemove={() => handleApiKeyRemove(p.provider)}
               />
             </Fragment>
           ))}

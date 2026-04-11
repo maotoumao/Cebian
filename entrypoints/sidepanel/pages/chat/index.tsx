@@ -218,7 +218,7 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
 
   return (
     <>
-      <ScrollArea className="flex-1" ref={scrollRef}>
+      <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
         <div className="flex flex-col gap-6 p-5">
           {messages.map((msg) => {
             // User messages
