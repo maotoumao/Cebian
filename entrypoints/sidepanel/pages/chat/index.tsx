@@ -184,7 +184,7 @@ function ToolCallRenderer({
 
 // ─── ChatPage ───
 
-export function ChatPage() {
+export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
   const [messages, setMessages] = useState<Message[]>(DEMO_MESSAGES);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -267,7 +267,7 @@ export function ChatPage() {
         </div>
       </ScrollArea>
 
-      <ChatInput onSend={handleSend} />
+      <ChatInput onSend={handleSend} onOpenSettings={onOpenSettings} />
     </>
   );
 }

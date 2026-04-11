@@ -33,7 +33,7 @@ function App() {
         />
 
         <Routes>
-          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/chat" element={<ChatPage onOpenSettings={() => setSettingsOpen(true)} />} />
           <Route path="/tasks" element={<TasksPage />} />
           <Route path="*" element={<Navigate to="/chat" replace />} />
         </Routes>
