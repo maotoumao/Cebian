@@ -91,7 +91,7 @@ export function ModelSelector({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="text-xs">
+        <Button variant="ghost" size="xs" className="text-[0.7rem]">
           {activeModelName ?? '选择模型'}
           <ChevronDown data-icon />
         </Button>

@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useMemo, type KeyboardEvent } from 'react';
-import { Send, Mic, ChevronDown } from 'lucide-react';
+import { Send, Mic, MousePointer2, Camera, Paperclip, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { ModelSelector } from '@/components/settings/model/ModelSelector';
 import { ThinkingLevelSelector } from '@/components/settings/model/ThinkingLevelSelector';
 import { useStorageItem } from '@/hooks/useStorageItem';
@@ -17,8 +18,8 @@ interface ChatInputProps {
 
 export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
   const [value, setValue] = useState('');
-  const [mode, setMode] = useState<'agent' | 'ask'>('agent');
   const [showSlash, setShowSlash] = useState(false);
+  const [mobileMode, setMobileMode] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [currentModel, setCurrentModel] = useStorageItem(activeModel, null);
@@ -114,30 +115,41 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
         </div>
       )}
 
-      <div className="border border-border rounded-2xl bg-card focus-within:border-border/80 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
-        {/* Top row: context badges + mode */}
-        <div className="flex items-center justify-between px-3 pt-2">
-          <div className="flex gap-1.5 flex-wrap">
+      <div className="border border-border rounded-xl bg-card focus-within:border-border/80 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+        {/* Top row: tools + context */}
+        <div className="flex items-center gap-1 px-2 pt-2 pb-2">
+          {/* Tool icons */}
+          <Button variant="ghost" size="icon-xs" title="选择元素">
+            <MousePointer2 className="size-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon-xs" title="截图">
+            <Camera className="size-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon-xs" title="上传文件">
+            <Paperclip className="size-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            title="移动端模式"
+            className={mobileMode ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}
+            onClick={() => setMobileMode(!mobileMode)}
+          >
+            <Smartphone className="size-3.5" />
+          </Button>
+
+          <Separator orientation="vertical" className="h-4! mx-1 bg-border" />
+
+          {/* Context badges */}
+          <div className="flex gap-1 flex-wrap flex-1 min-w-0">
             <Badge
               variant="outline"
-              className="text-info border-info/20 bg-info/5 text-[0.7rem] font-mono gap-1 h-5"
+              className="text-info border-info/20 bg-info/5 text-[0.65rem] font-mono gap-1 h-4.5 rounded"
             >
               #login-form
-              <button className="opacity-70 hover:opacity-100 ml-0.5">✕</button>
+              <button className="opacity-70 hover:opacity-100 ml-0.5 text-[0.6rem]">✕</button>
             </Badge>
           </div>
-
-          <button
-            onClick={() => setMode(mode === 'agent' ? 'ask' : 'agent')}
-            className={`flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[0.75rem] border transition-colors ${
-              mode === 'agent'
-                ? 'text-primary border-primary/20 bg-primary/5'
-                : 'text-info border-info/20 bg-info/5'
-            }`}
-          >
-            {mode === 'agent' ? '✨ Agent' : '💬 Ask'}
-            <ChevronDown className="size-3" />
-          </button>
         </div>
 
         {/* Textarea */}
@@ -147,12 +159,12 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
           onChange={(e) => handleInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Type '/' for commands..."
-          className="w-full bg-transparent border-none outline-none resize-none text-foreground text-[0.9rem] px-3 py-3 min-h-[48px] max-h-[150px] leading-relaxed placeholder:text-muted-foreground/50"
+          className="w-full bg-transparent border-none outline-none resize-none text-foreground text-[0.85rem] px-3 py-2 min-h-[44px] max-h-[150px] leading-relaxed placeholder:text-muted-foreground/50"
         />
 
         {/* Bottom row: actions */}
-        <div className="flex items-center justify-between px-2 pb-2">
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between px-2 pb-1.5">
+          <div className="flex items-center gap-0.5">
             <ModelSelector
               activeModel={currentModel}
               configuredProviders={providers}
@@ -169,16 +181,18 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
           </div>
 
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon-xs">
-              <Mic className="size-4" />
+            <Button variant="ghost" size="icon-xs" className="hover:shadow-xs" title="语音输入">
+              <Mic className="size-3" />
             </Button>
 
-            <button
+            <Button
+              variant="ghost"
+              size="icon-xs"
               onClick={handleSend}
-              className="w-8 h-8 rounded-md bg-foreground text-background grid place-items-center hover:bg-primary hover:scale-105 transition-all"
+              className="bg-foreground text-background hover:bg-primary hover:text-primary-foreground hover:shadow-xs"
             >
-              <Send className="size-3.5" />
-            </button>
+              <Send className="size-3" />
+            </Button>
           </div>
         </div>
       </div>
