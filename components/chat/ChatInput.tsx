@@ -1,17 +1,39 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
-import { Send, Crosshair, Mic, ChevronDown } from 'lucide-react';
+import { Send, Mic, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ModelSelector } from '@/components/settings/model/ModelSelector';
+import { ThinkingLevelSelector } from '@/components/settings/model/ThinkingLevelSelector';
+import { useStorageItem } from '@/hooks/useStorageItem';
+import { activeModel, thinkingLevel, providerCredentials, type ThinkingLevel } from '@/lib/storage';
+import { getModel, type KnownProvider } from '@mariozechner/pi-ai';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
+  onOpenSettings?: () => void;
 }
 
-export function ChatInput({ onSend }: ChatInputProps) {
+export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [mode, setMode] = useState<'agent' | 'ask'>('agent');
   const [showSlash, setShowSlash] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const [currentModel, setCurrentModel] = useStorageItem(activeModel, null);
+  const [currentThinkingLevel, setCurrentThinkingLevel] = useStorageItem(thinkingLevel, 'medium');
+  const [providers] = useStorageItem(providerCredentials, {});
+
+  const isReasoningModel = currentModel
+    ? (() => { try { return getModel(currentModel.provider as KnownProvider, currentModel.modelId as never)?.reasoning ?? false; } catch { return false; } })()
+    : false;
+
+  const handleModelSelect = (provider: string, modelId: string) => {
+    setCurrentModel({ provider, modelId });
+  };
+
+  const handleThinkingSelect = (level: ThinkingLevel) => {
+    setCurrentThinkingLevel(level);
+  };
 
   // Auto-resize textarea
   useEffect(() => {
@@ -116,14 +138,20 @@ export function ChatInput({ onSend }: ChatInputProps) {
 
         {/* Bottom row: actions */}
         <div className="flex items-center justify-between px-2 pb-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-primary text-[0.75rem] gap-1.5 h-7 border border-primary/10 bg-primary/5 hover:bg-primary/10"
-          >
-            <Crosshair className="size-3.5" />
-            Pick Element
-          </Button>
+          <div className="flex items-center gap-1">
+            <ModelSelector
+              activeModel={currentModel}
+              configuredProviders={providers}
+              onSelect={handleModelSelect}
+              onOpenSettings={onOpenSettings ?? (() => {})}
+            />
+            {isReasoningModel && (
+              <ThinkingLevelSelector
+                level={currentThinkingLevel}
+                onSelect={handleThinkingSelect}
+              />
+            )}
+          </div>
 
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon-xs">
