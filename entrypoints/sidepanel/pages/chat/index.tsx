@@ -1,269 +1,219 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChatInput } from '@/components/chat/ChatInput';
 import {
   UserMessageBubble,
   AgentMessage,
+  AgentTextBlock,
   ThinkingBlock,
-  ClarificationBox,
-  ExecutionResult,
 } from '@/components/chat/Message';
-import { ToolCard } from '@/components/chat/ToolCard';
-import type {
-  Message,
-  UserMessage,
-  AssistantMessage,
-  ToolResultMessage,
-} from '@/lib/types';
+import { Agent, type AgentEvent, type AgentMessage as AgentMessageType } from '@mariozechner/pi-agent-core';
+import type { AssistantMessage } from '@mariozechner/pi-ai';
+import { getAssistantText, getThinkingBlocks } from '@/lib/types';
+import { useStorageItem } from '@/hooks/useStorageItem';
 import {
-  TOOL_ASK_USER,
-  TOOL_EXECUTE_SCRIPT,
-  getAssistantText,
-  getThinkingBlocks,
-  getToolCalls,
-  findToolResult,
-} from '@/lib/types';
+  activeModel,
+  thinkingLevel,
+  providerCredentials,
+  customProviders as customProvidersStorage,
+  systemPrompt as systemPromptStorage,
+  maxRounds as maxRoundsStorage,
+} from '@/lib/storage';
+import { createCebianAgent } from '@/lib/agent';
+import { mergeCustomProviders, isCustomProvider, findCustomModel } from '@/lib/custom-models';
+import { PRESET_PROVIDERS } from '@/lib/constants';
+import { createConversation, saveMessage } from '@/lib/db';
+import { getModels, type KnownProvider, type Api, type Model } from '@mariozechner/pi-ai';
 
-// ─── Stub usage/metadata for demo messages ───
+// ─── Helpers ───
 
-const STUB_META = {
-  api: 'anthropic-messages' as const,
-  provider: 'anthropic',
-  model: 'claude-sonnet-4-20250514',
-  usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-};
-
-const now = Date.now();
-
-const DEMO_MESSAGES: Message[] = [
-  // 1. User asks to analyze forms
-  {
-    role: 'user',
-    content: '帮我分析一下当前页面的表单，找出所有带 name 属性的输入框，并用红框高亮出来。',
-    timestamp: now - 5000,
-  },
-  // 2. Agent thinks, then asks user to clarify via ask_user tool
-  {
-    role: 'assistant',
-    content: [
-      {
-        type: 'thinking',
-        thinking:
-          'Reading document structure...\nQuerying for `form` tags: Found 3 matches.\nFiltering forms: Two contain `input[name]`.\nDiscovered: #login-form (4 inputs) and #newsletter-sub (1 input).',
-      },
-      {
-        type: 'text',
-        text: '我扫描了当前页面，发现有两个不同的表单区域（顶部的登录表单，以及侧边栏的订阅表单）。',
-      },
-      {
-        type: 'toolCall',
-        id: 'tc_ask_1',
-        name: TOOL_ASK_USER,
-        arguments: {
-          title: '需要更明确的目标',
-          description: '你想让我高亮哪一个？',
-          options: [
-            { label: '仅高亮 #login-form' },
-            { label: '仅高亮 #newsletter-sub' },
-            { label: '全部高亮 (All)', primary: true },
-          ],
-        },
-      },
-    ],
-    ...STUB_META,
-    stopReason: 'toolUse',
-    timestamp: now - 4000,
-  },
-  // 3. User's selection becomes the tool result
-  {
-    role: 'toolResult',
-    toolCallId: 'tc_ask_1',
-    toolName: TOOL_ASK_USER,
-    content: [{ type: 'text', text: '全部高亮 (All)' }],
-    isError: false,
-    timestamp: now - 3000,
-  },
-  // 4. Agent executes script
-  {
-    role: 'assistant',
-    content: [
-      {
-        type: 'text',
-        text: '没问题，我将通过注入 DOM 脚本为它们添加红色高亮边框。稍等...',
-      },
-      {
-        type: 'toolCall',
-        id: 'tc_exec_1',
-        name: TOOL_EXECUTE_SCRIPT,
-        arguments: {
-          code: `const inputs = document.querySelectorAll(
-  'input[name], select[name], textarea[name]'
-);
-inputs.forEach(el => {
-  el.style.border = '2px solid red';
-  el.style.boxShadow = '0 0 8px rgba(255,0,0,0.5)';
-});
-return inputs.length;`,
-        },
-      },
-    ],
-    ...STUB_META,
-    stopReason: 'toolUse',
-    timestamp: now - 2000,
-  },
-  // 5. Script execution result
-  {
-    role: 'toolResult',
-    toolCallId: 'tc_exec_1',
-    toolName: TOOL_EXECUTE_SCRIPT,
-    content: [{ type: 'text', text: '执行完毕。在页面中找到了 5 个匹配的表单载体，并已作高亮处理。' }],
-    isError: false,
-    timestamp: now - 1000,
-  },
-];
-
-// ─── Tool-call renderer ───
-
-function ToolCallRenderer({
-  tc,
-  messages,
-  onUserReply,
-}: {
-  tc: import('@/lib/types').ToolCall;
-  messages: Message[];
-  onUserReply: (toolCallId: string, text: string) => void;
-}) {
-  const result = findToolResult(messages, tc.id);
-
-  switch (tc.name) {
-    case TOOL_ASK_USER: {
-      const args = tc.arguments as {
-        title: string;
-        description: string;
-        options: { label: string; primary?: boolean }[];
-      };
-      return (
-        <ClarificationBox
-          title={args.title}
-          description={args.description}
-          options={args.options}
-          answered={!!result}
-          onSelect={(label) => onUserReply(tc.id, label)}
-        />
-      );
-    }
-    case TOOL_EXECUTE_SCRIPT: {
-      const code =
-        typeof tc.arguments.code === 'string'
-          ? tc.arguments.code
-          : JSON.stringify(tc.arguments, null, 2);
-      const status = !result ? 'running' : result.isError ? 'error' : 'done';
-      return (
-        <>
-          <ToolCard name={tc.name} status={status} code={code} />
-          {result && !result.isError && (
-            <ExecutionResult
-              message={
-                result.content
-                  .filter((b) => b.type === 'text')
-                  .map((b) => b.text)
-                  .join('')
-              }
-            />
-          )}
-        </>
-      );
-    }
-    default: {
-      const code = JSON.stringify(tc.arguments, null, 2);
-      const status = !result ? 'running' : result.isError ? 'error' : 'done';
-      return <ToolCard name={tc.name} status={status} code={code} />;
-    }
+function getModelForProvider(
+  provider: string,
+  modelId: string,
+  customProviders: import('@/lib/storage').CustomProviderConfig[],
+): Model<Api> | undefined {
+  if (isCustomProvider(provider)) {
+    return findCustomModel(customProviders, provider, modelId) ?? undefined;
   }
+  try {
+    const models = getModels(provider as KnownProvider) as Model<Api>[];
+    return models.find(m => m.id === modelId);
+  } catch {
+    return undefined;
+  }
+}
+
+function extractUserText(msg: AgentMessageType): string {
+  if (!('role' in msg) || msg.role !== 'user') return '';
+  if (typeof msg.content === 'string') return msg.content;
+  if (Array.isArray(msg.content)) {
+    return msg.content
+      .filter((b): b is { type: 'text'; text: string } => 'type' in b && b.type === 'text')
+      .map(b => b.text)
+      .join('');
+  }
+  return '';
 }
 
 // ─── ChatPage ───
 
 export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
-  const [messages, setMessages] = useState<Message[]>(DEMO_MESSAGES);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [conversationId] = useState(() => crypto.randomUUID());
+  const [messages, setMessages] = useState<AgentMessageType[]>([]);
+  const [streamingMessage, setStreamingMessage] = useState<AssistantMessage | null>(null);
+  const [isAgentRunning, setIsAgentRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const agentRef = useRef<Agent | null>(null);
+  const conversationCreated = useRef(false);
+
+  // Storage values
+  const [currentModel] = useStorageItem(activeModel, null);
+  const [currentThinkingLevel] = useStorageItem(thinkingLevel, 'medium');
+  const [providers] = useStorageItem(providerCredentials, {});
+  const [customProviderList] = useStorageItem(customProvidersStorage, []);
+  const [currentSystemPrompt] = useStorageItem(systemPromptStorage, '');
+  const [currentMaxRounds] = useStorageItem(maxRoundsStorage, 200);
+
+  const allCustomProviders = useMemo(() =>
+    mergeCustomProviders(PRESET_PROVIDERS, customProviderList),
+  [customProviderList]);
+
+  // Resolve current model object
+  const modelObj = useMemo(() => {
+    if (!currentModel) return undefined;
+    return getModelForProvider(currentModel.provider, currentModel.modelId, allCustomProviders);
+  }, [currentModel, allCustomProviders]);
+
+  // Auto-scroll on message changes
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) {
-      el.scrollTop = el.scrollHeight;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, streamingMessage]);
+
+  // Create / update agent when config changes
+  useEffect(() => {
+    if (!modelObj) return;
+
+    const agent = createCebianAgent({
+      model: modelObj,
+      systemPrompt: currentSystemPrompt,
+      thinkingLevel: currentThinkingLevel as 'off' | 'minimal' | 'low' | 'medium' | 'high',
+      maxRounds: currentMaxRounds,
+      messages,
+    });
+
+    const unsubscribe = agent.subscribe(async (event: AgentEvent) => {
+      switch (event.type) {
+        case 'agent_start':
+          setIsAgentRunning(true);
+          setError(null);
+          break;
+
+        case 'message_update':
+          if ('role' in event.message && (event.message as AssistantMessage).role === 'assistant') {
+            setStreamingMessage(event.message as AssistantMessage);
+          }
+          break;
+
+        case 'message_end':
+          setStreamingMessage(null);
+          setMessages([...agent.state.messages]);
+          // Create conversation on first persisted message
+          if (!conversationCreated.current) {
+            conversationCreated.current = true;
+            const firstUserText = extractUserText(agent.state.messages[0]);
+            const title = firstUserText.slice(0, 50) + (firstUserText.length > 50 ? '...' : '');
+            await createConversation(conversationId, title || '新对话', currentModel?.modelId ?? '', currentModel?.provider ?? '');
+          }
+          await saveMessage(conversationId, event.message);
+          break;
+
+        case 'agent_end':
+          setIsAgentRunning(false);
+          setMessages([...agent.state.messages]);
+          break;
+      }
+    });
+
+    agentRef.current = agent;
+
+    return () => {
+      setStreamingMessage(null);
+      unsubscribe();
+      agent.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelObj, currentSystemPrompt, currentThinkingLevel, currentMaxRounds, conversationId]);
+
+  // Send message
+  const handleSend = useCallback(async (text: string) => {
+    if (!agentRef.current || !modelObj || !text.trim()) return;
+
+    try {
+      await agentRef.current.prompt(text);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '发送失败');
+      setIsAgentRunning(false);
     }
-  }, [messages]);
-
-  const handleSend = (text: string) => {
-    const userMsg: UserMessage = {
-      role: 'user',
-      content: text,
-      timestamp: Date.now(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-  };
-
-  const handleToolReply = (toolCallId: string, text: string) => {
-    const toolResult: ToolResultMessage = {
-      role: 'toolResult',
-      toolCallId,
-      toolName: TOOL_ASK_USER,
-      content: [{ type: 'text', text }],
-      isError: false,
-      timestamp: Date.now(),
-    };
-    setMessages((prev) => [...prev, toolResult]);
-  };
+  }, [modelObj, conversationId, currentModel]);
 
   return (
     <>
       <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
         <div className="flex flex-col gap-6 p-5">
-          {messages.map((msg) => {
-            // User messages
+          {messages.map((msg, idx) => {
+            if (!('role' in msg)) return null;
+
             if (msg.role === 'user') {
               return (
-                <UserMessageBubble key={msg.timestamp}>
-                  {typeof msg.content === 'string'
-                    ? msg.content
-                    : msg.content
-                        .filter((b) => b.type === 'text')
-                        .map((b) => b.text)
-                        .join('')}
+                <UserMessageBubble key={`msg-${idx}`}>
+                  {extractUserText(msg)}
                 </UserMessageBubble>
               );
             }
 
-            // Assistant messages — render content blocks in order
             if (msg.role === 'assistant') {
-              const thinkingBlocks = getThinkingBlocks(msg);
-              const text = getAssistantText(msg);
-              const toolCalls = getToolCalls(msg);
+              const assistantMsg = msg as AssistantMessage;
+              const thinkingBlocks = getThinkingBlocks(assistantMsg);
+              const text = getAssistantText(assistantMsg);
 
               return (
-                <AgentMessage key={msg.timestamp}>
+                <AgentMessage key={`msg-${idx}`}>
                   {thinkingBlocks.map((block, i) => (
                     <ThinkingBlock key={i} content={block.thinking} />
                   ))}
-
-                  {text && <p>{text}</p>}
-
-                  {toolCalls.map((tc) => (
-                    <ToolCallRenderer
-                      key={tc.id}
-                      tc={tc}
-                      messages={messages}
-                      onUserReply={handleToolReply}
-                    />
-                  ))}
+                  {text && <AgentTextBlock content={text} />}
                 </AgentMessage>
               );
             }
 
-            // toolResult messages — rendered inline via ToolCallRenderer, skip standalone
             return null;
           })}
+
+          {streamingMessage && (
+            <AgentMessage isStreaming>
+              {getThinkingBlocks(streamingMessage).map((block, i) => (
+                <ThinkingBlock key={i} content={block.thinking} />
+              ))}
+              {getAssistantText(streamingMessage) && (
+                <AgentTextBlock content={getAssistantText(streamingMessage)} />
+              )}
+            </AgentMessage>
+          )}
+
+          {error && (
+            <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-3">
+              {error}
+            </div>
+          )}
+
+          {!modelObj && messages.length === 0 && (
+            <div className="text-center text-sm text-muted-foreground py-12">
+              请先选择一个 AI 模型
+            </div>
+          )}
         </div>
       </ScrollArea>
 

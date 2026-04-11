@@ -1,6 +1,7 @@
 import { Bot, ChevronRight, Lightbulb, CircleHelp, CheckCircle } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
 
 /* ─── User Message ─── */
 export function UserMessageBubble({ children }: { children: ReactNode }) {
@@ -14,7 +15,7 @@ export function UserMessageBubble({ children }: { children: ReactNode }) {
 }
 
 /* ─── Agent Message ─── */
-export function AgentMessage({ children }: { children: ReactNode }) {
+export function AgentMessage({ children, isStreaming }: { children: ReactNode; isStreaming?: boolean }) {
   return (
     <div className="self-start w-full animate-in slide-in-from-bottom-2 fade-in duration-300">
       <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground font-medium">
@@ -23,15 +24,22 @@ export function AgentMessage({ children }: { children: ReactNode }) {
       </div>
       <div className="text-[0.9rem] leading-relaxed space-y-3">
         {children}
+        {isStreaming && (
+          <span className="inline-block w-1.5 h-4 bg-primary animate-pulse rounded-sm align-text-bottom" />
+        )}
       </div>
     </div>
   );
 }
 
+/* ─── Agent Text Block (Markdown) ─── */
+export function AgentTextBlock({ content }: { content: string }) {
+  return <MarkdownRenderer content={content} />;
+}
+
 /* ─── Thinking Block (renders pi-ai ThinkingContent) ─── */
 export function ThinkingBlock({ content }: { content: string }) {
   const [open, setOpen] = useState(false);
-  const lines = content.split('\n').filter(Boolean);
 
   return (
     <div className="border border-border rounded-lg overflow-hidden text-xs bg-card/30">
@@ -46,13 +54,8 @@ export function ThinkingBlock({ content }: { content: string }) {
         Thinking Process
       </button>
       {open && (
-        <div className="px-3 py-3 border-t border-dashed border-border text-muted-foreground font-mono text-[0.75rem] leading-relaxed bg-card/50 space-y-1.5">
-          {lines.map((line, i) => (
-            <div key={i} className="flex gap-2">
-              <span className="text-muted-foreground/50 select-none">&gt;</span>
-              <span>{line}</span>
-            </div>
-          ))}
+        <div className="px-3 py-3 border-t border-dashed border-border text-muted-foreground font-mono text-[0.75rem] leading-relaxed bg-card/50">
+          <MarkdownRenderer content={content} className="prose-xs" />
         </div>
       )}
     </div>

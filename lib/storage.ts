@@ -96,3 +96,13 @@ export const cebianSettings = storage.defineItem<CebianSettings>(
   'local:settings',
   { fallback: DEFAULT_SETTINGS },
 );
+
+export const systemPrompt = storage.defineItem<string>(
+  'local:systemPrompt',
+  { fallback: '' },
+);
+
+export const maxRounds = storage.defineItem<number>(
+  'local:maxRounds',
+  { fallback: 200 },
+);

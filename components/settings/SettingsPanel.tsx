@@ -1,18 +1,23 @@
 import { useState } from 'react';
 import { ArrowLeft, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import {
   providerCredentials,
   customProviders as customProvidersStorage,
   cebianSettings,
   DEFAULT_SETTINGS,
+  systemPrompt as systemPromptStorage,
+  maxRounds as maxRoundsStorage,
 } from '@/lib/storage';
 import { mergeCustomProviders } from '@/lib/custom-models';
 import { PRESET_PROVIDERS } from '@/lib/constants';
+import { DEFAULT_SYSTEM_PROMPT } from '@/lib/agent';
 import { ProviderSummary } from '@/components/settings/provider/ProviderSummary';
 import { ProviderManagerDialog } from '@/components/settings/provider/ProviderManagerDialog';
 
@@ -25,6 +30,8 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const [providers] = useStorageItem(providerCredentials, {});
   const [customProviderList] = useStorageItem(customProvidersStorage, []);
   const [settings, setSettings] = useStorageItem(cebianSettings, DEFAULT_SETTINGS);
+  const [currentSystemPrompt, setCurrentSystemPrompt] = useStorageItem(systemPromptStorage, '');
+  const [currentMaxRounds, setCurrentMaxRounds] = useStorageItem(maxRoundsStorage, 200);
   const [providerDialogOpen, setProviderDialogOpen] = useState(false);
 
   const allCustomProviders = mergeCustomProviders(PRESET_PROVIDERS, customProviderList);
@@ -140,6 +147,40 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                     behavior: { ...settings.behavior, backgroundPersist },
                   })
                 }
+              />
+            </div>
+          </div>
+        </div>
+
+        <Separator className="my-1" />
+
+        {/* Section 3: Agent */}
+        <div>
+          <h3 className="text-xs text-muted-foreground font-medium tracking-wide uppercase mb-3">
+            Agent
+          </h3>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm">系统提示词</Label>
+              <p className="text-xs text-muted-foreground">留空使用默认值</p>
+              <Textarea
+                value={currentSystemPrompt}
+                onChange={(e) => setCurrentSystemPrompt(e.target.value)}
+                placeholder={DEFAULT_SYSTEM_PROMPT.slice(0, 120) + '...'}
+                rows={4}
+                className="text-xs"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm">最大对话轮数</Label>
+              <p className="text-xs text-muted-foreground">超出后自动截断早期消息</p>
+              <Input
+                type="number"
+                value={currentMaxRounds}
+                onChange={(e) => setCurrentMaxRounds(Math.max(1, parseInt(e.target.value) || 200))}
+                min={1}
+                max={1000}
+                className="w-24 h-8 text-sm"
               />
             </div>
           </div>
