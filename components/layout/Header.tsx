@@ -45,7 +45,7 @@ export function Header({ theme, onToggleTheme, onOpenSettings }: HeaderProps) {
                     size="icon-xs"
                     onClick={() => navigate(path)}
                   >
-                    <Icon className="size-[18px]" />
+                    <Icon className="size-4.5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>{label}</TooltipContent>
@@ -63,7 +63,7 @@ export function Header({ theme, onToggleTheme, onOpenSettings }: HeaderProps) {
               size="icon-xs"
               onClick={onToggleTheme}
             >
-              {theme === 'dark' ? <Sun className="size-[18px]" /> : <Moon className="size-[18px]" />}
+              {theme === 'dark' ? <Sun className="size-4.5" /> : <Moon className="size-4.5" />}
             </Button>
           </TooltipTrigger>
           <TooltipContent>切换主题</TooltipContent>
@@ -76,7 +76,7 @@ export function Header({ theme, onToggleTheme, onOpenSettings }: HeaderProps) {
               size="icon-xs"
               onClick={onOpenSettings}
             >
-              <Settings className="size-[18px]" />
+              <Settings className="size-4.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>设置</TooltipContent>

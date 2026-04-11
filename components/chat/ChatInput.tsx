@@ -159,7 +159,7 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
           onChange={(e) => handleInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Type '/' for commands..."
-          className="w-full bg-transparent border-none outline-none resize-none text-foreground text-[0.85rem] px-3 py-2 min-h-[44px] max-h-[150px] leading-relaxed placeholder:text-muted-foreground/50"
+          className="w-full bg-transparent border-none outline-none resize-none text-foreground text-[0.85rem] px-3 py-2 min-h-11 max-h-37.5 leading-relaxed placeholder:text-muted-foreground/50"
         />
 
         {/* Bottom row: actions */}

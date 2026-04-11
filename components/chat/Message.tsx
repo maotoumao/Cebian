@@ -96,7 +96,7 @@ export function ClarificationBox({
   return (
     <div className={`relative mt-3 p-3.5 border border-primary/20 bg-primary/5 rounded-lg ${answered ? 'opacity-60' : ''}`}>
       {/* left accent bar */}
-      <div className="absolute left-0 top-2.5 bottom-2.5 w-[2px] rounded-r bg-primary shadow-[0_0_8px_var(--primary)]" />
+      <div className="absolute left-0 top-2.5 bottom-2.5 w-0.5 rounded-r bg-primary shadow-[0_0_8px_var(--primary)]" />
 
       <div className="flex items-center gap-1.5 text-primary font-medium text-[0.85rem] mb-1.5">
         <CircleHelp className="size-3.5" />

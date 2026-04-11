@@ -52,7 +52,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
   className,
 }: MarkdownRendererProps) {
   return (
-    <div className={`prose prose-sm dark:prose-invert max-w-none break-words ${className ?? ''}`}>
+    <div className={`prose prose-sm dark:prose-invert max-w-none wrap-break-word ${className ?? ''}`}>
       <Markdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
