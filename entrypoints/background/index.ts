@@ -1,3 +1,5 @@
+import { setupOAuthRefresh } from './oauth-refresh';
+
 export default defineBackground(() => {
   console.log('Hello background!', { id: browser.runtime.id });
 
@@ -5,4 +7,6 @@ export default defineBackground(() => {
   chrome.sidePanel
     .setPanelBehavior({ openPanelOnActionClick: true })
     .catch((error) => console.error(error));
+
+  setupOAuthRefresh();
 });

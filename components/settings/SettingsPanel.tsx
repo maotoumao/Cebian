@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeft, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
@@ -90,42 +89,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
         <Separator className="my-1" />
 
-        {/* Section 2: 网络 */}
-        <div>
-          <h3 className="text-xs text-muted-foreground font-medium tracking-wide uppercase mb-3">
-            网络
-          </h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-sm">CORS 代理</Label>
-                <p className="text-xs text-muted-foreground">通过代理绕过跨域限制</p>
-              </div>
-              <Switch
-                checked={settings.proxy.enabled}
-                onCheckedChange={(enabled) =>
-                  setSettings({ ...settings, proxy: { ...settings.proxy, enabled } })
-                }
-              />
-            </div>
-            {settings.proxy.enabled && (
-              <Input
-                placeholder="https://proxy.example.com"
-                value={settings.proxy.url}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    proxy: { ...settings.proxy, url: e.target.value },
-                  })
-                }
-              />
-            )}
-          </div>
-        </div>
-
-        <Separator className="my-1" />
-
-        {/* Section 3: 行为 */}
+        {/* Section 2: 行为 */}
         <div>
           <h3 className="text-xs text-muted-foreground font-medium tracking-wide uppercase mb-3">
             行为

@@ -14,6 +14,7 @@ export interface OAuthCredential {
   refreshToken?: string;
   expiresAt?: number;
   verified: boolean;
+  extra?: Record<string, unknown>;
 }
 
 export type ProviderCredential = ApiKeyCredential | OAuthCredential;
@@ -50,11 +51,6 @@ export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high';
 
 // ─── Settings ───
 
-export interface ProxySettings {
-  enabled: boolean;
-  url: string;
-}
-
 export interface BehaviorSettings {
   confirmBeforeExec: boolean;
   streaming: boolean;
@@ -62,12 +58,10 @@ export interface BehaviorSettings {
 }
 
 export interface CebianSettings {
-  proxy: ProxySettings;
   behavior: BehaviorSettings;
 }
 
 export const DEFAULT_SETTINGS: CebianSettings = {
-  proxy: { enabled: false, url: '' },
   behavior: { confirmBeforeExec: true, streaming: true, backgroundPersist: true },
 };
 

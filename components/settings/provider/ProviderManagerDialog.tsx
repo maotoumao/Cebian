@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useState, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -6,7 +6,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
-import { ProviderOAuthItem } from '@/components/settings/provider/ProviderOAuthItem';
+import { ProviderOAuthItem, type OAuthPhase } from '@/components/settings/provider/ProviderOAuthItem';
 import { ProviderApiKeyItem } from '@/components/settings/provider/ProviderApiKeyItem';
 import { CustomProviderForm, CustomProviderCard } from '@/components/settings/provider/CustomProviderForm';
 import { useStorageItem } from '@/hooks/useStorageItem';
@@ -21,6 +21,7 @@ import {
 } from '@/lib/storage';
 import { OAUTH_PROVIDERS, APIKEY_PROVIDERS, PRESET_PROVIDERS } from '@/lib/constants';
 import { customProviderKey, getCustomModels } from '@/lib/custom-models';
+import { loginGitHubCopilot, loginOpenAICodex, loginGeminiCli } from '@/lib/oauth';
 
 interface ProviderManagerDialogProps {
   open: boolean;
@@ -31,6 +32,14 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
   const [providers, setProviders] = useStorageItem(providerCredentials, {});
   const [currentModel, setCurrentModel] = useStorageItem(activeModel, null);
   const [customs, setCustoms] = useStorageItem(customProviders, []);
+  const [oauthStates, setOAuthStates] = useState<Record<string, OAuthPhase>>({});
+  const abortRefs = useRef<Record<string, AbortController>>({});
+
+  const getOAuthState = (provider: string): OAuthPhase =>
+    oauthStates[provider] ?? { phase: 'idle' };
+
+  const setOAuthState = (provider: string, state: OAuthPhase) =>
+    setOAuthStates(prev => ({ ...prev, [provider]: state }));
 
   const clearActiveModelIfNeeded = (provider: string) => {
     if (currentModel?.provider === provider) {
@@ -38,7 +47,7 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
     }
   };
 
-  const handleApiKeySave = (provider: string, credential: ApiKeyCredential) => {
+  const handleCredentialSave = (provider: string, credential: ApiKeyCredential | OAuthCredential) => {
     setProviders({ ...providers, [provider]: credential });
   };
 
@@ -49,8 +58,61 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
     clearActiveModelIfNeeded(provider);
   };
 
-  const handleOAuthLogin = (provider: string) => {
-    console.log(`[OAuth] Login requested for ${provider}`);
+  const handleOAuthLogin = async (provider: string) => {
+    // Guard against concurrent logins
+    if (abortRefs.current[provider]) return;
+
+    const abort = new AbortController();
+    abortRefs.current[provider] = abort;
+    setOAuthState(provider, { phase: 'authorizing' });
+
+    try {
+      let result;
+
+      switch (provider) {
+        case 'github-copilot':
+          result = await loginGitHubCopilot({
+            onDeviceCode: (code) => {
+              setOAuthState(provider, { phase: 'authorizing', deviceCode: code });
+            },
+            signal: abort.signal,
+          });
+          break;
+        case 'openai-codex':
+          result = await loginOpenAICodex(abort.signal);
+          break;
+        case 'google-gemini-cli':
+          result = await loginGeminiCli(abort.signal);
+          break;
+        default:
+          return;
+      }
+
+      handleCredentialSave(provider, {
+        authType: 'oauth',
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        expiresAt: result.expiresAt,
+        verified: true,
+        extra: result.extra,
+      });
+      setOAuthState(provider, { phase: 'success' });
+      setTimeout(() => setOAuthState(provider, { phase: 'idle' }), 3000);
+    } catch (err) {
+      if (abort.signal.aborted) return;
+      setOAuthState(provider, {
+        phase: 'error',
+        message: err instanceof Error ? err.message : '授权失败',
+      });
+    } finally {
+      delete abortRefs.current[provider];
+    }
+  };
+
+  const handleOAuthCancel = (provider: string) => {
+    abortRefs.current[provider]?.abort();
+    delete abortRefs.current[provider];
+    setOAuthState(provider, { phase: 'idle' });
   };
 
   const handleOAuthLogout = (provider: string) => {
@@ -58,6 +120,7 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
     delete next[provider];
     setProviders(next);
     clearActiveModelIfNeeded(provider);
+    setOAuthState(provider, { phase: 'idle' });
   };
 
   const handleAddCustomProvider = (config: CustomProviderConfig) => {
@@ -98,9 +161,12 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
                   provider={p.provider}
                   label={p.label}
                   description={p.description}
+                  flow={p.flow}
                   credential={providers[p.provider] as OAuthCredential | undefined}
+                  oauthState={getOAuthState(p.provider)}
                   onLogin={() => handleOAuthLogin(p.provider)}
                   onLogout={() => handleOAuthLogout(p.provider)}
+                  onCancel={() => handleOAuthCancel(p.provider)}
                 />
               </Fragment>
             ))}
@@ -116,7 +182,7 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
                   provider={p.provider}
                   label={p.label}
                   credential={providers[p.provider] as ApiKeyCredential | undefined}
-                  onSave={(cred) => handleApiKeySave(p.provider, cred)}
+                  onSave={(cred) => handleCredentialSave(p.provider, cred)}
                   onRemove={() => handleApiKeyRemove(p.provider)}
                 />
               </Fragment>
@@ -133,7 +199,7 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
                     label={p.name}
                     models={getCustomModels(p)}
                     credential={providers[key] as ApiKeyCredential | undefined}
-                    onSave={(cred) => handleApiKeySave(key, cred)}
+                    onSave={(cred) => handleCredentialSave(key, cred)}
                     onRemove={() => handleApiKeyRemove(key)}
                   />
                 </Fragment>
@@ -161,7 +227,7 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
                     label={c.name}
                     models={getCustomModels(c)}
                     credential={cred}
-                    onSave={(cr) => handleApiKeySave(key, cr)}
+                    onSave={(cr) => handleCredentialSave(key, cr)}
                     onRemove={() => handleApiKeyRemove(key)}
                   />
                 </Fragment>
