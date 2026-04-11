@@ -1,6 +1,23 @@
-import { ArrowLeft } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { useStorageItem } from '@/hooks/useStorageItem';
+import {
+  providerCredentials,
+  cebianSettings,
+  type CebianSettings,
+} from '@/lib/storage';
+import { ProviderSummary } from '@/components/settings/provider/ProviderSummary';
+import { ProviderManagerDialog } from '@/components/settings/provider/ProviderManagerDialog';
+
+const DEFAULT_SETTINGS: CebianSettings = {
+  proxy: { enabled: false, url: '' },
+  behavior: { confirmBeforeExec: true, streaming: true, backgroundPersist: true },
+};
 
 interface SettingsPanelProps {
   open: boolean;
@@ -8,6 +25,12 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
+  const [providers] = useStorageItem(providerCredentials, {});
+  const [settings, setSettings] = useStorageItem(cebianSettings, DEFAULT_SETTINGS);
+  const [providerDialogOpen, setProviderDialogOpen] = useState(false);
+
+  const verifiedProviders = Object.entries(providers).filter(([, c]) => c.verified);
+
   return (
     <div
       className={`absolute inset-0 bg-background z-50 flex flex-col transition-transform duration-300 ease-out ${
@@ -24,74 +47,169 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
-        {/* LLM Config */}
-        <div className="space-y-2">
-          <label className="text-[0.75rem] text-muted-foreground tracking-wide">
-            LLM 模型配置
-          </label>
-          <p className="text-[0.9rem] mb-1">切换模型提供商</p>
-          <select className="w-full bg-card border border-border text-foreground px-3 py-2.5 rounded-lg text-[0.9rem] outline-none focus:border-primary transition-colors">
-            <option>GitHub Copilot Device Flow</option>
-            <option>OpenAI API</option>
-            <option>Anthropic Claude</option>
-            <option>Local Ollama</option>
-          </select>
+        {/* Section 1: AI 提供商 */}
+        <div>
+          <h3 className="text-xs text-muted-foreground font-medium tracking-wide uppercase mb-3">
+            AI 提供商
+          </h3>
+          {verifiedProviders.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-6 text-center">
+              <Key className="size-8 text-muted-foreground" />
+              <p className="text-sm font-medium">尚未配置任何 AI 提供商</p>
+              <p className="text-xs text-muted-foreground">添加 API Key 或登录以开始</p>
+              <Button
+                className="mt-2"
+                size="sm"
+                onClick={() => setProviderDialogOpen(true)}
+              >
+                配置提供商
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {verifiedProviders.slice(0, 5).map(([provider, credential]) => (
+                <ProviderSummary
+                  key={provider}
+                  provider={provider}
+                  credential={credential}
+                />
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full mt-1"
+                onClick={() => setProviderDialogOpen(true)}
+              >
+                管理提供商...
+              </Button>
+            </div>
+          )}
         </div>
 
-        <Separator />
+        <Separator className="my-1" />
 
-        {/* Feature Toggles */}
-        <div className="space-y-2">
-          <label className="text-[0.75rem] text-muted-foreground tracking-wide">
-            功能设置
-          </label>
-          <div className="space-y-4 mt-3">
-            <ToggleSwitch
-              title="代码执行前确认"
-              desc="执行脚本前弹窗确认"
-              defaultChecked
-            />
-            <ToggleSwitch
-              title="流式输出"
-              desc="实时显示 AI 回复"
-              defaultChecked
-            />
-            <ToggleSwitch
-              title="后台任务持久化"
-              desc="使用 Offscreen Document 保持定时任务"
-              defaultChecked
-            />
+        {/* Section 2: 网络 */}
+        <div>
+          <h3 className="text-xs text-muted-foreground font-medium tracking-wide uppercase mb-3">
+            网络
+          </h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm">CORS 代理</Label>
+                <p className="text-xs text-muted-foreground">通过代理绕过跨域限制</p>
+              </div>
+              <Switch
+                checked={settings.proxy.enabled}
+                onCheckedChange={(enabled) =>
+                  setSettings({ ...settings, proxy: { ...settings.proxy, enabled } })
+                }
+              />
+            </div>
+            {settings.proxy.enabled && (
+              <Input
+                placeholder="https://proxy.example.com"
+                value={settings.proxy.url}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    proxy: { ...settings.proxy, url: e.target.value },
+                  })
+                }
+              />
+            )}
+          </div>
+        </div>
+
+        <Separator className="my-1" />
+
+        {/* Section 3: 行为 */}
+        <div>
+          <h3 className="text-xs text-muted-foreground font-medium tracking-wide uppercase mb-3">
+            行为
+          </h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm">执行前确认</Label>
+                <p className="text-xs text-muted-foreground">执行脚本前弹窗确认</p>
+              </div>
+              <Switch
+                checked={settings.behavior.confirmBeforeExec}
+                onCheckedChange={(confirmBeforeExec) =>
+                  setSettings({
+                    ...settings,
+                    behavior: { ...settings.behavior, confirmBeforeExec },
+                  })
+                }
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm">流式输出</Label>
+                <p className="text-xs text-muted-foreground">实时显示 AI 回复</p>
+              </div>
+              <Switch
+                checked={settings.behavior.streaming}
+                onCheckedChange={(streaming) =>
+                  setSettings({
+                    ...settings,
+                    behavior: { ...settings.behavior, streaming },
+                  })
+                }
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm">后台任务持久化</Label>
+                <p className="text-xs text-muted-foreground">
+                  使用 Offscreen Document 保持定时任务
+                </p>
+              </div>
+              <Switch
+                checked={settings.behavior.backgroundPersist}
+                onCheckedChange={(backgroundPersist) =>
+                  setSettings({
+                    ...settings,
+                    behavior: { ...settings.behavior, backgroundPersist },
+                  })
+                }
+              />
+            </div>
+          </div>
+        </div>
+
+        <Separator className="my-1" />
+
+        {/* Section 4: 关于 */}
+        <div>
+          <h3 className="text-xs text-muted-foreground font-medium tracking-wide uppercase mb-3">
+            关于
+          </h3>
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Cebian v0.1.0</p>
+            <p className="text-xs text-muted-foreground">AI 浏览器侧边栏助手</p>
+            <div className="flex gap-2 pt-1 text-xs text-muted-foreground">
+              <a href="#" className="hover:text-foreground transition-colors">
+                GitHub
+              </a>
+              <span>·</span>
+              <a href="#" className="hover:text-foreground transition-colors">
+                MIT License
+              </a>
+              <span>·</span>
+              <a href="#" className="hover:text-foreground transition-colors">
+                反馈
+              </a>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
 
-function ToggleSwitch({
-  title,
-  desc,
-  defaultChecked = false,
-}: {
-  title: string;
-  desc: string;
-  defaultChecked?: boolean;
-}) {
-  return (
-    <label className="flex items-center justify-between cursor-pointer">
-      <div className="space-y-0.5">
-        <div className="text-[0.9rem]">{title}</div>
-        <div className="text-[0.75rem] text-muted-foreground/60">{desc}</div>
-      </div>
-      <div className="relative">
-        <input
-          type="checkbox"
-          defaultChecked={defaultChecked}
-          className="peer sr-only"
-        />
-        <div className="w-11 h-6 bg-border rounded-full peer-checked:bg-primary transition-colors" />
-        <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5" />
-      </div>
-    </label>
+      <ProviderManagerDialog
+        open={providerDialogOpen}
+        onOpenChange={setProviderDialogOpen}
+      />
+    </div>
   );
 }
