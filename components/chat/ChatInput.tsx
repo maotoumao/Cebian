@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useMemo, type KeyboardEvent } from 'react';
-import { Send, Mic, MousePointer2, Camera, Paperclip, Smartphone } from 'lucide-react';
+import { Send, MousePointer2, Camera, Paperclip, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ModelSelector } from '@/components/settings/model/ModelSelector';
-import { ThinkingLevelSelector } from '@/components/settings/model/ThinkingLevelSelector';
+import { ModelSelector } from '@/components/chat/ModelSelector';
+import { ThinkingLevelSelector } from '@/components/chat/ThinkingLevelSelector';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { activeModel, thinkingLevel, providerCredentials, customProviders as customProvidersStorage, type ThinkingLevel } from '@/lib/storage';
 import { getModel, type KnownProvider } from '@mariozechner/pi-ai';
@@ -88,25 +88,25 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
     <footer className="px-4 py-4 border-t border-border bg-background relative">
       {/* Slash menu */}
       {showSlash && (
-        <div className="absolute bottom-full left-4 right-4 mb-3 bg-accent border border-border rounded-lg p-1.5 shadow-xl z-50 animate-in slide-in-from-bottom-1 fade-in duration-150">
+        <div className="absolute bottom-full left-4 right-4 mb-3 bg-popover border border-border rounded-lg p-1.5 shadow-xl z-50 animate-in slide-in-from-bottom-1 fade-in duration-150">
           {SLASH_COMMANDS.map((cmd) => (
             <button
               key={cmd.name}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-card transition-colors text-left"
+              className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-accent transition-colors text-left cursor-pointer"
               onClick={() => {
                 setValue(cmd.name + ' ');
                 setShowSlash(false);
                 textareaRef.current?.focus();
               }}
             >
-              <span className="text-base w-7 h-7 grid place-items-center rounded bg-card/50">
+              <span className="text-sm w-6 h-6 grid place-items-center rounded bg-accent/50 shrink-0">
                 {cmd.icon}
               </span>
-              <div className="flex flex-col">
-                <span className="text-[0.85rem] font-medium font-mono">
+              <div className="flex items-baseline gap-2 min-w-0">
+                <span className="text-[0.8rem] font-medium font-mono shrink-0">
                   {cmd.name}
                 </span>
-                <span className="text-[0.7rem] text-muted-foreground">
+                <span className="text-[0.65rem] text-muted-foreground truncate">
                   {cmd.desc}
                 </span>
               </div>
@@ -181,10 +181,6 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
           </div>
 
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon-xs" className="hover:shadow-xs" title="语音输入">
-              <Mic className="size-3" />
-            </Button>
-
             <Button
               variant="ghost"
               size="icon-xs"

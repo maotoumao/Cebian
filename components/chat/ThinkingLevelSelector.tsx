@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Brain, Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 
 import type { ThinkingLevel } from '@/lib/storage';
 import { cn } from '@/lib/utils';
@@ -29,8 +29,7 @@ export function ThinkingLevelSelector({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="text-xs">
-          <Brain data-icon />
+        <Button variant="ghost" size="xs" className="text-[0.7rem]">
           思考: {currentLabel}
           <ChevronDown data-icon />
         </Button>
