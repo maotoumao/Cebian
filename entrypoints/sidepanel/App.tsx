@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { Header } from '@/components/chat/Header';
-import { SettingsPanel } from '@/components/chat/SettingsPanel';
+import { Header } from '@/components/layout/Header';
+import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { ChatPage } from './pages/chat';
 import { TasksPage } from './pages/tasks';
 
