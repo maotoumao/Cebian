@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 
 /* ─── User Message ─── */
-export function UserMessage({ children }: { children: ReactNode }) {
+export function UserMessageBubble({ children }: { children: ReactNode }) {
   return (
     <div className="self-end max-w-[95%] animate-in slide-in-from-bottom-2 fade-in duration-300">
       <div className="bg-card border border-border px-4 py-3 rounded-2xl rounded-br-sm text-[0.9rem] leading-relaxed">
@@ -28,15 +28,10 @@ export function AgentMessage({ children }: { children: ReactNode }) {
   );
 }
 
-/* ─── Thinking Process (CoT) ─── */
-export function ThinkingProcess({
-  title,
-  steps,
-}: {
-  title: string;
-  steps: string[];
-}) {
+/* ─── Thinking Block (renders pi-ai ThinkingContent) ─── */
+export function ThinkingBlock({ content }: { content: string }) {
   const [open, setOpen] = useState(false);
+  const lines = content.split('\n').filter(Boolean);
 
   return (
     <div className="border border-border rounded-lg overflow-hidden text-xs bg-card/30">
@@ -48,14 +43,14 @@ export function ThinkingProcess({
           className={`size-[10px] transition-transform duration-200 ${open ? 'rotate-90' : ''}`}
         />
         <Lightbulb className="size-3 text-primary" />
-        {title}
+        Thinking Process
       </button>
       {open && (
         <div className="px-3 py-3 border-t border-dashed border-border text-muted-foreground font-mono text-[0.75rem] leading-relaxed bg-card/50 space-y-1.5">
-          {steps.map((step, i) => (
+          {lines.map((line, i) => (
             <div key={i} className="flex gap-2">
               <span className="text-muted-foreground/50 select-none">&gt;</span>
-              <span>{step}</span>
+              <span>{line}</span>
             </div>
           ))}
         </div>
@@ -69,15 +64,17 @@ export function ClarificationBox({
   title,
   description,
   options,
+  answered,
   onSelect,
 }: {
   title: string;
   description: string;
   options: { label: string; primary?: boolean }[];
+  answered?: boolean;
   onSelect?: (label: string) => void;
 }) {
   return (
-    <div className="relative mt-3 p-3.5 border border-primary/20 bg-primary/5 rounded-lg">
+    <div className={`relative mt-3 p-3.5 border border-primary/20 bg-primary/5 rounded-lg ${answered ? 'opacity-60' : ''}`}>
       {/* left accent bar */}
       <div className="absolute left-0 top-2.5 bottom-2.5 w-[2px] rounded-r bg-primary shadow-[0_0_8px_var(--primary)]" />
 
@@ -93,6 +90,7 @@ export function ClarificationBox({
             variant={opt.primary ? 'default' : 'outline'}
             size="sm"
             className="text-xs h-7"
+            disabled={answered}
             onClick={() => onSelect?.(opt.label)}
           >
             {opt.label}
