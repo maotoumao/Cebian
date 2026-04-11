@@ -23,7 +23,7 @@ Before writing any code, verify placement and structure:
 
 ## Post-Task Code Review
 
-After completing all coding for a task, create a subagent to perform a senior-level code review. The review must check:
+After completing all coding for a task, **create a subagent** to perform a senior-level code review. The review must check:
 
 1. **Best practices** — idiomatic React/TypeScript, proper hook usage, correct WXT patterns
 2. **Dead code** — no unused imports, variables, functions, or unreachable branches
