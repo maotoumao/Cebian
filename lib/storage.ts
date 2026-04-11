@@ -27,6 +27,23 @@ export interface ActiveModel {
   modelId: string;
 }
 
+// ─── Custom providers (OpenAI-compatible) ───
+
+export interface CustomModelDef {
+  modelId: string;
+  name: string;
+  reasoning: boolean;
+  contextWindow?: number;
+  maxTokens?: number;
+}
+
+export interface CustomProviderConfig {
+  id: string;
+  name: string;
+  baseUrl: string;
+  models: CustomModelDef[];
+}
+
 // ─── Thinking level ───
 
 export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high';
@@ -64,6 +81,11 @@ export const providerCredentials = storage.defineItem<ProviderCredentials>(
 export const activeModel = storage.defineItem<ActiveModel | null>(
   'local:activeModel',
   { fallback: null },
+);
+
+export const customProviders = storage.defineItem<CustomProviderConfig[]>(
+  'local:customProviders',
+  { fallback: [] },
 );
 
 export const thinkingLevel = storage.defineItem<ThinkingLevel>(

@@ -8,9 +8,12 @@ import { Switch } from '@/components/ui/switch';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import {
   providerCredentials,
+  customProviders as customProvidersStorage,
   cebianSettings,
   DEFAULT_SETTINGS,
 } from '@/lib/storage';
+import { mergeCustomProviders } from '@/lib/custom-models';
+import { PRESET_PROVIDERS } from '@/lib/constants';
 import { ProviderSummary } from '@/components/settings/provider/ProviderSummary';
 import { ProviderManagerDialog } from '@/components/settings/provider/ProviderManagerDialog';
 
@@ -21,8 +24,11 @@ interface SettingsPanelProps {
 
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const [providers] = useStorageItem(providerCredentials, {});
+  const [customProviderList] = useStorageItem(customProvidersStorage, []);
   const [settings, setSettings] = useStorageItem(cebianSettings, DEFAULT_SETTINGS);
   const [providerDialogOpen, setProviderDialogOpen] = useState(false);
+
+  const allCustomProviders = mergeCustomProviders(PRESET_PROVIDERS, customProviderList);
 
   const verifiedProviders = Object.entries(providers).filter(([, c]) => c.verified);
 
@@ -67,6 +73,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                   key={provider}
                   provider={provider}
                   credential={credential}
+                  customProviders={allCustomProviders}
                 />
               ))}
               <Button
@@ -75,7 +82,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 className="w-full mt-1"
                 onClick={() => setProviderDialogOpen(true)}
               >
-                管理提供商...
+                管理 AI 提供商
               </Button>
             </div>
           )}

@@ -1,5 +1,7 @@
 // ─── Provider registry ───
 
+import type { CustomProviderConfig } from './storage';
+
 export const OAUTH_PROVIDERS = [
   { provider: 'github-copilot', label: 'GitHub Copilot', description: '使用 Copilot 订阅访问 GPT/Claude' },
   { provider: 'openai-codex', label: 'OpenAI Codex', description: '使用 ChatGPT Plus/Pro 订阅' },
@@ -18,6 +20,20 @@ export const APIKEY_PROVIDERS = [
   { provider: 'minimax-cn', label: 'MiniMax (CN)' },
   { provider: 'kimi-coding', label: 'Kimi' },
 ] as const;
+
+// ─── Preset custom providers (OpenAI-compatible) ───
+
+export const PRESET_PROVIDERS: readonly CustomProviderConfig[] = [
+  {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    baseUrl: 'https://api.deepseek.com',
+    models: [
+      { modelId: 'deepseek-chat', name: 'DeepSeek Chat', reasoning: false, contextWindow: 65536, maxTokens: 8192 },
+      { modelId: 'deepseek-reasoner', name: 'DeepSeek Reasoner', reasoning: true, contextWindow: 65536, maxTokens: 8192 },
+    ],
+  },
+];
 
 // ─── Slash commands ───
 

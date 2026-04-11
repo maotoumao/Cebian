@@ -1,14 +1,32 @@
-import { getModels, type KnownProvider } from '@mariozechner/pi-ai';
-import type { ProviderCredential } from '@/lib/storage';
+import { getModels, type KnownProvider, type Api, type Model } from '@mariozechner/pi-ai';
+import type { ProviderCredential, CustomProviderConfig } from '@/lib/storage';
+import { isCustomProvider, findCustomProvider, getCustomModels } from '@/lib/custom-models';
 
 interface ProviderSummaryProps {
   provider: string;
   credential: ProviderCredential;
+  customProviders: CustomProviderConfig[];
 }
 
-export function ProviderSummary({ provider, credential }: ProviderSummaryProps) {
-  const models = getModels(provider as KnownProvider);
-  const modelCount = models?.length ?? 0;
+export function ProviderSummary({ provider, credential, customProviders }: ProviderSummaryProps) {
+  let models: Model<Api>[] = [];
+  let displayName = provider;
+
+  if (isCustomProvider(provider)) {
+    const config = findCustomProvider(customProviders, provider);
+    if (config) {
+      models = getCustomModels(config);
+      displayName = config.name;
+    }
+  } else {
+    try {
+      models = getModels(provider as KnownProvider) as Model<Api>[];
+    } catch {
+      // unknown provider
+    }
+  }
+
+  const modelCount = models.length;
   const authLabel = credential.authType === 'oauth' ? 'OAuth' : 'API Key';
   const verified = credential.verified;
   const statusText = verified
@@ -24,7 +42,7 @@ export function ProviderSummary({ provider, credential }: ProviderSummaryProps) 
           <span
             className={`inline-block size-2 rounded-full ${verified ? 'bg-emerald-500' : 'bg-muted-foreground'}`}
           />
-          <span className="text-sm font-medium capitalize">{provider}</span>
+          <span className="text-sm font-medium">{displayName}</span>
           <span
             className={`text-xs ${verified ? 'text-emerald-500' : 'text-muted-foreground'}`}
           >

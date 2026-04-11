@@ -11,11 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
+import { isCustomProvider } from "@/lib/custom-models";
 import type { ApiKeyCredential } from "@/lib/storage";
 
 interface ProviderApiKeyItemProps {
-  provider: KnownProvider;
+  provider: string;
   label: string;
+  models?: Model<Api>[];
   credential?: ApiKeyCredential;
   onSave: (credential: ApiKeyCredential) => void;
   onRemove?: () => void;
@@ -24,6 +26,7 @@ interface ProviderApiKeyItemProps {
 export function ProviderApiKeyItem({
   provider,
   label,
+  models: modelsProp,
   credential,
   onSave,
   onRemove,
@@ -39,12 +42,9 @@ export function ProviderApiKeyItem({
 
   const { cheapestModel, modelCount } = useMemo(() => {
     try {
-      // Cast needed: getModels with union KnownProvider yields Model<never>[]
-      // due to TS computing intersection of model IDs across all providers
-      const models = getModels(provider) as Model<Api>[];
+      const models = modelsProp ?? (isCustomProvider(provider) ? [] : (getModels(provider as KnownProvider) as Model<Api>[]));
       if (models.length === 0) return { cheapestModel: undefined, modelCount: 0 };
 
-      // Pick the cheapest model for connection testing
       const cheapest = models.reduce((min, m) =>
         m.cost.input + m.cost.output < min.cost.input + min.cost.output ? m : min,
       );
@@ -53,7 +53,7 @@ export function ProviderApiKeyItem({
     } catch {
       return { cheapestModel: undefined, modelCount: 0 };
     }
-  }, [provider]);
+  }, [provider, modelsProp]);
 
   const handleSave = async () => {
     if (!cheapestModel || !key.trim()) return;

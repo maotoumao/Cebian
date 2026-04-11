@@ -5,9 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { ModelSelector } from '@/components/settings/model/ModelSelector';
 import { ThinkingLevelSelector } from '@/components/settings/model/ThinkingLevelSelector';
 import { useStorageItem } from '@/hooks/useStorageItem';
-import { activeModel, thinkingLevel, providerCredentials, type ThinkingLevel } from '@/lib/storage';
+import { activeModel, thinkingLevel, providerCredentials, customProviders as customProvidersStorage, type ThinkingLevel } from '@/lib/storage';
 import { getModel, type KnownProvider } from '@mariozechner/pi-ai';
-import { SLASH_COMMANDS } from '@/lib/constants';
+import { isCustomProvider, findCustomModel, mergeCustomProviders } from '@/lib/custom-models';
+import { SLASH_COMMANDS, PRESET_PROVIDERS } from '@/lib/constants';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -23,16 +24,26 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
   const [currentModel, setCurrentModel] = useStorageItem(activeModel, null);
   const [currentThinkingLevel, setCurrentThinkingLevel] = useStorageItem(thinkingLevel, 'medium');
   const [providers] = useStorageItem(providerCredentials, {});
+  const [customProviderList] = useStorageItem(customProvidersStorage, []);
+
+  const allCustomProviders = useMemo(() =>
+    mergeCustomProviders(PRESET_PROVIDERS, customProviderList),
+  [customProviderList]);
 
   const isReasoningModel = useMemo(() => {
     if (!currentModel) return false;
+
+    if (isCustomProvider(currentModel.provider)) {
+      return findCustomModel(allCustomProviders, currentModel.provider, currentModel.modelId)?.reasoning ?? false;
+    }
+
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- modelId is dynamic, pi-ai expects string literal
       return (getModel as any)(currentModel.provider, currentModel.modelId)?.reasoning ?? false;
     } catch {
       return false;
     }
-  }, [currentModel]);
+  }, [currentModel, allCustomProviders]);
 
   const handleModelSelect = (provider: string, modelId: string) => {
     setCurrentModel({ provider, modelId });
@@ -145,6 +156,7 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
             <ModelSelector
               activeModel={currentModel}
               configuredProviders={providers}
+              customProviders={allCustomProviders}
               onSelect={handleModelSelect}
               onOpenSettings={onOpenSettings ?? (() => {})}
             />
