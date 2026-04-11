@@ -12,6 +12,11 @@ const components: Components = {
     </a>
   ),
 
+  // Horizontal rule with proper spacing
+  hr: (props) => (
+    <hr className="my-2 border-border" {...props} />
+  ),
+
   // Code blocks with language label
   pre: ({ children, ...props }) => (
     <pre className="overflow-x-auto rounded-md bg-accent/50 p-3 text-[0.8rem]" {...props}>

@@ -15,6 +15,12 @@ Before writing any code, verify placement and structure:
 - Would this change require restructuring existing modules? If so, propose the restructuring plan before implementing.
 - Avoid creating unnecessary abstractions, helpers, or wrapper files for one-off operations.
 
+## Debugging & Troubleshooting
+
+- When investigating a bug, if the root cause is uncertain or multiple rounds of investigation haven't resolved it, **stop guessing** — add targeted `console.log` / `console.warn` statements at the suspicious code paths and ask the user to reproduce the issue so the logs can be collected.
+- Clearly tell the user what to do (e.g., "open the sidepanel, trigger X, then share the console output") and what information you need from the logs.
+- Do not keep making speculative fixes without evidence. Logging → user feedback → informed fix.
+
 ## Post-Task Code Review
 
 After completing all coding for a task, create a subagent to perform a senior-level code review. The review must check:

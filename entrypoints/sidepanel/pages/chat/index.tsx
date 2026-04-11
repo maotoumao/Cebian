@@ -148,11 +148,24 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
           break;
 
         case 'message_start':
-        case 'message_update':
         case 'message_end':
           setMessages([...agent.state.messages]);
           if (event.type === 'message_end' && sessionCreated.current) {
             writerRef.current.schedule(conversationId, agent.state.messages);
+          }
+          break;
+
+        case 'message_update':
+          if ('role' in event.message && event.message.role === 'assistant') {
+            setMessages(prev => {
+              const last = prev[prev.length - 1];
+              if ('role' in last && last.role === 'assistant') {
+                const updated = [...prev];
+                updated[updated.length - 1] = event.message;
+                return updated;
+              }
+              return [...prev, event.message];
+            });
           }
           break;
 
