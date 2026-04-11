@@ -6,6 +6,15 @@
 - When a UI component is missing, prefer adding it via shadcn/ui (`shadcn` skill is available).
 - Before introducing any third-party dependency, check whether WXT provides a built-in module or recommended integration (see https://wxt.dev). Prefer WXT-ecosystem packages over generic alternatives.
 
+## Plan-First Workflow
+
+All tasks must follow a plan-first approach:
+
+1. **Plan before acting** — Before writing any code, draft an implementation plan listing all steps, files to change, and the expected outcome.
+2. **Wait for approval** — Present the plan to the user and **do not proceed** until the user explicitly approves it. Never start coding based on an unapproved plan.
+3. **Execute after approval** — Only after the user confirms (e.g., "approved", "go ahead", "looks good") should implementation begin.
+4. **Scope changes require re-approval** — If mid-task you discover the plan needs significant changes, stop, present the revised plan, and wait for approval again.
+
 ## Architecture Validation
 
 Before writing any code, verify placement and structure:

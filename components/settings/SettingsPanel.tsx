@@ -17,7 +17,7 @@ import {
 } from '@/lib/storage';
 import { mergeCustomProviders } from '@/lib/custom-models';
 import { PRESET_PROVIDERS } from '@/lib/constants';
-import { DEFAULT_SYSTEM_PROMPT } from '@/lib/agent';
+import { DEFAULT_SYSTEM_PROMPT } from '@/lib/constants';
 import { ProviderSummary } from '@/components/settings/provider/ProviderSummary';
 import { ProviderManagerDialog } from '@/components/settings/provider/ProviderManagerDialog';
 

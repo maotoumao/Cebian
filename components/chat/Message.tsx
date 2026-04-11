@@ -1,5 +1,5 @@
-import { Bot, ChevronRight, Lightbulb, CircleHelp, CheckCircle } from 'lucide-react';
-import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { Bot, ChevronRight, Lightbulb, CircleHelp, CheckCircle, Send } from 'lucide-react';
+import { useState, useEffect, useRef, type ReactNode, type KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
 
@@ -79,44 +79,95 @@ export function ThinkingBlock({ content, isLive }: { content: string; isLive?: b
   );
 }
 
-/* ─── Clarification Box ─── */
-export function ClarificationBox({
-  title,
-  description,
+/* ─── Ask User Block (interactive tool UI) ─── */
+export function AskUserBlock({
+  question,
   options,
+  allowFreeText = true,
   answered,
   onSelect,
 }: {
-  title: string;
-  description: string;
-  options: { label: string; primary?: boolean }[];
+  question: string;
+  options?: { label: string; description?: string }[];
+  allowFreeText?: boolean;
   answered?: boolean;
-  onSelect?: (label: string) => void;
+  onSelect?: (text: string) => void;
 }) {
+  const [freeText, setFreeText] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleFreeTextSubmit = () => {
+    if (!freeText.trim()) return;
+    onSelect?.(freeText.trim());
+    setFreeText('');
+  };
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleFreeTextSubmit();
+    }
+  };
+
   return (
     <div className={`relative mt-3 p-3.5 border border-primary/20 bg-primary/5 rounded-lg ${answered ? 'opacity-60' : ''}`}>
       {/* left accent bar */}
       <div className="absolute left-0 top-2.5 bottom-2.5 w-0.5 rounded-r bg-primary shadow-[0_0_8px_var(--primary)]" />
 
-      <div className="flex items-center gap-1.5 text-primary font-medium text-[0.85rem] mb-1.5">
-        <CircleHelp className="size-3.5" />
-        {title}
+      <div className="flex items-center gap-2 text-primary font-medium text-[0.85rem] mb-1.5">
+        <CircleHelp className="size-4.5 shrink-0" />
+        {question}
       </div>
-      <p className="text-xs text-muted-foreground mb-3">{description}</p>
-      <div className="flex flex-wrap gap-2">
-        {options.map((opt) => (
+
+      {/* Option buttons */}
+      {options && options.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-2.5">
+          {options.map((opt, i) => (
+            <Button
+              key={`${i}-${opt.label}`}
+              variant="outline"
+              size="sm"
+              className="text-xs h-7"
+              disabled={!onSelect}
+              onClick={() => onSelect?.(opt.label)}
+              title={opt.description}
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {/* Free text input */}
+      {allowFreeText && onSelect && (
+        <div className="flex items-end gap-1.5 mt-2.5">
+          <textarea
+            ref={textareaRef}
+            value={freeText}
+            onChange={(e) => setFreeText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="输入回复…"
+            rows={1}
+            className="flex-1 resize-none bg-background border border-border rounded-md px-2.5 py-1.5 text-xs leading-relaxed placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
+          />
           <Button
-            key={opt.label}
-            variant={opt.primary ? 'default' : 'outline'}
-            size="sm"
-            className="text-xs h-7"
-            disabled={answered}
-            onClick={() => onSelect?.(opt.label)}
+            variant="ghost"
+            size="icon-xs"
+            onClick={handleFreeTextSubmit}
+            disabled={!freeText.trim()}
+            className="shrink-0"
           >
-            {opt.label}
+            <Send className="size-3" />
           </Button>
-        ))}
-      </div>
+        </div>
+      )}
+
+      {/* Hint */}
+      {!answered && (
+        <p className="text-[0.65rem] text-muted-foreground/60 mt-2">
+          或直接在下方输入新消息以跳过
+        </p>
+      )}
     </div>
   );
 }

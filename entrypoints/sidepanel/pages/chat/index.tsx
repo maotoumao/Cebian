@@ -8,10 +8,13 @@ import {
   AgentMessage,
   AgentTextBlock,
   ThinkingBlock,
+  AskUserBlock,
 } from '@/components/chat/Message';
 import { Agent, type AgentEvent, type AgentMessage as AgentMessageType } from '@mariozechner/pi-agent-core';
-import type { AssistantMessage } from '@mariozechner/pi-ai';
-import { getAssistantText, getThinkingBlocks } from '@/lib/types';
+import type { AssistantMessage, ToolResultMessage } from '@mariozechner/pi-ai';
+import { getAssistantText, getThinkingBlocks, getToolCalls, findToolResult, TOOL_ASK_USER } from '@/lib/types';
+import { useInteractiveTool } from '@/hooks/useInteractiveTool';
+import { askUserBridge, type AskUserRequest } from '@/lib/tools/ask-user';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import {
   activeModel,
@@ -21,7 +24,8 @@ import {
   systemPrompt as systemPromptStorage,
   maxRounds as maxRoundsStorage,
 } from '@/lib/storage';
-import { createCebianAgent, DEFAULT_SYSTEM_PROMPT } from '@/lib/agent';
+import { createCebianAgent } from '@/lib/agent';
+import { DEFAULT_SYSTEM_PROMPT } from '@/lib/constants';
 import { mergeCustomProviders, isCustomProvider, findCustomModel } from '@/lib/custom-models';
 import { PRESET_PROVIDERS } from '@/lib/constants';
 import { createSession, getSession, ThrottledSessionWriter, type SessionRecord } from '@/lib/db';
@@ -74,6 +78,7 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
   const sessionCreated = useRef(false);
   const conversationIdRef = useRef<string | null>(isNewChat ? null : routeSessionId!);
   const writerRef = useRef(new ThrottledSessionWriter());
+  const pendingPromptRef = useRef<string | null>(null);
 
   // Load existing session from DB
   useEffect(() => {
@@ -183,7 +188,7 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
       systemPrompt: systemPromptRef.current,
       thinkingLevel: thinkingLevelRef.current as 'off' | 'minimal' | 'low' | 'medium' | 'high',
       maxRounds: maxRoundsRef.current,
-      messages,
+      messages: isNewChat ? [] : messages,
     });
 
     const unsubscribe = agent.subscribe(async (event: AgentEvent) => {
@@ -253,6 +258,20 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
           } else if (conversationIdRef.current) {
             await writerRef.current.flush();
           }
+
+          // If user sent a message while ask_user was pending, send it now.
+          // Must defer to next tick — agent is still settling during agent_end listener,
+          // so prompt() would throw "already processing" if called synchronously.
+          const deferred = pendingPromptRef.current;
+          if (deferred) {
+            pendingPromptRef.current = null;
+            setTimeout(() => {
+              agent.prompt(deferred).catch((err) => {
+                console.error('Deferred prompt failed:', err);
+                setIsAgentRunning(false);
+              });
+            }, 0);
+          }
           break;
         }
       }
@@ -274,9 +293,21 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
     return () => writer.dispose();
   }, []);
 
+  // Interactive tool state
+  const { pending: pendingAskUser, resolve: resolveAskUser, cancel: cancelAskUser } = useInteractiveTool(askUserBridge);
+
   // Send message
   const handleSend = useCallback(async (text: string) => {
     if (!agentRef.current || !modelObj || !text.trim()) return;
+
+    // If an ask_user tool is pending, cancel it, abort current run, and defer the new message
+    // Cancel resolves the tool, abort stops the agent loop, agent_end will fire and send the deferred prompt
+    if (pendingAskUser) {
+      cancelAskUser();
+      pendingPromptRef.current = text.trim();
+      try { agentRef.current.abort(); } catch { /* agent may already be idle */ }
+      return;
+    }
 
     try {
       await agentRef.current.prompt(text);
@@ -284,7 +315,7 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
       console.error('Agent prompt failed:', err);
       setIsAgentRunning(false);
     }
-  }, [modelObj]);
+  }, [modelObj, pendingAskUser, cancelAskUser]);
 
   return (
     <>
@@ -311,9 +342,18 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
               const assistantMsg = msg as AssistantMessage;
               const thinkingBlocks = getThinkingBlocks(assistantMsg);
               const text = getAssistantText(assistantMsg);
+              const toolCalls = getToolCalls(assistantMsg);
               const isLast = idx === messages.length - 1;
               const isStreaming = isLast && isAgentRunning;
               const isError = assistantMsg.stopReason === 'error';
+
+              // Skip empty aborted messages (produced by cancel + abort flow)
+              if (assistantMsg.stopReason === 'aborted' && !text && thinkingBlocks.length === 0 && toolCalls.length === 0) {
+                return null;
+              }
+
+              // Determine ask_user tool calls to render
+              const askUserCalls = toolCalls.filter(tc => tc.name === TOOL_ASK_USER);
 
               return (
                 <AgentMessage key={`msg-${idx}`} isStreaming={isStreaming}>
@@ -326,8 +366,44 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
                       {assistantMsg.errorMessage ?? '模型返回错误'}
                     </div>
                   )}
+                  {askUserCalls.map((tc) => {
+                    const args = tc.arguments as AskUserRequest;
+                    const isPending = pendingAskUser?.toolCallId === tc.id;
+                    const toolResult = findToolResult(messages, tc.id);
+                    const answered = !isPending && !!toolResult;
+
+                    return (
+                      <AskUserBlock
+                        key={`ask-${tc.id}`}
+                        question={args.question}
+                        options={args.options}
+                        allowFreeText={args.allow_free_text ?? true}
+                        answered={answered}
+                        onSelect={isPending ? resolveAskUser : undefined}
+                      />
+                    );
+                  })}
                 </AgentMessage>
               );
+            }
+
+            // Render ask_user tool results as user bubbles (skip cancelled ones)
+            if (msg.role === 'toolResult') {
+              const tr = msg as ToolResultMessage;
+              if (tr.toolName === TOOL_ASK_USER && !tr.details?.cancelled) {
+                const text = tr.content
+                  .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+                  .map(b => b.text)
+                  .join('');
+                if (text) {
+                  return (
+                    <UserMessageBubble key={`msg-${idx}`}>
+                      {text}
+                    </UserMessageBubble>
+                  );
+                }
+              }
+              return null;
             }
 
             return null;
