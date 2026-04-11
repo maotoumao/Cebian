@@ -15,22 +15,7 @@ import {
   type OAuthCredential,
   type ProviderCredentials,
 } from '@/lib/storage';
-
-const OAUTH_PROVIDERS = [
-  { provider: 'github-copilot', label: 'GitHub Copilot', description: '使用 Copilot 订阅访问 GPT/Claude' },
-  { provider: 'openai-codex', label: 'OpenAI Codex', description: '使用 ChatGPT Plus/Pro 订阅' },
-  { provider: 'google-gemini-cli', label: 'Google Gemini', description: 'Google Cloud OAuth 登录' },
-] as const;
-
-const APIKEY_PROVIDERS = [
-  { provider: 'anthropic', label: 'Anthropic', description: 'Claude 系列模型' },
-  { provider: 'openai', label: 'OpenAI', description: 'GPT-4o, o1, o3 系列' },
-  { provider: 'google', label: 'Google Gemini', description: 'Gemini 2.5 Flash/Pro' },
-  { provider: 'xai', label: 'xAI', description: 'Grok 系列' },
-  { provider: 'groq', label: 'Groq', description: '高速推理' },
-  { provider: 'openrouter', label: 'OpenRouter', description: '多模型聚合' },
-  { provider: 'mistral', label: 'Mistral', description: 'Mistral/Mixtral 系列' },
-] as const;
+import { OAUTH_PROVIDERS, APIKEY_PROVIDERS } from '@/lib/constants';
 
 interface ProviderManagerDialogProps {
   open: boolean;
@@ -63,7 +48,7 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
 
         {/* OAuth providers */}
         <div className="space-y-4">
-          <p className="text-xs text-muted-foreground">通过账号登录</p>
+          <p className="text-xs text-muted-foreground">OAuth</p>
           {OAUTH_PROVIDERS.map((p, i) => (
             <Fragment key={p.provider}>
               {i > 0 && <Separator />}

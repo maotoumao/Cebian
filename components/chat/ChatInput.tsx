@@ -7,17 +7,12 @@ import { ThinkingLevelSelector } from '@/components/settings/model/ThinkingLevel
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { activeModel, thinkingLevel, providerCredentials, type ThinkingLevel } from '@/lib/storage';
 import { getModel, type KnownProvider } from '@mariozechner/pi-ai';
+import { SLASH_COMMANDS } from '@/lib/constants';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
   onOpenSettings?: () => void;
 }
-
-const SLASH_COMMANDS = [
-  { icon: '⚡️', name: '/profile', desc: 'Intercept & Profile Network (CDP)' },
-  { icon: '📋', name: '/summarize', desc: 'Extract & Summarize current page' },
-  { icon: '⏱️', name: '/rpa', desc: 'Set background timer loop via SW' },
-] as const;
 
 export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
   const [value, setValue] = useState('');
