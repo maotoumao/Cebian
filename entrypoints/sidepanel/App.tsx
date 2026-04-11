@@ -1,17 +1,21 @@
-import { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Header } from '@/components/layout/Header';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
+import { HistoryPanel } from '@/components/layout/HistoryPanel';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { themePreference } from '@/lib/storage';
 import { ChatPage } from './pages/chat';
-import { TasksPage } from './pages/tasks';
 
 function App() {
   const [theme, setTheme] = useStorageItem(themePreference, 'dark');
   const [themeReady, setThemeReady] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Load theme from storage before first render
   useEffect(() => {
@@ -39,6 +43,24 @@ function App() {
   const toggleTheme = () =>
     setTheme(theme === 'dark' ? 'light' : 'dark');
 
+  const handleNewChat = useCallback(() => {
+    // If already on /chat/new, do nothing
+    if (location.pathname === '/chat/new') return;
+    navigate('/chat/new');
+  }, [location.pathname, navigate]);
+
+  const handleSelectSession = useCallback((sessionId: string) => {
+    setHistoryOpen(false);
+    navigate(`/chat/${sessionId}`);
+  }, [navigate]);
+
+  const handleDeleteSession = useCallback((deletedId: string) => {
+    // If the deleted session is the one currently open, redirect to new chat
+    if (location.pathname === `/chat/${deletedId}`) {
+      navigate('/chat/new', { replace: true });
+    }
+  }, [location.pathname, navigate]);
+
   if (!themeReady) return null;
 
   return (
@@ -48,17 +70,26 @@ function App() {
           theme={theme}
           onToggleTheme={toggleTheme}
           onOpenSettings={() => setSettingsOpen(true)}
+          onNewChat={handleNewChat}
+          onOpenHistory={() => setHistoryOpen(true)}
         />
 
         <Routes>
-          <Route path="/chat" element={<ChatPage onOpenSettings={() => setSettingsOpen(true)} />} />
-          <Route path="/tasks" element={<TasksPage />} />
-          <Route path="*" element={<Navigate to="/chat" replace />} />
+          <Route path="/chat/new" element={<ChatPage onOpenSettings={() => setSettingsOpen(true)} />} />
+          <Route path="/chat/:sessionId" element={<ChatPage onOpenSettings={() => setSettingsOpen(true)} />} />
+          <Route path="*" element={<Navigate to="/chat/new" replace />} />
         </Routes>
 
         <SettingsPanel
           open={settingsOpen}
           onClose={() => setSettingsOpen(false)}
+        />
+
+        <HistoryPanel
+          open={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          onSelectSession={handleSelectSession}
+          onDeleteSession={handleDeleteSession}
         />
       </div>
     </TooltipProvider>

@@ -6,7 +6,7 @@ import '@/assets/tailwind.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <MemoryRouter initialEntries={['/chat']}>
+    <MemoryRouter initialEntries={['/chat/new']}>
       <App />
     </MemoryRouter>
   </React.StrictMode>,
