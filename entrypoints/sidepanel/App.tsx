@@ -3,19 +3,16 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Header } from '@/components/layout/Header';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
+import { useStorageItem } from '@/hooks/useStorageItem';
+import { themePreference } from '@/lib/storage';
 import { ChatPage } from './pages/chat';
 import { TasksPage } from './pages/tasks';
 
-type Theme = 'dark' | 'light';
-
 function App() {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem('cebian-theme') as Theme) || 'dark',
-  );
+  const [theme, setTheme] = useStorageItem(themePreference, 'dark');
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('cebian-theme', theme);
     if (theme === 'light') {
       document.documentElement.setAttribute('data-theme', 'light');
     } else {
@@ -24,7 +21,7 @@ function App() {
   }, [theme]);
 
   const toggleTheme = () =>
-    setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
+    setTheme(theme === 'dark' ? 'light' : 'dark');
 
   return (
     <TooltipProvider delayDuration={300}>
