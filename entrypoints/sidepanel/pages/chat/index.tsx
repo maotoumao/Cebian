@@ -9,6 +9,7 @@ import {
   AgentTextBlock,
   ThinkingBlock,
 } from '@/components/chat/Message';
+import { ToolCard } from '@/components/chat/ToolCard';
 import type { AgentMessage as AgentMessageType } from '@mariozechner/pi-agent-core';
 import type { AssistantMessage, ToolResultMessage } from '@mariozechner/pi-ai';
 import { getAssistantText, getThinkingBlocks, getToolCalls, findToolResult, extractUserText } from '@/lib/message-helpers';
@@ -158,21 +159,39 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                       {assistantMsg.errorMessage ?? '模型返回错误'}
                     </div>
                   )}
-                  {/* Generic interactive tool rendering */}
+                  {/* Generic tool rendering */}
                   {toolCalls.map((tc) => {
                     const info = getInteractiveToolInfo(tc.name);
-                    if (!info) return null;
-                    const pending = getPendingFor(tc.name);
-                    const isPending = pending?.toolCallId === tc.id;
+
+                    // Interactive tool — render via registry
+                    if (info) {
+                      const pending = getPendingFor(tc.name);
+                      const isPending = pending?.toolCallId === tc.id;
+                      const toolResult = findToolResult(messages, tc.id);
+                      return (
+                        <info.Component
+                          key={`tool-${tc.id}`}
+                          toolCallId={tc.id}
+                          args={tc.arguments}
+                          isPending={isPending}
+                          toolResult={toolResult}
+                          onResolve={isPending ? (response: any) => resolve(tc.name, response) : undefined}
+                        />
+                      );
+                    }
+
+                    // Non-interactive tool — render as ToolCard
                     const toolResult = findToolResult(messages, tc.id);
+                    const status = toolResult
+                      ? (toolResult.isError ? 'error' : 'done')
+                      : 'running';
+                    const code = JSON.stringify(tc.arguments, null, 2);
                     return (
-                      <info.Component
+                      <ToolCard
                         key={`tool-${tc.id}`}
-                        toolCallId={tc.id}
-                        args={tc.arguments}
-                        isPending={isPending}
-                        toolResult={toolResult}
-                        onResolve={isPending ? (response: any) => resolve(tc.name, response) : undefined}
+                        name={tc.name}
+                        status={status}
+                        code={code}
                       />
                     );
                   })}
