@@ -8,7 +8,7 @@
 
 function buildTarget(tabId: number, frameId?: number): chrome.scripting.InjectionTarget {
   const target: chrome.scripting.InjectionTarget = { tabId };
-  if (frameId) target.frameIds = [frameId];
+  if (frameId != null) target.frameIds = [frameId];
   return target;
 }
 
@@ -78,17 +78,30 @@ export async function executeInTabWithArgs<TArgs extends any[], T>(
  */
 export function waitForNavigation(tabId: number, timeout: number): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    const timer = setTimeout(() => {
+    let settled = false;
+    const settle = (fn: (v: any) => void, value: any) => {
+      if (settled) return;
+      settled = true;
       chrome.tabs.onUpdated.removeListener(listener);
-      reject(new Error(`Navigation timeout: ${timeout}ms`));
+      clearTimeout(timer);
+      fn(value);
+    };
+
+    const timer = setTimeout(() => {
+      settle(reject, new Error(`Navigation timeout: ${timeout}ms`));
     }, timeout);
     const listener = (updatedTabId: number, info: chrome.tabs.TabChangeInfo) => {
       if (updatedTabId === tabId && info.status === 'complete') {
-        chrome.tabs.onUpdated.removeListener(listener);
-        clearTimeout(timer);
-        resolve('Navigation complete');
+        settle(resolve, 'Navigation complete');
       }
     };
     chrome.tabs.onUpdated.addListener(listener);
+
+    // Catch-up: navigation may have completed before listener was attached
+    chrome.tabs.get(tabId).then(tab => {
+      if (tab.status === 'complete') {
+        settle(resolve, 'Navigation complete');
+      }
+    });
   });
 }
