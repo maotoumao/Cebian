@@ -7,8 +7,8 @@ const ExecuteJsParameters = Type.Object({
   code: Type.String({
     description:
       'JavaScript code to execute in the active tab. ' +
-      'Wrap in an async IIFE if you need await. ' +
-      'The return value will be JSON-serialized and returned.',
+      'You can use await directly. ' +
+      'Return a value to get it back — it will be JSON-serialized.',
   }),
   frameId: Type.Optional(
     Type.Number({
@@ -30,7 +30,8 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
     'Return a value to get it back — it will be JSON-serialized.',
   parameters: ExecuteJsParameters,
 
-  async execute(toolCallId, params): Promise<AgentToolResult> {
+  async execute(toolCallId, params, signal): Promise<AgentToolResult> {
+    signal?.throwIfAborted();
     const tabId = await getActiveTabId();
 
     const target = params.frameId != null
@@ -40,12 +41,18 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
     const results = await chrome.scripting.executeScript({
       target,
       func: new Function(`return (async () => { ${params.code} })()`) as () => Promise<unknown>,
-      world: 'MAIN',
-    } as any);
+      ...({ world: 'MAIN' } as any),
+    });
 
     const result = results?.[0];
     const output = result?.result;
-    const text = output === undefined ? '(no return value)' : JSON.stringify(output, null, 2);
+
+    let text: string;
+    try {
+      text = output === undefined ? '(no return value)' : JSON.stringify(output, null, 2);
+    } catch {
+      text = `(result could not be serialized — got ${typeof output})`;
+    }
 
     return {
       content: [{ type: 'text', text }],
