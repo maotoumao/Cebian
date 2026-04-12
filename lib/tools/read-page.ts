@@ -1,7 +1,9 @@
 import { Type } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
+import { Readability } from '@mozilla/readability';
+import TurndownService from 'turndown';
 import { TOOL_READ_PAGE } from '@/lib/types';
-import { getActiveTabId, executeInTabWithArgs } from './chrome-api';
+import { getActiveTabId, executeInTab, executeInTabWithArgs } from './chrome-api';
 
 const ReadPageParameters = Type.Object({
   mode: Type.Union(
@@ -17,7 +19,7 @@ const ReadPageParameters = Type.Object({
         '"text": plain innerText. ' +
         '"html": cleaned innerHTML (no script/style/svg). ' +
         '"readable": extracts main article content (like Reader Mode). ' +
-        '"markdown": readable content converted to markdown.',
+        '"markdown": readable content converted to markdown — best for analysis.',
       default: 'readable',
     },
   ),
@@ -42,172 +44,69 @@ const ReadPageParameters = Type.Object({
   ),
 });
 
-/**
- * In-page function that extracts content.
- * Runs inside the tab via chrome.scripting.executeScript.
- * Must be self-contained — no closures over outer scope.
- */
-function extractPageContent(
-  mode: string, selector: string | undefined, maxLength: number,
-): string {
+// ─── In-page functions (self-contained, no closures) ───
+
+/** Extract plain innerText from the page. */
+function extractText(selector: string | undefined): string {
   const root = selector
     ? document.querySelector(selector) as HTMLElement | null
     : document.body;
   if (!root) return selector
     ? `(no element found for selector: ${selector})`
     : '(page has no body element)';
-
-  let content: string;
-
-  switch (mode) {
-    case 'text':
-      content = root.innerText;
-      break;
-
-    case 'html': {
-      const clone = root.cloneNode(true) as HTMLElement;
-      clone.querySelectorAll('script, style, svg, noscript, iframe').forEach(el => el.remove());
-      content = clone.innerHTML;
-      break;
-    }
-
-    case 'readable':
-    case 'markdown': {
-      const clone = root.cloneNode(true) as HTMLElement;
-      // Remove noise elements
-      clone.querySelectorAll(
-        'script, style, svg, noscript, iframe, nav, header, footer, aside, ' +
-        '[role="navigation"], [role="banner"], [role="contentinfo"], ' +
-        '.sidebar, .nav, .menu, .footer, .header, .ad, .advertisement, .social-share',
-      ).forEach(el => el.remove());
-
-      if (mode === 'markdown') {
-        const BLOCK_TAGS = new Set([
-          'p', 'div', 'section', 'article', 'main',
-          'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-          'ul', 'ol', 'li', 'blockquote', 'pre', 'table',
-          'hr', 'br', 'figure', 'figcaption', 'details', 'summary',
-        ]);
-        const lines: string[] = [];
-        let inlineBuffer = '';
-
-        const flushInline = () => {
-          const trimmed = inlineBuffer.trim();
-          if (trimmed) lines.push(trimmed);
-          inlineBuffer = '';
-        };
-
-        const walk = (node: Node) => {
-          if (node.nodeType === Node.TEXT_NODE) {
-            const text = node.textContent ?? '';
-            if (text.trim()) inlineBuffer += text.replace(/\s+/g, ' ');
-            return;
-          }
-          if (node.nodeType !== Node.ELEMENT_NODE) return;
-          const el = node as HTMLElement;
-          const tag = el.tagName.toLowerCase();
-
-          if (tag === 'br') { flushInline(); lines.push(''); return; }
-          if (tag === 'hr') { flushInline(); lines.push('---'); return; }
-
-          if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
-            flushInline();
-            const level = parseInt(tag[1]);
-            lines.push('');
-            lines.push('#'.repeat(level) + ' ' + el.innerText.trim());
-            lines.push('');
-            return;
-          }
-          if (tag === 'p' || tag === 'div' || tag === 'section' || tag === 'article') {
-            flushInline();
-            lines.push('');
-            el.childNodes.forEach(walk);
-            flushInline();
-            lines.push('');
-            return;
-          }
-          if (tag === 'li') {
-            flushInline();
-            lines.push('- ' + el.innerText.trim());
-            return;
-          }
-          if (tag === 'pre') {
-            flushInline();
-            lines.push('```');
-            lines.push(el.innerText);
-            lines.push('```');
-            return;
-          }
-          // Inline elements — append to buffer
-          if (tag === 'a') {
-            const href = el.getAttribute('href') ?? '';
-            inlineBuffer += `[${el.innerText.trim()}](${href})`;
-            return;
-          }
-          if (tag === 'code') {
-            inlineBuffer += '`' + el.innerText + '`';
-            return;
-          }
-          if (tag === 'strong' || tag === 'b') {
-            inlineBuffer += '**' + el.innerText.trim() + '**';
-            return;
-          }
-          if (tag === 'em' || tag === 'i') {
-            inlineBuffer += '*' + el.innerText.trim() + '*';
-            return;
-          }
-          if (tag === 'img') {
-            const alt = el.getAttribute('alt') ?? '';
-            const src = el.getAttribute('src') ?? '';
-            if (alt || src) { flushInline(); lines.push(`![${alt}](${src})`); }
-            return;
-          }
-          if (tag === 'blockquote') {
-            flushInline();
-            el.innerText.split('\n').forEach(l => lines.push('> ' + l));
-            return;
-          }
-          // Table: first row assumed to be header
-          if (tag === 'table') {
-            flushInline();
-            const rows = el.querySelectorAll('tr');
-            rows.forEach((row, i) => {
-              const cells = Array.from(row.querySelectorAll('th, td'))
-                .map(c => (c as HTMLElement).innerText.trim());
-              lines.push('| ' + cells.join(' | ') + ' |');
-              if (i === 0) lines.push('| ' + cells.map(() => '---').join(' | ') + ' |');
-            });
-            return;
-          }
-
-          // Unknown element — recurse if block, append if inline
-          if (BLOCK_TAGS.has(tag)) {
-            flushInline();
-            el.childNodes.forEach(walk);
-            flushInline();
-          } else {
-            el.childNodes.forEach(walk);
-          }
-        };
-        walk(clone);
-        flushInline();
-        content = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
-      } else {
-        content = clone.innerText;
-      }
-      break;
-    }
-
-    default:
-      content = root.innerText;
-  }
-
-  if (content.length > maxLength) {
-    content = content.slice(0, maxLength) + `\n\n...(truncated at ${maxLength} chars)`;
-  }
-
-  return content;
+  return root.innerText;
 }
+
+/** Extract cleaned innerHTML (no script/style/svg). */
+function extractHtml(selector: string | undefined): string {
+  const root = selector
+    ? document.querySelector(selector) as HTMLElement | null
+    : document.body;
+  if (!root) return selector
+    ? `(no element found for selector: ${selector})`
+    : '(page has no body element)';
+  const clone = root.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll('script, style, svg, noscript').forEach(el => el.remove());
+  return clone.innerHTML;
+}
+
+/** Get the full document HTML for Readability processing. */
+function getDocumentHtml(selector: string | undefined): { html: string; url: string } {
+  if (selector) {
+    const el = document.querySelector(selector);
+    if (!el) return { html: '', url: window.location.href };
+    return { html: el.outerHTML, url: window.location.href };
+  }
+  return { html: document.documentElement.outerHTML, url: window.location.href };
+}
+
+// ─── Extension-side processing ───
+
+function truncate(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + `\n\n...(truncated at ${maxLength} chars)`;
+}
+
+function parseWithReadability(html: string, url: string): string | null {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  // Set base URL for relative link resolution
+  const base = doc.createElement('base');
+  base.href = url;
+  doc.head.prepend(base);
+  const article = new Readability(doc).parse();
+  return article?.content ?? null;
+}
+
+function htmlToMarkdown(html: string): string {
+  const turndown = new TurndownService({
+    headingStyle: 'atx',
+    codeBlockStyle: 'fenced',
+    bulletListMarker: '-',
+  });
+  return turndown.turndown(html);
+}
+
+// ─── Tool definition ───
 
 export const readPageTool: AgentTool<typeof ReadPageParameters> = {
   name: TOOL_READ_PAGE,
@@ -227,15 +126,48 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
     const mode = params.mode ?? 'readable';
     const maxLength = params.maxLength ?? 20000;
 
-    const content = await executeInTabWithArgs(
-      tabId,
-      extractPageContent,
-      [mode, params.selector, maxLength],
-      params.frameId,
-    );
+    let content: string;
+
+    switch (mode) {
+      case 'text': {
+        content = await executeInTabWithArgs(tabId, extractText, [params.selector], params.frameId);
+        break;
+      }
+      case 'html': {
+        content = await executeInTabWithArgs(tabId, extractHtml, [params.selector], params.frameId);
+        break;
+      }
+      case 'readable':
+      case 'markdown': {
+        // Step 1: Get raw HTML from page
+        const { html, url } = await executeInTabWithArgs(
+          tabId, getDocumentHtml, [params.selector], params.frameId,
+        );
+        if (!html) {
+          content = params.selector
+            ? `(no element found for selector: ${params.selector})`
+            : '(page has no body element)';
+          break;
+        }
+
+        // Step 2: Extract article with Readability (extension context)
+        const articleHtml = parseWithReadability(html, url);
+        if (!articleHtml) {
+          // Readability couldn't parse — fall back to cleaned text
+          content = await executeInTabWithArgs(tabId, extractText, [params.selector], params.frameId);
+          break;
+        }
+
+        // Step 3: Convert to markdown if requested
+        content = mode === 'markdown' ? htmlToMarkdown(articleHtml) : articleHtml;
+        break;
+      }
+      default:
+        content = await executeInTabWithArgs(tabId, extractText, [params.selector], params.frameId);
+    }
 
     return {
-      content: [{ type: 'text', text: content }],
+      content: [{ type: 'text', text: truncate(content, maxLength) }],
       details: { status: 'done' },
     };
   },
