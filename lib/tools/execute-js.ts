@@ -30,7 +30,7 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
     'Return a value to get it back — it will be JSON-serialized.',
   parameters: ExecuteJsParameters,
 
-  async execute(toolCallId, params, signal): Promise<AgentToolResult> {
+  async execute(toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
     signal?.throwIfAborted();
     const tabId = await getActiveTabId();
 
