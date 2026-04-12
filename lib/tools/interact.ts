@@ -7,25 +7,33 @@ import { getActiveTabId, executeInTabWithArgs, waitForNavigation } from './chrom
 
 const ClickParams = Type.Object({
   action: Type.Literal('click'),
-  selector: Type.String({ description: 'CSS selector of the element to click.' }),
+  selector: Type.Optional(Type.String({ description: 'CSS selector of the element to click.' })),
+  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels). Use with y as alternative to selector.' })),
+  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels). Use with x as alternative to selector.' })),
   frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
 });
 
 const DblclickParams = Type.Object({
   action: Type.Literal('dblclick'),
-  selector: Type.String({ description: 'CSS selector of the element to double-click.' }),
+  selector: Type.Optional(Type.String({ description: 'CSS selector of the element to double-click.' })),
+  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels).' })),
+  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels).' })),
   frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
 });
 
 const RightclickParams = Type.Object({
   action: Type.Literal('rightclick'),
-  selector: Type.String({ description: 'CSS selector of the element to right-click.' }),
+  selector: Type.Optional(Type.String({ description: 'CSS selector of the element to right-click.' })),
+  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels).' })),
+  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels).' })),
   frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
 });
 
 const HoverParams = Type.Object({
   action: Type.Literal('hover'),
-  selector: Type.String({ description: 'CSS selector of the element to hover over.' }),
+  selector: Type.Optional(Type.String({ description: 'CSS selector of the element to hover over.' })),
+  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels).' })),
+  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels).' })),
   frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
 });
 
@@ -86,10 +94,17 @@ const WaitNavigationParams = Type.Object({
   timeout: Type.Optional(Type.Number({ description: 'Timeout in ms. Default: 5000.' })),
 });
 
+const FindParams = Type.Object({
+  action: Type.Literal('find'),
+  text: Type.String({ description: 'Text content to search for in the page.' }),
+  nth: Type.Optional(Type.Number({ description: 'Which match to return (0-based). Default: 0.' })),
+  frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
+});
+
 const InteractParameters = Type.Union([
   ClickParams, DblclickParams, RightclickParams, HoverParams,
   TypeParams, ClearParams, SelectParams, ScrollParams, KeypressParams,
-  WaitParams, WaitHiddenParams, WaitNavigationParams,
+  WaitParams, WaitHiddenParams, WaitNavigationParams, FindParams,
 ]);
 
 // ─── In-page interaction function (self-contained) ───
@@ -97,20 +112,30 @@ const InteractParameters = Type.Union([
 function performInteraction(params: {
   action: string;
   selector?: string;
+  x?: number;
+  y?: number;
   text?: string;
   key?: string;
   modifiers?: string[];
   deltaX?: number;
   deltaY?: number;
   timeout?: number;
+  nth?: number;
 }): Promise<string> {
-  const { action, selector, text, key, modifiers, deltaX, deltaY, timeout = 5000 } = params;
+  const { action, selector, x, y, text, key, modifiers, deltaX, deltaY, timeout = 5000, nth = 0 } = params;
 
   function getEl(): HTMLElement {
-    if (!selector) throw new Error('selector is required for this action.');
-    const el = document.querySelector<HTMLElement>(selector);
-    if (!el) throw new Error(`Element not found: ${selector}`);
-    return el;
+    if (selector) {
+      const el = document.querySelector<HTMLElement>(selector);
+      if (!el) throw new Error(`Element not found: ${selector}`);
+      return el;
+    }
+    if (x != null && y != null) {
+      const el = document.elementFromPoint(x, y) as HTMLElement | null;
+      if (!el) throw new Error(`No element at coordinates (${x}, ${y})`);
+      return el;
+    }
+    throw new Error('Either selector or x/y coordinates are required.');
   }
 
   function modInit() {
@@ -275,6 +300,59 @@ function performInteraction(params: {
       });
     }
 
+    case 'find': {
+      if (!text) throw new Error('"text" is required for find action.');
+      const walker = document.createTreeWalker(
+        document.body, NodeFilter.SHOW_TEXT, null,
+      );
+      const matches: { selector: string; context: string }[] = [];
+      let node: Text | null;
+      while ((node = walker.nextNode() as Text | null)) {
+        if (node.textContent && node.textContent.includes(text)) {
+          const parent = node.parentElement;
+          if (!parent) continue;
+          // Build a CSS selector path
+          const path: string[] = [];
+          let el: HTMLElement | null = parent;
+          while (el && el !== document.body) {
+            let seg = el.tagName.toLowerCase();
+            if (el.id) {
+              seg = `#${el.id}`;
+              path.unshift(seg);
+              break;
+            }
+            const siblings = el.parentElement
+              ? Array.from(el.parentElement.children).filter(c => c.tagName === el!.tagName)
+              : [];
+            if (siblings.length > 1) {
+              seg += `:nth-of-type(${siblings.indexOf(el) + 1})`;
+            }
+            path.unshift(seg);
+            el = el.parentElement;
+          }
+          const selectorPath = path.join(' > ');
+          const fullText = parent.innerText.trim();
+          const context = fullText.length > 100
+            ? fullText.slice(0, 100) + '...'
+            : fullText;
+          matches.push({ selector: selectorPath, context });
+        }
+      }
+      if (matches.length === 0) return Promise.resolve(`No matches found for: "${text}"`);
+      if (nth >= matches.length) {
+        return Promise.resolve(
+          `Only ${matches.length} match(es) found for "${text}", requested index ${nth}.\n` +
+          matches.map((m, i) => `[${i}] ${m.selector} — "${m.context}"`).join('\n'),
+        );
+      }
+      const match = matches[nth];
+      return Promise.resolve(
+        `Found (${matches.length} total, showing #${nth}):\n` +
+        `  selector: ${match.selector}\n` +
+        `  context: "${match.context}"`,
+      );
+    }
+
     default:
       return Promise.reject(new Error(`Unknown action: ${action}`));
   }
@@ -287,9 +365,10 @@ export const interactTool: AgentTool<typeof InteractParameters> = {
   label: 'Interact',
   description:
     'Simulate user interactions on the active page. ' +
-    'Actions: click, dblclick, rightclick, hover, type (text input), clear, ' +
-    'select (dropdown), scroll, keypress, wait (element appears), ' +
-    'wait_hidden (element disappears), wait_navigation (page load completes). ' +
+    'Actions: click, dblclick, rightclick, hover (target by CSS selector or x/y coordinates), ' +
+    'type (text input), clear, select (dropdown), scroll, keypress, ' +
+    'wait (element appears), wait_hidden (element disappears), ' +
+    'wait_navigation (page load completes), find (search text in page and return selector). ' +
     'Elements are scrolled into view automatically before interaction.',
   parameters: InteractParameters,
 
