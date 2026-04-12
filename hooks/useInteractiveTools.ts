@@ -17,7 +17,7 @@ export function useInteractiveTools() {
     interactiveToolRegistry.cancelAll();
   }, []);
 
-  const getToolInfo = useCallback((toolName: string): InteractiveToolInfo | undefined => {
+  const getInteractiveToolInfo = useCallback((toolName: string): InteractiveToolInfo | undefined => {
     return interactiveToolRegistry.get(toolName);
   }, []);
 
@@ -29,5 +29,5 @@ export function useInteractiveTools() {
     interactiveToolRegistry.resolve(toolName, response);
   }, []);
 
-  return { hasPending, cancelAll, getToolInfo, getPendingFor, resolve };
+  return { hasPending, cancelAll, getInteractiveToolInfo, getPendingFor, resolve };
 }

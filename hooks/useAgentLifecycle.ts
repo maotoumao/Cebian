@@ -5,6 +5,7 @@ import { createCebianAgent } from '@/lib/agent';
 import { DEFAULT_SYSTEM_PROMPT } from '@/lib/constants';
 import type { ThrottledSessionWriter, SessionRecord } from '@/lib/db';
 import { interactiveToolRegistry } from '@/lib/tools/registry';
+import { extractUserText } from '@/lib/message-helpers';
 
 // ─── Types ───
 
@@ -170,5 +171,3 @@ export function useAgentLifecycle(opts: {
 
   return { agentRef, isAgentRunning, handleSend };
 }
-
-import { extractUserText } from '@/lib/types';

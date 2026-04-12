@@ -11,7 +11,7 @@ import {
 } from '@/components/chat/Message';
 import type { AgentMessage as AgentMessageType } from '@mariozechner/pi-agent-core';
 import type { AssistantMessage, ToolResultMessage } from '@mariozechner/pi-ai';
-import { getAssistantText, getThinkingBlocks, getToolCalls, findToolResult, extractUserText } from '@/lib/types';
+import { getAssistantText, getThinkingBlocks, getToolCalls, findToolResult, extractUserText } from '@/lib/message-helpers';
 import { useInteractiveTools } from '@/hooks/useInteractiveTools';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import {
@@ -94,7 +94,7 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
   });
 
   // Interactive tools (generic — no tool-specific code)
-  const { getToolInfo, getPendingFor, resolve } = useInteractiveTools();
+  const { getInteractiveToolInfo, getPendingFor, resolve } = useInteractiveTools();
 
   // Auto-scroll
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -155,7 +155,7 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
                   )}
                   {/* Generic interactive tool rendering */}
                   {toolCalls.map((tc) => {
-                    const info = getToolInfo(tc.name);
+                    const info = getInteractiveToolInfo(tc.name);
                     if (!info) return null;
                     const pending = getPendingFor(tc.name);
                     const isPending = pending?.toolCallId === tc.id;
@@ -178,7 +178,7 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
             // Generic: render interactive tool results as user bubbles
             if (msg.role === 'toolResult') {
               const tr = msg as ToolResultMessage;
-              const info = getToolInfo(tr.toolName);
+              const info = getInteractiveToolInfo(tr.toolName);
               if (info?.renderResultAsUserBubble && !tr.details?.cancelled) {
                 const text = tr.content
                   .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
