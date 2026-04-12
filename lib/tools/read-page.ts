@@ -53,7 +53,9 @@ function extractPageContent(
   const root = selector
     ? document.querySelector(selector) as HTMLElement | null
     : document.body;
-  if (!root) return `(no element found for selector: ${selector})`;
+  if (!root) return selector
+    ? `(no element found for selector: ${selector})`
+    : '(page has no body element)';
 
   let content: string;
 
@@ -80,57 +82,94 @@ function extractPageContent(
       ).forEach(el => el.remove());
 
       if (mode === 'markdown') {
+        const BLOCK_TAGS = new Set([
+          'p', 'div', 'section', 'article', 'main',
+          'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+          'ul', 'ol', 'li', 'blockquote', 'pre', 'table',
+          'hr', 'br', 'figure', 'figcaption', 'details', 'summary',
+        ]);
         const lines: string[] = [];
+        let inlineBuffer = '';
+
+        const flushInline = () => {
+          const trimmed = inlineBuffer.trim();
+          if (trimmed) lines.push(trimmed);
+          inlineBuffer = '';
+        };
+
         const walk = (node: Node) => {
           if (node.nodeType === Node.TEXT_NODE) {
-            const text = (node.textContent ?? '').trim();
-            if (text) lines.push(text);
+            const text = node.textContent ?? '';
+            if (text.trim()) inlineBuffer += text.replace(/\s+/g, ' ');
             return;
           }
           if (node.nodeType !== Node.ELEMENT_NODE) return;
           const el = node as HTMLElement;
           const tag = el.tagName.toLowerCase();
 
-          if (tag === 'br') { lines.push(''); return; }
+          if (tag === 'br') { flushInline(); lines.push(''); return; }
+          if (tag === 'hr') { flushInline(); lines.push('---'); return; }
+
           if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
+            flushInline();
             const level = parseInt(tag[1]);
             lines.push('');
             lines.push('#'.repeat(level) + ' ' + el.innerText.trim());
             lines.push('');
             return;
           }
-          if (tag === 'p') {
+          if (tag === 'p' || tag === 'div' || tag === 'section' || tag === 'article') {
+            flushInline();
             lines.push('');
             el.childNodes.forEach(walk);
+            flushInline();
             lines.push('');
             return;
           }
           if (tag === 'li') {
+            flushInline();
             lines.push('- ' + el.innerText.trim());
             return;
           }
-          if (tag === 'a') {
-            const href = el.getAttribute('href') ?? '';
-            lines.push(`[${el.innerText.trim()}](${href})`);
-            return;
-          }
-          if (tag === 'img') {
-            const alt = el.getAttribute('alt') ?? '';
-            const src = el.getAttribute('src') ?? '';
-            if (alt || src) lines.push(`![${alt}](${src})`);
-            return;
-          }
-          if (tag === 'pre' || tag === 'code') {
+          if (tag === 'pre') {
+            flushInline();
             lines.push('```');
             lines.push(el.innerText);
             lines.push('```');
             return;
           }
+          // Inline elements — append to buffer
+          if (tag === 'a') {
+            const href = el.getAttribute('href') ?? '';
+            inlineBuffer += `[${el.innerText.trim()}](${href})`;
+            return;
+          }
+          if (tag === 'code') {
+            inlineBuffer += '`' + el.innerText + '`';
+            return;
+          }
+          if (tag === 'strong' || tag === 'b') {
+            inlineBuffer += '**' + el.innerText.trim() + '**';
+            return;
+          }
+          if (tag === 'em' || tag === 'i') {
+            inlineBuffer += '*' + el.innerText.trim() + '*';
+            return;
+          }
+          if (tag === 'img') {
+            const alt = el.getAttribute('alt') ?? '';
+            const src = el.getAttribute('src') ?? '';
+            if (alt || src) { flushInline(); lines.push(`![${alt}](${src})`); }
+            return;
+          }
           if (tag === 'blockquote') {
+            flushInline();
             el.innerText.split('\n').forEach(l => lines.push('> ' + l));
             return;
           }
+          // Table: first row assumed to be header
           if (tag === 'table') {
+            flushInline();
             const rows = el.querySelectorAll('tr');
             rows.forEach((row, i) => {
               const cells = Array.from(row.querySelectorAll('th, td'))
@@ -140,9 +179,18 @@ function extractPageContent(
             });
             return;
           }
-          el.childNodes.forEach(walk);
+
+          // Unknown element — recurse if block, append if inline
+          if (BLOCK_TAGS.has(tag)) {
+            flushInline();
+            el.childNodes.forEach(walk);
+            flushInline();
+          } else {
+            el.childNodes.forEach(walk);
+          }
         };
         walk(clone);
+        flushInline();
         content = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
       } else {
         content = clone.innerText;
