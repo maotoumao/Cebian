@@ -3,7 +3,7 @@ import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { Readability } from '@mozilla/readability';
 import TurndownService from 'turndown';
 import { TOOL_READ_PAGE } from '@/lib/types';
-import { getActiveTabId, executeInTab, executeInTabWithArgs } from './chrome-api';
+import { getActiveTabId, executeInTabWithArgs } from './chrome-api';
 
 const ReadPageParameters = Type.Object({
   mode: Type.Union(
@@ -139,22 +139,27 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
       }
       case 'readable':
       case 'markdown': {
-        // Step 1: Get raw HTML from page
-        const { html, url } = await executeInTabWithArgs(
-          tabId, getDocumentHtml, [params.selector], params.frameId,
-        );
-        if (!html) {
-          content = params.selector
-            ? `(no element found for selector: ${params.selector})`
-            : '(page has no body element)';
+        // If selector is provided, skip Readability (it needs full document)
+        // and go directly HTML → Turndown for markdown, or HTML as readable.
+        if (params.selector) {
+          const html = await executeInTabWithArgs(
+            tabId, extractHtml, [params.selector], params.frameId,
+          );
+          content = mode === 'markdown' ? htmlToMarkdown(html) : html;
           break;
         }
+
+        // Step 1: Get full document HTML from page
+        const { html, url } = await executeInTabWithArgs(
+          tabId, getDocumentHtml, [undefined], params.frameId,
+        );
 
         // Step 2: Extract article with Readability (extension context)
         const articleHtml = parseWithReadability(html, url);
         if (!articleHtml) {
           // Readability couldn't parse — fall back to cleaned text
-          content = await executeInTabWithArgs(tabId, extractText, [params.selector], params.frameId);
+          const fallback = await executeInTabWithArgs(tabId, extractText, [params.selector], params.frameId);
+          content = '(Readability extraction failed, falling back to plain text)\n\n' + fallback;
           break;
         }
 
