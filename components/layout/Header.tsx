@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/tooltip';
 
 interface HeaderProps {
+  title?: string;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
   onOpenSettings: () => void;
@@ -14,7 +15,7 @@ interface HeaderProps {
   onOpenHistory: () => void;
 }
 
-export function Header({ theme, onToggleTheme, onOpenSettings, onNewChat, onOpenHistory }: HeaderProps) {
+export function Header({ title, theme, onToggleTheme, onOpenSettings, onNewChat, onOpenHistory }: HeaderProps) {
   return (
     <header className="flex items-center justify-between px-5 py-4 border-b border-border bg-background/80 backdrop-blur-xl z-10">
       <div className="flex items-center gap-2">
@@ -36,6 +37,10 @@ export function Header({ theme, onToggleTheme, onOpenSettings, onNewChat, onOpen
           <TooltipContent>历史记录</TooltipContent>
         </Tooltip>
       </div>
+
+      <span className="flex-1 text-center text-sm font-medium truncate px-2">
+        {title}
+      </span>
 
       <div className="flex gap-2">
         <Tooltip>

@@ -24,7 +24,7 @@ export function AgentMessage({ children, isStreaming }: { children?: ReactNode; 
       </div>
       <div className="text-[0.9rem] leading-relaxed space-y-3">
         {children}
-        {isStreaming && (
+        {isStreaming && !children && (
           <span className="inline-block w-1.5 h-4 bg-primary animate-pulse rounded-sm align-text-bottom" />
         )}
       </div>

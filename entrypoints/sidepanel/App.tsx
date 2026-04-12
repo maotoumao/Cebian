@@ -13,6 +13,7 @@ function App() {
   const [themeReady, setThemeReady] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [chatTitle, setChatTitle] = useState('');
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -46,11 +47,13 @@ function App() {
   const handleNewChat = useCallback(() => {
     // If already on /chat/new, do nothing
     if (location.pathname === '/chat/new') return;
+    setChatTitle('');
     navigate('/chat/new');
   }, [location.pathname, navigate]);
 
   const handleSelectSession = useCallback((sessionId: string) => {
     setHistoryOpen(false);
+    setChatTitle('');
     navigate(`/chat/${sessionId}`);
   }, [navigate]);
 
@@ -67,6 +70,7 @@ function App() {
     <TooltipProvider delayDuration={300}>
       <div className="flex flex-col h-screen overflow-hidden relative">
         <Header
+          title={chatTitle}
           theme={theme}
           onToggleTheme={toggleTheme}
           onOpenSettings={() => setSettingsOpen(true)}
@@ -75,8 +79,8 @@ function App() {
         />
 
         <Routes>
-          <Route path="/chat/new" element={<ChatPage onOpenSettings={() => setSettingsOpen(true)} />} />
-          <Route path="/chat/:sessionId" element={<ChatPage onOpenSettings={() => setSettingsOpen(true)} />} />
+          <Route path="/chat/new" element={<ChatPage onOpenSettings={() => setSettingsOpen(true)} onTitleChange={setChatTitle} />} />
+          <Route path="/chat/:sessionId" element={<ChatPage onOpenSettings={() => setSettingsOpen(true)} onTitleChange={setChatTitle} />} />
           <Route path="*" element={<Navigate to="/chat/new" replace />} />
         </Routes>
 

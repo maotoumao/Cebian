@@ -47,7 +47,7 @@ function getModelForProvider(
 
 // ─── ChatPage ───
 
-export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
+export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: () => void; onTitleChange?: (title: string) => void }) {
   const { sessionId: routeSessionId } = useParams<{ sessionId?: string }>();
   const isNewChat = !routeSessionId || routeSessionId === 'new';
 
@@ -69,6 +69,11 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
 
   // Session management
   const session = useSessionManager(isNewChat, routeSessionId);
+
+  // Sync session title to parent
+  useEffect(() => {
+    onTitleChange?.(session.sessionTitle);
+  }, [session.sessionTitle, onTitleChange]);
 
   // Agent config (batched as a single object)
   const agentConfig = useMemo(() => ({

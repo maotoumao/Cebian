@@ -7,6 +7,7 @@ export interface SessionManager {
   messages: AgentMessage[];
   setMessages: React.Dispatch<React.SetStateAction<AgentMessage[]>>;
   sessionLoading: boolean;
+  sessionTitle: string;
   sessionCreated: React.RefObject<boolean>;
   conversationIdRef: React.RefObject<string | null>;
   writerRef: React.RefObject<ThrottledSessionWriter>;
@@ -22,6 +23,7 @@ export function useSessionManager(
 
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [sessionLoading, setSessionLoading] = useState(!isNewChat);
+  const [sessionTitle, setSessionTitle] = useState('');
 
   const sessionCreated = useRef(false);
   const conversationIdRef = useRef<string | null>(isNewChat ? null : routeSessionId!);
@@ -31,6 +33,7 @@ export function useSessionManager(
   useEffect(() => {
     if (isNewChat) {
       setMessages([]);
+      setSessionTitle('');
       sessionCreated.current = false;
       conversationIdRef.current = null;
       setSessionLoading(false);
@@ -52,6 +55,7 @@ export function useSessionManager(
         if (cancelled) return;
         if (session) {
           setMessages(session.messages);
+          setSessionTitle(session.title);
           sessionCreated.current = true;
           conversationIdRef.current = session.id;
         } else {
@@ -82,6 +86,7 @@ export function useSessionManager(
     // ends up appended to this session.
     conversationIdRef.current = session.id;
     sessionCreated.current = true;
+    setSessionTitle(session.title);
     navigate(`/chat/${session.id}`, { replace: true });
     try {
       await createSession(session);
@@ -98,6 +103,7 @@ export function useSessionManager(
     messages,
     setMessages,
     sessionLoading,
+    sessionTitle,
     sessionCreated,
     conversationIdRef,
     writerRef,
