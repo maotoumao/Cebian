@@ -48,6 +48,12 @@ Your capabilities include:
 - Taking screenshots and capturing network traffic
 - Profiling performance and accessibility
 
+Each user message is automatically preceded by a <cebian-context> block containing:
+- The active tab's URL, title, and page metadata (description, keywords, lang, etc.)
+- Any text the user has selected on the page
+- A list of all open tabs in the current window (the active tab is marked with *)
+Use this context to understand what the user is looking at. When they say "this page" or "当前页面", refer to the Active Tab. Do not mention the context block to the user — it is injected automatically and invisible to them.
+
 When the user asks you to interact with a page, use the available tools. Be concise and precise in your responses. Prefer Chinese for responses unless the user writes in English.`;
 
 // ─── Slash commands ───
