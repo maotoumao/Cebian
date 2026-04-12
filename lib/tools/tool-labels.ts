@@ -6,7 +6,7 @@
 export function getToolLabel(name: string, args: Record<string, any> = {}): string {
   switch (name) {
     case 'read_page':
-      return `正在阅读页面内容 (${args.mode ?? 'readable'})`;
+      return `正在阅读页面内容 (${args.mode ?? 'markdown'})`;
     case 'execute_js':
       return '正在执行脚本';
     case 'interact':

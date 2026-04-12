@@ -2,6 +2,7 @@ import { Type } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { Readability } from '@mozilla/readability';
 import TurndownService from 'turndown';
+import { gfm } from 'turndown-plugin-gfm';
 import { TOOL_READ_PAGE } from '@/lib/types';
 import { getActiveTabId, executeInTabWithArgs } from './chrome-api';
 
@@ -10,17 +11,19 @@ const ReadPageParameters = Type.Object({
     [
       Type.Literal('text'),
       Type.Literal('html'),
-      Type.Literal('readable'),
       Type.Literal('markdown'),
+      Type.Literal('article'),
+      Type.Literal('readable'),
     ],
     {
       description:
         'Extraction mode. ' +
+        '"markdown" (default): full-page content as markdown — works for any page type. ' +
+        '"article": article/reader-mode extraction as markdown — use for news, blogs, docs. ' +
         '"text": plain innerText. ' +
         '"html": cleaned innerHTML (no script/style/svg). ' +
-        '"readable": extracts main article content (like Reader Mode). ' +
-        '"markdown": readable content converted to markdown — best for analysis.',
-      default: 'readable',
+        '"readable": deprecated alias for "article".',
+      default: 'markdown',
     },
   ),
   selector: Type.Optional(
@@ -70,6 +73,20 @@ function extractHtml(selector: string | null): string {
   return clone.innerHTML;
 }
 
+/** Extract cleaned HTML with extra noise removal (hidden elements, stylesheets). */
+function extractCleanHtml(selector: string | null): string {
+  const root = selector
+    ? document.querySelector(selector) as HTMLElement | null
+    : document.body;
+  if (!root) return selector
+    ? `(no element found for selector: ${selector})`
+    : '(page has no body element)';
+  const clone = root.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll('script, style, svg, noscript, link[rel="stylesheet"]').forEach(el => el.remove());
+  clone.querySelectorAll('[aria-hidden="true"], [hidden]').forEach(el => el.remove());
+  return clone.innerHTML;
+}
+
 /** Get the full document HTML for Readability processing. */
 function getDocumentHtml(selector: string | null): { html: string; url: string } {
   if (selector) {
@@ -103,6 +120,7 @@ function htmlToMarkdown(html: string): string {
     codeBlockStyle: 'fenced',
     bulletListMarker: '-',
   });
+  turndown.use(gfm);
   return turndown.turndown(html);
 }
 
@@ -113,9 +131,9 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
   label: 'Read Page',
   description:
     'Extract content from the current page. ' +
-    'Modes: "text" (raw text), "html" (cleaned HTML), ' +
-    '"readable" (article extraction, like Reader Mode), ' +
-    '"markdown" (article as markdown — best for analysis). ' +
+    'Modes: "markdown" (default, full-page as markdown — works for any page), ' +
+    '"article" (reader-mode extraction as markdown — for news/blogs/docs), ' +
+    '"text" (plain text), "html" (cleaned HTML). ' +
     'Optionally scope to a CSS selector. ' +
     'Use this before answering questions about page content.',
   parameters: ReadPageParameters,
@@ -123,7 +141,7 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
   async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
     signal?.throwIfAborted();
     const tabId = await getActiveTabId();
-    const mode = params.mode ?? 'readable';
+    const mode = params.mode ?? 'markdown';
     const maxLength = params.maxLength ?? 20000;
 
     let content: string;
@@ -137,34 +155,29 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
         content = await executeInTabWithArgs(tabId, extractHtml, [params.selector ?? null], params.frameId);
         break;
       }
-      case 'readable':
       case 'markdown': {
-        // If selector is provided, skip Readability (it needs full document)
-        // and go directly HTML → Turndown for markdown, or HTML as readable.
+        // Full-page cleaned HTML → markdown (no Readability filtering)
+        const html = await executeInTabWithArgs(tabId, extractCleanHtml, [params.selector ?? null], params.frameId);
+        content = htmlToMarkdown(html);
+        break;
+      }
+      case 'article':
+      case 'readable': {
+        // Readability extraction → markdown ("readable" is a deprecated alias)
         if (params.selector) {
-          const html = await executeInTabWithArgs(
-            tabId, extractHtml, [params.selector ?? null], params.frameId,
-          );
-          content = mode === 'markdown' ? htmlToMarkdown(html) : html;
+          const html = await executeInTabWithArgs(tabId, extractCleanHtml, [params.selector], params.frameId);
+          content = htmlToMarkdown(html);
           break;
         }
 
-        // Step 1: Get full document HTML from page
-        const { html, url } = await executeInTabWithArgs(
-          tabId, getDocumentHtml, [null], params.frameId,
-        );
-
-        // Step 2: Extract article with Readability (extension context)
+        const { html, url } = await executeInTabWithArgs(tabId, getDocumentHtml, [null], params.frameId);
         const articleHtml = parseWithReadability(html, url);
         if (!articleHtml) {
-          // Readability couldn't parse — fall back to cleaned text
-          const fallback = await executeInTabWithArgs(tabId, extractText, [params.selector ?? null], params.frameId);
+          const fallback = await executeInTabWithArgs(tabId, extractText, [null], params.frameId);
           content = '(Readability extraction failed, falling back to plain text)\n\n' + fallback;
           break;
         }
-
-        // Step 3: Convert to markdown if requested
-        content = mode === 'markdown' ? htmlToMarkdown(articleHtml) : articleHtml;
+        content = htmlToMarkdown(articleHtml);
         break;
       }
       default:
