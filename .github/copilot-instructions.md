@@ -40,5 +40,6 @@ After completing all coding for a task, **create a subagent** to perform a senio
 4. **Architecture** — placement is reasonable, no misplaced concerns, clean separation
 5. **Error handling** — no silent failures, no swallowed exceptions
 6. **Performance** — no unnecessary re-renders, no expensive operations in hot paths, proper memoization where needed
+7. **Deprecation** — no use of deprecated APIs, functions, props, or patterns from any dependency (React, WXT, AI SDK, etc.). If a deprecated usage is found, replace it with the current recommended alternative
 
 Use the `Explore` agent with thoroughness `thorough` for this review. Fix any issues found before reporting completion.

@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useRef, useEffect, useMemo, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import { SquarePen } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChatInput } from '@/components/chat/ChatInput';
@@ -8,27 +8,23 @@ import {
   AgentMessage,
   AgentTextBlock,
   ThinkingBlock,
-  AskUserBlock,
 } from '@/components/chat/Message';
-import { Agent, type AgentEvent, type AgentMessage as AgentMessageType } from '@mariozechner/pi-agent-core';
+import type { AgentMessage as AgentMessageType } from '@mariozechner/pi-agent-core';
 import type { AssistantMessage, ToolResultMessage } from '@mariozechner/pi-ai';
-import { getAssistantText, getThinkingBlocks, getToolCalls, findToolResult, TOOL_ASK_USER } from '@/lib/types';
-import { useInteractiveTool } from '@/hooks/useInteractiveTool';
-import { askUserBridge, type AskUserRequest } from '@/lib/tools/ask-user';
+import { getAssistantText, getThinkingBlocks, getToolCalls, findToolResult } from '@/lib/types';
+import { useInteractiveTools } from '@/hooks/useInteractiveTools';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import {
   activeModel,
   thinkingLevel,
-  providerCredentials,
   customProviders as customProvidersStorage,
   systemPrompt as systemPromptStorage,
   maxRounds as maxRoundsStorage,
 } from '@/lib/storage';
-import { createCebianAgent } from '@/lib/agent';
-import { DEFAULT_SYSTEM_PROMPT } from '@/lib/constants';
 import { mergeCustomProviders, isCustomProvider, findCustomModel } from '@/lib/custom-models';
 import { PRESET_PROVIDERS } from '@/lib/constants';
-import { createSession, getSession, ThrottledSessionWriter, type SessionRecord } from '@/lib/db';
+import { useSessionManager } from '@/hooks/useSessionManager';
+import { useAgentLifecycle } from '@/hooks/useAgentLifecycle';
 import { getModels, type KnownProvider, type Api, type Model } from '@mariozechner/pi-ai';
 
 // ─── Helpers ───
@@ -65,107 +61,55 @@ function extractUserText(msg: AgentMessageType): string {
 
 export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
   const { sessionId: routeSessionId } = useParams<{ sessionId?: string }>();
-  const navigate = useNavigate();
-
   const isNewChat = !routeSessionId || routeSessionId === 'new';
-
-  const [messages, setMessages] = useState<AgentMessageType[]>([]);
-  const [isAgentRunning, setIsAgentRunning] = useState(false);
-  const [sessionLoading, setSessionLoading] = useState(!isNewChat);
-
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const agentRef = useRef<Agent | null>(null);
-  const sessionCreated = useRef(false);
-  const conversationIdRef = useRef<string | null>(isNewChat ? null : routeSessionId!);
-  const writerRef = useRef(new ThrottledSessionWriter());
-  const pendingPromptRef = useRef<string | null>(null);
-
-  // Load existing session from DB
-  useEffect(() => {
-    if (isNewChat) {
-      // Reset state for new chat
-      setMessages([]);
-      sessionCreated.current = false;
-      conversationIdRef.current = null;
-      setSessionLoading(false);
-      return;
-    }
-
-    // Load a historical session
-    let cancelled = false;
-    setSessionLoading(true);
-
-    getSession(routeSessionId!)
-      .then((session) => {
-        if (cancelled) return;
-        if (session) {
-          setMessages(session.messages);
-          sessionCreated.current = true;
-          conversationIdRef.current = session.id;
-        } else {
-          // Invalid sessionId — redirect to new chat
-          navigate('/chat/new', { replace: true });
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load session:', err);
-        if (!cancelled) navigate('/chat/new', { replace: true });
-      })
-      .finally(() => {
-        if (!cancelled) setSessionLoading(false);
-      });
-
-    return () => { cancelled = true; };
-  }, [routeSessionId, isNewChat, navigate]);
 
   // Storage values
   const [currentModel] = useStorageItem(activeModel, null);
   const [currentThinkingLevel] = useStorageItem(thinkingLevel, 'medium');
-  const [providers] = useStorageItem(providerCredentials, {});
   const [customProviderList] = useStorageItem(customProvidersStorage, []);
   const [currentSystemPrompt] = useStorageItem(systemPromptStorage, '');
   const [currentMaxRounds] = useStorageItem(maxRoundsStorage, 200);
-
-  // Refs for config values (avoid agent rebuild on config change)
-  const systemPromptRef = useRef(currentSystemPrompt);
-  const thinkingLevelRef = useRef(currentThinkingLevel);
-  const maxRoundsRef = useRef(currentMaxRounds);
-  const currentModelRef = useRef(currentModel);
-
-  // Sync refs + dynamically update agent state
-  useEffect(() => {
-    systemPromptRef.current = currentSystemPrompt;
-    if (agentRef.current) {
-      agentRef.current.state.systemPrompt = currentSystemPrompt || DEFAULT_SYSTEM_PROMPT;
-    }
-  }, [currentSystemPrompt]);
-
-  useEffect(() => {
-    thinkingLevelRef.current = currentThinkingLevel;
-    if (agentRef.current) {
-      agentRef.current.state.thinkingLevel = currentThinkingLevel as 'off' | 'minimal' | 'low' | 'medium' | 'high';
-    }
-  }, [currentThinkingLevel]);
-
-  useEffect(() => {
-    maxRoundsRef.current = currentMaxRounds;
-  }, [currentMaxRounds]);
-
-  useEffect(() => {
-    currentModelRef.current = currentModel;
-  }, [currentModel]);
 
   const allCustomProviders = useMemo(() =>
     mergeCustomProviders(PRESET_PROVIDERS, customProviderList),
   [customProviderList]);
 
-  // Resolve current model object
   const modelObj = useMemo(() => {
     if (!currentModel) return undefined;
     return getModelForProvider(currentModel.provider, currentModel.modelId, allCustomProviders);
   }, [currentModel, allCustomProviders]);
 
-  // Auto-scroll helper
+  // Session management
+  const session = useSessionManager(isNewChat, routeSessionId);
+
+  // Agent config (batched as a single object)
+  const agentConfig = useMemo(() => ({
+    systemPrompt: currentSystemPrompt,
+    thinkingLevel: currentThinkingLevel,
+    maxRounds: currentMaxRounds,
+    currentModel,
+  }), [currentSystemPrompt, currentThinkingLevel, currentMaxRounds, currentModel]);
+
+  // Agent lifecycle
+  const { isAgentRunning, handleSend } = useAgentLifecycle({
+    modelObj,
+    isNewChat,
+    sessionLoading: session.sessionLoading,
+    messages: session.messages,
+    setMessages: session.setMessages,
+    config: agentConfig,
+    sessionCreated: session.sessionCreated,
+    conversationIdRef: session.conversationIdRef,
+    writerRef: session.writerRef,
+    persistNewSession: session.persistNewSession,
+    routeSessionId,
+  });
+
+  // Interactive tools (generic — no tool-specific code)
+  const { getToolInfo, getPendingFor, resolve } = useInteractiveTools();
+
+  // Auto-scroll
+  const scrollRef = useRef<HTMLDivElement>(null);
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
       const el = scrollRef.current;
@@ -174,148 +118,11 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
       if (viewport) viewport.scrollTop = viewport.scrollHeight;
     });
   }, []);
+  useEffect(() => { scrollToBottom(); }, [session.messages, scrollToBottom]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
-
-  // Create agent (only when model or route session changes)
-  useEffect(() => {
-    if (!modelObj || sessionLoading) return;
-
-    const agent = createCebianAgent({
-      model: modelObj,
-      systemPrompt: systemPromptRef.current,
-      thinkingLevel: thinkingLevelRef.current as 'off' | 'minimal' | 'low' | 'medium' | 'high',
-      maxRounds: maxRoundsRef.current,
-      messages: isNewChat ? [] : messages,
-    });
-
-    const unsubscribe = agent.subscribe(async (event: AgentEvent) => {
-      switch (event.type) {
-        case 'agent_start':
-          setIsAgentRunning(true);
-          break;
-
-        case 'message_start':
-        case 'message_end':
-          setMessages([...agent.state.messages]);
-          if (event.type === 'message_end' && sessionCreated.current && conversationIdRef.current) {
-            writerRef.current.schedule(conversationIdRef.current, agent.state.messages);
-          }
-          break;
-
-        case 'message_update':
-          if ('role' in event.message && event.message.role === 'assistant') {
-            setMessages(prev => {
-              const last = prev[prev.length - 1];
-              if ('role' in last && last.role === 'assistant') {
-                const updated = [...prev];
-                updated[updated.length - 1] = event.message;
-                return updated;
-              }
-              return [...prev, event.message];
-            });
-          }
-          break;
-
-        case 'agent_end': {
-          setIsAgentRunning(false);
-          setMessages([...agent.state.messages]);
-
-          if (!sessionCreated.current && agent.state.messages.length > 0) {
-            // First agent response — generate ID, persist, and replace route
-            const newId = crypto.randomUUID();
-            conversationIdRef.current = newId;
-            sessionCreated.current = true;
-
-            const firstUserText = extractUserText(agent.state.messages[0]);
-            const title = firstUserText.slice(0, 50) + (firstUserText.length > 50 ? '...' : '');
-            const session: SessionRecord = {
-              id: newId,
-              title: title || '新对话',
-              model: currentModelRef.current?.modelId ?? '',
-              provider: currentModelRef.current?.provider ?? '',
-              systemPrompt: systemPromptRef.current,
-              thinkingLevel: thinkingLevelRef.current,
-              messageCount: agent.state.messages.length,
-              totalInputTokens: 0,
-              totalOutputTokens: 0,
-              totalCost: 0,
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-              messages: agent.state.messages,
-            };
-            try {
-              await createSession(session);
-              navigate(`/chat/${newId}`, { replace: true });
-            } catch (err) {
-              console.error('Failed to create session:', err);
-              // Reset so next agent_end can retry
-              sessionCreated.current = false;
-              conversationIdRef.current = null;
-            }
-          } else if (conversationIdRef.current) {
-            await writerRef.current.flush();
-          }
-
-          // If user sent a message while ask_user was pending, send it now.
-          // Must defer to next tick — agent is still settling during agent_end listener,
-          // so prompt() would throw "already processing" if called synchronously.
-          const deferred = pendingPromptRef.current;
-          if (deferred) {
-            pendingPromptRef.current = null;
-            setTimeout(() => {
-              agent.prompt(deferred).catch((err) => {
-                console.error('Deferred prompt failed:', err);
-                setIsAgentRunning(false);
-              });
-            }, 0);
-          }
-          break;
-        }
-      }
-    });
-
-    agentRef.current = agent;
-
-    return () => {
-      unsubscribe();
-      agent.abort();
-    };
-    // Only rebuild agent when model or route session changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelObj, routeSessionId, sessionLoading]);
-
-  // Cleanup writer on unmount
-  useEffect(() => {
-    const writer = writerRef.current;
-    return () => writer.dispose();
-  }, []);
-
-  // Interactive tool state
-  const { pending: pendingAskUser, resolve: resolveAskUser, cancel: cancelAskUser } = useInteractiveTool(askUserBridge);
-
-  // Send message
-  const handleSend = useCallback(async (text: string) => {
-    if (!agentRef.current || !modelObj || !text.trim()) return;
-
-    // If an ask_user tool is pending, cancel it, abort current run, and defer the new message
-    // Cancel resolves the tool, abort stops the agent loop, agent_end will fire and send the deferred prompt
-    if (pendingAskUser) {
-      cancelAskUser();
-      pendingPromptRef.current = text.trim();
-      try { agentRef.current.abort(); } catch { /* agent may already be idle */ }
-      return;
-    }
-
-    try {
-      await agentRef.current.prompt(text);
-    } catch (err) {
-      console.error('Agent prompt failed:', err);
-      setIsAgentRunning(false);
-    }
-  }, [modelObj, pendingAskUser, cancelAskUser]);
+  const { messages, sessionLoading } = session;
+  const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+  const showWaitingPlaceholder = isAgentRunning && lastMsg && 'role' in lastMsg && lastMsg.role === 'user';
 
   return (
     <>
@@ -332,7 +139,7 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
 
             if (msg.role === 'user') {
               return (
-                <UserMessageBubble key={`msg-${idx}`}>
+                <UserMessageBubble key={`user-${idx}`}>
                   {extractUserText(msg)}
                 </UserMessageBubble>
               );
@@ -347,16 +154,8 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
               const isStreaming = isLast && isAgentRunning;
               const isError = assistantMsg.stopReason === 'error';
 
-              // Skip empty aborted messages (produced by cancel + abort flow)
-              if (assistantMsg.stopReason === 'aborted' && !text && thinkingBlocks.length === 0 && toolCalls.length === 0) {
-                return null;
-              }
-
-              // Determine ask_user tool calls to render
-              const askUserCalls = toolCalls.filter(tc => tc.name === TOOL_ASK_USER);
-
               return (
-                <AgentMessage key={`msg-${idx}`} isStreaming={isStreaming}>
+                <AgentMessage key={`asst-${idx}`} isStreaming={isStreaming}>
                   {thinkingBlocks.map((block, i) => (
                     <ThinkingBlock key={`t-${idx}-${i}`} content={block.thinking} isLive={isStreaming} />
                   ))}
@@ -366,20 +165,21 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
                       {assistantMsg.errorMessage ?? '模型返回错误'}
                     </div>
                   )}
-                  {askUserCalls.map((tc) => {
-                    const args = tc.arguments as AskUserRequest;
-                    const isPending = pendingAskUser?.toolCallId === tc.id;
+                  {/* Generic interactive tool rendering */}
+                  {toolCalls.map((tc) => {
+                    const info = getToolInfo(tc.name);
+                    if (!info) return null;
+                    const pending = getPendingFor(tc.name);
+                    const isPending = pending?.toolCallId === tc.id;
                     const toolResult = findToolResult(messages, tc.id);
-                    const answered = !isPending && !!toolResult;
-
                     return (
-                      <AskUserBlock
-                        key={`ask-${tc.id}`}
-                        question={args.question}
-                        options={args.options}
-                        allowFreeText={args.allow_free_text ?? true}
-                        answered={answered}
-                        onSelect={isPending ? resolveAskUser : undefined}
+                      <info.Component
+                        key={`tool-${tc.id}`}
+                        toolCallId={tc.id}
+                        args={tc.arguments}
+                        isPending={isPending}
+                        toolResult={toolResult}
+                        onResolve={isPending ? (response: any) => resolve(tc.name, response) : undefined}
                       />
                     );
                   })}
@@ -387,17 +187,18 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
               );
             }
 
-            // Render ask_user tool results as user bubbles (skip cancelled ones)
+            // Generic: render interactive tool results as user bubbles
             if (msg.role === 'toolResult') {
               const tr = msg as ToolResultMessage;
-              if (tr.toolName === TOOL_ASK_USER && !tr.details?.cancelled) {
+              const info = getToolInfo(tr.toolName);
+              if (info?.renderResultAsUserBubble && !tr.details?.cancelled) {
                 const text = tr.content
                   .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
                   .map(b => b.text)
                   .join('');
                 if (text) {
                   return (
-                    <UserMessageBubble key={`msg-${idx}`}>
+                    <UserMessageBubble key={`tr-${idx}`}>
                       {text}
                     </UserMessageBubble>
                   );
@@ -409,8 +210,8 @@ export function ChatPage({ onOpenSettings }: { onOpenSettings?: () => void }) {
             return null;
           })}
 
-          {/* Waiting placeholder: show after user sends, before assistant responds */}
-          {isAgentRunning && messages.length > 0 && 'role' in messages[messages.length - 1] && messages[messages.length - 1].role === 'user' && (
+          {/* Waiting placeholder */}
+          {showWaitingPlaceholder && (
             <AgentMessage isStreaming />
           )}
 
