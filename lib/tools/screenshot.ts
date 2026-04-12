@@ -25,7 +25,7 @@ export const screenshotTool: AgentTool<typeof ScreenshotParameters> = {
     signal?.throwIfAborted();
     const quality = params.quality ?? 80;
 
-    const dataUrl = await chrome.tabs.captureVisibleTab(undefined, {
+    const dataUrl = await chrome.tabs.captureVisibleTab({
       format: 'jpeg',
       quality,
     });
