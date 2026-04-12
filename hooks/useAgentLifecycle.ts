@@ -154,12 +154,10 @@ export function useAgentLifecycle(opts: {
     setIsAgentRunning(true);
 
     // If any interactive tool is pending, cancel all and steer with user message.
-    // cancel() resolves bridges with CANCELLED → tool.execute() returns cancelled result →
-    // steer() injects the user message right after tool results, before the next LLM call,
-    // so the model sees both the cancellation and the new message in a single turn.
+    // IMPORTANT: gather context BEFORE cancelAll, because cancelAll unblocks the agent
+    // loop which will drain the steering queue. If we steer after an async gap
+    // (e.g. gatherPageContext), the queue may be drained before we enqueue.
     if (interactiveToolRegistry.hasPending()) {
-      interactiveToolRegistry.cancelAll();
-
       gatherPageContext().then((ctx) => {
         const agent = agentRef.current;
         if (!agent) return;
@@ -169,7 +167,9 @@ export function useAgentLifecycle(opts: {
           content: [{ type: 'text', text: enriched }],
           timestamp: Date.now(),
         } as AgentMessage;
+        // Enqueue BEFORE cancelling so getSteeringMessages() sees it when the loop drains.
         agent.steer(userMessage);
+        interactiveToolRegistry.cancelAll();
       }).catch((err) => {
         console.error('Agent steer failed:', err);
         setIsAgentRunning(false);
