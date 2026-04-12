@@ -33,3 +33,5 @@ export const TOOL_READ_PAGE = 'read_page' as const;
 export const TOOL_INTERACT = 'interact' as const;
 /** Tool that manages browser tabs */
 export const TOOL_TAB = 'tab' as const;
+/** Tool that captures a screenshot of the active tab */
+export const TOOL_SCREENSHOT = 'screenshot' as const;

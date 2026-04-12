@@ -4,9 +4,12 @@ import { executeJsTool } from './execute-js';
 import { readPageTool } from './read-page';
 import { interactTool } from './interact';
 import { tabTool } from './tab';
+import { screenshotTool } from './screenshot';
 
 // Register interactive tools (side-effect imports)
 import './ask-user-registry';
 
 /** All tools available to the Cebian agent. */
-export const tools: AgentTool<any>[] = [askUserTool, executeJsTool, readPageTool, interactTool, tabTool];
+export const tools: AgentTool<any>[] = [
+  askUserTool, executeJsTool, readPageTool, interactTool, tabTool, screenshotTool,
+];
