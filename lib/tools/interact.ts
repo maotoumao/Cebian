@@ -11,12 +11,12 @@ const InteractParameters = Type.Object({
     Type.Literal('hover'), Type.Literal('type'), Type.Literal('clear'),
     Type.Literal('select'), Type.Literal('scroll'), Type.Literal('keypress'),
     Type.Literal('wait'), Type.Literal('wait_hidden'), Type.Literal('wait_navigation'),
-    Type.Literal('find'),
+    Type.Literal('find'), Type.Literal('query'),
   ], { description: 'The interaction to perform.' }),
   selector: Type.Optional(Type.String({
     description:
       'CSS selector of the target element. ' +
-      'Required for: type, clear, select, wait, wait_hidden. ' +
+      'Required for: type, clear, select, wait, wait_hidden, query. ' +
       'Optional for: click, dblclick, rightclick, hover (alternative: provide x + y instead). ' +
       'Optional for: scroll (omit to scroll the page). ' +
       'Not used by: keypress, wait_navigation, find.',
@@ -54,6 +54,9 @@ const InteractParameters = Type.Object({
   nth: Type.Optional(Type.Number({
     description: 'Match index (0-based) for "find" action. Default: 0 (first match).',
   })),
+  limit: Type.Optional(Type.Number({
+    description: 'Max elements to return for "query" action. Default: 20.',
+  })),
   frameId: Type.Optional(Type.Number({
     description: 'Frame ID to interact with. Omit for top frame. Use tab({ action: "list_frames" }) to discover IDs.',
   })),
@@ -73,8 +76,9 @@ function performInteraction(params: {
   deltaY?: number;
   timeout?: number;
   nth?: number;
+  limit?: number;
 }): Promise<string> {
-  const { action, selector, x, y, text, key, modifiers, deltaX, deltaY, timeout = 5000, nth = 0 } = params;
+  const { action, selector, x, y, text, key, modifiers, deltaX, deltaY, timeout = 5000, nth = 0, limit = 20 } = params;
 
   /** Whether the element was found by coordinates (skip scrollIntoView). */
   let resolvedByCoords = false;
@@ -312,6 +316,52 @@ function performInteraction(params: {
       );
     }
 
+    case 'query': {
+      if (!selector) throw new Error('"selector" is required for query action.');
+      const els = Array.from(document.querySelectorAll<HTMLElement>(selector));
+      if (els.length === 0) return Promise.resolve(`No elements found for: ${selector}`);
+
+      const elements = els.slice(0, limit).map((el, i) => {
+        // Build CSS selector path
+        const path: string[] = [];
+        let node: HTMLElement | null = el;
+        while (node && node !== document.body) {
+          let seg = node.tagName.toLowerCase();
+          if (node.id) {
+            seg = '#' + CSS.escape(node.id);
+            path.unshift(seg);
+            break;
+          }
+          const siblings = node.parentElement
+            ? Array.from(node.parentElement.children).filter(c => c.tagName === node!.tagName)
+            : [];
+          if (siblings.length > 1) {
+            seg += `:nth-of-type(${siblings.indexOf(node) + 1})`;
+          }
+          path.unshift(seg);
+          node = node.parentElement;
+        }
+
+        const rect = el.getBoundingClientRect();
+        const attrs: Record<string, string> = {};
+        for (const attr of el.attributes) {
+          attrs[attr.name] = attr.value;
+        }
+
+        return {
+          index: i,
+          tag: el.tagName.toLowerCase(),
+          text: el.innerText?.trim().slice(0, 100) || '',
+          selector: path.join(' > '),
+          attributes: attrs,
+          visible: el.offsetParent !== null || el.getClientRects().length > 0,
+          rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) },
+        };
+      });
+
+      return Promise.resolve(JSON.stringify({ count: els.length, elements }, null, 2));
+    }
+
     default:
       return Promise.reject(new Error(`Unknown action: ${action}`));
   }
@@ -327,7 +377,8 @@ export const interactTool: AgentTool<typeof InteractParameters> = {
     'Actions: click, dblclick, rightclick, hover (target by CSS selector or x/y coordinates), ' +
     'type (text input), clear, select (dropdown), scroll, keypress, ' +
     'wait (element appears), wait_hidden (element disappears), ' +
-    'wait_navigation (page load completes), find (search text in page and return selector). ' +
+    'wait_navigation (page load completes), find (search text in page and return selector), ' +
+    'query (get info about elements matching a CSS selector). ' +
     'Elements are scrolled into view automatically before interaction.',
   parameters: InteractParameters,
 
