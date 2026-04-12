@@ -6,6 +6,7 @@ import type {
   ThinkingContent,
   ToolCall,
 } from '@mariozechner/pi-ai';
+import { CONTEXT_STRIP_RE } from './page-context';
 
 /** Extract plain text from an AssistantMessage's content blocks */
 export function getAssistantText(msg: AssistantMessage): string {
@@ -36,15 +37,18 @@ export function findToolResult(
   );
 }
 
-/** Extract plain text from a user message (handles string and block-array formats) */
+/** Extract plain text from a user message (handles string and block-array formats).
+ *  Strips <cebian-context> blocks so the UI only shows the user's actual input. */
 export function extractUserText(msg: Message): string {
   if (msg.role !== 'user') return '';
-  if (typeof msg.content === 'string') return msg.content;
-  if (Array.isArray(msg.content)) {
-    return msg.content
+  let raw = '';
+  if (typeof msg.content === 'string') {
+    raw = msg.content;
+  } else if (Array.isArray(msg.content)) {
+    raw = msg.content
       .filter((b): b is { type: 'text'; text: string } => 'type' in b && b.type === 'text')
       .map(b => b.text)
       .join('');
   }
-  return '';
+  return raw.replace(CONTEXT_STRIP_RE, '').trim();
 }

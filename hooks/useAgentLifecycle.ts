@@ -6,6 +6,7 @@ import { DEFAULT_SYSTEM_PROMPT } from '@/lib/constants';
 import type { ThrottledSessionWriter, SessionRecord } from '@/lib/db';
 import { interactiveToolRegistry } from '@/lib/tools/registry';
 import { extractUserText } from '@/lib/message-helpers';
+import { gatherPageContext } from '@/lib/page-context';
 
 // ─── Types ───
 
@@ -148,11 +149,9 @@ export function useAgentLifecycle(opts: {
   const handleSend = useCallback((text: string) => {
     if (!agentRef.current || !modelObj || !text.trim()) return;
 
-    const userMessage: AgentMessage = {
-      role: 'user',
-      content: [{ type: 'text', text: text.trim() }],
-      timestamp: Date.now(),
-    } as AgentMessage;
+    const trimmed = text.trim();
+    // Lock immediately to prevent double-sends during async context gathering
+    setIsAgentRunning(true);
 
     // If any interactive tool is pending, cancel all and steer with user message.
     // cancel() resolves bridges with CANCELLED → tool.execute() returns cancelled result →
@@ -160,12 +159,34 @@ export function useAgentLifecycle(opts: {
     // so the model sees both the cancellation and the new message in a single turn.
     if (interactiveToolRegistry.hasPending()) {
       interactiveToolRegistry.cancelAll();
-      agentRef.current.steer(userMessage);
+
+      gatherPageContext().then((ctx) => {
+        const agent = agentRef.current;
+        if (!agent) return;
+        const enriched = ctx ? `${ctx}\n\n${trimmed}` : trimmed;
+        const userMessage: AgentMessage = {
+          role: 'user',
+          content: [{ type: 'text', text: enriched }],
+          timestamp: Date.now(),
+        } as AgentMessage;
+        agent.steer(userMessage);
+      }).catch((err) => {
+        console.error('Agent steer failed:', err);
+        setIsAgentRunning(false);
+      });
       return;
     }
 
-    agentRef.current.prompt(text.trim()).catch((err) => {
-      console.error('Agent prompt failed:', err);
+    gatherPageContext().then((ctx) => {
+      const agent = agentRef.current;
+      if (!agent) return;
+      const enriched = ctx ? `${ctx}\n\n${trimmed}` : trimmed;
+      agent.prompt(enriched).catch((err) => {
+        console.error('Agent prompt failed:', err);
+        setIsAgentRunning(false);
+      });
+    }).catch((err) => {
+      console.error('Context gathering failed:', err);
       setIsAgentRunning(false);
     });
   }, [modelObj]);
