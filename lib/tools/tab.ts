@@ -39,68 +39,76 @@ export const tabTool: AgentTool<typeof TabParameters> = {
   name: TOOL_TAB,
   label: 'Manage Tab',
   description:
-    'Manage browser tabs: open a new tab, close a tab, switch to a tab, reload, ' +
+    'Manage browser tabs: open a new tab (http/https only), close a tab, switch to a tab, reload, ' +
     'or list all frames (including iframes) in the active tab. ' +
-    'Use the tab list from the context block to find tab IDs.',
+    'Use the tab list from the context block to find tab IDs. ' +
+    'Avoid closing the active tab — it will disconnect the page context.',
   parameters: TabParameters,
 
   async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
     signal?.throwIfAborted();
 
-    switch (params.action) {
-      case 'open': {
-        const tab = await chrome.tabs.create({ url: params.url });
-        return {
-          content: [{ type: 'text', text: `Opened new tab (id: ${tab.id}): ${params.url}` }],
-          details: { status: 'done' },
-        };
-      }
-
-      case 'close': {
-        await chrome.tabs.remove(params.tabId);
-        return {
-          content: [{ type: 'text', text: `Closed tab: ${params.tabId}` }],
-          details: { status: 'done' },
-        };
-      }
-
-      case 'switch': {
-        await chrome.tabs.update(params.tabId, { active: true });
-        const tab = await chrome.tabs.get(params.tabId);
-        return {
-          content: [{ type: 'text', text: `Switched to tab: ${tab.title ?? tab.url}` }],
-          details: { status: 'done' },
-        };
-      }
-
-      case 'reload': {
-        const tabId = params.tabId
-          ?? (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.id;
-        if (!tabId) {
+    try {
+      switch (params.action) {
+        case 'open': {
+          const parsed = new URL(params.url);
+          if (!['http:', 'https:'].includes(parsed.protocol)) {
+            return {
+              content: [{ type: 'text', text: `Error: only http/https URLs are allowed. Got: ${parsed.protocol}` }],
+              details: { status: 'error' },
+            };
+          }
+          const tab = await chrome.tabs.create({ url: params.url });
           return {
-            content: [{ type: 'text', text: 'Error: no tab to reload.' }],
-            details: { status: 'error' },
+            content: [{ type: 'text', text: `Opened new tab (id: ${tab.id}): ${params.url}` }],
+            details: { status: 'done' },
           };
         }
-        await chrome.tabs.reload(tabId);
-        return {
-          content: [{ type: 'text', text: `Reloaded tab: ${tabId}` }],
-          details: { status: 'done' },
-        };
-      }
 
-      case 'list_frames': {
-        const tabId = await getActiveTabId();
-        try {
-          const results = await chrome.scripting.executeScript({
+        case 'close': {
+          await chrome.tabs.remove(params.tabId);
+          return {
+            content: [{ type: 'text', text: `Closed tab: ${params.tabId}` }],
+            details: { status: 'done' },
+          };
+        }
+
+        case 'switch': {
+          await chrome.tabs.update(params.tabId, { active: true });
+          const tab = await chrome.tabs.get(params.tabId);
+          return {
+            content: [{ type: 'text', text: `Switched to tab: ${tab.title ?? tab.url}` }],
+            details: { status: 'done' },
+          };
+        }
+
+        case 'reload': {
+          const tabId = params.tabId
+            ?? (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.id;
+          if (!tabId) {
+            return {
+              content: [{ type: 'text', text: 'Error: no tab to reload.' }],
+              details: { status: 'error' },
+            };
+          }
+          await chrome.tabs.reload(tabId);
+          return {
+            content: [{ type: 'text', text: `Reloaded tab: ${tabId}` }],
+            details: { status: 'done' },
+          };
+        }
+
+        case 'list_frames': {
+          const tabId = await getActiveTabId();
+          const results = await (chrome.scripting.executeScript as any)({
             target: { tabId, allFrames: true },
             func: () => ({
               url: window.location.href,
               title: document.title,
               isTop: window === window.top,
             }),
-          } as any);
-          const frames = results.map((r: any) => ({
+          });
+          const frames = (results as chrome.scripting.InjectionResult[]).map(r => ({
             frameId: r.frameId,
             ...r.result,
           }));
@@ -108,19 +116,19 @@ export const tabTool: AgentTool<typeof TabParameters> = {
             content: [{ type: 'text', text: JSON.stringify(frames, null, 2) }],
             details: { status: 'done' },
           };
-        } catch {
+        }
+
+        default:
           return {
-            content: [{ type: 'text', text: 'Error: cannot list frames (page may be restricted).' }],
+            content: [{ type: 'text', text: `Unknown action: ${(params as any).action}` }],
             details: { status: 'error' },
           };
-        }
       }
-
-      default:
-        return {
-          content: [{ type: 'text', text: `Unknown action: ${(params as any).action}` }],
-          details: { status: 'error' },
-        };
+    } catch (err) {
+      return {
+        content: [{ type: 'text', text: `Error: ${(err as Error).message}` }],
+        details: { status: 'error' },
+      };
     }
   },
 };
