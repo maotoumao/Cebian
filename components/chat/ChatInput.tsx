@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, type KeyboardEvent } from 'react';
-import { Send, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, Image, FileText, X } from 'lucide-react';
+import { Send, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +12,11 @@ import { getModel, type KnownProvider } from '@mariozechner/pi-ai';
 import { isCustomProvider, findCustomModel, mergeCustomProviders } from '@/lib/custom-models';
 import { SLASH_COMMANDS, PRESET_PROVIDERS } from '@/lib/constants';
 import { startElementPicker, cancelElementPicker } from '@/lib/element-picker';
-import { MAX_ATTACHMENT_COUNT, type Attachment } from '@/lib/attachments';
+import {
+  MAX_ATTACHMENT_COUNT, MAX_IMAGE_SIZE, MAX_TEXT_FILE_SIZE,
+  isImageFile, isTextFile, formatFileSize,
+  type Attachment,
+} from '@/lib/attachments';
 
 interface ChatInputProps {
   onSend: (message: string, attachments?: Attachment[]) => void;
@@ -26,6 +30,7 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isPicking, setIsPicking] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [currentModel, setCurrentModel] = useStorageItem(activeModel, null);
   const [currentThinkingLevel, setCurrentThinkingLevel] = useStorageItem(thinkingLevel, 'medium');
@@ -153,6 +158,63 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
     }
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const remaining = MAX_ATTACHMENT_COUNT - attachments.length;
+    if (remaining <= 0) {
+      toast.warning(`最多添加 ${MAX_ATTACHMENT_COUNT} 个附件`);
+      e.target.value = '';
+      return;
+    }
+
+    const filesToProcess = Array.from(files).slice(0, remaining);
+    if (files.length > remaining) {
+      toast.warning(`仅添加前 ${remaining} 个文件，已达上限`);
+    }
+
+    for (const file of filesToProcess) {
+      if (isImageFile(file)) {
+        if (file.size > MAX_IMAGE_SIZE) {
+          toast.error(`${file.name} 超过 ${formatFileSize(MAX_IMAGE_SIZE)} 限制`);
+          continue;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          const base64 = dataUrl.split(',', 2)[1] ?? '';
+          const mimeType = file.type || 'image/png';
+          setAttachments((prev) => {
+            if (prev.length >= MAX_ATTACHMENT_COUNT) return prev;
+            return [...prev, { type: 'image', source: 'upload', data: base64, mimeType, name: file.name }];
+          });
+        };
+        reader.onerror = () => toast.error(`读取失败: ${file.name}`);
+        reader.readAsDataURL(file);
+      } else if (isTextFile(file.name)) {
+        if (file.size > MAX_TEXT_FILE_SIZE) {
+          toast.error(`${file.name} 超过 ${formatFileSize(MAX_TEXT_FILE_SIZE)} 限制`);
+          continue;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          setAttachments((prev) => {
+            if (prev.length >= MAX_ATTACHMENT_COUNT) return prev;
+            return [...prev, { type: 'file', content: reader.result as string, name: file.name, mimeType: file.type || 'text/plain', size: file.size }];
+          });
+        };
+        reader.onerror = () => toast.error(`读取失败: ${file.name}`);
+        reader.readAsText(file);
+      } else {
+        toast.error(`不支持的文件类型: ${file.name}`);
+      }
+    }
+
+    // Reset input so the same file can be selected again
+    e.target.value = '';
+  };
+
   const removeAttachment = (index: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
@@ -204,9 +266,17 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
           <Button variant="ghost" size="icon-xs" title="截图" onClick={handleScreenshot}>
             <Camera className="size-3.5" />
           </Button>
-          <Button variant="ghost" size="icon-xs" title="上传文件">
+          <Button variant="ghost" size="icon-xs" title="上传文件" onClick={() => fileInputRef.current?.click()}>
             <Paperclip className="size-3.5" />
           </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,.txt,.md,.csv,.tsv,.log,.js,.ts,.jsx,.tsx,.mjs,.cjs,.py,.java,.c,.cpp,.h,.hpp,.go,.rs,.rb,.php,.sh,.bash,.sql,.yaml,.yml,.toml,.ini,.cfg,.json,.xml,.html,.htm,.css,.scss,.less,.env,.gitignore,.editorconfig"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
           <Button
             variant="ghost"
             size="icon-xs"
