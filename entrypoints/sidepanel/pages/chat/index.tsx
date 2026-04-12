@@ -13,6 +13,7 @@ import { ToolCard } from '@/components/chat/ToolCard';
 import type { AgentMessage as AgentMessageType } from '@mariozechner/pi-agent-core';
 import type { AssistantMessage, ToolResultMessage } from '@mariozechner/pi-ai';
 import { getAssistantText, getThinkingBlocks, getToolCalls, findToolResult, extractUserText } from '@/lib/message-helpers';
+import { getToolLabel } from '@/lib/tools/tool-labels';
 import { useInteractiveTools } from '@/hooks/useInteractiveTools';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import {
@@ -185,13 +186,21 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                     const status = toolResult
                       ? (toolResult.isError ? 'error' : 'done')
                       : 'running';
-                    const code = JSON.stringify(tc.arguments, null, 2);
+                    const label = getToolLabel(tc.name, tc.arguments);
+                    const argsStr = JSON.stringify(tc.arguments, null, 2);
+                    const resultText = toolResult
+                      ? toolResult.content
+                          .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+                          .map(b => b.text)
+                          .join('\n')
+                      : undefined;
                     return (
                       <ToolCard
                         key={`tool-${tc.id}`}
-                        name={tc.name}
+                        label={label}
                         status={status}
-                        code={code}
+                        args={argsStr}
+                        result={resultText}
                       />
                     );
                   })}
