@@ -7,7 +7,7 @@ import type { Components } from 'react-markdown';
 const components: Components = {
   // External links open in new tab
   a: ({ href, children, ...props }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2" {...props}>
+    <a href={href} target="_blank" rel="noopener noreferrer" className="text-info underline underline-offset-2 hover:text-info/80" {...props}>
       {children}
     </a>
   ),
