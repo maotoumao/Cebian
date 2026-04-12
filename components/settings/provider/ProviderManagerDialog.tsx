@@ -123,9 +123,23 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
     setOAuthState(provider, { phase: 'idle' });
   };
 
-  const handleAddCustomProvider = (config: CustomProviderConfig) => {
+  const handleAddCustomProvider = (config: CustomProviderConfig, apiKey?: string) => {
     if (customs.some(c => c.id === config.id) || PRESET_PROVIDERS.some(p => p.id === config.id)) return;
     setCustoms([...customs, config]);
+    if (apiKey) {
+      const key = customProviderKey(config.id);
+      handleCredentialSave(key, { authType: 'apiKey', apiKey, verified: true });
+    }
+  };
+
+  const handleUpdateCustomProvider = (config: CustomProviderConfig, apiKey?: string) => {
+    setCustoms(customs.map(c => c.id === config.id ? config : c));
+    const key = customProviderKey(config.id);
+    if (apiKey) {
+      handleCredentialSave(key, { authType: 'apiKey', apiKey, verified: true });
+    } else {
+      handleApiKeyRemove(key);
+    }
   };
 
   const handleRemoveCustomProvider = (id: string) => {
@@ -216,21 +230,14 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
               const key = customProviderKey(c.id);
               const cred = providers[key] as ApiKeyCredential | undefined;
               return (
-                <Fragment key={key}>
-                  <CustomProviderCard
-                    config={c}
-                    verified={!!cred?.verified}
-                    onRemove={() => handleRemoveCustomProvider(c.id)}
-                  />
-                  <ProviderApiKeyItem
-                    provider={key}
-                    label={c.name}
-                    models={getCustomModels(c)}
-                    credential={cred}
-                    onSave={(cr) => handleCredentialSave(key, cr)}
-                    onRemove={() => handleApiKeyRemove(key)}
-                  />
-                </Fragment>
+                <CustomProviderCard
+                  key={key}
+                  config={c}
+                  apiKey={cred?.apiKey ?? ''}
+                  verified={!!cred?.verified}
+                  onUpdate={handleUpdateCustomProvider}
+                  onRemove={() => handleRemoveCustomProvider(c.id)}
+                />
               );
             })}
 
