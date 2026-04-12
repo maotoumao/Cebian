@@ -31,3 +31,5 @@ export const TOOL_EXECUTE_JS = 'execute_js' as const;
 export const TOOL_READ_PAGE = 'read_page' as const;
 /** Tool that simulates user interactions on the page */
 export const TOOL_INTERACT = 'interact' as const;
+/** Tool that manages browser tabs */
+export const TOOL_TAB = 'tab' as const;
