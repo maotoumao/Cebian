@@ -11,7 +11,7 @@ import {
 } from '@/components/chat/Message';
 import type { AgentMessage as AgentMessageType } from '@mariozechner/pi-agent-core';
 import type { AssistantMessage, ToolResultMessage } from '@mariozechner/pi-ai';
-import { getAssistantText, getThinkingBlocks, getToolCalls, findToolResult } from '@/lib/types';
+import { getAssistantText, getThinkingBlocks, getToolCalls, findToolResult, extractUserText } from '@/lib/types';
 import { useInteractiveTools } from '@/hooks/useInteractiveTools';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import {
@@ -43,18 +43,6 @@ function getModelForProvider(
   } catch {
     return undefined;
   }
-}
-
-function extractUserText(msg: AgentMessageType): string {
-  if (!('role' in msg) || msg.role !== 'user') return '';
-  if (typeof msg.content === 'string') return msg.content;
-  if (Array.isArray(msg.content)) {
-    return msg.content
-      .filter((b): b is { type: 'text'; text: string } => 'type' in b && b.type === 'text')
-      .map(b => b.text)
-      .join('');
-  }
-  return '';
 }
 
 // ─── ChatPage ───

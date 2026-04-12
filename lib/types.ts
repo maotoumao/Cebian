@@ -58,3 +58,16 @@ export function findToolResult(
       m.role === 'toolResult' && m.toolCallId === toolCallId,
   );
 }
+
+/** Extract plain text from a user message (handles string and block-array formats) */
+export function extractUserText(msg: Message): string {
+  if (msg.role !== 'user') return '';
+  if (typeof msg.content === 'string') return msg.content;
+  if (Array.isArray(msg.content)) {
+    return msg.content
+      .filter((b): b is { type: 'text'; text: string } => 'type' in b && b.type === 'text')
+      .map(b => b.text)
+      .join('');
+  }
+  return '';
+}

@@ -171,16 +171,4 @@ export function useAgentLifecycle(opts: {
   return { agentRef, isAgentRunning, handleSend };
 }
 
-// ─── Helper ───
-
-function extractUserText(msg: AgentMessage): string {
-  if (!('role' in msg) || msg.role !== 'user') return '';
-  if (typeof msg.content === 'string') return msg.content;
-  if (Array.isArray(msg.content)) {
-    return msg.content
-      .filter((b): b is { type: 'text'; text: string } => 'type' in b && b.type === 'text')
-      .map(b => b.text)
-      .join('');
-  }
-  return '';
-}
+import { extractUserText } from '@/lib/types';

@@ -28,9 +28,9 @@ export interface InteractiveToolComponentProps<TRequest = any> {
  * Public view of a registered tool — bridge is NOT exposed.
  * This is what consumers (ChatPage, hooks) receive from the registry.
  */
-export interface InteractiveToolInfo<TRquest = any> {
+export interface InteractiveToolInfo<TRequest = any> {
   name: string;
-  Component: ComponentType<InteractiveToolComponentProps<TRquest>>;
+  Component: ComponentType<InteractiveToolComponentProps<TRequest>>;
   renderResultAsUserBubble?: boolean;
 }
 
