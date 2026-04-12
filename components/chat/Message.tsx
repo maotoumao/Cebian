@@ -15,13 +15,15 @@ export function UserMessageBubble({ children }: { children: ReactNode }) {
 }
 
 /* ─── Agent Message ─── */
-export function AgentMessage({ children, isStreaming }: { children?: ReactNode; isStreaming?: boolean }) {
+export function AgentMessage({ children, isStreaming, showHeader = true }: { children?: ReactNode; isStreaming?: boolean; showHeader?: boolean }) {
   return (
-    <div className="self-start w-full">
-      <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground font-medium">
-        <Bot className="size-3.5 text-primary" />
-        Cebian Agent
-      </div>
+    <div className={`self-start w-full ${showHeader ? '' : '-mt-4'}`}>
+      {showHeader && (
+        <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground font-medium">
+          <Bot className="size-3.5 text-primary" />
+          Cebian Agent
+        </div>
+      )}
       <div className="text-[0.9rem] leading-relaxed space-y-3">
         {children}
         {isStreaming && !children && (

@@ -149,8 +149,24 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
               const isStreaming = isLast && isAgentRunning;
               const isError = assistantMsg.stopReason === 'error';
 
+              // Show header only for the first assistant message in a consecutive group
+              let showHeader = true;
+              for (let i = idx - 1; i >= 0; i--) {
+                const prev = messages[i];
+                if (!('role' in prev)) continue;
+                if (prev.role === 'toolResult') {
+                  // If this toolResult renders as a user bubble, treat as a visual break
+                  const tr = prev as ToolResultMessage;
+                  const info = getInteractiveToolInfo(tr.toolName);
+                  if (info?.renderResultAsUserBubble && !tr.details?.cancelled) break;
+                  continue;
+                }
+                if (prev.role === 'assistant') showHeader = false;
+                break;
+              }
+
               return (
-                <AgentMessage key={`asst-${idx}`} isStreaming={isStreaming}>
+                <AgentMessage key={`asst-${idx}`} isStreaming={isStreaming} showHeader={showHeader}>
                   {thinkingBlocks.map((block, i) => (
                     <ThinkingBlock key={`t-${idx}-${i}`} content={block.thinking} isLive={isStreaming} />
                   ))}
