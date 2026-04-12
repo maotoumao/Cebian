@@ -24,7 +24,7 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
   label: 'Execute JavaScript',
   description:
     'Execute JavaScript code in the active browser tab and return the result. ' +
-    'Use for reading DOM properties, extracting data, modifying page content, ' +
+    'Use for operating DOM properties, extracting data, modifying page content, ' +
     'calling page APIs, or reading localStorage/sessionStorage. ' +
     'The code runs in the page context with full access to the DOM and page globals. ' +
     'Return a value to get it back — it will be JSON-serialized.',
