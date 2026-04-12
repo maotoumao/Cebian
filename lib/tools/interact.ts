@@ -7,33 +7,33 @@ import { getActiveTabId, executeInTabWithArgs, waitForNavigation } from './chrom
 
 const ClickParams = Type.Object({
   action: Type.Literal('click'),
-  selector: Type.Optional(Type.String({ description: 'CSS selector of the element to click.' })),
-  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels, must be visible). Use with y as alternative to selector.' })),
-  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels, must be visible). Use with x as alternative to selector.' })),
+  selector: Type.Optional(Type.String({ description: 'CSS selector of the element to click. Provide selector OR x/y, not both.' })),
+  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels, must be visible). Provide x+y OR selector.' })),
+  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels, must be visible). Provide x+y OR selector.' })),
   frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
 });
 
 const DblclickParams = Type.Object({
   action: Type.Literal('dblclick'),
-  selector: Type.Optional(Type.String({ description: 'CSS selector of the element to double-click.' })),
-  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels).' })),
-  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels).' })),
+  selector: Type.Optional(Type.String({ description: 'CSS selector of the element. Provide selector OR x/y, not both.' })),
+  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels, must be visible). Provide x+y OR selector.' })),
+  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels, must be visible). Provide x+y OR selector.' })),
   frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
 });
 
 const RightclickParams = Type.Object({
   action: Type.Literal('rightclick'),
-  selector: Type.Optional(Type.String({ description: 'CSS selector of the element to right-click.' })),
-  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels).' })),
-  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels).' })),
+  selector: Type.Optional(Type.String({ description: 'CSS selector of the element. Provide selector OR x/y, not both.' })),
+  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels, must be visible). Provide x+y OR selector.' })),
+  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels, must be visible). Provide x+y OR selector.' })),
   frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
 });
 
 const HoverParams = Type.Object({
   action: Type.Literal('hover'),
-  selector: Type.Optional(Type.String({ description: 'CSS selector of the element to hover over.' })),
-  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels).' })),
-  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels).' })),
+  selector: Type.Optional(Type.String({ description: 'CSS selector of the element. Provide selector OR x/y, not both.' })),
+  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels, must be visible). Provide x+y OR selector.' })),
+  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels, must be visible). Provide x+y OR selector.' })),
   frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
 });
 
