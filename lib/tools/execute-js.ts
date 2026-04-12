@@ -40,7 +40,10 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
 
     const results = await chrome.scripting.executeScript({
       target,
-      func: new Function(`return (async () => { ${params.code} })()`) as () => Promise<unknown>,
+      func: (code: string) => {
+        return new Function(`return (async () => { ${code} })()`)();
+      },
+      args: [params.code],
       ...({ world: 'MAIN' } as any),
     });
 

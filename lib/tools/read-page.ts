@@ -47,7 +47,7 @@ const ReadPageParameters = Type.Object({
 // ─── In-page functions (self-contained, no closures) ───
 
 /** Extract plain innerText from the page. */
-function extractText(selector: string | undefined): string {
+function extractText(selector: string | null): string {
   const root = selector
     ? document.querySelector(selector) as HTMLElement | null
     : document.body;
@@ -58,7 +58,7 @@ function extractText(selector: string | undefined): string {
 }
 
 /** Extract cleaned innerHTML (no script/style/svg). */
-function extractHtml(selector: string | undefined): string {
+function extractHtml(selector: string | null): string {
   const root = selector
     ? document.querySelector(selector) as HTMLElement | null
     : document.body;
@@ -71,7 +71,7 @@ function extractHtml(selector: string | undefined): string {
 }
 
 /** Get the full document HTML for Readability processing. */
-function getDocumentHtml(selector: string | undefined): { html: string; url: string } {
+function getDocumentHtml(selector: string | null): { html: string; url: string } {
   if (selector) {
     const el = document.querySelector(selector);
     if (!el) return { html: '', url: window.location.href };
@@ -130,11 +130,11 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
 
     switch (mode) {
       case 'text': {
-        content = await executeInTabWithArgs(tabId, extractText, [params.selector], params.frameId);
+        content = await executeInTabWithArgs(tabId, extractText, [params.selector ?? null], params.frameId);
         break;
       }
       case 'html': {
-        content = await executeInTabWithArgs(tabId, extractHtml, [params.selector], params.frameId);
+        content = await executeInTabWithArgs(tabId, extractHtml, [params.selector ?? null], params.frameId);
         break;
       }
       case 'readable':
@@ -143,7 +143,7 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
         // and go directly HTML → Turndown for markdown, or HTML as readable.
         if (params.selector) {
           const html = await executeInTabWithArgs(
-            tabId, extractHtml, [params.selector], params.frameId,
+            tabId, extractHtml, [params.selector ?? null], params.frameId,
           );
           content = mode === 'markdown' ? htmlToMarkdown(html) : html;
           break;
@@ -151,14 +151,14 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
 
         // Step 1: Get full document HTML from page
         const { html, url } = await executeInTabWithArgs(
-          tabId, getDocumentHtml, [undefined], params.frameId,
+          tabId, getDocumentHtml, [null], params.frameId,
         );
 
         // Step 2: Extract article with Readability (extension context)
         const articleHtml = parseWithReadability(html, url);
         if (!articleHtml) {
           // Readability couldn't parse — fall back to cleaned text
-          const fallback = await executeInTabWithArgs(tabId, extractText, [params.selector], params.frameId);
+          const fallback = await executeInTabWithArgs(tabId, extractText, [params.selector ?? null], params.frameId);
           content = '(Readability extraction failed, falling back to plain text)\n\n' + fallback;
           break;
         }
@@ -168,7 +168,7 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
         break;
       }
       default:
-        content = await executeInTabWithArgs(tabId, extractText, [params.selector], params.frameId);
+        content = await executeInTabWithArgs(tabId, extractText, [params.selector ?? null], params.frameId);
     }
 
     return {
