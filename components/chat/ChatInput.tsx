@@ -12,7 +12,7 @@ import { getModel, type KnownProvider } from '@mariozechner/pi-ai';
 import { isCustomProvider, findCustomModel, mergeCustomProviders } from '@/lib/custom-models';
 import { SLASH_COMMANDS, PRESET_PROVIDERS } from '@/lib/constants';
 import { startElementPicker, cancelElementPicker } from '@/lib/element-picker';
-import type { Attachment, ElementAttachment } from '@/lib/attachments';
+import { MAX_ATTACHMENT_COUNT, type Attachment } from '@/lib/attachments';
 
 interface ChatInputProps {
   onSend: (message: string, attachments?: Attachment[]) => void;
@@ -73,6 +73,18 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
     return () => { cancelElementPicker(); };
   }, []);
 
+  // Cancel picker on Esc key (sidepanel has focus, not the page)
+  useEffect(() => {
+    if (!isPicking) return;
+    const onKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        cancelElementPicker();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isPicking]);
+
   const canSend = value.trim().length > 0;
 
   const handleSend = () => {
@@ -96,7 +108,10 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
   };
 
   const handlePickElement = async () => {
-    if (isPicking) return;
+    if (isPicking) {
+      cancelElementPicker();
+      return;
+    }
     setIsPicking(true);
     try {
       const result = await startElementPicker();
@@ -117,6 +132,24 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
     } finally {
       setIsPicking(false);
       textareaRef.current?.focus();
+    }
+  };
+
+  const handleScreenshot = async () => {
+    if (attachments.length >= MAX_ATTACHMENT_COUNT) {
+      toast.warning(`最多添加 ${MAX_ATTACHMENT_COUNT} 个附件`);
+      return;
+    }
+    try {
+      const dataUrl = await chrome.tabs.captureVisibleTab({ format: 'jpeg', quality: 85 });
+      const base64 = dataUrl.split(',', 2)[1] ?? '';
+      setAttachments((prev) => [
+        ...prev,
+        { type: 'image', source: 'screenshot', data: base64, mimeType: 'image/jpeg' },
+      ]);
+    } catch (err) {
+      toast.error('截图失败');
+      console.error('[Screenshot]', err);
     }
   };
 
@@ -159,10 +192,16 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
         {/* Top row: tools + attachments */}
         <div className="flex items-center gap-1 px-2 pt-2 pb-2">
           {/* Tool icons */}
-          <Button variant="ghost" size="icon-xs" title="选择元素" onClick={handlePickElement} disabled={isPicking}>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            title={isPicking ? '取消选择' : '选择元素'}
+            onClick={handlePickElement}
+            className={isPicking ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}
+          >
             <MousePointer2 className="size-3.5" />
           </Button>
-          <Button variant="ghost" size="icon-xs" title="截图">
+          <Button variant="ghost" size="icon-xs" title="截图" onClick={handleScreenshot}>
             <Camera className="size-3.5" />
           </Button>
           <Button variant="ghost" size="icon-xs" title="上传文件">
@@ -183,36 +222,57 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
               <Separator orientation="vertical" className="h-4! mx-1 bg-border" />
 
               {/* Attachment chips */}
-              <div className="flex gap-1 flex-1 min-w-0 overflow-x-auto scrollbar-none">
+              <div className="flex gap-1.5 flex-1 min-w-0 overflow-x-auto scrollbar-none items-center">
                 {attachments.map((att, i) => (
-                  <Badge
-                    key={i}
-                    variant="outline"
-                    className={`shrink-0 text-[0.65rem] font-mono gap-1 h-5 rounded pl-1 pr-0.5 ${
-                      att.type === 'element'
-                        ? 'text-info border-info/20 bg-info/5'
-                        : att.type === 'image'
-                          ? 'text-purple-400 border-purple-400/20 bg-purple-400/5'
-                          : 'text-emerald-400 border-emerald-400/20 bg-emerald-400/5'
-                    }`}
-                  >
-                    {att.type === 'element' && <Crosshair className="size-2.5 shrink-0" />}
-                    {att.type === 'image' && <Image className="size-2.5 shrink-0" />}
-                    {att.type === 'file' && <FileText className="size-2.5 shrink-0" />}
-
-                    <span className="truncate max-w-24">
-                      {att.type === 'element' && att.selector}
-                      {att.type === 'image' && (att.name || (att.source === 'screenshot' ? '截图' : '图片'))}
-                      {att.type === 'file' && att.name}
-                    </span>
-
-                    <button
-                      className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
-                      onClick={() => removeAttachment(i)}
+                  att.type === 'image' ? (
+                    // Image attachment: thumbnail + label badge
+                    <Badge
+                      key={i}
+                      variant="outline"
+                      className="shrink-0 text-[0.65rem] font-mono gap-1 h-5 rounded pl-0.5 pr-0.5 text-purple-400 border-purple-400/20 bg-purple-400/5 group"
                     >
-                      <X className="size-2.5" />
-                    </button>
-                  </Badge>
+                      <img
+                        src={`data:${att.mimeType};base64,${att.data}`}
+                        alt={att.name || '截图'}
+                        className="h-3.5 w-auto rounded-sm object-cover"
+                      />
+                      <span className="truncate max-w-24">
+                        {att.name || (att.source === 'screenshot' ? '截图' : '图片')}
+                      </span>
+                      <button
+                        className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
+                        onClick={() => removeAttachment(i)}
+                      >
+                        <X className="size-2.5" />
+                      </button>
+                    </Badge>
+                  ) : (
+                    // Element / file attachment: badge chip
+                    <Badge
+                      key={i}
+                      variant="outline"
+                      className={`shrink-0 text-[0.65rem] font-mono gap-1 h-5 rounded pl-1 pr-0.5 ${
+                        att.type === 'element'
+                          ? 'text-info border-info/20 bg-info/5'
+                          : 'text-emerald-400 border-emerald-400/20 bg-emerald-400/5'
+                      }`}
+                    >
+                      {att.type === 'element' && <Crosshair className="size-2.5 shrink-0" />}
+                      {att.type === 'file' && <FileText className="size-2.5 shrink-0" />}
+
+                      <span className="truncate max-w-24">
+                        {att.type === 'element' && att.selector}
+                        {att.type === 'file' && att.name}
+                      </span>
+
+                      <button
+                        className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
+                        onClick={() => removeAttachment(i)}
+                      >
+                        <X className="size-2.5" />
+                      </button>
+                    </Badge>
+                  )
                 ))}
               </div>
             </>

@@ -345,10 +345,13 @@ export async function startElementPicker(): Promise<ElementAttachment | null> {
     // Setup: wire up cleanup so external callers can cancel
     currentCleanup = () => {
       cleanup();
-      // Remove picker UI from the page
+      // Remove picker UI + cursor style from the page
       chrome.scripting.executeScript({
         target: { tabId },
-        func: () => document.getElementById('cebian-picker-host')?.remove(),
+        func: () => {
+          document.getElementById('cebian-picker-host')?.remove();
+          document.getElementById('cebian-picker-cursor')?.remove();
+        },
       }).catch(() => {});
       resolve(null);
     };
