@@ -34,6 +34,9 @@ export type Attachment = ImageAttachment | TextFileAttachment | ElementAttachmen
 
 // ─── Size / type limits ───
 
+/** Regex to strip attachment XML blocks from user messages for display. */
+export const ATTACHMENT_STRIP_RE = /<selected-element[\s\S]*?<\/selected-element>\s*|<attached-file[\s\S]*?<\/attached-file>\s*/g;
+
 export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;      // 5 MB
 export const MAX_TEXT_FILE_SIZE = 100 * 1024;         // 100 KB
 export const MAX_ATTACHMENT_COUNT = 10;
@@ -67,6 +70,11 @@ export function isImageFile(file: File): boolean {
 
 // ─── Build LLM-ready content from attachments ───
 
+/** Escape a string for safe use inside XML attribute values. */
+function escXmlAttr(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 /**
  * Build XML text prefix from element and file attachments.
  * This text is prepended to the user message before page context.
@@ -77,11 +85,11 @@ export function buildTextPrefix(attachments: Attachment[]): string {
   for (const a of attachments) {
     if (a.type === 'element') {
       const attrs = Object.entries(a.attributes)
-        .map(([k, v]) => `${k}="${v}"`)
+        .map(([k, v]) => `${k}="${escXmlAttr(v)}"`)
         .join(' ');
 
       const lines = [
-        `<selected-element selector="${a.selector}"${a.frameId ? ` frame-id="${a.frameId}" frame-url="${a.frameUrl ?? ''}"` : ''}>`,
+        `<selected-element selector="${escXmlAttr(a.selector)}"${a.frameId ? ` frame-id="${a.frameId}" frame-url="${escXmlAttr(a.frameUrl ?? '')}"` : ''}>`,
         `  path: ${a.path}`,
         `  tag: ${a.tagName}`,
         `  attributes: ${attrs || '(none)'}`,
@@ -94,7 +102,7 @@ export function buildTextPrefix(attachments: Attachment[]): string {
 
     if (a.type === 'file') {
       blocks.push(
-        `<attached-file name="${a.name}" type="${a.mimeType}">\n${a.content}\n</attached-file>`,
+        `<attached-file name="${escXmlAttr(a.name)}" type="${escXmlAttr(a.mimeType)}">\n${a.content}\n</attached-file>`,
       );
     }
   }

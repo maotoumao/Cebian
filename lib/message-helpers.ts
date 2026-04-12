@@ -7,6 +7,7 @@ import type {
   ToolCall,
 } from '@mariozechner/pi-ai';
 import { CONTEXT_STRIP_RE } from './page-context';
+import { ATTACHMENT_STRIP_RE } from './attachments';
 
 /** Extract plain text from an AssistantMessage's content blocks */
 export function getAssistantText(msg: AssistantMessage): string {
@@ -50,5 +51,5 @@ export function extractUserText(msg: Message): string {
       .map(b => b.text)
       .join('');
   }
-  return raw.replace(CONTEXT_STRIP_RE, '').trim();
+  return raw.replace(CONTEXT_STRIP_RE, '').replace(ATTACHMENT_STRIP_RE, '').trim();
 }

@@ -7,6 +7,7 @@ import type { ThrottledSessionWriter, SessionRecord } from '@/lib/db';
 import { interactiveToolRegistry } from '@/lib/tools/registry';
 import { extractUserText } from '@/lib/message-helpers';
 import { gatherPageContext } from '@/lib/page-context';
+import { buildTextPrefix, extractImages, type Attachment } from '@/lib/attachments';
 
 // ─── Types ───
 
@@ -20,7 +21,7 @@ export interface AgentConfig {
 export interface AgentLifecycle {
   agentRef: React.RefObject<Agent | null>;
   isAgentRunning: boolean;
-  handleSend: (text: string) => void;
+  handleSend: (text: string, attachments?: Attachment[]) => void;
 }
 
 // ─── Hook ───
@@ -146,12 +147,24 @@ export function useAgentLifecycle(opts: {
   }, [modelObj, routeSessionId, sessionLoading]);
 
   // Send message — generic interactive tool handling via followUp
-  const handleSend = useCallback((text: string) => {
+  const handleSend = useCallback((text: string, attachments: Attachment[] = []) => {
     if (!agentRef.current || !modelObj || !text.trim()) return;
 
     const trimmed = text.trim();
     // Lock immediately to prevent double-sends during async context gathering
     setIsAgentRunning(true);
+
+    /** Build enriched text: [pageContext] + [attachmentPrefix] + [userText] */
+    const buildEnrichedText = (ctx: string): string => {
+      const parts: string[] = [];
+      if (ctx) parts.push(ctx);
+      const prefix = buildTextPrefix(attachments);
+      if (prefix) parts.push(prefix);
+      if (trimmed) parts.push(trimmed);
+      return parts.join('\n\n');
+    };
+
+    const images = extractImages(attachments);
 
     // If any interactive tool is pending, cancel all and steer with user message.
     // IMPORTANT: gather context BEFORE cancelAll, because cancelAll unblocks the agent
@@ -161,10 +174,12 @@ export function useAgentLifecycle(opts: {
       gatherPageContext().then((ctx) => {
         const agent = agentRef.current;
         if (!agent) return;
-        const enriched = ctx ? `${ctx}\n\n${trimmed}` : trimmed;
+        const enriched = buildEnrichedText(ctx);
+        const content: any[] = [{ type: 'text', text: enriched }];
+        if (images.length > 0) content.push(...images);
         const userMessage: AgentMessage = {
           role: 'user',
-          content: [{ type: 'text', text: enriched }],
+          content,
           timestamp: Date.now(),
         } as AgentMessage;
         // Enqueue BEFORE cancelling so getSteeringMessages() sees it when the loop drains.
@@ -180,8 +195,8 @@ export function useAgentLifecycle(opts: {
     gatherPageContext().then((ctx) => {
       const agent = agentRef.current;
       if (!agent) return;
-      const enriched = ctx ? `${ctx}\n\n${trimmed}` : trimmed;
-      agent.prompt(enriched).catch((err) => {
+      const enriched = buildEnrichedText(ctx);
+      agent.prompt(enriched, images.length > 0 ? images : undefined).catch((err) => {
         console.error('Agent prompt failed:', err);
         setIsAgentRunning(false);
       });
