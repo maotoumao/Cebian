@@ -149,7 +149,7 @@ function performInteraction(params: {
     case 'hover': {
       const el = getEl();
       el.scrollIntoView({ block: 'center', behavior: 'instant' });
-      el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+      el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
       el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
       return Promise.resolve(`Hovered: ${selector}`);
     }
@@ -189,6 +189,10 @@ function performInteraction(params: {
         }
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (el.isContentEditable) {
+        el.focus();
+        document.execCommand('selectAll', false);
+        document.execCommand('delete', false);
       }
       return Promise.resolve(`Cleared: ${selector}`);
     }
@@ -199,6 +203,7 @@ function performInteraction(params: {
         const option = Array.from(el.options).find(o => o.text === text || o.value === text);
         if (!option) throw new Error(`Option not found: ${text}`);
         el.value = option.value;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
         return Promise.resolve(`Selected "${text}" in: ${selector}`);
       }
@@ -247,14 +252,20 @@ function performInteraction(params: {
 
     case 'wait_hidden': {
       if (!selector) throw new Error('"selector" is required for wait_hidden action.');
+      const isHidden = (sel: string) => {
+        const el = document.querySelector<HTMLElement>(sel);
+        if (!el) return true;
+        const style = getComputedStyle(el);
+        return style.display === 'none' || style.visibility === 'hidden';
+      };
       return new Promise<string>((resolve, reject) => {
-        if (!document.querySelector(selector)) { resolve(`Element already hidden: ${selector}`); return; }
+        if (isHidden(selector)) { resolve(`Element already hidden: ${selector}`); return; }
         const timer = setTimeout(() => {
           observer.disconnect();
           reject(new Error(`Timeout: element ${selector} still visible after ${timeout}ms`));
         }, timeout);
         const observer = new MutationObserver(() => {
-          if (!document.querySelector(selector)) {
+          if (isHidden(selector)) {
             observer.disconnect();
             clearTimeout(timer);
             resolve(`Element disappeared: ${selector}`);
@@ -303,7 +314,7 @@ export const interactTool: AgentTool<typeof InteractParameters> = {
     }
 
     // All other actions run in-page
-    const frameId = 'frameId' in params ? params.frameId : undefined;
+    const frameId = params.frameId;
     try {
       const result = await executeInTabWithArgs(tabId, performInteraction, [params], frameId);
       return {
