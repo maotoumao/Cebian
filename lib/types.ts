@@ -29,3 +29,5 @@ export const TOOL_ASK_USER = 'ask_user' as const;
 export const TOOL_EXECUTE_JS = 'execute_js' as const;
 /** Tool that extracts page content in various formats */
 export const TOOL_READ_PAGE = 'read_page' as const;
+/** Tool that simulates user interactions on the page */
+export const TOOL_INTERACT = 'interact' as const;
