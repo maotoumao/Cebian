@@ -25,5 +25,5 @@ export type {
 
 /** Tool that pauses the agent loop to ask the user a question */
 export const TOOL_ASK_USER = 'ask_user' as const;
-/** Tool that executes JS in the active tab */
-export const TOOL_EXECUTE_SCRIPT = 'executeScript' as const;
+/** Tool that executes arbitrary JS in the active tab */
+export const TOOL_EXECUTE_JS = 'execute_js' as const;
