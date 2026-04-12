@@ -12,22 +12,22 @@ export function ToolCard({ label, status, args, result }: ToolCardProps) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden my-2 text-xs">
+    <div className="border border-border rounded-lg overflow-hidden my-3 text-[0.8rem] min-w-0">
       {/* Header — always visible */}
       <button
         type="button"
-        className="w-full flex items-center gap-2 px-3 py-2 bg-card hover:bg-accent/50 transition-colors text-left cursor-pointer"
+        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 bg-card hover:bg-accent/50 transition-colors text-left cursor-pointer"
         onClick={() => setOpen(!open)}
       >
         {/* Status icon */}
         {status === 'running' && (
-          <Loader2 className="size-3.5 text-primary animate-spin shrink-0" />
+          <Loader2 className="size-4 text-primary animate-spin shrink-0" />
         )}
         {status === 'done' && (
-          <Check className="size-3.5 text-success shrink-0" />
+          <Check className="size-4 text-success shrink-0" />
         )}
         {status === 'error' && (
-          <X className="size-3.5 text-destructive shrink-0" />
+          <X className="size-4 text-destructive shrink-0" />
         )}
 
         {/* Label */}
@@ -41,20 +41,20 @@ export function ToolCard({ label, status, args, result }: ToolCardProps) {
 
       {/* Expandable body */}
       {open && (
-        <div className="border-t border-border">
+        <div className="border-t border-border overflow-hidden">
           {/* Arguments */}
-          <div className="px-3 py-2 bg-background">
-            <div className="text-[0.65rem] text-muted-foreground/60 mb-1 font-medium">参数</div>
-            <pre className="text-muted-foreground whitespace-pre-wrap overflow-x-auto font-mono">
+          <div className="px-3.5 py-2.5 bg-background">
+            <div className="text-[0.65rem] text-muted-foreground/60 mb-1.5 font-medium">参数</div>
+            <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-all font-mono">
               <code>{args}</code>
             </pre>
           </div>
 
           {/* Result (if available) */}
           {result && (
-            <div className="px-3 py-2 bg-background border-t border-border/50">
-              <div className="text-[0.65rem] text-muted-foreground/60 mb-1 font-medium">结果</div>
-              <pre className="text-muted-foreground whitespace-pre-wrap overflow-x-auto font-mono max-h-48 overflow-y-auto">
+            <div className="px-3.5 py-2.5 bg-background border-t border-border/50">
+              <div className="text-[0.65rem] text-muted-foreground/60 mb-1.5 font-medium">结果</div>
+              <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-all font-mono max-h-48 overflow-y-auto">
                 <code>{result}</code>
               </pre>
             </div>
