@@ -87,11 +87,13 @@ export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }
           )}
 
           {!loading && sessions.map((session) => (
-            <button
+            <div
               key={session.id}
-              type="button"
-              className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-muted/50 transition-colors group"
+              role="button"
+              tabIndex={0}
+              className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-muted/50 transition-colors group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onClick={() => onSelectSession(session.id)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectSession(session.id); } }}
             >
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">
@@ -114,7 +116,7 @@ export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }
               >
                 <Trash2 className="size-4" />
               </Button>
-            </button>
+            </div>
           ))}
         </div>
       </ScrollArea>
