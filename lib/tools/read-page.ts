@@ -84,6 +84,8 @@ function extractCleanHtml(selector: string | null): string {
   const clone = root.cloneNode(true) as HTMLElement;
   clone.querySelectorAll('script, style, svg, noscript, link[rel="stylesheet"]').forEach(el => el.remove());
   clone.querySelectorAll('[aria-hidden="true"], [hidden]').forEach(el => el.remove());
+  // Strip inline style attributes — they add noise without semantic value
+  clone.querySelectorAll('[style]').forEach(el => el.removeAttribute('style'));
   return clone.innerHTML;
 }
 
@@ -121,6 +123,8 @@ function htmlToMarkdown(html: string): string {
     bulletListMarker: '-',
   });
   turndown.use(gfm);
+  // Defensive: strip any <style>/<script> that survived in-page cleaning
+  turndown.remove(['style', 'script', 'noscript']);
   return turndown.turndown(html);
 }
 
