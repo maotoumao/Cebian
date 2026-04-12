@@ -49,6 +49,7 @@ export function useSessionManager(
 
     let cancelled = false;
     setSessionLoading(true);
+    setSessionTitle('');
 
     getSession(routeSessionId!)
       .then((session) => {

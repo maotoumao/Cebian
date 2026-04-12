@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { Toaster } from '@/components/ui/sonner';
 import { Header } from '@/components/layout/Header';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { HistoryPanel } from '@/components/layout/HistoryPanel';
@@ -95,6 +96,8 @@ function App() {
           onSelectSession={handleSelectSession}
           onDeleteSession={handleDeleteSession}
         />
+
+        <Toaster theme={theme === 'light' ? 'light' : 'dark'} />
       </div>
     </TooltipProvider>
   );
