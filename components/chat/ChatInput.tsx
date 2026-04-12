@@ -192,10 +192,6 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
           </div>
         </div>
       </div>
-
-      <p className="text-center text-[0.65rem] text-muted-foreground/50 mt-2.5">
-        Cebian has CDP and script injection permissions active.
-      </p>
     </footer>
   );
 }

@@ -8,8 +8,8 @@ import { getActiveTabId, executeInTabWithArgs, waitForNavigation } from './chrom
 const ClickParams = Type.Object({
   action: Type.Literal('click'),
   selector: Type.Optional(Type.String({ description: 'CSS selector of the element to click.' })),
-  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels). Use with y as alternative to selector.' })),
-  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels). Use with x as alternative to selector.' })),
+  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels, must be visible). Use with y as alternative to selector.' })),
+  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels, must be visible). Use with x as alternative to selector.' })),
   frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
 });
 
@@ -124,6 +124,9 @@ function performInteraction(params: {
 }): Promise<string> {
   const { action, selector, x, y, text, key, modifiers, deltaX, deltaY, timeout = 5000, nth = 0 } = params;
 
+  /** Whether the element was found by coordinates (skip scrollIntoView). */
+  let resolvedByCoords = false;
+
   function getEl(): HTMLElement {
     if (selector) {
       const el = document.querySelector<HTMLElement>(selector);
@@ -133,10 +136,14 @@ function performInteraction(params: {
     if (x != null && y != null) {
       const el = document.elementFromPoint(x, y) as HTMLElement | null;
       if (!el) throw new Error(`No element at coordinates (${x}, ${y})`);
+      resolvedByCoords = true;
       return el;
     }
     throw new Error('Either selector or x/y coordinates are required.');
   }
+
+  /** Description of what was targeted, for result messages. */
+  const targetDesc = selector ?? `(${x}, ${y})`;
 
   function modInit() {
     return {
@@ -150,33 +157,33 @@ function performInteraction(params: {
   switch (action) {
     case 'click': {
       const el = getEl();
-      el.scrollIntoView({ block: 'center', behavior: 'instant' });
+      if (!resolvedByCoords) el.scrollIntoView({ block: 'center', behavior: 'instant' });
       el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, ...modInit() }));
       el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, ...modInit() }));
       el.click();
-      return Promise.resolve(`Clicked: ${selector}`);
+      return Promise.resolve(`Clicked: ${targetDesc}`);
     }
 
     case 'dblclick': {
       const el = getEl();
-      el.scrollIntoView({ block: 'center', behavior: 'instant' });
+      if (!resolvedByCoords) el.scrollIntoView({ block: 'center', behavior: 'instant' });
       el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
-      return Promise.resolve(`Double-clicked: ${selector}`);
+      return Promise.resolve(`Double-clicked: ${targetDesc}`);
     }
 
     case 'rightclick': {
       const el = getEl();
-      el.scrollIntoView({ block: 'center', behavior: 'instant' });
+      if (!resolvedByCoords) el.scrollIntoView({ block: 'center', behavior: 'instant' });
       el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, button: 2 }));
-      return Promise.resolve(`Right-clicked: ${selector}`);
+      return Promise.resolve(`Right-clicked: ${targetDesc}`);
     }
 
     case 'hover': {
       const el = getEl();
-      el.scrollIntoView({ block: 'center', behavior: 'instant' });
+      if (!resolvedByCoords) el.scrollIntoView({ block: 'center', behavior: 'instant' });
       el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
       el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-      return Promise.resolve(`Hovered: ${selector}`);
+      return Promise.resolve(`Hovered: ${targetDesc}`);
     }
 
     case 'type': {
@@ -317,7 +324,7 @@ function performInteraction(params: {
           while (el && el !== document.body) {
             let seg = el.tagName.toLowerCase();
             if (el.id) {
-              seg = `#${el.id}`;
+              seg = '#' + CSS.escape(el.id);
               path.unshift(seg);
               break;
             }
