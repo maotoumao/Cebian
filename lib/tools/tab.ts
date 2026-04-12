@@ -3,35 +3,20 @@ import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_TAB } from '@/lib/types';
 import { getActiveTabId } from './chrome-api';
 
-// ─── Discriminated union per action ───
+// ─── Parameters: single flat object (OpenAI requires top-level "type": "object") ───
 
-const OpenParams = Type.Object({
-  action: Type.Literal('open'),
-  url: Type.String({ description: 'URL to open in a new tab.' }),
+const TabParameters = Type.Object({
+  action: Type.Union([
+    Type.Literal('open'), Type.Literal('close'), Type.Literal('switch'),
+    Type.Literal('reload'), Type.Literal('list_frames'),
+  ], { description: 'The tab action to perform.' }),
+  url: Type.Optional(Type.String({
+    description: 'URL to open. Required for "open" action (http/https only).',
+  })),
+  tabId: Type.Optional(Type.Number({
+    description: 'Tab ID. Required for "close" and "switch". Optional for "reload" (omit to reload active tab). Get IDs from the context block.',
+  })),
 });
-
-const CloseParams = Type.Object({
-  action: Type.Literal('close'),
-  tabId: Type.Number({ description: 'Tab ID to close. Get IDs from the context block.' }),
-});
-
-const SwitchParams = Type.Object({
-  action: Type.Literal('switch'),
-  tabId: Type.Number({ description: 'Tab ID to switch to. Get IDs from the context block.' }),
-});
-
-const ReloadParams = Type.Object({
-  action: Type.Literal('reload'),
-  tabId: Type.Optional(Type.Number({ description: 'Tab ID to reload. Omit to reload the active tab.' })),
-});
-
-const ListFramesParams = Type.Object({
-  action: Type.Literal('list_frames'),
-});
-
-const TabParameters = Type.Union([
-  OpenParams, CloseParams, SwitchParams, ReloadParams, ListFramesParams,
-]);
 
 // ─── Tool definition ───
 
@@ -41,8 +26,7 @@ export const tabTool: AgentTool<typeof TabParameters> = {
   description:
     'Manage browser tabs: open a new tab (http/https only), close a tab, switch to a tab, reload, ' +
     'or list all frames (including iframes) in the active tab. ' +
-    'Use the tab list from the context block to find tab IDs. ' +
-    'Avoid closing the active tab — it will disconnect the page context.',
+    'Use the tab list from the context block to find tab IDs.',
   parameters: TabParameters,
 
   async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
@@ -51,6 +35,9 @@ export const tabTool: AgentTool<typeof TabParameters> = {
     try {
       switch (params.action) {
         case 'open': {
+          if (!params.url) {
+            return { content: [{ type: 'text', text: 'Error: "url" is required for open action.' }], details: { status: 'error' } };
+          }
           const parsed = new URL(params.url);
           if (!['http:', 'https:'].includes(parsed.protocol)) {
             return {
@@ -66,6 +53,9 @@ export const tabTool: AgentTool<typeof TabParameters> = {
         }
 
         case 'close': {
+          if (!params.tabId) {
+            return { content: [{ type: 'text', text: 'Error: "tabId" is required for close action.' }], details: { status: 'error' } };
+          }
           await chrome.tabs.remove(params.tabId);
           return {
             content: [{ type: 'text', text: `Closed tab: ${params.tabId}` }],
@@ -74,6 +64,9 @@ export const tabTool: AgentTool<typeof TabParameters> = {
         }
 
         case 'switch': {
+          if (!params.tabId) {
+            return { content: [{ type: 'text', text: 'Error: "tabId" is required for switch action.' }], details: { status: 'error' } };
+          }
           await chrome.tabs.update(params.tabId, { active: true });
           const tab = await chrome.tabs.get(params.tabId);
           return {

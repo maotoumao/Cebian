@@ -3,109 +3,61 @@ import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_INTERACT } from '@/lib/types';
 import { getActiveTabId, executeInTabWithArgs, waitForNavigation } from './chrome-api';
 
-// ─── Discriminated union: each action has its own parameter shape ───
+// ─── Parameters: single flat object (OpenAI requires top-level "type": "object") ───
 
-const ClickParams = Type.Object({
-  action: Type.Literal('click'),
-  selector: Type.Optional(Type.String({ description: 'CSS selector of the element to click. Provide selector OR x/y, not both.' })),
-  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels, must be visible). Provide x+y OR selector.' })),
-  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels, must be visible). Provide x+y OR selector.' })),
-  frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
+const InteractParameters = Type.Object({
+  action: Type.Union([
+    Type.Literal('click'), Type.Literal('dblclick'), Type.Literal('rightclick'),
+    Type.Literal('hover'), Type.Literal('type'), Type.Literal('clear'),
+    Type.Literal('select'), Type.Literal('scroll'), Type.Literal('keypress'),
+    Type.Literal('wait'), Type.Literal('wait_hidden'), Type.Literal('wait_navigation'),
+    Type.Literal('find'),
+  ], { description: 'The interaction to perform.' }),
+  selector: Type.Optional(Type.String({
+    description:
+      'CSS selector of the target element. ' +
+      'Required for: type, clear, select, wait, wait_hidden. ' +
+      'Optional for: click, dblclick, rightclick, hover (alternative: provide x + y instead). ' +
+      'Optional for: scroll (omit to scroll the page). ' +
+      'Not used by: keypress, wait_navigation, find.',
+  })),
+  x: Type.Optional(Type.Number({
+    description:
+      'X viewport coordinate (pixels, must be visible on screen). ' +
+      'For click/dblclick/rightclick/hover only. Provide x + y together as alternative to selector.',
+  })),
+  y: Type.Optional(Type.Number({
+    description:
+      'Y viewport coordinate (pixels, must be visible on screen). ' +
+      'For click/dblclick/rightclick/hover only. Provide x + y together as alternative to selector.',
+  })),
+  text: Type.Optional(Type.String({
+    description:
+      'Text content. ' +
+      'Required for: type (text to input), select (option text/value to pick), find (text to search for).',
+  })),
+  key: Type.Optional(Type.String({
+    description: 'Key name for "keypress" action (e.g. "Enter", "Tab", "Escape", "ArrowDown"). Required for keypress.',
+  })),
+  modifiers: Type.Optional(Type.Array(Type.String(), {
+    description: 'Modifier keys to hold during keypress: "ctrl", "shift", "alt", "meta".',
+  })),
+  deltaX: Type.Optional(Type.Number({
+    description: 'Horizontal scroll amount for "scroll" action. Default: 0.',
+  })),
+  deltaY: Type.Optional(Type.Number({
+    description: 'Vertical scroll amount for "scroll" action. Positive = down. Default: 300.',
+  })),
+  timeout: Type.Optional(Type.Number({
+    description: 'Timeout in ms for wait, wait_hidden, wait_navigation. Default: 5000.',
+  })),
+  nth: Type.Optional(Type.Number({
+    description: 'Match index (0-based) for "find" action. Default: 0 (first match).',
+  })),
+  frameId: Type.Optional(Type.Number({
+    description: 'Frame ID to interact with. Omit for top frame. Use tab({ action: "list_frames" }) to discover IDs.',
+  })),
 });
-
-const DblclickParams = Type.Object({
-  action: Type.Literal('dblclick'),
-  selector: Type.Optional(Type.String({ description: 'CSS selector of the element. Provide selector OR x/y, not both.' })),
-  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels, must be visible). Provide x+y OR selector.' })),
-  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels, must be visible). Provide x+y OR selector.' })),
-  frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
-});
-
-const RightclickParams = Type.Object({
-  action: Type.Literal('rightclick'),
-  selector: Type.Optional(Type.String({ description: 'CSS selector of the element. Provide selector OR x/y, not both.' })),
-  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels, must be visible). Provide x+y OR selector.' })),
-  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels, must be visible). Provide x+y OR selector.' })),
-  frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
-});
-
-const HoverParams = Type.Object({
-  action: Type.Literal('hover'),
-  selector: Type.Optional(Type.String({ description: 'CSS selector of the element. Provide selector OR x/y, not both.' })),
-  x: Type.Optional(Type.Number({ description: 'X coordinate (viewport pixels, must be visible). Provide x+y OR selector.' })),
-  y: Type.Optional(Type.Number({ description: 'Y coordinate (viewport pixels, must be visible). Provide x+y OR selector.' })),
-  frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
-});
-
-const TypeParams = Type.Object({
-  action: Type.Literal('type'),
-  selector: Type.String({ description: 'CSS selector of the input/textarea to type into.' }),
-  text: Type.String({ description: 'Text to type.' }),
-  frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
-});
-
-const ClearParams = Type.Object({
-  action: Type.Literal('clear'),
-  selector: Type.String({ description: 'CSS selector of the input/textarea to clear.' }),
-  frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
-});
-
-const SelectParams = Type.Object({
-  action: Type.Literal('select'),
-  selector: Type.String({ description: 'CSS selector of the <select> element.' }),
-  text: Type.String({ description: 'Option text or value to select.' }),
-  frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
-});
-
-const ScrollParams = Type.Object({
-  action: Type.Literal('scroll'),
-  selector: Type.Optional(Type.String({ description: 'CSS selector to scroll. Omit to scroll the page.' })),
-  deltaX: Type.Optional(Type.Number({ description: 'Horizontal scroll delta. Default: 0.' })),
-  deltaY: Type.Optional(Type.Number({ description: 'Vertical scroll delta. Positive = down. Default: 300.' })),
-  frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
-});
-
-const KeypressParams = Type.Object({
-  action: Type.Literal('keypress'),
-  key: Type.String({ description: 'Key to press (e.g. "Enter", "Tab", "Escape", "ArrowDown").' }),
-  modifiers: Type.Optional(Type.Array(
-    Type.Union([Type.Literal('ctrl'), Type.Literal('shift'), Type.Literal('alt'), Type.Literal('meta')]),
-    { description: 'Modifier keys to hold.' },
-  )),
-  frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
-});
-
-const WaitParams = Type.Object({
-  action: Type.Literal('wait'),
-  selector: Type.String({ description: 'CSS selector to wait for.' }),
-  timeout: Type.Optional(Type.Number({ description: 'Timeout in ms. Default: 5000.' })),
-  frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
-});
-
-const WaitHiddenParams = Type.Object({
-  action: Type.Literal('wait_hidden'),
-  selector: Type.String({ description: 'CSS selector to wait until hidden/removed.' }),
-  timeout: Type.Optional(Type.Number({ description: 'Timeout in ms. Default: 5000.' })),
-  frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
-});
-
-const WaitNavigationParams = Type.Object({
-  action: Type.Literal('wait_navigation'),
-  timeout: Type.Optional(Type.Number({ description: 'Timeout in ms. Default: 5000.' })),
-});
-
-const FindParams = Type.Object({
-  action: Type.Literal('find'),
-  text: Type.String({ description: 'Text content to search for in the page.' }),
-  nth: Type.Optional(Type.Number({ description: 'Which match to return (0-based). Default: 0.' })),
-  frameId: Type.Optional(Type.Number({ description: 'Frame ID. Omit for top frame.' })),
-});
-
-const InteractParameters = Type.Union([
-  ClickParams, DblclickParams, RightclickParams, HoverParams,
-  TypeParams, ClearParams, SelectParams, ScrollParams, KeypressParams,
-  WaitParams, WaitHiddenParams, WaitNavigationParams, FindParams,
-]);
 
 // ─── In-page interaction function (self-contained) ───
 
