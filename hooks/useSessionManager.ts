@@ -37,6 +37,13 @@ export function useSessionManager(
       return;
     }
 
+    // Skip DB load when navigating from persistNewSession — messages are
+    // already in state and the DB write may still be in flight.
+    if (sessionCreated.current && conversationIdRef.current === routeSessionId) {
+      setSessionLoading(false);
+      return;
+    }
+
     let cancelled = false;
     setSessionLoading(true);
 
@@ -69,13 +76,21 @@ export function useSessionManager(
   }, []);
 
   const persistNewSession = useCallback(async (session: SessionRecord) => {
+    // Set refs and navigate synchronously first to avoid race condition:
+    // without this, the route stays /chat/new during the async DB write,
+    // so clicking "new chat" is silently ignored and the next conversation
+    // ends up appended to this session.
+    conversationIdRef.current = session.id;
+    sessionCreated.current = true;
+    navigate(`/chat/${session.id}`, { replace: true });
     try {
       await createSession(session);
-      conversationIdRef.current = session.id;
-      sessionCreated.current = true;
-      navigate(`/chat/${session.id}`, { replace: true });
     } catch (err) {
       console.error('Failed to create session:', err);
+      // Roll back so the user can retry
+      conversationIdRef.current = null;
+      sessionCreated.current = false;
+      navigate('/chat/new', { replace: true });
     }
   }, [navigate]);
 

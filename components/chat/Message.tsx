@@ -111,9 +111,6 @@ export function AskUserBlock({
 
   return (
     <div className={`relative mt-3 p-3.5 border border-primary/20 bg-primary/5 rounded-lg ${answered ? 'opacity-60' : ''}`}>
-      {/* left accent bar */}
-      <div className="absolute left-0 top-2.5 bottom-2.5 w-0.5 rounded-r bg-primary shadow-[0_0_8px_var(--primary)]" />
-
       <div className="flex items-center gap-2 text-primary font-medium text-[0.85rem] mb-1.5">
         <CircleHelp className="size-4.5 shrink-0" />
         {question}
@@ -152,7 +149,7 @@ export function AskUserBlock({
           />
           <Button
             variant="ghost"
-            size="icon-xs"
+            size="icon-sm"
             onClick={handleFreeTextSubmit}
             disabled={!freeText.trim()}
             className="shrink-0"
@@ -160,13 +157,6 @@ export function AskUserBlock({
             <Send className="size-3" />
           </Button>
         </div>
-      )}
-
-      {/* Hint */}
-      {!answered && (
-        <p className="text-[0.65rem] text-muted-foreground/60 mt-2">
-          或直接在下方输入新消息以跳过
-        </p>
       )}
     </div>
   );

@@ -154,12 +154,13 @@ export function useAgentLifecycle(opts: {
       timestamp: Date.now(),
     } as AgentMessage;
 
-    // If any interactive tool is pending, cancel all and queue as follow-up.
+    // If any interactive tool is pending, cancel all and steer with user message.
     // cancel() resolves bridges with CANCELLED → tool.execute() returns cancelled result →
-    // agent naturally finishes the current run → picks up the follow-up message.
+    // steer() injects the user message right after tool results, before the next LLM call,
+    // so the model sees both the cancellation and the new message in a single turn.
     if (interactiveToolRegistry.hasPending()) {
       interactiveToolRegistry.cancelAll();
-      agentRef.current.followUp(userMessage);
+      agentRef.current.steer(userMessage);
       return;
     }
 
