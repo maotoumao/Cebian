@@ -3,7 +3,7 @@
  * Used by ToolCard to show concise descriptions instead of raw tool names.
  */
 
-export function getToolLabel(name: string, args: Record<string, any>): string {
+export function getToolLabel(name: string, args: Record<string, any> = {}): string {
   switch (name) {
     case 'read_page':
       return `正在阅读页面内容 (${args.mode ?? 'readable'})`;

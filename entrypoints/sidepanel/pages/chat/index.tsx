@@ -192,7 +192,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                       ? toolResult.content
                           .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
                           .map(b => b.text)
-                          .join('\n')
+                          .join('\n') || undefined
                       : undefined;
                     return (
                       <ToolCard

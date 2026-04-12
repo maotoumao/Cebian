@@ -43,18 +43,18 @@ export function ToolCard({ label, status, args, result }: ToolCardProps) {
       {open && (
         <div className="border-t border-border">
           {/* Arguments */}
-          <div className="px-3 py-2 bg-[#0a0a0d]">
+          <div className="px-3 py-2 bg-background">
             <div className="text-[0.65rem] text-muted-foreground/60 mb-1 font-medium">参数</div>
-            <pre className="text-[#a9a9b3] whitespace-pre-wrap overflow-x-auto font-mono">
+            <pre className="text-muted-foreground whitespace-pre-wrap overflow-x-auto font-mono">
               <code>{args}</code>
             </pre>
           </div>
 
           {/* Result (if available) */}
-          {result != null && (
-            <div className="px-3 py-2 bg-[#0a0a0d] border-t border-border/50">
+          {result && (
+            <div className="px-3 py-2 bg-background border-t border-border/50">
               <div className="text-[0.65rem] text-muted-foreground/60 mb-1 font-medium">结果</div>
-              <pre className="text-[#a9a9b3] whitespace-pre-wrap overflow-x-auto font-mono max-h-48 overflow-y-auto">
+              <pre className="text-muted-foreground whitespace-pre-wrap overflow-x-auto font-mono max-h-48 overflow-y-auto">
                 <code>{result}</code>
               </pre>
             </div>
