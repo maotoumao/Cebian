@@ -7,9 +7,9 @@ export interface SessionManager {
   messages: AgentMessage[];
   setMessages: React.Dispatch<React.SetStateAction<AgentMessage[]>>;
   sessionLoading: boolean;
-  sessionCreated: React.MutableRefObject<boolean>;
-  conversationIdRef: React.MutableRefObject<string | null>;
-  writerRef: React.MutableRefObject<ThrottledSessionWriter>;
+  sessionCreated: React.RefObject<boolean>;
+  conversationIdRef: React.RefObject<string | null>;
+  writerRef: React.RefObject<ThrottledSessionWriter>;
   /** Persist a newly-created session and navigate to it. */
   persistNewSession: (session: SessionRecord) => Promise<void>;
 }
