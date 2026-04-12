@@ -1,14 +1,20 @@
 import { useState } from 'react';
 import { ChevronRight, Loader2, Check, X } from 'lucide-react';
 
+interface ToolCardImage {
+  data: string;
+  mimeType: string;
+}
+
 interface ToolCardProps {
   label: string;
   status: 'running' | 'done' | 'error';
   args: string;
   result?: string;
+  images?: ToolCardImage[];
 }
 
-export function ToolCard({ label, status, args, result }: ToolCardProps) {
+export function ToolCard({ label, status, args, result, images }: ToolCardProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -51,12 +57,22 @@ export function ToolCard({ label, status, args, result }: ToolCardProps) {
           </div>
 
           {/* Result (if available) */}
-          {result && (
+          {(result || (images && images.length > 0)) && (
             <div className="px-3.5 py-2.5 bg-background border-t border-border/50">
               <div className="text-[0.65rem] text-muted-foreground/60 mb-1.5 font-medium">结果</div>
-              <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-all font-mono max-h-48 overflow-y-auto">
-                <code>{result}</code>
-              </pre>
+              {result && (
+                <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-all font-mono max-h-48 overflow-y-auto">
+                  <code>{result}</code>
+                </pre>
+              )}
+              {images?.map((img, i) => (
+                <img
+                  key={i}
+                  src={`data:${img.mimeType};base64,${img.data}`}
+                  className="mt-2 rounded border border-border max-w-full"
+                  alt="Tool result"
+                />
+              ))}
             </div>
           )}
         </div>

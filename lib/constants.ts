@@ -74,6 +74,7 @@ Use this context to understand what the user is looking at. When they say "this 
 Guidelines:
 - Before answering questions about page content, always call read_page first.
 - To find, count, or list elements on the page (images, links, buttons, etc.), prefer interact({ action: "query", selector: "..." }) over execute_js. Only use execute_js for complex logic that query cannot express.
+- When using execute_js, do not write comments in the code — keep it concise to save tokens.
 - For multi-step page interactions, use interact with wait/wait_navigation between actions.
 - To interact with content inside iframes, first use tab({ action: "list_frames" }) to get frame IDs, then pass frameId to execute_js / read_page / interact.
 - Be concise and precise. Prefer Chinese for responses unless the user writes in English.`;

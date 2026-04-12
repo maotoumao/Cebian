@@ -194,6 +194,10 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                           .map(b => b.text)
                           .join('\n') || undefined
                       : undefined;
+                    const resultImages = toolResult
+                      ? toolResult.content
+                          .filter((b): b is { type: 'image'; data: string; mimeType: string } => b.type === 'image')
+                      : undefined;
                     return (
                       <ToolCard
                         key={`tool-${tc.id}`}
@@ -201,6 +205,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                         status={status}
                         args={argsStr}
                         result={resultText}
+                        images={resultImages}
                       />
                     );
                   })}
