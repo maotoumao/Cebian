@@ -69,7 +69,7 @@ export async function gatherPageContext(): Promise<string> {
   lines.push(`[Open Tabs] (${tabs.length})`);
   for (const tab of tabs) {
     const marker = tab.id === activeTab.id ? '* ' : '  ';
-    lines.push(`${marker}${tab.title ?? ''} | ${tab.url ?? ''}`);
+    lines.push(`${marker}[${tab.id}] ${tab.title ?? ''} | ${tab.url ?? ''}`);
   }
 
   return `${CONTEXT_TAG_OPEN}\n${lines.join('\n')}\n${CONTEXT_TAG_CLOSE}`;
