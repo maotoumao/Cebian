@@ -55,7 +55,7 @@ const InteractParameters = Type.Object({
     description: 'Match index (0-based) for "find" action. Default: 0 (first match).',
   })),
   limit: Type.Optional(Type.Number({
-    description: 'Max elements to return for "query" action. Default: 20.',
+    description: 'Max elements to return for "query" action. Default: 20. Use -1 to return all.',
   })),
   frameId: Type.Optional(Type.Number({
     description: 'Frame ID to interact with. Omit for top frame. Use tab({ action: "list_frames" }) to discover IDs.',
@@ -321,7 +321,8 @@ function performInteraction(params: {
       const els = Array.from(document.querySelectorAll<HTMLElement>(selector));
       if (els.length === 0) return Promise.resolve(`No elements found for: ${selector}`);
 
-      const elements = els.slice(0, limit).map((el, i) => {
+      const capped = limit < 0 ? els : els.slice(0, limit);
+      const elements = capped.map((el, i) => {
         // Build CSS selector path
         const path: string[] = [];
         let node: HTMLElement | null = el;

@@ -71,7 +71,7 @@ export function ThinkingBlock({ content, isLive }: { content: string; isLive?: b
       >
         <div className="overflow-hidden">
           <div className="px-3 py-3 border-t border-dashed border-border text-muted-foreground font-mono text-[0.75rem] leading-relaxed bg-card/50">
-            <MarkdownRenderer content={content} className="prose-xs" />
+            <MarkdownRenderer content={content} />
           </div>
         </div>
       </div>

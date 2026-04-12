@@ -17,6 +17,31 @@ const components: Components = {
     <hr className="my-2 border-border" {...props} />
   ),
 
+  // Paragraph
+  p: ({ children, ...props }) => (
+    <p className="my-1.5" {...props}>{children}</p>
+  ),
+
+  // Unordered list
+  ul: ({ children, ...props }) => (
+    <ul className="list-disc pl-5 my-1.5 space-y-0.5" {...props}>{children}</ul>
+  ),
+
+  // Ordered list
+  ol: ({ children, ...props }) => (
+    <ol className="list-decimal pl-5 my-1.5 space-y-0.5" {...props}>{children}</ol>
+  ),
+
+  // List item
+  li: ({ children, ...props }) => (
+    <li className="text-foreground" {...props}>{children}</li>
+  ),
+
+  // Blockquote
+  blockquote: ({ children, ...props }) => (
+    <blockquote className="border-l-2 border-border pl-3 my-2 text-muted-foreground italic" {...props}>{children}</blockquote>
+  ),
+
   // Code blocks with language label
   pre: ({ children, ...props }) => (
     <pre className="overflow-x-auto rounded-md bg-accent/50 p-3 text-[0.8rem]" {...props}>
@@ -98,7 +123,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
   className,
 }: MarkdownRendererProps) {
   return (
-    <div className={`prose prose-sm dark:prose-invert max-w-none wrap-break-word ${className ?? ''}`}>
+    <div className={`max-w-none wrap-break-word ${className ?? ''}`}>
       <Markdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
