@@ -22,7 +22,7 @@ export function AgentMessage({ children, isStreaming }: { children?: ReactNode; 
         <Bot className="size-3.5 text-primary" />
         Cebian Agent
       </div>
-      <div className="text-[0.9rem] leading-relaxed space-y-3">
+      <div className="text-[0.9rem] leading-relaxed space-y-3 min-w-0 overflow-hidden">
         {children}
         {isStreaming && !children && (
           <span className="inline-block w-1.5 h-4 bg-primary animate-pulse rounded-sm align-text-bottom" />
