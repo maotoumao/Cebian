@@ -58,23 +58,28 @@ class AgentManager {
 
   constructor() {
     // Subscribe to interactive tool bridge state changes.
-    // When a tool becomes pending (bridge.request() called), broadcast to the
-    // session's subscribed ports so the UI can render the tool component.
+    // Broadcasts tool_pending when a tool becomes pending, and
+    // tool_resolved when it's resolved/cancelled — so the UI updates immediately.
     interactiveToolRegistry.subscribe(() => {
       for (const info of interactiveToolRegistry.getAll()) {
         const pending = interactiveToolRegistry.getPendingFor(info.name);
-        if (pending) {
-          // Find the session that's currently running — tool belongs to it
-          for (const managed of this.sessions.values()) {
-            if (managed.isRunning) {
-              this.broadcast(managed.sessionId, {
-                type: 'tool_pending',
-                sessionId: managed.sessionId,
-                toolName: info.name,
-                toolCallId: pending.toolCallId,
-                args: pending.request,
-              });
-            }
+        for (const managed of this.sessions.values()) {
+          if (!managed.isRunning) continue;
+          if (pending) {
+            this.broadcast(managed.sessionId, {
+              type: 'tool_pending',
+              sessionId: managed.sessionId,
+              toolName: info.name,
+              toolCallId: pending.toolCallId,
+              args: pending.request,
+            });
+          } else {
+            // Tool was resolved or cancelled — notify client to clear pending state
+            this.broadcast(managed.sessionId, {
+              type: 'tool_resolved',
+              sessionId: managed.sessionId,
+              toolName: info.name,
+            });
           }
         }
       }
