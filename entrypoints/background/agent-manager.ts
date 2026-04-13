@@ -55,17 +55,22 @@ class AgentManager {
   /** Guards against concurrent getOrCreateAgent calls for the same session. */
   private creating = new Map<string, Promise<ManagedSession>>();
   private broadcast: BroadcastFn = () => {};
+  /** Tracks which tools are currently pending, to detect state transitions. */
+  private pendingToolNames = new Set<string>();
 
   constructor() {
     // Subscribe to interactive tool bridge state changes.
-    // Broadcasts tool_pending when a tool becomes pending, and
-    // tool_resolved when it's resolved/cancelled — so the UI updates immediately.
+    // Only broadcast on actual state transitions: null→pending or pending→null.
     interactiveToolRegistry.subscribe(() => {
       for (const info of interactiveToolRegistry.getAll()) {
         const pending = interactiveToolRegistry.getPendingFor(info.name);
-        for (const managed of this.sessions.values()) {
-          if (!managed.isRunning) continue;
-          if (pending) {
+        const wasPending = this.pendingToolNames.has(info.name);
+
+        if (pending && !wasPending) {
+          // null → pending: tool just became pending
+          this.pendingToolNames.add(info.name);
+          for (const managed of this.sessions.values()) {
+            if (!managed.isRunning) continue;
             this.broadcast(managed.sessionId, {
               type: 'tool_pending',
               sessionId: managed.sessionId,
@@ -73,8 +78,12 @@ class AgentManager {
               toolCallId: pending.toolCallId,
               args: pending.request,
             });
-          } else {
-            // Tool was resolved or cancelled — notify client to clear pending state
+          }
+        } else if (!pending && wasPending) {
+          // pending → null: tool was resolved or cancelled
+          this.pendingToolNames.delete(info.name);
+          for (const managed of this.sessions.values()) {
+            if (!managed.isRunning) continue;
             this.broadcast(managed.sessionId, {
               type: 'tool_resolved',
               sessionId: managed.sessionId,
@@ -82,6 +91,7 @@ class AgentManager {
             });
           }
         }
+        // If state didn't change (pending→pending or null→null), do nothing
       }
     });
   }
