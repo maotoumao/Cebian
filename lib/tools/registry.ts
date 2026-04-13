@@ -1,70 +1,43 @@
 /**
- * Interactive tool registry.
+ * Interactive tool registry (background-side).
  *
- * Only interactive tools (those that pause the agent and display UI for user input)
- * need to register here. Non-interactive tools (e.g. executeScript) don't need this.
- *
- * Purpose: lets ChatPage render any interactive tool's UI generically,
- * without hardcoding tool names or components.
+ * Manages bridge instances for interactive tools that pause the agent
+ * and wait for user input. UI rendering is handled by ui-registry.ts.
  */
 
-import type { ComponentType } from 'react';
 import type { InteractiveBridge, PendingRequest } from './interactive-bridge';
-import type { ToolResultMessage } from '@mariozechner/pi-ai';
 
 /**
- * Props that every interactive tool UI component receives.
- * The registry renders these generically — each tool only provides the Component.
+ * Registration input for a bridge-backed interactive tool.
  */
-export interface InteractiveToolComponentProps<TRequest = any> {
-  toolCallId: string;
-  args: TRequest;
-  isPending: boolean;
-  toolResult?: ToolResultMessage;
-  onResolve?: (response: any) => void;
-}
-
-/**
- * Public view of a registered tool — bridge is NOT exposed.
- * This is what consumers (ChatPage, hooks) receive from the registry.
- */
-export interface InteractiveToolInfo<TRequest = any> {
+export interface InteractiveToolRegistration<TRequest = any, TResponse = any> {
   name: string;
-  Component: ComponentType<InteractiveToolComponentProps<TRequest>>;
-  renderResultAsUserBubble?: boolean;
-}
-
-/**
- * Registration input — extends InteractiveToolInfo with the bridge.
- * Only used as the argument to `registry.register()`. Not exported.
- */
-interface InteractiveToolWithBridge<TRequest = any, TResponse = any> extends InteractiveToolInfo {
-  /** The bridge instance connecting tool.execute() ↔ React UI */
   bridge: InteractiveBridge<TRequest, TResponse>;
 }
 
+/**
+ * Public info about a registered tool (bridge not exposed).
+ */
+export interface InteractiveToolInfo {
+  name: string;
+}
 
 type Listener = () => void;
 
 class InteractiveToolRegistry {
-  private tools = new Map<string, InteractiveToolWithBridge>();
+  private tools = new Map<string, InteractiveToolRegistration>();
   private listeners = new Set<Listener>();
-  /** Per-listener unsubscribe fns for bridge subscriptions, so late-registered tools can be added. */
   private bridgeUnsubs = new Map<Listener, (() => void)[]>();
-  /** Cached public info objects — stable references for React consumers. */
   private infoCache = new Map<string, InteractiveToolInfo>();
 
   /** Register an interactive tool. Call at module load time. */
-  register<TReq, TRes>(meta: InteractiveToolWithBridge<TReq, TRes>): void {
+  register<TReq, TRes>(meta: InteractiveToolRegistration<TReq, TRes>): void {
     if (this.tools.has(meta.name)) {
       console.warn(`InteractiveToolRegistry: tool "${meta.name}" already registered, overwriting`);
     }
-    this.tools.set(meta.name, meta as InteractiveToolWithBridge);
-    // Update info cache
-    this.infoCache.set(meta.name, {
-      name: meta.name, Component: meta.Component, renderResultAsUserBubble: meta.renderResultAsUserBubble,
-    });
-    // Subscribe existing listeners to the new tool's bridge (snapshot to avoid mutation during iteration)
+    this.tools.set(meta.name, meta as InteractiveToolRegistration);
+    this.infoCache.set(meta.name, { name: meta.name });
+    // Subscribe existing listeners to the new tool's bridge
     for (const [cb, unsubs] of [...this.bridgeUnsubs]) {
       unsubs.push(meta.bridge.subscribe(() => cb()));
     }
@@ -104,6 +77,11 @@ class InteractiveToolRegistry {
     for (const tool of this.tools.values()) {
       tool.bridge.cancel();
     }
+  }
+
+  /** Cancel a specific pending interactive tool. */
+  cancelOne(toolName: string): void {
+    this.tools.get(toolName)?.bridge.cancel();
   }
 
   /** Subscribe to registry changes. Returns unsubscribe fn. */

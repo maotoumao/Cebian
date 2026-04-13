@@ -4,6 +4,9 @@ import { MemoryRouter } from 'react-router-dom';
 import App from './App.tsx';
 import '@/assets/tailwind.css';
 
+// Register interactive tool UI components (side-effect)
+import '@/lib/tools/ask-user-registry';
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <MemoryRouter initialEntries={['/chat/new']}>

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Trash2, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { listSessions, deleteSession, type SessionRecord } from '@/lib/db';
+import { listSessions, type SessionRecord } from '@/lib/db';
+import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage } from '@/lib/protocol';
 
 interface HistoryPanelProps {
   open: boolean;
@@ -48,9 +49,24 @@ export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     try {
-      await deleteSession(id);
+      // Optimistic UI update
       setSessions(prev => prev.filter(s => s.id !== id));
       onDeleteSession?.(id);
+      // Send delete to background (handles DB + agent cleanup)
+      const port = chrome.runtime.connect({ name: AGENT_PORT_NAME });
+      const onMessage = (msg: ServerMessage) => {
+        if (msg.type === 'session_deleted' && msg.sessionId === id) {
+          port.onMessage.removeListener(onMessage);
+          port.disconnect();
+        }
+      };
+      port.onMessage.addListener(onMessage);
+      port.postMessage({ type: 'session_delete', sessionId: id } satisfies ClientMessage);
+      // Safety timeout: disconnect after 5s if no response
+      setTimeout(() => {
+        port.onMessage.removeListener(onMessage);
+        try { port.disconnect(); } catch { /* already disconnected */ }
+      }, 5000);
     } catch (err) {
       console.error('Failed to delete session:', err);
     }

@@ -1,8 +1,8 @@
-// Side-effect module: registers ask_user as an interactive tool.
-// Import this file once at app startup to activate registration.
+// Side-effect module: registers ask_user UI component with the UI tool registry.
+// Import this file once in the sidepanel to enable rendering ask_user blocks.
 
-import { interactiveToolRegistry, type InteractiveToolComponentProps } from './registry';
-import { askUserBridge, type AskUserRequest } from './ask-user';
+import { uiToolRegistry, type InteractiveToolComponentProps } from './ui-registry';
+import type { AskUserRequest } from './ask-user';
 import { AskUserBlock } from '@/components/chat/Message';
 import { TOOL_ASK_USER } from '@/lib/types';
 
@@ -25,11 +25,10 @@ function AskUserToolComponent({
   );
 }
 
-// ─── Register with the interactive tool registry ───
+// ─── Register with the UI tool registry ───
 
-interactiveToolRegistry.register<AskUserRequest, string>({
+uiToolRegistry.register<AskUserRequest>({
   name: TOOL_ASK_USER,
-  bridge: askUserBridge,
   Component: AskUserToolComponent,
   renderResultAsUserBubble: true,
 });
