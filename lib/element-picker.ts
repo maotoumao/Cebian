@@ -11,7 +11,7 @@ function createPickerInPage() {
   // ── Shadow DOM host ──
   const host = document.createElement('div');
   host.id = 'cebian-picker-host';
-  host.style.cssText = 'all:initial !important;position:absolute !important;top:0 !important;left:0 !important;width:0 !important;height:0 !important;overflow:visible !important;pointer-events:none !important;';
+  host.style.cssText = 'all:initial !important;position:fixed !important;top:0 !important;left:0 !important;width:0 !important;height:0 !important;overflow:visible !important;pointer-events:none !important;z-index:2147483647 !important;';
   document.documentElement.appendChild(host);
 
   const shadow = host.attachShadow({ mode: 'closed' });
@@ -28,6 +28,7 @@ function createPickerInPage() {
     .highlight {
       position: fixed;
       pointer-events: none;
+      z-index: 2147483646;
       border: 2px solid #e8a43a;
       background: rgba(232, 164, 58, 0.08);
       border-radius: 2px;
@@ -36,6 +37,7 @@ function createPickerInPage() {
     .tooltip {
       position: fixed;
       pointer-events: none;
+      z-index: 2147483647;
       display: flex;
       align-items: baseline;
       gap: 6px;
