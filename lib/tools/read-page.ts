@@ -1,10 +1,8 @@
 import { Type } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
-import { Readability } from '@mozilla/readability';
-import TurndownService from 'turndown';
-import { gfm } from 'turndown-plugin-gfm';
 import { TOOL_READ_PAGE } from '@/lib/types';
 import { getActiveTabId, executeInTabWithArgs } from './chrome-api';
+import type { OffscreenRequest, OffscreenResponse } from '@/entrypoints/offscreen/main';
 
 const ReadPageParameters = Type.Object({
   mode: Type.Union(
@@ -99,33 +97,43 @@ function getDocumentHtml(selector: string | null): { html: string; url: string }
   return { html: document.documentElement.outerHTML, url: window.location.href };
 }
 
-// ─── Extension-side processing ───
+// ─── Offscreen document helpers ───
+
+const OFFSCREEN_URL = 'offscreen.html';
+
+/** Ensure the offscreen document exists, creating it if needed. */
+async function ensureOffscreen(): Promise<void> {
+  const existing = await chrome.offscreen.hasDocument();
+  if (existing) return;
+  await chrome.offscreen.createDocument({
+    url: chrome.runtime.getURL(OFFSCREEN_URL),
+    reasons: ['DOM_PARSER'],
+    justification: 'Parse HTML to markdown using DOMParser + Readability + Turndown',
+  });
+}
+
+/** Send HTML to the offscreen document for markdown conversion. */
+async function convertHtmlToMarkdown(html: string): Promise<string> {
+  await ensureOffscreen();
+  const msg: OffscreenRequest = { type: 'html-to-markdown', html };
+  const resp: OffscreenResponse = await chrome.runtime.sendMessage(msg);
+  if (resp.error) throw new Error(`Offscreen conversion failed: ${resp.error}`);
+  return resp.result ?? '';
+}
+
+/** Send HTML to the offscreen document for Readability + markdown conversion. */
+async function convertArticleToMarkdown(html: string, url: string): Promise<string | null> {
+  await ensureOffscreen();
+  const msg: OffscreenRequest = { type: 'html-to-markdown', html, readability: { url } };
+  const resp: OffscreenResponse = await chrome.runtime.sendMessage(msg);
+  if (resp.error === 'readability-failed') return null;
+  if (resp.error) throw new Error(`Offscreen conversion failed: ${resp.error}`);
+  return resp.result ?? '';
+}
 
 function truncate(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength) + `\n\n...(truncated at ${maxLength} chars)`;
-}
-
-function parseWithReadability(html: string, url: string): string | null {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  // Set base URL for relative link resolution
-  const base = doc.createElement('base');
-  base.href = url;
-  doc.head.prepend(base);
-  const article = new Readability(doc).parse();
-  return article?.content ?? null;
-}
-
-function htmlToMarkdown(html: string): string {
-  const turndown = new TurndownService({
-    headingStyle: 'atx',
-    codeBlockStyle: 'fenced',
-    bulletListMarker: '-',
-  });
-  turndown.use(gfm);
-  // Defensive: strip any <style>/<script> that survived in-page cleaning
-  turndown.remove(['style', 'script', 'noscript']);
-  return turndown.turndown(html);
 }
 
 // ─── Tool definition ───
@@ -160,9 +168,9 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
         break;
       }
       case 'markdown': {
-        // Full-page cleaned HTML → markdown (no Readability filtering)
+        // Full-page cleaned HTML → markdown via offscreen document
         const html = await executeInTabWithArgs(tabId, extractCleanHtml, [params.selector ?? null], params.frameId);
-        content = htmlToMarkdown(html);
+        content = await convertHtmlToMarkdown(html);
         break;
       }
       case 'article':
@@ -170,18 +178,18 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
         // Readability extraction → markdown ("readable" is a deprecated alias)
         if (params.selector) {
           const html = await executeInTabWithArgs(tabId, extractCleanHtml, [params.selector], params.frameId);
-          content = htmlToMarkdown(html);
+          content = await convertHtmlToMarkdown(html);
           break;
         }
 
         const { html, url } = await executeInTabWithArgs(tabId, getDocumentHtml, [null], params.frameId);
-        const articleHtml = parseWithReadability(html, url);
-        if (!articleHtml) {
+        const articleMd = await convertArticleToMarkdown(html, url);
+        if (!articleMd) {
           const fallback = await executeInTabWithArgs(tabId, extractText, [null], params.frameId);
           content = '(Readability extraction failed, falling back to plain text)\n\n' + fallback;
           break;
         }
-        content = htmlToMarkdown(articleHtml);
+        content = articleMd;
         break;
       }
       default:
