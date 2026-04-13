@@ -56,6 +56,31 @@ class AgentManager {
   private creating = new Map<string, Promise<ManagedSession>>();
   private broadcast: BroadcastFn = () => {};
 
+  constructor() {
+    // Subscribe to interactive tool bridge state changes.
+    // When a tool becomes pending (bridge.request() called), broadcast to the
+    // session's subscribed ports so the UI can render the tool component.
+    interactiveToolRegistry.subscribe(() => {
+      for (const info of interactiveToolRegistry.getAll()) {
+        const pending = interactiveToolRegistry.getPendingFor(info.name);
+        if (pending) {
+          // Find the session that's currently running — tool belongs to it
+          for (const managed of this.sessions.values()) {
+            if (managed.isRunning) {
+              this.broadcast(managed.sessionId, {
+                type: 'tool_pending',
+                sessionId: managed.sessionId,
+                toolName: info.name,
+                toolCallId: pending.toolCallId,
+                args: pending.request,
+              });
+            }
+          }
+        }
+      }
+    });
+  }
+
   setBroadcast(fn: BroadcastFn): void {
     this.broadcast = fn;
   }
@@ -178,8 +203,6 @@ class AgentManager {
         if (managed.sessionCreated) {
           sessionStore.scheduleWrite(sessionId, messages);
         }
-        // Check for pending interactive tools
-        this.broadcastPendingTools(sessionId);
         break;
       }
 
@@ -223,22 +246,6 @@ class AgentManager {
           await sessionStore.flush(sessionId);
         }
         break;
-      }
-    }
-  }
-
-  /** Broadcast any pending interactive tool requests to subscribed ports */
-  private broadcastPendingTools(sessionId: string): void {
-    for (const info of interactiveToolRegistry.getAll()) {
-      const pending = interactiveToolRegistry.getPendingFor(info.name);
-      if (pending) {
-        this.broadcast(sessionId, {
-          type: 'tool_pending',
-          sessionId,
-          toolName: info.name,
-          toolCallId: pending.toolCallId,
-          args: pending.request,
-        });
       }
     }
   }
