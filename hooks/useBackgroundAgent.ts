@@ -37,7 +37,7 @@ export interface AgentPortCallbacks {
 
 // ─── Hook ───
 
-export function useAgentPort(callbacks: AgentPortCallbacks) {
+export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
   const [state, setState] = useState<AgentPortState>({
     messages: [],
     isAgentRunning: false,

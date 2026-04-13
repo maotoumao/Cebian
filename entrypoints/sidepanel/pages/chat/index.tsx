@@ -14,7 +14,7 @@ import type { AssistantMessage, ToolResultMessage } from '@mariozechner/pi-ai';
 import { getAssistantText, getThinkingBlocks, getToolCalls, findToolResult } from '@/lib/message-helpers';
 import { getToolLabel } from '@/lib/tools/tool-labels';
 import { uiToolRegistry } from '@/lib/tools/ui-registry';
-import { useAgentPort } from '@/hooks/useAgentPort';
+import { useBackgroundAgent } from '@/hooks/useBackgroundAgent';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { activeModel } from '@/lib/storage';
 import type { SessionRecord } from '@/lib/db';
@@ -37,7 +37,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     subscribe: portSubscribe,
     unsubscribe: portUnsubscribe,
     resolveTool,
-  } = useAgentPort({
+  } = useBackgroundAgent({
     onSessionCreated: useCallback((sessionId: string, title: string) => {
       onTitleChange?.(title);
       navigate(`/chat/${sessionId}`, { replace: true });
