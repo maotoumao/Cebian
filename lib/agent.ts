@@ -1,7 +1,7 @@
 import { Agent, type AgentOptions, type AgentMessage } from '@mariozechner/pi-agent-core';
 import type { Api, Model, Message } from '@mariozechner/pi-ai';
 import { providerCredentials, type OAuthCredential } from './storage';
-import { getApiKeyFromCredential } from './oauth';
+import { getValidOAuthToken } from './oauth';
 import { isCustomProvider, findCustomModel, mergeCustomProviders } from './custom-models';
 import { PRESET_PROVIDERS, DEFAULT_SYSTEM_PROMPT } from './constants';
 import { tools } from './tools';
@@ -62,7 +62,7 @@ export function createCebianAgent(options: CreateAgentOptions): Agent {
         }
 
         if (cred.authType === 'oauth') {
-          return getApiKeyFromCredential(provider, cred as OAuthCredential);
+          return getValidOAuthToken(provider, cred as OAuthCredential);
         }
       } catch (err) {
         console.error(`[Agent] Failed to get API key for ${provider}:`, err);

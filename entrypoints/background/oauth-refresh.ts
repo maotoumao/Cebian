@@ -2,7 +2,7 @@ import { providerCredentials, type OAuthCredential, type ProviderCredentials } f
 import { refreshOAuthCredential } from '@/lib/oauth';
 
 const ALARM_NAME = 'oauth-refresh';
-const REFRESH_INTERVAL_MINUTES = 30;
+const REFRESH_INTERVAL_MINUTES = 10;
 const EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 
 export function setupOAuthRefresh() {

@@ -14,7 +14,7 @@ import {
   getGitHubCopilotBaseUrl,
   normalizeDomain,
 } from '@mariozechner/pi-ai/oauth';
-import type { OAuthCredential } from './storage';
+import { providerCredentials, type OAuthCredential } from './storage';
 
 // ─── PKCE (Web Crypto) ───
 
@@ -397,17 +397,44 @@ export function getCopilotBaseUrl(cred: OAuthCredential): string {
   return getGitHubCopilotBaseUrl(cred.accessToken, domain);
 }
 
-// ─── Get API key (with auto-refresh if expired) ───
+// ─── Get API key ───
 
 export function getApiKeyFromCredential(
-  provider: string,
+  _provider: string,
   cred: OAuthCredential,
 ): string {
-  if (provider === 'google-gemini-cli') {
+  if (cred.extra?.projectId) {
     return JSON.stringify({
       token: cred.accessToken,
-      projectId: cred.extra?.projectId,
+      projectId: cred.extra.projectId,
     });
   }
   return cred.accessToken;
+}
+
+// ─── On-demand token refresh ───
+
+const ON_DEMAND_BUFFER_MS = 5 * 60 * 1000; // 5 minutes before expiry
+
+/**
+ * Get a valid OAuth token, refreshing on-demand if it's about to expire.
+ */
+export async function getValidOAuthToken(
+  provider: string,
+  cred: OAuthCredential,
+): Promise<string> {
+  if (cred.refreshToken && cred.expiresAt && Date.now() >= cred.expiresAt - ON_DEMAND_BUFFER_MS) {
+    console.log(`[OAuth] ${provider}: token expiring soon, refreshing on-demand...`);
+    try {
+      const refreshed = await refreshOAuthCredential(provider, cred);
+      const creds = await providerCredentials.getValue();
+      await providerCredentials.setValue({ ...creds, [provider]: refreshed });
+      console.log(`[OAuth] ${provider}: on-demand refresh succeeded`);
+      return getApiKeyFromCredential(provider, refreshed);
+    } catch (err) {
+      console.error(`[OAuth] ${provider}: on-demand refresh failed, using existing token`, err);
+    }
+  }
+
+  return getApiKeyFromCredential(provider, cred);
 }
