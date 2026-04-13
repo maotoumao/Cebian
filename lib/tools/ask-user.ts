@@ -1,6 +1,6 @@
 import { Type, type Static } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
-import { createInteractiveBridge, INTERACTIVE_CANCELLED } from './interactive-bridge';
+import { createInteractiveBridge, INTERACTIVE_CANCELLED, type InteractiveBridge } from './interactive-bridge';
 import { TOOL_ASK_USER } from '@/lib/types';
 
 // ─── Request type ───
@@ -28,19 +28,15 @@ const AskUserParameters = Type.Object({
 
 export type AskUserRequest = Static<typeof AskUserParameters>;
 
-// ─── Bridge instance (module-level singleton) ───
-
-export const askUserBridge = createInteractiveBridge<AskUserRequest, string>();
-
 // ─── Tool details ───
 
 interface AskUserDetails {
   cancelled: boolean;
 }
 
-// ─── Tool definition ───
+// ─── Shared tool metadata (reused by createSessionAskUserTool) ───
 
-export const askUserTool: AgentTool<typeof AskUserParameters, AskUserDetails> = {
+export const ASK_USER_META = {
   name: TOOL_ASK_USER,
   label: 'Ask User',
   description:
@@ -48,20 +44,34 @@ export const askUserTool: AgentTool<typeof AskUserParameters, AskUserDetails> = 
     'Provide clear options when possible. The user may also type a free-form answer. ' +
     'Use this when you need more information from the user to complete the task.',
   parameters: AskUserParameters,
+} as const;
 
-  async execute(toolCallId, params, signal): Promise<AgentToolResult<AskUserDetails>> {
-    const result = await askUserBridge.request(toolCallId, params, signal);
+// ─── Factory: creates a session-specific ask_user tool + bridge ───
 
-    if (result === INTERACTIVE_CANCELLED) {
+export function createSessionAskUserTool(): {
+  tool: AgentTool<typeof AskUserParameters, AskUserDetails>;
+  bridge: InteractiveBridge<AskUserRequest, string>;
+} {
+  const bridge = createInteractiveBridge<AskUserRequest, string>();
+
+  const tool: AgentTool<typeof AskUserParameters, AskUserDetails> = {
+    ...ASK_USER_META,
+    async execute(toolCallId, params, signal): Promise<AgentToolResult<AskUserDetails>> {
+      const result = await bridge.request(toolCallId, params, signal);
+
+      if (result === INTERACTIVE_CANCELLED) {
+        return {
+          content: [{ type: 'text', text: '用户跳过了此问题。' }],
+          details: { cancelled: true },
+        };
+      }
+
       return {
-        content: [{ type: 'text', text: '用户跳过了此问题。' }],
-        details: { cancelled: true },
+        content: [{ type: 'text', text: result }],
+        details: { cancelled: false },
       };
-    }
+    },
+  };
 
-    return {
-      content: [{ type: 'text', text: result }],
-      details: { cancelled: false },
-    };
-  },
-};
+  return { tool, bridge };
+}

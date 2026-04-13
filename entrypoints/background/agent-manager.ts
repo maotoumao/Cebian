@@ -1,5 +1,5 @@
 // Background Agent Manager — singleton that manages Agent instances.
-// Replaces useAgentLifecycle: all agent execution happens here.
+// Each session gets its own Agent + ask_user bridge (per-session isolation).
 
 import { Agent, type AgentEvent, type AgentMessage } from '@mariozechner/pi-agent-core';
 import type { Api, Model } from '@mariozechner/pi-ai';
@@ -10,9 +10,10 @@ import { sessionStore } from './session-store';
 import { gatherPageContext } from '@/lib/page-context';
 import { buildTextPrefix, extractImages, type Attachment } from '@/lib/attachments';
 import { extractUserText } from '@/lib/message-helpers';
-import { interactiveToolRegistry } from '@/lib/tools/registry';
-import { askUserBridge } from '@/lib/tools/ask-user';
+import { createSessionTools } from '@/lib/tools';
 import { TOOL_ASK_USER } from '@/lib/types';
+import type { InteractiveBridge } from '@/lib/tools/interactive-bridge';
+import type { AskUserRequest } from '@/lib/tools/ask-user';
 import type { ServerMessage } from '@/lib/protocol';
 import type { SessionRecord } from '@/lib/db';
 import {
@@ -27,13 +28,6 @@ import { getCopilotBaseUrl } from '@/lib/oauth';
 import { mergeCustomProviders, isCustomProvider, findCustomModel } from '@/lib/custom-models';
 import { PRESET_PROVIDERS } from '@/lib/constants';
 
-// ─── Register interactive tool bridges (BG side) ───
-
-interactiveToolRegistry.register<any, string>({
-  name: TOOL_ASK_USER,
-  bridge: askUserBridge,
-});
-
 // ─── Types ───
 
 interface ManagedSession {
@@ -43,7 +37,14 @@ interface ManagedSession {
   isRunning: boolean;
   /** provider/modelId used to create this agent, for detecting model changes. */
   modelKey: string;
-  unsubscribe: () => void;
+  /** Per-session ask_user bridge. */
+  askUserBridge: InteractiveBridge<AskUserRequest, string>;
+  /** Whether the ask_user bridge currently has a pending request. */
+  toolPending: boolean;
+  /** Cleanup: unsubscribe from agent events. */
+  unsubscribeAgent: () => void;
+  /** Cleanup: unsubscribe from bridge state changes. */
+  unsubscribeBridge: () => void;
 }
 
 type BroadcastFn = (sessionId: string, msg: ServerMessage) => void;
@@ -55,46 +56,6 @@ class AgentManager {
   /** Guards against concurrent getOrCreateAgent calls for the same session. */
   private creating = new Map<string, Promise<ManagedSession>>();
   private broadcast: BroadcastFn = () => {};
-  /** Tracks which tools are currently pending, to detect state transitions. */
-  private pendingToolNames = new Set<string>();
-
-  constructor() {
-    // Subscribe to interactive tool bridge state changes.
-    // Only broadcast on actual state transitions: null→pending or pending→null.
-    interactiveToolRegistry.subscribe(() => {
-      for (const info of interactiveToolRegistry.getAll()) {
-        const pending = interactiveToolRegistry.getPendingFor(info.name);
-        const wasPending = this.pendingToolNames.has(info.name);
-
-        if (pending && !wasPending) {
-          // null → pending: tool just became pending
-          this.pendingToolNames.add(info.name);
-          for (const managed of this.sessions.values()) {
-            if (!managed.isRunning) continue;
-            this.broadcast(managed.sessionId, {
-              type: 'tool_pending',
-              sessionId: managed.sessionId,
-              toolName: info.name,
-              toolCallId: pending.toolCallId,
-              args: pending.request,
-            });
-          }
-        } else if (!pending && wasPending) {
-          // pending → null: tool was resolved or cancelled
-          this.pendingToolNames.delete(info.name);
-          for (const managed of this.sessions.values()) {
-            if (!managed.isRunning) continue;
-            this.broadcast(managed.sessionId, {
-              type: 'tool_resolved',
-              sessionId: managed.sessionId,
-              toolName: info.name,
-            });
-          }
-        }
-        // If state didn't change (pending→pending or null→null), do nothing
-      }
-    });
-  }
 
   setBroadcast(fn: BroadcastFn): void {
     this.broadcast = fn;
@@ -173,12 +134,16 @@ class AgentManager {
       sessionCreated = !!existingSession;
     }
 
+    // Create per-session tools with isolated ask_user bridge
+    const { tools: sessionTools, askUserBridge } = createSessionTools();
+
     const agent = createCebianAgent({
       model: resolved.model,
       systemPrompt: sysPrompt || DEFAULT_SYSTEM_PROMPT,
       thinkingLevel: (thinkingLvl || 'medium') as any,
       maxRounds: rounds || 200,
       messages,
+      tools: sessionTools,
     });
 
     const managed: ManagedSession = {
@@ -187,12 +152,38 @@ class AgentManager {
       sessionCreated,
       isRunning: false,
       modelKey: `${resolved.provider}/${resolved.modelId}`,
-      unsubscribe: () => {},
+      askUserBridge,
+      toolPending: false,
+      unsubscribeAgent: () => {},
+      unsubscribeBridge: () => {},
     };
 
     // Subscribe to agent events
-    managed.unsubscribe = agent.subscribe(async (event: AgentEvent) => {
+    managed.unsubscribeAgent = agent.subscribe(async (event: AgentEvent) => {
       await this.handleAgentEvent(managed, event);
+    });
+
+    // Subscribe to this session's bridge state changes for tool_pending/tool_resolved
+    managed.unsubscribeBridge = askUserBridge.subscribe((pending) => {
+      if (pending && !managed.toolPending) {
+        // null → pending
+        managed.toolPending = true;
+        this.broadcast(sessionId, {
+          type: 'tool_pending',
+          sessionId,
+          toolName: TOOL_ASK_USER,
+          toolCallId: pending.toolCallId,
+          args: pending.request,
+        });
+      } else if (!pending && managed.toolPending) {
+        // pending → null
+        managed.toolPending = false;
+        this.broadcast(sessionId, {
+          type: 'tool_resolved',
+          sessionId,
+          toolName: TOOL_ASK_USER,
+        });
+      }
     });
 
     this.sessions.set(sessionId, managed);
@@ -229,8 +220,8 @@ class AgentManager {
 
       case 'agent_end': {
         managed.isRunning = false;
-        // Cancel any pending interactive tools so their bridges are cleaned up
-        interactiveToolRegistry.cancelAll();
+        // Cancel any pending ask_user on this session's bridge
+        managed.askUserBridge.cancel();
         const messages = [...agent.state.messages];
         this.broadcast(sessionId, { type: 'agent_end', sessionId, messages });
 
@@ -283,7 +274,8 @@ class AgentManager {
         // Model changed — recreate with new model, preserving in-memory messages
         const currentMessages = [...managed.agent.state.messages];
         const wasCreated = managed.sessionCreated;
-        managed.unsubscribe();
+        managed.unsubscribeAgent();
+        managed.unsubscribeBridge();
         this.sessions.delete(sessionId);
         managed = await this.getOrCreateAgent(sessionId, currentMessages);
         managed.sessionCreated = wasCreated;
@@ -301,8 +293,8 @@ class AgentManager {
 
     const images = extractImages(attachments);
 
-    // If any interactive tool is pending, steer the agent instead of prompting
-    if (interactiveToolRegistry.hasPending()) {
+    // If this session's ask_user is pending, steer the agent instead of prompting
+    if (managed.askUserBridge.getPending()) {
       const content: any[] = [{ type: 'text', text: enriched }];
       if (images.length > 0) content.push(...images);
       const userMessage: AgentMessage = {
@@ -312,7 +304,7 @@ class AgentManager {
       } as AgentMessage;
       // Enqueue BEFORE cancelling so getSteeringMessages() sees it when the loop drains.
       managed.agent.steer(userMessage);
-      interactiveToolRegistry.cancelAll();
+      managed.askUserBridge.cancel();
     } else {
       await managed.agent.prompt(enriched, images.length > 0 ? images : undefined);
     }
@@ -323,22 +315,24 @@ class AgentManager {
     const managed = this.sessions.get(sessionId);
     if (managed) {
       managed.agent.abort();
-      // Recreate agent on next prompt (abort invalidates the agent)
-      managed.unsubscribe();
+      managed.unsubscribeAgent();
+      managed.unsubscribeBridge();
       this.sessions.delete(sessionId);
     }
   }
 
   /** Resolve an interactive tool's pending request */
-  resolveTool(_sessionId: string, toolName: string, response: any): void {
-    // The constructor's registry subscription handles broadcasting tool_resolved
-    interactiveToolRegistry.resolve(toolName, response);
+  resolveTool(sessionId: string, _toolName: string, response: any): void {
+    const managed = this.sessions.get(sessionId);
+    // Bridge subscription handles broadcasting tool_resolved
+    managed?.askUserBridge.resolve(response);
   }
 
   /** Cancel a specific interactive tool */
-  cancelTool(_sessionId: string, toolName: string): void {
-    // The constructor's registry subscription handles broadcasting tool_resolved
-    interactiveToolRegistry.cancelOne(toolName);
+  cancelTool(sessionId: string, _toolName: string): void {
+    const managed = this.sessions.get(sessionId);
+    // Bridge subscription handles broadcasting tool_resolved
+    managed?.askUserBridge.cancel();
   }
 
   /** Get current state for a session (for reconnecting clients) */
@@ -355,7 +349,8 @@ class AgentManager {
   destroySession(sessionId: string): void {
     const managed = this.sessions.get(sessionId);
     if (managed) {
-      managed.unsubscribe();
+      managed.unsubscribeAgent();
+      managed.unsubscribeBridge();
       managed.agent.abort();
       this.sessions.delete(sessionId);
     }

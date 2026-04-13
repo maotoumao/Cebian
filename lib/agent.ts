@@ -1,9 +1,8 @@
-import { Agent, type AgentOptions, type AgentMessage } from '@mariozechner/pi-agent-core';
+import { Agent, type AgentOptions, type AgentMessage, type AgentTool } from '@mariozechner/pi-agent-core';
 import type { Api, Model, Message } from '@mariozechner/pi-ai';
 import { providerCredentials, type OAuthCredential } from './storage';
 import { getValidOAuthToken } from './oauth';
 import { DEFAULT_SYSTEM_PROMPT } from './constants';
-import { tools } from './tools';
 
 // ─── Agent factory ───
 
@@ -13,6 +12,8 @@ export interface CreateAgentOptions {
   thinkingLevel: 'off' | 'minimal' | 'low' | 'medium' | 'high';
   maxRounds: number;
   messages?: AgentMessage[];
+  /** Session-specific tools array (includes per-session ask_user). */
+  tools: AgentTool<any>[];
 }
 
 export function createCebianAgent(options: CreateAgentOptions): Agent {
@@ -22,6 +23,7 @@ export function createCebianAgent(options: CreateAgentOptions): Agent {
     thinkingLevel,
     maxRounds,
     messages = [],
+    tools: agentTools,
   } = options;
 
   const effectivePrompt = systemPrompt.trim() || DEFAULT_SYSTEM_PROMPT;
@@ -31,7 +33,7 @@ export function createCebianAgent(options: CreateAgentOptions): Agent {
       systemPrompt: effectivePrompt,
       model,
       thinkingLevel,
-      tools,
+      tools: agentTools,
       messages,
     },
 
