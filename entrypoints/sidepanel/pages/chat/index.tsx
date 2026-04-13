@@ -19,10 +19,13 @@ import { useStorageItem } from '@/hooks/useStorageItem';
 import {
   activeModel,
   thinkingLevel,
+  providerCredentials,
   customProviders as customProvidersStorage,
   systemPrompt as systemPromptStorage,
   maxRounds as maxRoundsStorage,
+  type ProviderCredentials,
 } from '@/lib/storage';
+import { getCopilotBaseUrl } from '@/lib/oauth';
 import { mergeCustomProviders, isCustomProvider, findCustomModel } from '@/lib/custom-models';
 import { PRESET_PROVIDERS } from '@/lib/constants';
 import { useSessionManager } from '@/hooks/useSessionManager';
@@ -35,16 +38,31 @@ function getModelForProvider(
   provider: string,
   modelId: string,
   customProviders: import('@/lib/storage').CustomProviderConfig[],
+  creds: ProviderCredentials,
 ): Model<Api> | undefined {
+  let model: Model<Api> | undefined;
+
   if (isCustomProvider(provider)) {
-    return findCustomModel(customProviders, provider, modelId) ?? undefined;
+    model = findCustomModel(customProviders, provider, modelId) ?? undefined;
+  } else {
+    try {
+      const models = getModels(provider as KnownProvider) as Model<Api>[];
+      model = models.find(m => m.id === modelId);
+    } catch {
+      return undefined;
+    }
   }
-  try {
-    const models = getModels(provider as KnownProvider) as Model<Api>[];
-    return models.find(m => m.id === modelId);
-  } catch {
-    return undefined;
+  if (!model) return undefined;
+
+  // For GitHub Copilot, dynamically resolve base URL from token (handles enterprise)
+  if (provider === 'github-copilot') {
+    const cred = creds[provider];
+    if (cred?.authType === 'oauth') {
+      return { ...model, baseUrl: getCopilotBaseUrl(cred) };
+    }
   }
+
+  return model;
 }
 
 // ─── ChatPage ───
@@ -64,10 +82,13 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     mergeCustomProviders(PRESET_PROVIDERS, customProviderList),
   [customProviderList]);
 
+  const [creds] = useStorageItem(providerCredentials, {});
+  const copilotCred = creds['github-copilot'];
+
   const modelObj = useMemo(() => {
     if (!currentModel) return undefined;
-    return getModelForProvider(currentModel.provider, currentModel.modelId, allCustomProviders);
-  }, [currentModel, allCustomProviders]);
+    return getModelForProvider(currentModel.provider, currentModel.modelId, allCustomProviders, creds);
+  }, [currentModel, allCustomProviders, copilotCred]);
 
   // Session management
   const session = useSessionManager(isNewChat, routeSessionId);

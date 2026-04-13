@@ -11,6 +11,8 @@ import {
   refreshGitHubCopilotToken,
   refreshOpenAICodexToken,
   refreshGoogleCloudToken,
+  getGitHubCopilotBaseUrl,
+  normalizeDomain,
 } from '@mariozechner/pi-ai/oauth';
 import type { OAuthCredential } from './storage';
 
@@ -344,10 +346,16 @@ export async function refreshOAuthCredential(
 
   switch (provider) {
     case 'github-copilot': {
-      const result = await refreshGitHubCopilotToken(cred.refreshToken);
+      const domain = cred.extra?.enterpriseUrl
+        ? (normalizeDomain(cred.extra.enterpriseUrl as string) ?? undefined)
+        : undefined;
+      const result = await refreshGitHubCopilotToken(cred.refreshToken, domain);
       newAccess = result.access;
       newRefresh = result.refresh;
       newExpires = result.expires;
+      if (result.enterpriseUrl) {
+        newExtra = { ...cred.extra, enterpriseUrl: result.enterpriseUrl };
+      }
       break;
     }
     case 'openai-codex': {
@@ -378,6 +386,15 @@ export async function refreshOAuthCredential(
     verified: true,
     extra: newExtra,
   };
+}
+
+// ─── Get Copilot base URL ───
+
+export function getCopilotBaseUrl(cred: OAuthCredential): string {
+  const domain = cred.extra?.enterpriseUrl
+    ? (normalizeDomain(cred.extra.enterpriseUrl as string) ?? undefined)
+    : undefined;
+  return getGitHubCopilotBaseUrl(cred.accessToken, domain);
 }
 
 // ─── Get API key (with auto-refresh if expired) ───
