@@ -41,6 +41,8 @@ interface ManagedSession {
   sessionId: string;
   sessionCreated: boolean;
   isRunning: boolean;
+  /** provider/modelId used to create this agent, for detecting model changes. */
+  modelKey: string;
   unsubscribe: () => void;
 }
 
@@ -179,6 +181,7 @@ class AgentManager {
       sessionId,
       sessionCreated: !!existingSession,
       isRunning: false,
+      modelKey: `${resolved.provider}/${resolved.modelId}`,
       unsubscribe: () => {},
     };
 
@@ -265,7 +268,20 @@ class AgentManager {
 
   /** Send a prompt to the agent for a session */
   async prompt(sessionId: string, text: string, attachments: Attachment[] = []): Promise<void> {
-    const managed = await this.getOrCreateAgent(sessionId);
+    let managed = await this.getOrCreateAgent(sessionId);
+
+    // Check if the model has changed since the agent was created
+    const currentModel = await activeModelStorage.getValue();
+    if (currentModel) {
+      const currentKey = `${currentModel.provider}/${currentModel.modelId}`;
+      if (currentKey !== managed.modelKey) {
+        // Model changed — recreate the agent with the new model, preserving messages
+        managed.unsubscribe();
+        this.sessions.delete(sessionId);
+        managed = await this.getOrCreateAgent(sessionId);
+      }
+    }
+
     const ctx = await gatherPageContext();
 
     const parts: string[] = [];
