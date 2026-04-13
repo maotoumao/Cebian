@@ -1,15 +1,61 @@
-import { Bot, ChevronRight, Lightbulb, CircleHelp, CheckCircle, Send } from 'lucide-react';
-import { useState, useEffect, useRef, type ReactNode, type KeyboardEvent } from 'react';
+import { Bot, ChevronRight, Lightbulb, CircleHelp, CheckCircle, Send, Crosshair, FileText } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo, type ReactNode, type KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
+import { extractUserText, extractUserAttachments } from '@/lib/message-helpers';
+import type { Message } from '@mariozechner/pi-ai';
 
 /* ─── User Message ─── */
-export function UserMessageBubble({ children }: { children: ReactNode }) {
+export function UserMessageBubble({ msg, children }: { msg?: Message; children?: ReactNode }) {
+  const text = msg ? extractUserText(msg) : null;
+  const attachments = useMemo(() => msg ? extractUserAttachments(msg) : null, [msg]);
+  const hasAttachments = attachments && (attachments.images.length > 0 || attachments.elements.length > 0 || attachments.files.length > 0);
+
   return (
     <div className="self-end max-w-[95%]">
       <div className="bg-card border border-border px-4 py-3 rounded-2xl rounded-br-sm text-[0.9rem] leading-relaxed">
-        {children}
+        {text ?? children}
       </div>
+
+      {hasAttachments && (
+        <div className="flex gap-1.5 flex-wrap items-center justify-end mt-1.5 px-1">
+          {attachments.images.map((img, i) => (
+            <Badge
+              key={`img-${i}`}
+              variant="outline"
+              className="shrink-0 text-[0.65rem] font-mono gap-1 h-5 rounded pl-0.5 pr-1 text-purple-400 border-purple-400/20 bg-purple-400/5"
+            >
+              <img
+                src={`data:${img.mimeType};base64,${img.data}`}
+                alt="附件图片"
+                className="h-3.5 w-auto rounded-sm object-cover"
+              />
+              图片
+            </Badge>
+          ))}
+          {attachments.elements.map((el, i) => (
+            <Badge
+              key={`el-${i}`}
+              variant="outline"
+              className="shrink-0 text-[0.65rem] font-mono gap-1 h-5 rounded pl-1 pr-1 text-info border-info/20 bg-info/5"
+            >
+              <Crosshair className="size-2.5 shrink-0" />
+              <span className="truncate max-w-24">{el.selector}</span>
+            </Badge>
+          ))}
+          {attachments.files.map((f, i) => (
+            <Badge
+              key={`file-${i}`}
+              variant="outline"
+              className="shrink-0 text-[0.65rem] font-mono gap-1 h-5 rounded pl-1 pr-1 text-emerald-400 border-emerald-400/20 bg-emerald-400/5"
+            >
+              <FileText className="size-2.5 shrink-0" />
+              <span className="truncate max-w-24">{f.name}</span>
+            </Badge>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -17,7 +63,7 @@ export function UserMessageBubble({ children }: { children: ReactNode }) {
 /* ─── Agent Message ─── */
 export function AgentMessage({ children, isStreaming, showHeader = true }: { children?: ReactNode; isStreaming?: boolean; showHeader?: boolean }) {
   return (
-    <div className={`self-start w-full ${showHeader ? '' : '-mt-4'}`}>
+    <div className={`self-start w-full`}>
       {showHeader && (
         <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground font-medium">
           <Bot className="size-3.5 text-primary" />

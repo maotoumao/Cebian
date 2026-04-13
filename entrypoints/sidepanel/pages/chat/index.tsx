@@ -12,7 +12,7 @@ import {
 import { ToolCard } from '@/components/chat/ToolCard';
 import type { AgentMessage as AgentMessageType } from '@mariozechner/pi-agent-core';
 import type { AssistantMessage, ToolResultMessage } from '@mariozechner/pi-ai';
-import { getAssistantText, getThinkingBlocks, getToolCalls, findToolResult, extractUserText } from '@/lib/message-helpers';
+import { getAssistantText, getThinkingBlocks, getToolCalls, findToolResult } from '@/lib/message-helpers';
 import { getToolLabel } from '@/lib/tools/tool-labels';
 import { useInteractiveTools } from '@/hooks/useInteractiveTools';
 import { useStorageItem } from '@/hooks/useStorageItem';
@@ -155,9 +155,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
 
             if (msg.role === 'user') {
               return (
-                <UserMessageBubble key={`user-${idx}`}>
-                  {extractUserText(msg)}
-                </UserMessageBubble>
+                <UserMessageBubble key={`user-${idx}`} msg={msg} />
               );
             }
 
