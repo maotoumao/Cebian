@@ -18,7 +18,7 @@ export function ToolCard({ label, status, args, result, images }: ToolCardProps)
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden my-3 text-[0.8rem] min-w-0">
+    <div className="border border-border rounded-lg overflow-hidden text-[0.8rem] min-w-0">
       {/* Header — always visible */}
       <button
         type="button"

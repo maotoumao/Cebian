@@ -63,7 +63,7 @@ export function UserMessageBubble({ msg, children }: { msg?: Message; children?:
 /* ─── Agent Message ─── */
 export function AgentMessage({ children, isStreaming, showHeader = true }: { children?: ReactNode; isStreaming?: boolean; showHeader?: boolean }) {
   return (
-    <div className={`self-start w-full`}>
+    <div className={`self-start w-full ${showHeader ? '' : '-mt-1'}`}>
       {showHeader && (
         <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground font-medium">
           <Bot className="size-3.5 text-primary" />
