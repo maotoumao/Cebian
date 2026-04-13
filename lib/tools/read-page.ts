@@ -101,15 +101,23 @@ function getDocumentHtml(selector: string | null): { html: string; url: string }
 
 const OFFSCREEN_URL = 'offscreen.html';
 
+/** Singleton promise to avoid concurrent createDocument calls. */
+let offscreenReady: Promise<void> | null = null;
+
 /** Ensure the offscreen document exists, creating it if needed. */
 async function ensureOffscreen(): Promise<void> {
-  const existing = await chrome.offscreen.hasDocument();
-  if (existing) return;
-  await chrome.offscreen.createDocument({
-    url: chrome.runtime.getURL(OFFSCREEN_URL),
-    reasons: ['DOM_PARSER'],
-    justification: 'Parse HTML to markdown using DOMParser + Readability + Turndown',
-  });
+  if (!offscreenReady) {
+    offscreenReady = (async () => {
+      const existing = await chrome.offscreen.hasDocument();
+      if (existing) return;
+      await chrome.offscreen.createDocument({
+        url: chrome.runtime.getURL(OFFSCREEN_URL),
+        reasons: ['DOM_PARSER'],
+        justification: 'Parse HTML to markdown using DOMParser + Readability + Turndown',
+      });
+    })();
+  }
+  return offscreenReady;
 }
 
 /** Send HTML to the offscreen document for markdown conversion. */

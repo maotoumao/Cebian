@@ -134,15 +134,15 @@ class AgentManager {
   }
 
   /** Get or create a managed agent for a session */
-  private async getOrCreateAgent(sessionId: string): Promise<ManagedSession> {
+  private async getOrCreateAgent(sessionId: string, existingMessages?: AgentMessage[]): Promise<ManagedSession> {
     const existing = this.sessions.get(sessionId);
-    if (existing) return existing;
+    if (existing && !existingMessages) return existing;
 
     // Guard against concurrent creation
     const pending = this.creating.get(sessionId);
-    if (pending) return pending;
+    if (pending && !existingMessages) return pending;
 
-    const promise = this.createAgent(sessionId);
+    const promise = this.createAgent(sessionId, existingMessages);
     this.creating.set(sessionId, promise);
     try {
       const managed = await promise;
@@ -153,7 +153,7 @@ class AgentManager {
   }
 
   /** Internal: actually create the agent (called only once per session). */
-  private async createAgent(sessionId: string): Promise<ManagedSession> {
+  private async createAgent(sessionId: string, existingMessages?: AgentMessage[]): Promise<ManagedSession> {
 
     const resolved = await this.resolveModelObj();
     if (!resolved) throw new Error('No model selected or model not found');
@@ -164,9 +164,14 @@ class AgentManager {
       maxRoundsStorage.getValue(),
     ]);
 
-    // Load existing messages if session exists in DB
-    const existingSession = await sessionStore.load(sessionId);
-    const messages = existingSession?.messages ?? [];
+    // Use provided messages, or load from DB, or start empty
+    let messages: AgentMessage[] = existingMessages ?? [];
+    let sessionCreated = false;
+    if (!existingMessages) {
+      const existingSession = await sessionStore.load(sessionId);
+      messages = existingSession?.messages ?? [];
+      sessionCreated = !!existingSession;
+    }
 
     const agent = createCebianAgent({
       model: resolved.model,
@@ -179,7 +184,7 @@ class AgentManager {
     const managed: ManagedSession = {
       agent,
       sessionId,
-      sessionCreated: !!existingSession,
+      sessionCreated,
       isRunning: false,
       modelKey: `${resolved.provider}/${resolved.modelId}`,
       unsubscribe: () => {},
@@ -275,10 +280,13 @@ class AgentManager {
     if (currentModel) {
       const currentKey = `${currentModel.provider}/${currentModel.modelId}`;
       if (currentKey !== managed.modelKey) {
-        // Model changed — recreate the agent with the new model, preserving messages
+        // Model changed — recreate with new model, preserving in-memory messages
+        const currentMessages = [...managed.agent.state.messages];
+        const wasCreated = managed.sessionCreated;
         managed.unsubscribe();
         this.sessions.delete(sessionId);
-        managed = await this.getOrCreateAgent(sessionId);
+        managed = await this.getOrCreateAgent(sessionId, currentMessages);
+        managed.sessionCreated = wasCreated;
       }
     }
 
@@ -322,15 +330,15 @@ class AgentManager {
   }
 
   /** Resolve an interactive tool's pending request */
-  resolveTool(sessionId: string, toolName: string, response: any): void {
+  resolveTool(_sessionId: string, toolName: string, response: any): void {
+    // The constructor's registry subscription handles broadcasting tool_resolved
     interactiveToolRegistry.resolve(toolName, response);
-    this.broadcast(sessionId, { type: 'tool_resolved', sessionId, toolName });
   }
 
   /** Cancel a specific interactive tool */
-  cancelTool(sessionId: string, toolName: string): void {
+  cancelTool(_sessionId: string, toolName: string): void {
+    // The constructor's registry subscription handles broadcasting tool_resolved
     interactiveToolRegistry.cancelOne(toolName);
-    this.broadcast(sessionId, { type: 'tool_resolved', sessionId, toolName });
   }
 
   /** Get current state for a session (for reconnecting clients) */
