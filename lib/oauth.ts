@@ -399,7 +399,8 @@ export function getCopilotBaseUrl(cred: OAuthCredential): string {
 
 // ─── Get API key ───
 
-export function getApiKeyFromCredential(
+// Google Gemini requires projectId alongside the token; other providers use plain accessToken.
+function getApiKeyFromCredential(
   _provider: string,
   cred: OAuthCredential,
 ): string {
@@ -416,20 +417,37 @@ export function getApiKeyFromCredential(
 
 const ON_DEMAND_BUFFER_MS = 5 * 60 * 1000; // 5 minutes before expiry
 
+/** Per-provider in-flight refresh promise to deduplicate concurrent refreshes. */
+const inflightRefresh = new Map<string, Promise<OAuthCredential>>();
+
 /**
  * Get a valid OAuth token, refreshing on-demand if it's about to expire.
+ * Deduplicates concurrent refresh requests per provider.
  */
 export async function getValidOAuthToken(
   provider: string,
-  cred: OAuthCredential,
+  _cred: OAuthCredential,
 ): Promise<string> {
+  // Re-read from storage in case background alarm already refreshed
+  const freshCreds = await providerCredentials.getValue();
+  const cred = (freshCreds[provider] as OAuthCredential | undefined) ?? _cred;
+
   if (cred.refreshToken && cred.expiresAt && Date.now() >= cred.expiresAt - ON_DEMAND_BUFFER_MS) {
-    console.log(`[OAuth] ${provider}: token expiring soon, refreshing on-demand...`);
+    let pending = inflightRefresh.get(provider);
+    if (!pending) {
+      pending = refreshOAuthCredential(provider, cred)
+        .then(async (refreshed) => {
+          const creds = await providerCredentials.getValue();
+          await providerCredentials.setValue({ ...creds, [provider]: refreshed });
+          console.log(`[OAuth] ${provider}: on-demand refresh succeeded`);
+          return refreshed;
+        })
+        .finally(() => inflightRefresh.delete(provider));
+      inflightRefresh.set(provider, pending);
+    }
+
     try {
-      const refreshed = await refreshOAuthCredential(provider, cred);
-      const creds = await providerCredentials.getValue();
-      await providerCredentials.setValue({ ...creds, [provider]: refreshed });
-      console.log(`[OAuth] ${provider}: on-demand refresh succeeded`);
+      const refreshed = await pending;
       return getApiKeyFromCredential(provider, refreshed);
     } catch (err) {
       console.error(`[OAuth] ${provider}: on-demand refresh failed, using existing token`, err);
