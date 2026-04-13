@@ -318,6 +318,12 @@ class AgentManager {
       managed.unsubscribeAgent();
       managed.unsubscribeBridge();
       this.sessions.delete(sessionId);
+      // Ensure client knows the agent stopped (abort may not fire agent_end)
+      this.broadcast(sessionId, {
+        type: 'agent_end',
+        sessionId,
+        messages: [...managed.agent.state.messages],
+      });
     }
   }
 
