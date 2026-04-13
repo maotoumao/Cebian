@@ -17,6 +17,7 @@ import {
   isImageFile, isTextFile, formatFileSize,
   type Attachment,
 } from '@/lib/attachments';
+import { useMobileEmulation } from '@/hooks/useMobileEmulation';
 
 interface ChatInputProps {
   onSend: (message: string, attachments?: Attachment[]) => void;
@@ -26,9 +27,9 @@ interface ChatInputProps {
 export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [showSlash, setShowSlash] = useState(false);
-  const [mobileMode, setMobileMode] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isPicking, setIsPicking] = useState(false);
+  const { isActiveTabMobile, toggle: toggleMobile } = useMobileEmulation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -281,8 +282,8 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
             variant="ghost"
             size="icon-xs"
             title="移动端模式"
-            className={mobileMode ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}
-            onClick={() => setMobileMode(!mobileMode)}
+            className={isActiveTabMobile ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}
+            onClick={toggleMobile}
           >
             <Smartphone className="size-3.5" />
           </Button>
