@@ -5,7 +5,6 @@ import {
   createSession,
   getSession,
   listSessions,
-  updateSessionMessages,
   deleteSession,
   ThrottledSessionWriter,
   type SessionRecord,

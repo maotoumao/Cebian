@@ -2,8 +2,7 @@ import { Agent, type AgentOptions, type AgentMessage } from '@mariozechner/pi-ag
 import type { Api, Model, Message } from '@mariozechner/pi-ai';
 import { providerCredentials, type OAuthCredential } from './storage';
 import { getValidOAuthToken } from './oauth';
-import { isCustomProvider, findCustomModel, mergeCustomProviders } from './custom-models';
-import { PRESET_PROVIDERS, DEFAULT_SYSTEM_PROMPT } from './constants';
+import { DEFAULT_SYSTEM_PROMPT } from './constants';
 import { tools } from './tools';
 
 // ─── Agent factory ───

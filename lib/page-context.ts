@@ -8,8 +8,6 @@ const CONTEXT_TAG_CLOSE = '</cebian-context>';
 /** Matches only a leading context block (anchored to start of string). */
 export const CONTEXT_STRIP_RE = /^<cebian-context>[\s\S]*?<\/cebian-context>\s*/;
 
-const MAX_SELECTED_TEXT = 2000;
-
 interface PageMeta {
   description?: string;
   keywords?: string;

@@ -8,7 +8,7 @@ import { ModelSelector } from '@/components/chat/ModelSelector';
 import { ThinkingLevelSelector } from '@/components/chat/ThinkingLevelSelector';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { activeModel, thinkingLevel, providerCredentials, customProviders as customProvidersStorage, type ThinkingLevel } from '@/lib/storage';
-import { getModel, type KnownProvider } from '@mariozechner/pi-ai';
+import { getModel } from '@mariozechner/pi-ai';
 import { isCustomProvider, findCustomModel, mergeCustomProviders } from '@/lib/custom-models';
 import { SLASH_COMMANDS, PRESET_PROVIDERS } from '@/lib/constants';
 import { startElementPicker, cancelElementPicker } from '@/lib/element-picker';

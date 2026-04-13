@@ -22,8 +22,6 @@ import {
   thinkingLevel as thinkingLevelStorage,
   systemPrompt as systemPromptStorage,
   maxRounds as maxRoundsStorage,
-  type ProviderCredentials,
-  type CustomProviderConfig,
 } from '@/lib/storage';
 import { getCopilotBaseUrl } from '@/lib/oauth';
 import { mergeCustomProviders, isCustomProvider, findCustomModel } from '@/lib/custom-models';
