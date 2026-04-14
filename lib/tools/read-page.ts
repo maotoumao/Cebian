@@ -102,7 +102,7 @@ function getDocumentHtml(selector: string | null): { html: string; url: string }
 function extractOutline(selector: string | null): string {
   const MIN_WIDTH = 50;
   const MIN_HEIGHT = 30;
-  const MAX_DEPTH = 4;
+  const MAX_DEPTH = 6;
   const MAX_NODES = 200;
   const TEXT_LEN = 60;
   const INLINE_TAGS = new Set(['SPAN', 'A', 'EM', 'STRONG', 'B', 'I', 'U', 'S', 'SMALL', 'SUB', 'SUP', 'BR', 'WBR', 'ABBR', 'CODE', 'KBD', 'MARK', 'Q', 'CITE', 'TIME', 'LABEL']);
@@ -139,7 +139,29 @@ function extractOutline(selector: string | null): string {
     return path.join(' > ');
   }
 
-  function countInteractive(el: HTMLElement) {
+  /** Count interactive elements that are DIRECT children of el (not descendants). Used for flatten decisions. */
+  function countDirectInteractive(el: HTMLElement) {
+    const result = { inputs: 0, buttons: 0, links: 0, images: 0 };
+    for (const child of el.children) {
+      if (!(child instanceof HTMLElement)) continue;
+      const tag = child.tagName;
+      const type = child.getAttribute('type');
+      // Submit/button inputs → button (not input)
+      if (tag === 'BUTTON' || child.getAttribute('role') === 'button'
+        || (tag === 'INPUT' && (type === 'submit' || type === 'button'))) {
+        result.buttons++;
+      } else if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+        || child.getAttribute('contenteditable') === 'true') {
+        result.inputs++;
+      }
+      if (tag === 'A' && child.hasAttribute('href')) result.links++;
+      if (tag === 'IMG' || tag === 'SVG' || child.getAttribute('role') === 'img') result.images++;
+    }
+    return result;
+  }
+
+  /** Count ALL interactive descendants (used for the final summary line only). */
+  function countAllInteractive(el: HTMLElement) {
     return {
       inputs: el.querySelectorAll('input, textarea, select, [contenteditable="true"]').length,
       buttons: el.querySelectorAll('button, [role="button"], input[type="submit"], input[type="button"]').length,
@@ -149,6 +171,7 @@ function extractOutline(selector: string | null): string {
   }
 
   function getTextPreview(el: HTMLElement): string {
+    // Only collect direct text nodes — do NOT fallback to textContent (which includes all descendants)
     let text = '';
     for (const child of el.childNodes) {
       if (child.nodeType === Node.TEXT_NODE) {
@@ -156,9 +179,6 @@ function extractOutline(selector: string | null): string {
       }
     }
     text = text.trim();
-    if (!text) {
-      text = (el.textContent || '').trim().replace(/\s+/g, ' ');
-    }
     return text.length > TEXT_LEN ? text.slice(0, TEXT_LEN) + '...' : text;
   }
 
@@ -199,7 +219,10 @@ function extractOutline(selector: string | null): string {
     sel: string;
     rect: { x: number; y: number; w: number; h: number };
     text: string;
+    /** Direct child interactive counts (used for flatten decisions). */
     inter: { inputs: number; buttons: number; links: number; images: number };
+    /** Total descendant interactive counts (used for display). Computed after traversal. */
+    totalInter?: { inputs: number; buttons: number; links: number; images: number };
     clues: string[];
     style: { position: string; zIndex: string; overflow: string };
     children: OutlineNode[];
@@ -216,7 +239,7 @@ function extractOutline(selector: string | null): string {
       const rect = getVisualRect(child);
       if (!rect) continue;
 
-      const inter = countInteractive(child);
+      const inter = countDirectInteractive(child);
       const hasContent = inter.inputs + inter.buttons + inter.links + inter.images > 0
         || (child.textContent?.trim().length ?? 0) > 0;
       if (!hasContent) continue;
@@ -241,11 +264,12 @@ function extractOutline(selector: string | null): string {
         children: traverse(child, depth + 1),
       };
 
-      // Flatten: skip pure wrappers — but keep semantic tags, elements with notable styles, or elements with links
+      // Flatten: skip pure wrappers — but keep semantic tags, elements with notable styles, or elements with direct interactive children
       const hasNotableStyle = style.position || style.zIndex || style.overflow;
       const isSemantic = SEMANTIC_TAGS.has(child.tagName);
       if (node.children.length === 1 && !node.text && !hasNotableStyle && !isSemantic
-        && node.inter.inputs === 0 && node.inter.buttons === 0 && node.inter.links === 0) {
+        && node.inter.inputs === 0 && node.inter.buttons === 0
+        && node.inter.links === 0 && node.inter.images === 0) {
         results.push(...node.children);
       } else {
         results.push(node);
@@ -254,14 +278,31 @@ function extractOutline(selector: string | null): string {
     return results;
   }
 
+  /** Post-traversal: compute total descendant interactive counts for display. */
+  function computeTotalInter(nodes: OutlineNode[]): void {
+    for (const node of nodes) {
+      computeTotalInter(node.children);
+      const totals = { ...node.inter };
+      for (const child of node.children) {
+        const ct = child.totalInter!;
+        totals.inputs += ct.inputs;
+        totals.buttons += ct.buttons;
+        totals.links += ct.links;
+        totals.images += ct.images;
+      }
+      node.totalInter = totals;
+    }
+  }
+
   function formatNode(node: OutlineNode, indent: number): string[] {
     const pad = '  '.repeat(indent);
+    const ti = node.totalInter ?? node.inter;
 
     const interParts: string[] = [];
-    if (node.inter.inputs) interParts.push(node.inter.inputs + ' input');
-    if (node.inter.buttons) interParts.push(node.inter.buttons + ' btn');
-    if (node.inter.links) interParts.push(node.inter.links + ' link');
-    if (node.inter.images) interParts.push(node.inter.images + ' img');
+    if (ti.inputs) interParts.push(ti.inputs + ' input');
+    if (ti.buttons) interParts.push(ti.buttons + ' btn');
+    if (ti.links) interParts.push(ti.links + ' link');
+    if (ti.images) interParts.push(ti.images + ' img');
     const interStr = interParts.length ? ' | ' + interParts.join(', ') : '';
 
     const clueStr = node.clues.length ? ' {' + node.clues.join('; ') + '}' : '';
@@ -283,7 +324,8 @@ function extractOutline(selector: string | null): string {
   }
 
   const tree = traverse(root, 0);
-  const totalInter = countInteractive(root);
+  computeTotalInter(tree);
+  const totalInter = countAllInteractive(root);
 
   const header: string[] = [];
   if (selector) {
