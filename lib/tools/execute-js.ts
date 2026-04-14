@@ -7,8 +7,9 @@ const ExecuteJsParameters = Type.Object({
   code: Type.String({
     description:
       'JavaScript code to execute in the active tab. ' +
-      'You can use await directly. ' +
-      'Return a value to get it back — it will be JSON-serialized.',
+      'The code is the body of an async function — use `return` to produce a result ' +
+      '(e.g. `return document.title`). You can use `await` directly. ' +
+      'The return value will be JSON-serialized.',
   }),
   frameId: Type.Optional(
     Type.Number({
@@ -24,10 +25,11 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
   label: 'Execute JavaScript',
   description:
     'Execute JavaScript code in the active browser tab and return the result. ' +
-    'Use for operating DOM properties, extracting data, modifying page content, ' +
+    'The code runs as an async function body — use `return` to produce a result (e.g. `return document.title`). ' +
+    'Use for DOM operations, data extraction, page modifications, ' +
     'calling page APIs, or reading localStorage/sessionStorage. ' +
     'The code runs in the page context with full access to the DOM and page globals. ' +
-    'Return a value to get it back — it will be JSON-serialized.',
+    'The return value is JSON-serialized.',
   parameters: ExecuteJsParameters,
 
   async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {

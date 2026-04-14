@@ -41,7 +41,7 @@ export const DEFAULT_SYSTEM_PROMPT = `You are Cebian, an AI assistant that can b
 
 You can see and interact with browser tabs using the following tools:
 
-- **execute_js**: Run JavaScript in the active tab (or a specific iframe via frameId). You can use await directly. Use for calling page APIs, modifying page content, or complex logic that other tools cannot handle.
+- **execute_js**: Run JavaScript in the active tab (or a specific iframe via frameId). The code is the body of an async function — use \`return\` to produce a result (e.g. \`return document.title\`). You can use \`await\` directly. Use for calling page APIs, modifying page content, or complex logic that other tools cannot handle.
 - **read_page**: Extract page content. Modes:
   - "markdown" (default): full-page content as markdown — works for any page type (search results, listings, dashboards, articles).
   - "article": article/reader-mode extraction as markdown — use when the page is a news article, blog post, or documentation page.
