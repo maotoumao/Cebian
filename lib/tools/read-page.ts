@@ -104,6 +104,7 @@ function extractOutline(selector: string | null): string {
   const MIN_HEIGHT = 30;
   const MAX_DEPTH = 6;
   const MAX_NODES = 200;
+  const MAX_RAW_DEPTH = 30;
   const TEXT_LEN = 60;
   const INLINE_TAGS = new Set(['SPAN', 'A', 'EM', 'STRONG', 'B', 'I', 'U', 'S', 'SMALL', 'SUB', 'SUP', 'BR', 'WBR', 'ABBR', 'CODE', 'KBD', 'MARK', 'Q', 'CITE', 'TIME', 'LABEL']);
   const SEMANTIC_TAGS = new Set(['NAV', 'HEADER', 'FOOTER', 'ASIDE', 'MAIN', 'SECTION', 'ARTICLE', 'FORM']);
@@ -139,14 +140,13 @@ function extractOutline(selector: string | null): string {
     return path.join(' > ');
   }
 
-  /** Count interactive elements that are DIRECT children of el (not descendants). Used for flatten decisions. */
+  /** Count interactive elements that are DIRECT children of el (not descendants). */
   function countDirectInteractive(el: HTMLElement) {
     const result = { inputs: 0, buttons: 0, links: 0, images: 0 };
     for (const child of el.children) {
       if (!(child instanceof HTMLElement)) continue;
       const tag = child.tagName;
       const type = child.getAttribute('type');
-      // Submit/button inputs → button (not input)
       if (tag === 'BUTTON' || child.getAttribute('role') === 'button'
         || (tag === 'INPUT' && (type === 'submit' || type === 'button'))) {
         result.buttons++;
@@ -171,7 +171,6 @@ function extractOutline(selector: string | null): string {
   }
 
   function getTextPreview(el: HTMLElement): string {
-    // Only collect direct text nodes — do NOT fallback to textContent (which includes all descendants)
     let text = '';
     for (const child of el.childNodes) {
       if (child.nodeType === Node.TEXT_NODE) {
@@ -196,15 +195,12 @@ function extractOutline(selector: string | null): string {
     return clues;
   }
 
-  /** Check if element is a meaningful visual block. Returns its rect if yes, null if not. */
   function getVisualRect(el: HTMLElement): DOMRect | null {
     if (el.offsetParent === null && el.getClientRects().length === 0) return null;
     const rect = el.getBoundingClientRect();
     if (rect.width < MIN_WIDTH || rect.height < MIN_HEIGHT) return null;
-    // Count block-level children using tag-based heuristic (avoids getComputedStyle)
     const blockChildren = Array.from(el.children).filter(c => !INLINE_TAGS.has(c.tagName));
     if (blockChildren.length === 0 && !el.querySelector('input, button, a, select, textarea, img')) {
-      // Allow if element has meaningful direct text
       const directText = Array.from(el.childNodes)
         .filter(n => n.nodeType === Node.TEXT_NODE)
         .map(n => (n.textContent ?? '').trim())
@@ -214,68 +210,202 @@ function extractOutline(selector: string | null): string {
     return rect;
   }
 
+  /** Determine if an element is a pure wrapper that should be skipped (not consume depth).
+   *  Pre-computed values are passed in to avoid redundant DOM queries. */
+  function isWrapper(
+    el: HTMLElement,
+    cs: CSSStyleDeclaration,
+    textPreview: string,
+    directInter: { inputs: number; buttons: number; links: number; images: number },
+  ): boolean {
+    if (el.id) return false;
+    if (el.getAttribute('role')) return false;
+    if (el.getAttribute('aria-label')) return false;
+    if (el.getAttribute('aria-labelledby')) return false;
+    if (el.hasAttribute('tabindex')) return false;
+    if (SEMANTIC_TAGS.has(el.tagName)) return false;
+    // Only fixed/absolute/sticky are meaningful positioning; relative is cosmetic
+    if (cs.position === 'fixed' || cs.position === 'absolute' || cs.position === 'sticky') return false;
+    if (cs.zIndex !== 'auto' && cs.zIndex !== '0') return false;
+    if (cs.overflow !== 'visible') return false;
+    if (textPreview) return false;
+    if (directInter.inputs + directInter.buttons + directInter.links + directInter.images > 0) return false;
+    return true;
+  }
+
+  /** Fingerprint for detecting repeated sibling patterns. */
+  function getSiblingKey(el: HTMLElement): string {
+    const tag = el.tagName;
+    const cls = (typeof el.className === 'string') ? el.className : '';
+    const role = el.getAttribute('role') ?? '';
+    return `${tag}|${cls}|${role}`;
+  }
+
+  /** Check if two outline nodes have similar structure (same tag, similar interactive profile). */
+  function isSimilarStructure(a: OutlineNode, b: OutlineNode): boolean {
+    if (a.tag !== b.tag) return false;
+    // Same direct interactive profile
+    if (a.inter.inputs !== b.inter.inputs || a.inter.buttons !== b.inter.buttons
+      || a.inter.links !== b.inter.links || a.inter.images !== b.inter.images) return false;
+    // Similar child count (within ±1)
+    if (Math.abs(a.children.length - b.children.length) > 1) return false;
+    return true;
+  }
+
   interface OutlineNode {
     tag: string;
     sel: string;
     rect: { x: number; y: number; w: number; h: number };
     text: string;
-    /** Direct child interactive counts (used for flatten decisions). */
     inter: { inputs: number; buttons: number; links: number; images: number };
-    /** Total descendant interactive counts (used for display). Computed after traversal. */
     totalInter?: { inputs: number; buttons: number; links: number; images: number };
     clues: string[];
     style: { position: string; zIndex: string; overflow: string };
     children: OutlineNode[];
+    /** If set, this node represents N collapsed siblings that were similar to previous nodes. */
+    collapsedCount?: number;
+    collapsedSelector?: string;
   }
 
-  function traverse(el: HTMLElement, depth: number): OutlineNode[] {
-    if (depth > MAX_DEPTH || nodeCount >= MAX_NODES) return [];
-    const results: OutlineNode[] = [];
+  const SIBLING_SAMPLE_COUNT = 3;
+  const SIBLING_COLLAPSE_THRESHOLD = 5;
 
+  /**
+   * Traverse the DOM tree. `depth` counts meaningful nodes only.
+   * `rawDepth` counts actual DOM nesting to prevent infinite recursion on wrapper chains.
+   */
+  function traverse(el: HTMLElement, depth: number, rawDepth: number): OutlineNode[] {
+    if (depth > MAX_DEPTH || rawDepth > MAX_RAW_DEPTH || nodeCount >= MAX_NODES) return [];
+
+    // Phase 1: collect all meaningful children (skipping wrappers)
+    type Candidate = { el: HTMLElement; key: string; cs: CSSStyleDeclaration; textPreview: string; inter: ReturnType<typeof countDirectInteractive> }
+      | { el: null; key: '__promoted__'; _node: OutlineNode };
+    const candidates: Candidate[] = [];
     for (const child of el.children) {
-      if (nodeCount >= MAX_NODES) break;
+      if (nodeCount + candidates.length >= MAX_NODES + 50) break;
       if (!(child instanceof HTMLElement)) continue;
 
       const rect = getVisualRect(child);
       if (!rect) continue;
 
-      const inter = countDirectInteractive(child);
-      const hasContent = inter.inputs + inter.buttons + inter.links + inter.images > 0
-        || (child.textContent?.trim().length ?? 0) > 0;
+      const hasContent = (child.textContent?.trim().length ?? 0) > 0
+        || child.querySelector('input, button, a, select, textarea, img') !== null;
       if (!hasContent) continue;
 
-      nodeCount++;
-
       const cs = getComputedStyle(child);
-      const style = {
-        position: cs.position === 'static' ? '' : cs.position,
-        zIndex: cs.zIndex === 'auto' ? '' : cs.zIndex,
-        overflow: (cs.overflow === 'visible' || cs.overflow === '') ? '' : cs.overflow,
-      };
+      const textPreview = getTextPreview(child);
+      const inter = countDirectInteractive(child);
 
-      const node: OutlineNode = {
-        tag: child.tagName.toLowerCase(),
-        sel: getSelector(child),
-        rect: { x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.width), h: Math.round(rect.height) },
-        text: getTextPreview(child),
-        inter,
-        clues: getClues(child),
-        style,
-        children: traverse(child, depth + 1),
-      };
+      if (isWrapper(child, cs, textPreview, inter)) {
+        const promoted = traverse(child, depth, rawDepth + 1);
+        candidates.push(...promoted.map(n => ({ el: null, key: '__promoted__' as const, _node: n })));
+        continue;
+      }
 
-      // Flatten: skip pure wrappers — but keep semantic tags, elements with notable styles, or elements with direct interactive children
-      const hasNotableStyle = style.position || style.zIndex || style.overflow;
-      const isSemantic = SEMANTIC_TAGS.has(child.tagName);
-      if (node.children.length === 1 && !node.text && !hasNotableStyle && !isSemantic
-        && node.inter.inputs === 0 && node.inter.buttons === 0
-        && node.inter.links === 0 && node.inter.images === 0) {
-        results.push(...node.children);
+      candidates.push({ el: child, key: getSiblingKey(child), cs, textPreview, inter });
+    }
+
+    // Phase 2: group by sibling key, detect repeated patterns
+    const results: OutlineNode[] = [];
+    const keyCount = new Map<string, number>();
+    for (const c of candidates) {
+      keyCount.set(c.key, (keyCount.get(c.key) ?? 0) + 1);
+    }
+
+    // Track how many of each key we've emitted
+    const keyEmitted = new Map<string, number>();
+    // Store first few nodes per key to verify structural similarity
+    const keySamples = new Map<string, OutlineNode[]>();
+
+    for (const c of candidates) {
+      if (nodeCount >= MAX_NODES) break;
+
+      // Handle promoted nodes from wrapper flattening
+      if (c.key === '__promoted__') {
+        results.push((c as any)._node);
+        continue;
+      }
+
+      const count = keyCount.get(c.key)!;
+      const emitted = keyEmitted.get(c.key) ?? 0;
+
+      // If this key has enough siblings, apply collapse logic
+      if (count >= SIBLING_COLLAPSE_THRESHOLD) {
+        if (emitted < SIBLING_SAMPLE_COUNT) {
+          // Emit sample node (fully expanded)
+          const cc = c as Candidate & { cs: CSSStyleDeclaration; textPreview: string; inter: ReturnType<typeof countDirectInteractive> };
+          const node = buildNode(cc.el!, depth, rawDepth, cc.cs, cc.textPreview, cc.inter);
+          results.push(node);
+          keyEmitted.set(c.key, emitted + 1);
+
+          // Track samples for similarity check
+          const samples = keySamples.get(c.key) ?? [];
+          samples.push(node);
+          keySamples.set(c.key, samples);
+        } else if (emitted === SIBLING_SAMPLE_COUNT) {
+          // Verify the samples are actually similar before collapsing
+          const samples = keySamples.get(c.key) ?? [];
+          const allSimilar = samples.length >= 2 && samples.every((s, i) =>
+            i === 0 || isSimilarStructure(samples[0], s));
+
+          if (allSimilar) {
+            // Emit collapse summary
+            const remaining = count - SIBLING_SAMPLE_COUNT;
+            const collapseEl = (c as Candidate & { el: HTMLElement }).el;
+            const tag = collapseEl.tagName.toLowerCase();
+            const firstClass = (typeof collapseEl.className === 'string' && collapseEl.className)
+              ? collapseEl.className.split(/\s+/)[0] : '';
+            results.push({
+              tag, sel: `(${remaining} more)`, text: '',
+              rect: { x: 0, y: 0, w: 0, h: 0 }, inter: { inputs: 0, buttons: 0, links: 0, images: 0 },
+              clues: [], style: { position: '', zIndex: '', overflow: '' }, children: [],
+              collapsedCount: remaining,
+              collapsedSelector: `${getSelector(collapseEl.parentElement!)} > ${tag}${firstClass ? '.' + firstClass : ''}`,
+            });
+            keyEmitted.set(c.key, emitted + 1);
+          } else {
+            // Not actually similar, emit normally
+            const cc2 = c as Candidate & { cs: CSSStyleDeclaration; textPreview: string; inter: ReturnType<typeof countDirectInteractive> };
+            const node = buildNode(cc2.el!, depth, rawDepth, cc2.cs, cc2.textPreview, cc2.inter);
+            results.push(node);
+            keyEmitted.set(c.key, emitted + 1);
+            // Mark as non-collapsible so future siblings also emit normally
+            keyCount.set(c.key, SIBLING_COLLAPSE_THRESHOLD - 1);
+          }
+        }
+        // else: already collapsed, skip remaining siblings (don't consume nodeCount)
       } else {
+        // Not enough siblings for collapse, emit normally
+        const cc3 = c as Candidate & { cs: CSSStyleDeclaration; textPreview: string; inter: ReturnType<typeof countDirectInteractive> };
+        const node = buildNode(cc3.el!, depth, rawDepth, cc3.cs, cc3.textPreview, cc3.inter);
         results.push(node);
       }
     }
+
     return results;
+  }
+
+  /** Build an OutlineNode for a meaningful element using pre-computed values. */
+  function buildNode(
+    child: HTMLElement, depth: number, rawDepth: number,
+    cs: CSSStyleDeclaration, textPreview: string, inter: ReturnType<typeof countDirectInteractive>,
+  ): OutlineNode {
+    nodeCount++;
+    const style = {
+      position: (cs.position === 'static' || cs.position === 'relative') ? '' : cs.position,
+      zIndex: cs.zIndex === 'auto' ? '' : cs.zIndex,
+      overflow: cs.overflow === 'visible' ? '' : cs.overflow,
+    };
+    return {
+      tag: child.tagName.toLowerCase(),
+      sel: getSelector(child),
+      rect: (() => { const r = child.getBoundingClientRect(); return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }; })(),
+      text: textPreview,
+      inter,
+      clues: getClues(child),
+      style,
+      children: traverse(child, depth + 1, rawDepth + 1),
+    };
   }
 
   /** Post-traversal: compute total descendant interactive counts for display. */
@@ -296,6 +426,12 @@ function extractOutline(selector: string | null): string {
 
   function formatNode(node: OutlineNode, indent: number): string[] {
     const pad = '  '.repeat(indent);
+
+    // Collapsed sibling summary
+    if (node.collapsedCount) {
+      return [`${pad}... ${node.collapsedCount} more similar <${node.tag}> (selector: ${node.collapsedSelector})`];
+    }
+
     const ti = node.totalInter ?? node.inter;
 
     const interParts: string[] = [];
@@ -323,7 +459,7 @@ function extractOutline(selector: string | null): string {
     return lines;
   }
 
-  const tree = traverse(root, 0);
+  const tree = traverse(root, 0, 0);
   computeTotalInter(tree);
   const totalInter = countAllInteractive(root);
 
