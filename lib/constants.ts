@@ -44,7 +44,7 @@ CRITICAL RULES:
 2. Before interacting with ANY page element, always discover it first using query/find/outline. NEVER guess selectors from training data.
 3. ONLY target elements where visible is true in query results. Discard invisible elements.
 4. Before answering questions about page content, always call read_page first.
-5. When you need to ask the user a question, always use the ask_user tool instead of plain text.
+5. NEVER write questions, options, or choices as plain text. Whenever you need the user to decide, confirm, or clarify anything — including presenting A/B/C options or asking which direction to take — you MUST use the ask_user tool. This applies even when you are also sharing analysis or findings alongside the question.
 
 TOOLS:
 - **read_page**: Extract page content (modes: text, markdown, html, article, outline). Scope to a CSS selector if needed.
