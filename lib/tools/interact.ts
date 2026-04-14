@@ -3,53 +3,69 @@ import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_INTERACT } from '@/lib/types';
 import { getActiveTabId, executeInTabWithArgs, waitForNavigation } from './chrome-api';
 
+// ─── Shared field schemas (reused by top-level params and sequence steps) ───
+
+const selectorField = Type.Optional(Type.String({
+  description:
+    'CSS selector of the target element. ' +
+    'Required for: type, clear, select, wait, wait_hidden. ' +
+    'Optional for: click, dblclick, rightclick, hover (alternative: x + y). ' +
+    'Optional for: scroll (omit to scroll the page).',
+}));
+const xField = Type.Optional(Type.Number({
+  description: 'X viewport coordinate. For click/dblclick/rightclick/hover as alternative to selector.',
+}));
+const yField = Type.Optional(Type.Number({
+  description: 'Y viewport coordinate. For click/dblclick/rightclick/hover as alternative to selector.',
+}));
+const textField = Type.Optional(Type.String({
+  description: 'Text content. Required for: type (text to input), select (option text/value to pick).',
+}));
+const keyField = Type.Optional(Type.String({
+  description: 'Key name for keypress (e.g. "Enter", "Tab", "Escape", "ArrowDown"). Required for keypress.',
+}));
+const modifiersField = Type.Optional(Type.Array(Type.String(), {
+  description: 'Modifier keys to hold: "ctrl", "shift", "alt", "meta".',
+}));
+const deltaXField = Type.Optional(Type.Number({
+  description: 'Horizontal scroll amount for scroll. Default: 0.',
+}));
+const deltaYField = Type.Optional(Type.Number({
+  description: 'Vertical scroll amount for scroll. Positive = down. Default: 300.',
+}));
+const timeoutField = Type.Optional(Type.Number({
+  description: 'Timeout in ms for wait/wait_hidden. Default: 3000.',
+}));
+
+/** Actions available inside sequence steps. */
+const stepActions = [
+  Type.Literal('click'), Type.Literal('dblclick'), Type.Literal('rightclick'),
+  Type.Literal('hover'), Type.Literal('type'), Type.Literal('clear'),
+  Type.Literal('select'), Type.Literal('scroll'), Type.Literal('keypress'),
+  Type.Literal('wait'), Type.Literal('wait_hidden'),
+] as const;
+
 // ─── Parameters: single flat object (OpenAI requires top-level "type": "object") ───
 
 const InteractParameters = Type.Object({
   action: Type.Union([
-    Type.Literal('click'), Type.Literal('dblclick'), Type.Literal('rightclick'),
-    Type.Literal('hover'), Type.Literal('type'), Type.Literal('clear'),
-    Type.Literal('select'), Type.Literal('scroll'), Type.Literal('keypress'),
-    Type.Literal('wait'), Type.Literal('wait_hidden'), Type.Literal('wait_navigation'),
-    Type.Literal('find'), Type.Literal('query'),
+    ...stepActions, Type.Literal('wait_navigation'),
+    Type.Literal('find'), Type.Literal('query'), Type.Literal('sequence'),
   ], { description: 'The interaction to perform.' }),
-  selector: Type.Optional(Type.String({
-    description:
-      'CSS selector of the target element. ' +
-      'Required for: type, clear, select, wait, wait_hidden, query. ' +
-      'Optional for: click, dblclick, rightclick, hover (alternative: provide x + y instead). ' +
-      'Optional for: scroll (omit to scroll the page). ' +
-      'Not used by: keypress, wait_navigation, find.',
-  })),
-  x: Type.Optional(Type.Number({
-    description:
-      'X viewport coordinate (pixels, must be visible on screen). ' +
-      'For click/dblclick/rightclick/hover only. Provide x + y together as alternative to selector.',
-  })),
-  y: Type.Optional(Type.Number({
-    description:
-      'Y viewport coordinate (pixels, must be visible on screen). ' +
-      'For click/dblclick/rightclick/hover only. Provide x + y together as alternative to selector.',
-  })),
+  selector: selectorField,
+  x: xField,
+  y: yField,
   text: Type.Optional(Type.String({
     description:
       'Text content. ' +
       'Required for: type (text to input), select (option text/value to pick), find (text to search for).',
   })),
-  key: Type.Optional(Type.String({
-    description: 'Key name for "keypress" action (e.g. "Enter", "Tab", "Escape", "ArrowDown"). Required for keypress.',
-  })),
-  modifiers: Type.Optional(Type.Array(Type.String(), {
-    description: 'Modifier keys to hold during keypress: "ctrl", "shift", "alt", "meta".',
-  })),
-  deltaX: Type.Optional(Type.Number({
-    description: 'Horizontal scroll amount for "scroll" action. Default: 0.',
-  })),
-  deltaY: Type.Optional(Type.Number({
-    description: 'Vertical scroll amount for "scroll" action. Positive = down. Default: 300.',
-  })),
+  key: keyField,
+  modifiers: modifiersField,
+  deltaX: deltaXField,
+  deltaY: deltaYField,
   timeout: Type.Optional(Type.Number({
-    description: 'Timeout in ms for wait, wait_hidden, wait_navigation. Default: 5000.',
+    description: 'Timeout in ms for wait, wait_hidden, wait_navigation. Default: 3000.',
   })),
   nth: Type.Optional(Type.Number({
     description: 'Match index (0-based) for "find" action. Default: 0 (first match).',
@@ -60,6 +76,26 @@ const InteractParameters = Type.Object({
   frameId: Type.Optional(Type.Number({
     description: 'Frame ID to interact with. Omit for top frame. Use tab({ action: "list_frames" }) to discover IDs.',
   })),
+  steps: Type.Optional(Type.Array(
+    Type.Object({
+      action: Type.Union([...stepActions], { description: 'The interaction to perform in this step.' }),
+      selector: selectorField,
+      x: xField,
+      y: yField,
+      text: textField,
+      key: keyField,
+      modifiers: modifiersField,
+      deltaX: deltaXField,
+      deltaY: deltaYField,
+      timeout: timeoutField,
+    }),
+    {
+      description:
+        'Array of interaction steps for "sequence" action. ' +
+        'Each step uses the same parameters as the top-level interact tool (selector, x/y, text, key, etc.). ' +
+        'Steps are executed in order. Execution stops on the first error.',
+    },
+  )),
 });
 
 // ─── In-page interaction function (self-contained) ───
@@ -78,7 +114,7 @@ function performInteraction(params: {
   nth?: number;
   limit?: number;
 }): Promise<string> {
-  const { action, selector, x, y, text, key, modifiers, deltaX, deltaY, timeout = 5000, nth = 0, limit = 20 } = params;
+  const { action, selector, x, y, text, key, modifiers, deltaX, deltaY, timeout = 3000, nth = 0, limit = 20 } = params;
 
   /** Whether the element was found by coordinates (skip scrollIntoView). */
   let resolvedByCoords = false;
@@ -376,10 +412,13 @@ export const interactTool: AgentTool<typeof InteractParameters> = {
   description:
     'Simulate user interactions on the active page. ' +
     'Actions: click, dblclick, rightclick, hover (target by CSS selector or x/y coordinates), ' +
-    'type (text input), clear, select (dropdown), scroll, keypress, ' +
+    'type (text input), clear, select (dropdown), scroll (page or element via selector), keypress, ' +
     'wait (element appears), wait_hidden (element disappears), ' +
     'wait_navigation (page load completes), find (search text in page and return selector), ' +
     'query (get info about elements matching a CSS selector). ' +
+    'Use "sequence" with a "steps" array to batch multiple actions in one call ' +
+    '(e.g. click → wait → type → keypress). Each step supports the same parameters. ' +
+    'Execution stops on the first error and returns all results so far. ' +
     'Elements are scrolled into view automatically before interaction.',
   parameters: InteractParameters,
 
@@ -390,7 +429,7 @@ export const interactTool: AgentTool<typeof InteractParameters> = {
     // wait_navigation runs in extension context (not in-page)
     if (params.action === 'wait_navigation') {
       try {
-        const result = await waitForNavigation(tabId, params.timeout ?? 5000);
+        const result = await waitForNavigation(tabId, params.timeout ?? 3000);
         return {
           content: [{ type: 'text', text: result }],
           details: { status: 'done' },
@@ -401,6 +440,40 @@ export const interactTool: AgentTool<typeof InteractParameters> = {
           details: { status: 'error' },
         };
       }
+    }
+
+    // sequence: run multiple steps in order, in-page
+    if (params.action === 'sequence') {
+      if (!params.steps || params.steps.length === 0) {
+        return {
+          content: [{ type: 'text', text: 'Error: "steps" array is required for sequence action.' }],
+          details: { status: 'error' },
+        };
+      }
+
+      const frameId = params.frameId;
+      const results: string[] = [];
+
+      for (let i = 0; i < params.steps.length; i++) {
+        signal?.throwIfAborted();
+        const step = params.steps[i];
+
+        try {
+          const result = await executeInTabWithArgs(tabId, performInteraction, [step], frameId);
+          results.push(`[${i + 1}] ${result}`);
+        } catch (err) {
+          results.push(`[${i + 1}] Error: ${(err as Error).message}`);
+          return {
+            content: [{ type: 'text', text: `Sequence stopped at step ${i + 1}:\n${results.join('\n')}` }],
+            details: { status: 'error' },
+          };
+        }
+      }
+
+      return {
+        content: [{ type: 'text', text: `Sequence completed (${params.steps.length} steps):\n${results.join('\n')}` }],
+        details: { status: 'done' },
+      };
     }
 
     // All other actions run in-page

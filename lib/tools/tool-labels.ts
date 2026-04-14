@@ -43,6 +43,7 @@ function getInteractLabel(args: Record<string, any>): string {
     case 'wait_navigation': return '正在等待页面加载';
     case 'find': return `正在搜索 "${args.text ?? ''}"`;
     case 'query': return `正在查询元素${truncTarget}`;
+    case 'sequence': return `正在执行操作序列 (${args.steps?.length ?? 0} 步)`;
     default: return `interact: ${args.action ?? 'unknown'}`;
   }
 }
