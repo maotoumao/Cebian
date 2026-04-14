@@ -7,8 +7,9 @@ const ExecuteJsParameters = Type.Object({
   code: Type.String({
     description:
       'JavaScript code to execute in the active tab. ' +
-      'The code is the body of an async function — use `return` to produce a result ' +
+      'The code is inserted as the body of `async () => { YOUR_CODE }` — use `return` directly to produce a result ' +
       '(e.g. `return document.title`). You can use `await` directly. ' +
+      'NEVER wrap code in an IIFE like `(()=>{ return x })()` — the inner return does not propagate and the result will be null. ' +
       'The return value will be JSON-serialized.',
   }),
   frameId: Type.Optional(
