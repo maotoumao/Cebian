@@ -270,6 +270,13 @@ function extractOutline(selector: string | null): string {
   const SIBLING_SAMPLE_COUNT = 3;
   const SIBLING_COLLAPSE_THRESHOLD = 5;
 
+  /** Generate a collapse key from an OutlineNode (for promoted nodes that have no DOM element). */
+  function getNodeKey(node: OutlineNode): string {
+    const cls = node.clues.find(c => c.startsWith('class='));
+    const role = node.clues.find(c => c.startsWith('role='));
+    return `${node.tag}|${cls ?? ''}|${role ?? ''}`;
+  }
+
   /**
    * Traverse the DOM tree. `depth` counts meaningful nodes only.
    * `rawDepth` counts actual DOM nesting to prevent infinite recursion on wrapper chains.
@@ -278,8 +285,10 @@ function extractOutline(selector: string | null): string {
     if (depth > MAX_DEPTH || rawDepth > MAX_RAW_DEPTH || nodeCount >= MAX_NODES) return [];
 
     // Phase 1: collect all meaningful children (skipping wrappers)
-    type Candidate = { el: HTMLElement; key: string; cs: CSSStyleDeclaration; textPreview: string; inter: ReturnType<typeof countDirectInteractive> }
-      | { el: null; key: '__promoted__'; _node: OutlineNode };
+    interface DomCandidate { type: 'dom'; el: HTMLElement; key: string; cs: CSSStyleDeclaration; textPreview: string; inter: ReturnType<typeof countDirectInteractive> }
+    interface PromotedCandidate { type: 'promoted'; node: OutlineNode; key: string }
+    type Candidate = DomCandidate | PromotedCandidate;
+
     const candidates: Candidate[] = [];
     for (const child of el.children) {
       if (nodeCount + candidates.length >= MAX_NODES + 50) break;
@@ -298,86 +307,74 @@ function extractOutline(selector: string | null): string {
 
       if (isWrapper(child, cs, textPreview, inter)) {
         const promoted = traverse(child, depth, rawDepth + 1);
-        candidates.push(...promoted.map(n => ({ el: null, key: '__promoted__' as const, _node: n })));
+        candidates.push(...promoted.map(n => ({ type: 'promoted' as const, node: n, key: getNodeKey(n) })));
         continue;
       }
 
-      candidates.push({ el: child, key: getSiblingKey(child), cs, textPreview, inter });
+      candidates.push({ type: 'dom', el: child, key: getSiblingKey(child), cs, textPreview, inter });
     }
 
-    // Phase 2: group by sibling key, detect repeated patterns
+    // Phase 2: group by key, detect repeated patterns, collapse similar siblings
     const results: OutlineNode[] = [];
     const keyCount = new Map<string, number>();
     for (const c of candidates) {
       keyCount.set(c.key, (keyCount.get(c.key) ?? 0) + 1);
     }
 
-    // Track how many of each key we've emitted
     const keyEmitted = new Map<string, number>();
-    // Store first few nodes per key to verify structural similarity
     const keySamples = new Map<string, OutlineNode[]>();
 
     for (const c of candidates) {
       if (nodeCount >= MAX_NODES) break;
 
-      // Handle promoted nodes from wrapper flattening
-      if (c.key === '__promoted__') {
-        results.push((c as any)._node);
-        continue;
-      }
-
       const count = keyCount.get(c.key)!;
       const emitted = keyEmitted.get(c.key) ?? 0;
 
-      // If this key has enough siblings, apply collapse logic
+      // Resolve candidate to an OutlineNode
+      const resolveNode = (): OutlineNode => {
+        if (c.type === 'promoted') return c.node;
+        return buildNode(c.el, depth, rawDepth, c.cs, c.textPreview, c.inter);
+      };
+
       if (count >= SIBLING_COLLAPSE_THRESHOLD) {
         if (emitted < SIBLING_SAMPLE_COUNT) {
-          // Emit sample node (fully expanded)
-          const cc = c as Candidate & { cs: CSSStyleDeclaration; textPreview: string; inter: ReturnType<typeof countDirectInteractive> };
-          const node = buildNode(cc.el!, depth, rawDepth, cc.cs, cc.textPreview, cc.inter);
+          const node = resolveNode();
           results.push(node);
           keyEmitted.set(c.key, emitted + 1);
-
-          // Track samples for similarity check
           const samples = keySamples.get(c.key) ?? [];
           samples.push(node);
           keySamples.set(c.key, samples);
         } else if (emitted === SIBLING_SAMPLE_COUNT) {
-          // Verify the samples are actually similar before collapsing
           const samples = keySamples.get(c.key) ?? [];
           const allSimilar = samples.length >= 2 && samples.every((s, i) =>
             i === 0 || isSimilarStructure(samples[0], s));
 
           if (allSimilar) {
-            // Emit collapse summary
             const remaining = count - SIBLING_SAMPLE_COUNT;
-            const collapseEl = (c as Candidate & { el: HTMLElement }).el;
-            const tag = collapseEl.tagName.toLowerCase();
-            const firstClass = (typeof collapseEl.className === 'string' && collapseEl.className)
-              ? collapseEl.className.split(/\s+/)[0] : '';
+            const sampleNode = samples[0];
+            const firstClass = sampleNode.clues.find(cl => cl.startsWith('class='));
+            const clsSuffix = firstClass ? '.' + firstClass.slice(6).split(' ')[0] : '';
+            const parentSel = c.type === 'dom'
+              ? getSelector(c.el.parentElement!)
+              : sampleNode.sel.replace(/ > [^>]+$/, '');
             results.push({
-              tag, sel: `(${remaining} more)`, text: '',
+              tag: sampleNode.tag, sel: `(${remaining} more)`, text: '',
               rect: { x: 0, y: 0, w: 0, h: 0 }, inter: { inputs: 0, buttons: 0, links: 0, images: 0 },
               clues: [], style: { position: '', zIndex: '', overflow: '' }, children: [],
               collapsedCount: remaining,
-              collapsedSelector: `${getSelector(collapseEl.parentElement!)} > ${tag}${firstClass ? '.' + firstClass : ''}`,
+              collapsedSelector: `${parentSel} > ${sampleNode.tag}${clsSuffix}`,
             });
             keyEmitted.set(c.key, emitted + 1);
           } else {
-            // Not actually similar, emit normally
-            const cc2 = c as Candidate & { cs: CSSStyleDeclaration; textPreview: string; inter: ReturnType<typeof countDirectInteractive> };
-            const node = buildNode(cc2.el!, depth, rawDepth, cc2.cs, cc2.textPreview, cc2.inter);
+            const node = resolveNode();
             results.push(node);
             keyEmitted.set(c.key, emitted + 1);
-            // Mark as non-collapsible so future siblings also emit normally
             keyCount.set(c.key, SIBLING_COLLAPSE_THRESHOLD - 1);
           }
         }
-        // else: already collapsed, skip remaining siblings (don't consume nodeCount)
+        // else: already collapsed, skip
       } else {
-        // Not enough siblings for collapse, emit normally
-        const cc3 = c as Candidate & { cs: CSSStyleDeclaration; textPreview: string; inter: ReturnType<typeof countDirectInteractive> };
-        const node = buildNode(cc3.el!, depth, rawDepth, cc3.cs, cc3.textPreview, cc3.inter);
+        const node = resolveNode();
         results.push(node);
       }
     }
