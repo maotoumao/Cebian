@@ -41,9 +41,8 @@ export const ASK_USER_META = {
   label: 'Ask User',
   description:
     'Ask the user a question, present choices, or request a decision. ' +
-    'You MUST use this tool whenever your response requires user input to proceed — ' +
-    'including clarifications, confirmations, and presenting options (e.g. A/B/C choices). ' +
-    'NEVER write questions or options as plain text in your response; always use this tool instead. ' +
+    'Prioritize this tool over writing questions in plain text — ' +
+    'it gives the user a structured prompt with clickable options. ' +
     'Provide clear options when possible. The user may also type a free-form answer.',
   parameters: AskUserParameters,
 } as const;
