@@ -10,7 +10,7 @@ const selectorField = Type.Optional(Type.String({
     'CSS selector of the target element. ' +
     'Required for: type, clear, select, wait, wait_hidden. ' +
     'Optional for: click, dblclick, rightclick, hover (alternative: x + y). ' +
-    'Optional for: scroll (omit to scroll the page).',
+    'Optional for: scroll (provide to scroll within a specific container, omit to scroll the page).',
 }));
 const xField = Type.Optional(Type.Number({
   description: 'X viewport coordinate. For click/dblclick/rightclick/hover as alternative to selector.',

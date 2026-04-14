@@ -54,7 +54,7 @@ You can see and interact with browser tabs using the following tools:
   - type — input text into a field (requires selector + text)
   - clear — clear an input field
   - select — pick a dropdown option (requires selector + text)
-  - scroll — scroll the page or an element
+  - scroll — scroll the page or a specific scrollable element (provide CSS selector to scroll within a container, omit to scroll the page). Use deltaX/deltaY to control direction and distance.
   - keypress — press a key (e.g. Enter, Tab, Escape)
   - wait — wait for an element to appear
   - wait_hidden — wait for an element to disappear
