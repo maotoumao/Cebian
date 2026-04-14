@@ -16,6 +16,9 @@ const TabParameters = Type.Object({
   tabId: Type.Optional(Type.Number({
     description: 'Tab ID. Required for "close" and "switch". Optional for "reload" (omit to reload active tab). Get IDs from the context block.',
   })),
+  windowId: Type.Optional(Type.Number({
+    description: 'Window ID for the "open" action. Omit to use the current focused window. Get window IDs from the context block.',
+  })),
 });
 
 // ─── Tool definition ───
@@ -24,9 +27,10 @@ export const tabTool: AgentTool<typeof TabParameters> = {
   name: TOOL_TAB,
   label: 'Manage Tab',
   description:
-    'Manage browser tabs: open a new tab (http/https only), close a tab, switch to a tab, reload, ' +
+    'Manage browser tabs: open a new tab (http/https only, optionally in a specific window via windowId), ' +
+    'close a tab, switch to a tab, reload, ' +
     'or list all frames (including iframes) in the active tab. ' +
-    'Use the tab list from the context block to find tab IDs.',
+    'Use the tab list from the context block to find tab IDs and window IDs.',
   parameters: TabParameters,
 
   async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
@@ -45,9 +49,21 @@ export const tabTool: AgentTool<typeof TabParameters> = {
               details: { status: 'error' },
             };
           }
-          const tab = await chrome.tabs.create({ url: params.url });
+          const createProps: chrome.tabs.CreateProperties = { url: params.url };
+          if (params.windowId != null) {
+            try {
+              await chrome.windows.get(params.windowId);
+            } catch {
+              return {
+                content: [{ type: 'text', text: `Error: window ${params.windowId} does not exist.` }],
+                details: { status: 'error' },
+              };
+            }
+            createProps.windowId = params.windowId;
+          }
+          const tab = await chrome.tabs.create(createProps);
           return {
-            content: [{ type: 'text', text: `Opened new tab (id: ${tab.id}): ${params.url}` }],
+            content: [{ type: 'text', text: `Opened new tab (id: ${tab.id}) in window ${tab.windowId}: ${params.url}` }],
             details: { status: 'done' },
           };
         }

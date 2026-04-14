@@ -44,8 +44,14 @@ async function getActiveTabMeta(tabId: number): Promise<PageMeta> {
 }
 
 export async function gatherPageContext(): Promise<string> {
-  const tabs = await chrome.tabs.query({ currentWindow: true });
-  const activeTab = tabs.find(t => t.active);
+  const allWindows = await chrome.windows.getAll({ populate: true });
+  const currentWindow = allWindows.find(w => w.focused);
+
+  if (!allWindows.length) return '';
+
+  // Find the active tab (prefer focused window)
+  const activeTab = currentWindow?.tabs?.find(t => t.active)
+    ?? allWindows.flatMap(w => w.tabs ?? []).find(t => t.active);
 
   if (!activeTab) return '';
 
@@ -55,6 +61,7 @@ export async function gatherPageContext(): Promise<string> {
 
   // Active tab details
   lines.push(`[Active Tab] ${activeTab.title ?? ''} | ${activeTab.url ?? ''}`);
+  lines.push(`  windowId: ${activeTab.windowId}`);
   if (meta.description) lines.push(`  description: ${meta.description}`);
   if (meta.keywords) lines.push(`  keywords: ${meta.keywords}`);
   if (meta.canonical) lines.push(`  canonical: ${meta.canonical}`);
@@ -62,12 +69,16 @@ export async function gatherPageContext(): Promise<string> {
   if (meta.lang) lines.push(`  lang: ${meta.lang}`);
   if (meta.selectedText) lines.push(`  selected_text: "${meta.selectedText}"`);
 
-  // All tabs
+  // All windows and their tabs
   lines.push('');
-  lines.push(`[Open Tabs] (${tabs.length})`);
-  for (const tab of tabs) {
-    const marker = tab.id === activeTab.id ? '* ' : '  ';
-    lines.push(`${marker}[${tab.id}] ${tab.title ?? ''} | ${tab.url ?? ''}`);
+  for (const win of allWindows) {
+    const tabs = win.tabs ?? [];
+    const focusedMarker = win.focused ? ' (focused)' : '';
+    lines.push(`[Window ${win.id ?? 'unknown'}]${focusedMarker} (${tabs.length} tabs)`);
+    for (const tab of tabs) {
+      const marker = tab.id === activeTab.id ? '* ' : '  ';
+      lines.push(`${marker}[${tab.id}] ${tab.title ?? ''} | ${tab.url ?? ''}`);
+    }
   }
 
   return `${CONTEXT_TAG_OPEN}\n${lines.join('\n')}\n${CONTEXT_TAG_CLOSE}`;
