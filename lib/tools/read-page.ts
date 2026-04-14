@@ -2,6 +2,7 @@ import { Type } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_READ_PAGE } from '@/lib/types';
 import { getActiveTabId, executeInTabWithArgs } from './chrome-api';
+import { ensureOffscreen } from './offscreen';
 import type { OffscreenRequest, OffscreenResponse } from '@/entrypoints/offscreen/main';
 
 const ReadPageParameters = Type.Object({
@@ -98,27 +99,6 @@ function getDocumentHtml(selector: string | null): { html: string; url: string }
 }
 
 // ─── Offscreen document helpers ───
-
-const OFFSCREEN_URL = 'offscreen.html';
-
-/** Singleton promise to avoid concurrent createDocument calls. */
-let offscreenReady: Promise<void> | null = null;
-
-/** Ensure the offscreen document exists, creating it if needed. */
-async function ensureOffscreen(): Promise<void> {
-  if (!offscreenReady) {
-    offscreenReady = (async () => {
-      const existing = await chrome.offscreen.hasDocument();
-      if (existing) return;
-      await chrome.offscreen.createDocument({
-        url: chrome.runtime.getURL(OFFSCREEN_URL),
-        reasons: ['DOM_PARSER'],
-        justification: 'Parse HTML to markdown using DOMParser + Readability + Turndown',
-      });
-    })();
-  }
-  return offscreenReady;
-}
 
 /** Send HTML to the offscreen document for markdown conversion. */
 async function convertHtmlToMarkdown(html: string): Promise<string> {

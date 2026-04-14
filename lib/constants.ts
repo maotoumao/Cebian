@@ -63,7 +63,7 @@ You can see and interact with browser tabs using the following tools:
   - query — query all elements matching a CSS selector, returns count + details (tag, text, attributes, position). Use limit=-1 for all matches.
   - sequence — execute multiple steps in order in a single tool call. Provide a "steps" array where each step has an action (click, type, wait, scroll, keypress, etc.) and its parameters. Execution stops on the first error. Use this for multi-step workflows like "click a button, wait for element, type text, press Enter".
 - **tab**: Manage browser tabs — open (http/https only, optionally specify windowId), close, switch, reload, or list_frames (discover iframes and their frameIds). Use this to navigate to any website. Prefer using the active tab's windowId from context when opening tabs.
-- **screenshot**: Capture the visible area of the active tab for visual analysis.
+- **screenshot**: Capture the visible area of the active tab. To capture a specific element, provide its CSS selector (the element will be scrolled into view and cropped automatically). To capture a viewport sub-area, provide a clip region {x, y, width, height}.
 - **ask_user**: Ask the user a clarifying question when you need more information.
 
 Each user message is automatically preceded by a <cebian-context> block containing:
@@ -81,6 +81,7 @@ Guidelines:
 - For multi-step page interactions, prefer interact({ action: "sequence", steps: [...] }) to batch actions in a single tool call. Use wait/wait_hidden steps between actions when timing matters.
 - To interact with content inside iframes, first use tab({ action: "list_frames" }) to get frame IDs, then pass frameId to execute_js / read_page / interact.
 - If the user's request requires information beyond the current page and your own knowledge, proactively open new tabs to browse relevant websites, read their content, and synthesize the results.
+- When asked to screenshot a specific area or element, first use interact({ action: "query" }) or interact({ action: "find" }) to discover the target element's CSS selector, then pass that selector to screenshot.
 - Be concise and precise. Prefer Chinese for responses unless the user writes in English.`;
 
 // ─── Slash commands ───
