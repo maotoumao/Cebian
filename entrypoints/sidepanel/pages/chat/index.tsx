@@ -34,6 +34,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     state,
     pendingTools,
     send,
+    cancel,
     subscribe: portSubscribe,
     unsubscribe: portUnsubscribe,
     resolveTool,
@@ -242,7 +243,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
         </div>
       </ScrollArea>
 
-      <ChatInput onSend={send} onOpenSettings={onOpenSettings} />
+      <ChatInput onSend={send} onCancel={cancel} isAgentRunning={isAgentRunning} onOpenSettings={onOpenSettings} />
     </>
   );
 }

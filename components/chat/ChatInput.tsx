@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, type KeyboardEvent } from 'react';
-import { Send, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X } from 'lucide-react';
+import { Send, Square, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,9 +22,11 @@ import { useMobileEmulation } from '@/hooks/useMobileEmulation';
 interface ChatInputProps {
   onSend: (message: string, attachments?: Attachment[]) => void;
   onOpenSettings?: () => void;
+  isAgentRunning?: boolean;
+  onCancel?: () => void;
 }
 
-export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
+export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [showSlash, setShowSlash] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -104,7 +106,7 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      if (!isAgentRunning) handleSend();
     }
   };
 
@@ -379,15 +381,26 @@ export function ChatInput({ onSend, onOpenSettings }: ChatInputProps) {
           </div>
 
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={handleSend}
-              disabled={!canSend}
-              className="bg-foreground text-background hover:bg-primary hover:text-primary-foreground hover:shadow-xs disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <Send className="size-3" />
-            </Button>
+            {isAgentRunning ? (
+              <Button
+                variant="destructive"
+                size="icon-xs"
+                onClick={() => onCancel?.()}
+                className="hover:shadow-xs"
+              >
+                <Square className="size-3" fill="currentColor" />
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={handleSend}
+                disabled={!canSend}
+                className="bg-foreground text-background hover:bg-primary hover:text-primary-foreground hover:shadow-xs disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <Send className="size-3" />
+              </Button>
+            )}
           </div>
         </div>
       </div>
