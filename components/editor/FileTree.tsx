@@ -30,6 +30,8 @@ interface FileTreeProps {
   onSelect: (filePath: string) => void;
   /** Incremented to trigger re-scan. */
   refreshKey?: number;
+  /** Filter tree nodes by name. */
+  searchTerm?: string;
 }
 
 // ─── VFS → tree data builder ───
@@ -172,7 +174,7 @@ function Node({ node, style, dragHandle }: NodeRendererProps<TreeNodeData>) {
 
 // ─── Main component ───
 
-export function FileTree({ root, selectedFile, onSelect, refreshKey }: FileTreeProps) {
+export function FileTree({ root, selectedFile, onSelect, refreshKey, searchTerm }: FileTreeProps) {
   const [data, setData] = useState<TreeNodeData[]>([]);
   const treeRef = useRef<TreeApi<TreeNodeData>>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -283,6 +285,8 @@ export function FileTree({ root, selectedFile, onSelect, refreshKey }: FileTreeP
         selection={selectedFile ?? undefined}
         openByDefault={true}
         disableMultiSelection
+        searchTerm={searchTerm}
+        searchMatch={(node, term) => node.data.name.toLowerCase().includes(term.toLowerCase())}
         width={dims.width}
         height={dims.height}
         indent={14}
