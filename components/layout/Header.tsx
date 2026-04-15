@@ -11,12 +11,12 @@ interface HeaderProps {
   theme: 'dark' | 'light' | 'system';
   onToggleTheme: () => void;
   onOpenSettings: () => void;
-  onOpenCustomizations: () => void;
+  onOpenAIConfig: () => void;
   onNewChat: () => void;
   onOpenHistory: () => void;
 }
 
-export function Header({ title, theme, onToggleTheme, onOpenSettings, onOpenCustomizations, onNewChat, onOpenHistory }: HeaderProps) {
+export function Header({ title, theme, onToggleTheme, onOpenSettings, onOpenAIConfig, onNewChat, onOpenHistory }: HeaderProps) {
   return (
     <header className="flex items-center justify-between px-5 py-4 border-b border-border bg-background/80 backdrop-blur-xl z-10">
       <div className="flex items-center gap-2">
@@ -62,12 +62,12 @@ export function Header({ title, theme, onToggleTheme, onOpenSettings, onOpenCust
             <Button
               variant="ghost"
               size="icon-xs"
-              onClick={onOpenCustomizations}
+              onClick={onOpenAIConfig}
             >
               <Blocks className="size-4.5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>定制</TooltipContent>
+          <TooltipContent>AI 配置</TooltipContent>
         </Tooltip>
 
         <Tooltip>

@@ -1,5 +1,7 @@
 # Customizations Manager — Prompts & Skills
 
+> **Rename notice (2026-04-15):** All code references have been renamed: `customizations` → `ai-config`, `CustomizationsDialog` → `AIConfigDialog`, dialog ID `'customizations'` → `'ai-config'`, `lib/customizations/` → `lib/ai-config/`, `components/customizations/` → `components/ai-config/`. This doc retains the original naming for historical context.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a Customizations Manager to Cebian that allows users to create, edit, and manage **Prompts** (reusable prompt templates) and **Skills** (multi-file agent skill packages following the [agentskills.io specification](https://agentskills.io/specification)). The manager is accessed via a new button in the Header, opens as a Dialog, and uses CodeMirror 6 for editing. All data is persisted in the VFS (`~/.cebian/`). Skills are injected into every user message so the agent can load them on demand. A new `execute_skill_code` tool enables skills to run scripts with declared `chrome.*` API access.

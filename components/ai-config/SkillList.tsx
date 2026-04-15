@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { vfs } from '@/lib/vfs';
 import { CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE } from '@/lib/constants';
-import { validateSkillName } from '@/lib/customizations/skill-validator';
+import { validateSkillName } from '@/lib/ai-config/skill-validator';
 import { cn } from '@/lib/utils';
 
 interface SkillEntry {

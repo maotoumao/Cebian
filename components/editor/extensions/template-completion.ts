@@ -4,7 +4,7 @@
  * Triggers when the user types `{{` and shows a list of built-in template variables.
  */
 import { type CompletionContext, type CompletionResult, autocompletion } from '@codemirror/autocomplete';
-import { TEMPLATE_VARIABLES } from '@/lib/customizations/template';
+import { TEMPLATE_VARIABLES } from '@/lib/ai-config/template';
 
 function templateCompletionSource(context: CompletionContext): CompletionResult | null {
   // Match `{{` optionally followed by partial word

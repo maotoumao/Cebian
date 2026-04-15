@@ -93,7 +93,7 @@ function App() {
           theme={theme}
           onToggleTheme={toggleTheme}
           onOpenSettings={() => setSettingsOpen(true)}
-          onOpenCustomizations={() => showDialog('customizations', {})}
+          onOpenAIConfig={() => showDialog('ai-config', {})}
           onNewChat={handleNewChat}
           onOpenHistory={() => setHistoryOpen(true)}
         />

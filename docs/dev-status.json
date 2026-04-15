@@ -1,5 +1,5 @@
 {
-  "project": "Cebian Customizations Manager",
+  "project": "Cebian AI Config Manager",
   "planDocument": "docs/plans/2026-04-15-customizations-manager.md",
   "lastUpdated": "2026-04-15T18:30:00+08:00",
   "phases": [
@@ -12,10 +12,10 @@
         "refactor: extract VFS path constants + SKILLS_PREAMBLE to lib/constants, remove SLASH_COMMANDS"
       ],
       "filesCreated": [
-        "lib/customizations/frontmatter.ts",
-        "lib/customizations/scanner.ts",
-        "lib/customizations/template.ts",
-        "lib/customizations/skill-validator.ts"
+        "lib/ai-config/frontmatter.ts",
+        "lib/ai-config/scanner.ts",
+        "lib/ai-config/template.ts",
+        "lib/ai-config/skill-validator.ts"
       ],
       "filesModified": [
         "package.json",
@@ -66,7 +66,7 @@
     },
     {
       "id": "P2",
-      "title": "Customizations Dialog UI",
+      "title": "AI Config Dialog UI",
       "status": "completed",
       "commits": [
         "feat: P2 — Customizations Dialog UI",
@@ -75,16 +75,16 @@
         "refactor: extract useIsDark hook, add FileTree with context menu, replace SkillTree with SkillList + workspace EditorPanel"
       ],
       "filesCreated": [
-        "components/customizations/CustomizationsDialog.tsx",
-        "components/customizations/EditorPanel.tsx",
-        "components/customizations/PromptList.tsx",
-        "components/customizations/SkillList.tsx",
+        "components/ai-config/AIConfigDialog.tsx",
+        "components/ai-config/EditorPanel.tsx",
+        "components/ai-config/PromptList.tsx",
+        "components/ai-config/SkillList.tsx",
         "components/editor/FileTree.tsx",
         "components/ui/context-menu.tsx",
         "hooks/useIsDark.ts"
       ],
       "filesDeleted": [
-        "components/customizations/SkillTree.tsx"
+        "components/ai-config/SkillTree.tsx"
       ],
       "notes": [
         "EditorPanel supports optional 'workspace' prop — shows embedded FileTree when set",
@@ -111,9 +111,9 @@
       ],
       "notes": [
         "Blocks icon button added to Header between theme toggle and settings",
-        "CustomizationsDialog registered as 'customizations' in dialog registry",
-        "App.tsx calls showDialog('customizations', {}) on button click",
-        "CustomizationsDialog reads theme internally via useIsDark — no props needed",
+        "AIConfigDialog registered as 'ai-config' in dialog registry",
+        "App.tsx calls showDialog('ai-config', {}) on button click",
+        "AIConfigDialog reads theme internally via useIsDark — no props needed",
         "sm:max-w-xl removed from dialog.tsx base to allow full-width dialogs",
         "Dialog height fixed at 85vh"
       ]

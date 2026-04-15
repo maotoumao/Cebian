@@ -234,7 +234,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
       {/* Slash menu — will be replaced with dynamic VFS prompts in P6 */}
       {showSlash && (
         <div className="absolute bottom-full left-4 right-4 mb-3 bg-popover border border-border rounded-lg p-2.5 shadow-xl z-50 animate-in slide-in-from-bottom-1 fade-in duration-150">
-          <p className="text-xs text-muted-foreground text-center py-2">暂无 Prompt，前往定制管理创建</p>
+          <p className="text-xs text-muted-foreground text-center py-2">暂无 Prompt，前往 AI 配置创建</p>
         </div>
       )}
 

@@ -1,12 +1,12 @@
 import type { ComponentProps } from 'react';
 import { ImagePreviewDialog } from './image-preview';
-import { CustomizationsDialog } from '@/components/customizations/CustomizationsDialog';
+import { AIConfigDialog } from '@/components/ai-config/AIConfigDialog';
 
 // Dialog registry — add new dialogs here.
 // Types are auto-derived from component props.
 export const dialogRenderers = {
   'image-preview': ImagePreviewDialog,
-  'customizations': CustomizationsDialog,
+  'ai-config': AIConfigDialog,
 } as const;
 
 export type DialogName = keyof typeof dialogRenderers;

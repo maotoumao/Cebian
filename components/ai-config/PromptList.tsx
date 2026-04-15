@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { vfs } from '@/lib/vfs';
 import { CEBIAN_PROMPTS_DIR } from '@/lib/constants';
-import { parseFrontmatter } from '@/lib/customizations/frontmatter';
+import { parseFrontmatter } from '@/lib/ai-config/frontmatter';
 import { cn } from '@/lib/utils';
 
 interface PromptEntry {

@@ -1,9 +1,9 @@
 /**
- * CustomizationsDialog — main dialog for managing Prompts and Skills.
+ * AIConfigDialog — main dialog for managing Prompts and Skills.
  *
  * Two-tab layout (Prompts / Skills) with a list panel + editor panel.
  * For Skills, EditorPanel gets a `workspace` prop to show an embedded file tree.
- * Registered in the dialog system as 'customizations'.
+ * Registered in the dialog system as 'ai-config'.
  */
 import { useState, useCallback } from 'react';
 import { DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -20,7 +20,7 @@ type Tab = 'prompts' | 'skills';
 
 // ─── Component ───
 
-export function CustomizationsDialog() {
+export function AIConfigDialog() {
   const isDark = useIsDark();
   const [tab, setTab] = useState<Tab>('prompts');
   const [promptFile, setPromptFile] = useState('');
@@ -43,7 +43,7 @@ export function CustomizationsDialog() {
   return (
     <div className="flex flex-col h-[85vh]">
       <DialogHeader className="shrink-0 px-4 pt-4 pb-2">
-        <DialogTitle>定制管理</DialogTitle>
+        <DialogTitle>AI 配置</DialogTitle>
       </DialogHeader>
 
       {/* Tabs */}
