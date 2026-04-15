@@ -97,6 +97,7 @@ function FileIcon({ name, className }: { name: string; className?: string }) {
 function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeNodeData>) {
   const isSkillMd = node.data.name === 'SKILL.md';
   const allowNewFolder = (tree.props as any).allowNewFolder ?? true;
+  const editStartRef = useRef<number>(0);
 
   const handleClick = (e: React.MouseEvent) => {
     if (node.isInternal) {
@@ -144,15 +145,24 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
           className="flex-1 min-w-0 h-[22px] text-[13px] px-1 py-0 border rounded bg-background outline-none focus:ring-1 focus:ring-primary/40"
           autoFocus
           onFocus={(e) => {
+            editStartRef.current = Date.now();
             const val = e.target.value;
             const dotIdx = val.lastIndexOf('.');
             e.target.setSelectionRange(0, dotIdx > 0 ? dotIdx : val.length);
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') node.submit((e.target as HTMLInputElement).value);
-            if (e.key === 'Escape') node.reset();
+            if (e.key === 'Escape') {
+              e.stopPropagation(); // prevent Dialog from closing
+              node.reset();
+            }
           }}
           onBlur={(e) => {
+            // Context menu close steals focus — re-grab it
+            if (Date.now() - editStartRef.current < 150) {
+              e.target.focus();
+              return;
+            }
             const val = e.target.value.trim();
             if (val) node.submit(val);
             else node.reset();
@@ -264,10 +274,24 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
     return () => clearTimeout(timer);
   }, [data, pendingEditId]);
 
+  // ─── Resolve parent for create based on current selection ───
+
+  const resolveCreateParent = useCallback((explicitParent?: string): string => {
+    if (explicitParent) return explicitParent;
+    if (!selectedFile) return root;
+    // Check if selectedFile is a directory in the tree
+    const node = treeRef.current?.get(selectedFile);
+    if (node?.isInternal) return selectedFile; // folder → create inside
+    // file → create in same directory (parent)
+    const lastSlash = selectedFile.lastIndexOf('/');
+    return lastSlash > 0 ? selectedFile.substring(0, lastSlash) : root;
+  }, [root, selectedFile]);
+
   // ─── VFS-first create helpers ───
 
   const doCreateFile = useCallback(async (parentId?: string) => {
-    const parent = parentId ?? root;
+    if (treeRef.current?.isEditing) return; // don't create while editing
+    const parent = resolveCreateParent(parentId);
     const name = await uniqueName(parent, 'untitled', '.md');
     const fullPath = `${parent}/${name}`;
     try {
@@ -276,10 +300,11 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
       await scan();
       setPendingEditId(fullPath);
     } catch { /* ignore */ }
-  }, [root, scan]);
+  }, [resolveCreateParent, scan]);
 
   const doCreateFolder = useCallback(async (parentId?: string) => {
-    const parent = parentId ?? root;
+    if (treeRef.current?.isEditing) return; // don't create while editing
+    const parent = resolveCreateParent(parentId);
     const name = await uniqueName(parent, 'new-folder');
     const fullPath = `${parent}/${name}`;
     try {
@@ -288,7 +313,7 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
       await scan();
       setPendingEditId(fullPath);
     } catch { /* ignore */ }
-  }, [root, scan]);
+  }, [resolveCreateParent, scan]);
 
   // Expose imperative methods
   useImperativeHandle(ref, () => ({
@@ -322,15 +347,11 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
     const parentDir = id.substring(0, id.lastIndexOf('/'));
     const newPath = `${parentDir}/${trimmed}`;
 
-    // Same name → no-op (unless placeholder — treat unchanged name as cancel)
+    // Same name → keep as-is (placeholder stays with its auto-generated name)
     if (newPath === id) {
       if (isPlaceholder) {
-        try {
-          const stat = await vfs.stat(id);
-          if (stat.isDirectory()) await vfs.rm(id, { recursive: true, force: true });
-          else await vfs.unlink(id);
-        } catch { /* ignore */ }
-        await scan();
+        const node = treeRef.current?.get(id);
+        if (node?.isLeaf) onSelect(id);
       }
       return;
     }

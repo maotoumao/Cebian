@@ -222,6 +222,7 @@ export function AIConfigDialog() {
         <div className="flex-1 min-w-0">
           <EditorPanel
             filePath={selectedFile || undefined}
+            rootPath={root}
             isDark={isDark}
             enableTemplateVars={isPrompts}
             onSave={handleSave}

@@ -13,6 +13,8 @@ import { vfs } from '@/lib/vfs';
 interface EditorPanelProps {
   /** Full VFS path to edit. */
   filePath?: string;
+  /** Root path for computing relative breadcrumb. */
+  rootPath?: string;
   /** Theme for CodeMirror. */
   isDark: boolean;
   /** Enable {{variable}} template highlighting + autocomplete. */
@@ -29,7 +31,7 @@ function detectLanguage(filePath: string): 'markdown' | 'yaml' | 'javascript' {
 
 // ─── Component ───
 
-export function EditorPanel({ filePath, isDark, enableTemplateVars = false, onSave }: EditorPanelProps) {
+export function EditorPanel({ filePath, rootPath, isDark, enableTemplateVars = false, onSave }: EditorPanelProps) {
   const [body, setBody] = useState('');
   const [savedContent, setSavedContent] = useState('');
   const [loading, setLoading] = useState(false);
@@ -87,8 +89,27 @@ export function EditorPanel({ filePath, isDark, enableTemplateVars = false, onSa
     );
   }
 
+  // Compute breadcrumb segments relative to rootPath
+  const breadcrumb = (() => {
+    if (!filePath) return [];
+    const base = rootPath ?? '';
+    const rel = base && filePath.startsWith(base + '/') ? filePath.substring(base.length + 1) : filePath;
+    return rel.split('/');
+  })();
+
   return (
     <div className="flex flex-col h-full">
+      {/* Breadcrumb */}
+      {breadcrumb.length > 0 && (
+        <div className="flex items-center gap-1 px-3 py-1.5 text-xs text-muted-foreground border-b border-border shrink-0 overflow-hidden">
+          {breadcrumb.map((seg, i) => (
+            <span key={i} className="flex items-center gap-1 min-w-0">
+              {i > 0 && <span className="text-muted-foreground/50">/</span>}
+              <span className={i === breadcrumb.length - 1 ? 'text-foreground font-medium truncate' : 'truncate'}>{seg}</span>
+            </span>
+          ))}
+        </div>
+      )}
       <div className="flex-1 min-h-0">
         <CodeMirrorEditor
           value={body}
