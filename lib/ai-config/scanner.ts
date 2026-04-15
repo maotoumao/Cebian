@@ -55,9 +55,7 @@ export async function scanPrompts(): Promise<PromptMeta[]> {
   let entries: string[];
   try {
     entries = await vfs.readdir(CEBIAN_PROMPTS_DIR);
-    console.log('[scanPrompts] dir:', CEBIAN_PROMPTS_DIR, 'entries:', entries);
-  } catch (err) {
-    console.warn('[scanPrompts] readdir failed:', CEBIAN_PROMPTS_DIR, err);
+  } catch {
     return results;
   }
 
@@ -68,14 +66,12 @@ export async function scanPrompts(): Promise<PromptMeta[]> {
     try {
       const raw = await vfs.readFile(filePath, 'utf8');
       const content = typeof raw === 'string' ? raw : new TextDecoder().decode(raw as Uint8Array);
-      console.log('[scanPrompts] read file ok, length:', content.length, 'preview:', content.slice(0, 80));
       const { data } = parseFrontmatter(content);
-      console.log('[scanPrompts] parsed frontmatter:', data);
       const name = typeof data.name === 'string' ? data.name : entry.replace(/\.md$/, '');
       const description = typeof data.description === 'string' ? data.description : '';
       results.push({ name, description, fileName: entry, filePath });
-    } catch (err) {
-      console.warn('[scanPrompts] failed to read/parse:', filePath, err);
+    } catch {
+      // Skip unreadable files
     }
   }
 

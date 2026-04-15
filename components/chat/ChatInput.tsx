@@ -131,13 +131,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
   // Scan prompts when slash menu opens
   useEffect(() => {
     if (!showSlash) return;
-    scanPrompts().then((results) => {
-      console.log('[SlashMenu] scanned prompts:', results.length, results.map(p => p.name));
-      setPrompts(results);
-    }).catch((err) => {
-      console.warn('[SlashMenu] scanPrompts failed:', err);
-      setPrompts([]);
-    });
+    scanPrompts().then(setPrompts).catch(() => setPrompts([]));
   }, [showSlash]);
 
   // Filter prompts by typed search (after '/')
