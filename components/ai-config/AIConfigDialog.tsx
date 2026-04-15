@@ -9,7 +9,7 @@
  * Registered in the dialog system as 'ai-config'.
  */
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Plus, Search, FilePlus, FolderPlus } from 'lucide-react';
+import { Search, FilePlus, FolderPlus } from 'lucide-react';
 import { DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,10 +20,8 @@ import { FileTree, type FileTreeHandle } from '@/components/editor/FileTree';
 import { EditorPanel } from './EditorPanel';
 import { useIsDark } from '@/hooks/useIsDark';
 import { useStorageItem } from '@/hooks/useStorageItem';
-import { CEBIAN_PROMPTS_DIR, CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE } from '@/lib/constants';
-import { validateSkillName } from '@/lib/ai-config/skill-validator';
-import { aiConfigPanelWidth as aiConfigPanelWidthStorage } from '@/lib/storage';
-import { vfs } from '@/lib/vfs';
+import { CEBIAN_PROMPTS_DIR, CEBIAN_SKILLS_DIR } from '@/lib/constants';
+import { aiConfigDialogPanelWidth as aiConfigDialogPanelWidthStorage } from '@/lib/storage';
 import { cn } from '@/lib/utils';
 
 // ─── Types ───
@@ -48,13 +46,8 @@ export function AIConfigDialog() {
   // Search
   const [search, setSearch] = useState('');
 
-  // New skill input
-  const [showNewSkillInput, setShowNewSkillInput] = useState(false);
-  const [newSkillName, setNewSkillName] = useState('');
-  const [newSkillError, setNewSkillError] = useState('');
-
   // Resizable panel
-  const [panelWidth, setPanelWidth] = useStorageItem(aiConfigPanelWidthStorage, 240);
+  const [panelWidth, setPanelWidth] = useStorageItem(aiConfigDialogPanelWidthStorage, 240);
   const [dragWidth, setDragWidth] = useState<number | null>(null);
   const dragStartRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const latestDragWidthRef = useRef<number>(240);
@@ -66,34 +59,6 @@ export function AIConfigDialog() {
     if (tab === 'prompts') setPromptRefreshKey((k) => k + 1);
     else setSkillRefreshKey((k) => k + 1);
   }, [tab]);
-
-  // ─── New prompt (via tree inline create) ───
-
-  const handleNewPrompt = () => {
-    fileTreeRef.current?.createFile();
-  };
-
-  // ─── New skill ───
-
-  const handleNewSkillSubmit = async () => {
-    const name = newSkillName.trim();
-    const result = validateSkillName(name);
-    if (!result.valid) { setNewSkillError(result.error ?? ''); return; }
-
-    const dirPath = `${CEBIAN_SKILLS_DIR}/${name}`;
-    if (await vfs.exists(dirPath)) { setNewSkillError('该名称已存在'); return; }
-
-    const template = `---\nname: ${name}\ndescription: "TODO — describe what this skill does and when to use it."\nmetadata:\n  matched-url: "*"\n---\n\n## Instructions\n\n(Write your skill instructions here)\n`;
-    try {
-      await vfs.mkdir(dirPath, { recursive: true });
-      await vfs.writeFile(`${dirPath}/${SKILL_ENTRY_FILE}`, template);
-    } catch { return; }
-    setNewSkillName('');
-    setShowNewSkillInput(false);
-    setNewSkillError('');
-    setSkillRefreshKey((k) => k + 1);
-    setSkillFile(`${dirPath}/${SKILL_ENTRY_FILE}`);
-  };
 
   // ─── Drag handle ───
 
@@ -137,7 +102,6 @@ export function AIConfigDialog() {
   const switchTab = (t: Tab) => {
     setTab(t);
     setSearch('');
-    setShowNewSkillInput(false);
   };
 
   // ─── Derived values ───
@@ -178,7 +142,7 @@ export function AIConfigDialog() {
         {/* Left panel: toolbar + file tree */}
         <div className="shrink-0 border-r border-border flex flex-col" style={{ width: currentWidth }}>
           {/* Toolbar */}
-          <div className="flex items-center gap-2 p-2.5 border-b border-border shrink-0">
+          <div className="flex items-center gap-1 p-2.5 border-b border-border shrink-0">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
               <Input
@@ -188,36 +152,36 @@ export function AIConfigDialog() {
                 className="h-8 pl-8 text-[13px]"
               />
             </div>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={isPrompts ? handleNewPrompt : () => setShowNewSkillInput(true)}
-              title={isPrompts ? '新建 Prompt' : '新建 Skill'}
-            >
-              <Plus className="size-4" />
-            </Button>
+            {isPrompts ? (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => fileTreeRef.current?.createFile()}
+                title="新建 Prompt"
+              >
+                <FilePlus className="size-4" />
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={() => fileTreeRef.current?.createFile()}
+                  title="新建文件"
+                >
+                  <FilePlus className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={() => fileTreeRef.current?.createFolder()}
+                  title="新建文件夹"
+                >
+                  <FolderPlus className="size-4" />
+                </Button>
+              </>
+            )}
           </div>
-
-          {/* New skill inline input */}
-          {!isPrompts && showNewSkillInput && (
-            <div className="p-2.5 border-b border-border shrink-0">
-              <Input
-                value={newSkillName}
-                onChange={(e) => { setNewSkillName(e.target.value); setNewSkillError(''); }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleNewSkillSubmit();
-                  if (e.key === 'Escape') { setShowNewSkillInput(false); setNewSkillName(''); setNewSkillError(''); }
-                }}
-                onBlur={() => {
-                  if (!newSkillName.trim()) { setShowNewSkillInput(false); setNewSkillName(''); setNewSkillError(''); }
-                }}
-                placeholder="skill-name"
-                className="h-8 text-[13px]"
-                autoFocus
-              />
-              {newSkillError && <p className="text-xs text-destructive mt-1">{newSkillError}</p>}
-            </div>
-          )}
 
           {/* File tree with right-click on empty area */}
           <ContextMenu>
@@ -230,16 +194,20 @@ export function AIConfigDialog() {
                   onSelect={onSelect}
                   refreshKey={refreshKey}
                   searchTerm={search || undefined}
+                  allowNewFolder={!isPrompts}
                 />
               </div>
             </ContextMenuTrigger>
             <ContextMenuContent>
-              <ContextMenuItem onClick={() => fileTreeRef.current?.createFile()}>
-                <FilePlus className="size-3.5 mr-2" /> 新建文件
-              </ContextMenuItem>
-              <ContextMenuItem onClick={() => fileTreeRef.current?.createFolder()}>
-                <FolderPlus className="size-3.5 mr-2" /> 新建文件夹
-              </ContextMenuItem>
+              {isPrompts ? (
+                <ContextMenuItem onClick={() => fileTreeRef.current?.createFile()}>
+                  <FilePlus className="size-3.5 mr-2" /> 新建文件
+                </ContextMenuItem>
+              ) : (
+                <ContextMenuItem onClick={() => fileTreeRef.current?.createFolder()}>
+                  <FolderPlus className="size-3.5 mr-2" /> 新建文件夹
+                </ContextMenuItem>
+              )}
             </ContextMenuContent>
           </ContextMenu>
         </div>
