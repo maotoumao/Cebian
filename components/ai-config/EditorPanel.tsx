@@ -62,16 +62,31 @@ export function EditorPanel({ filePath, rootPath, isDark, enableTemplateVars = f
 
   useEffect(() => { loadFile(); }, [loadFile]);
 
-  const handleSave = async () => {
-    if (!filePath) return;
+  const handleSave = useCallback(async () => {
+    if (!filePath || body === savedContent) return;
     await vfs.writeFile(filePath, body);
     setSavedContent(body);
     onSave?.();
-  };
+  }, [filePath, body, savedContent, onSave]);
 
   const handleReset = () => {
     setBody(savedContent);
   };
+
+  // Ctrl+S keyboard shortcut
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSaveRef.current();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   if (!filePath) {
     return (

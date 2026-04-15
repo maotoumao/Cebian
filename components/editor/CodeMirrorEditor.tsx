@@ -140,7 +140,7 @@ export function CodeMirrorEditor({
       )}
       <div
         ref={containerRef}
-        className="min-h-[200px] h-full [&_.cm-editor]:h-full [&_.cm-editor]:outline-none [&_.cm-scroller]:overflow-auto text-[13px]"
+        className="min-h-[200px] h-full [&_.cm-editor]:h-full [&_.cm-editor]:outline-none [&_.cm-editor.cm-focused]:outline-none [&_.cm-scroller]:overflow-auto text-[13px]"
       />
     </div>
   );

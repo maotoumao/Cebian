@@ -9,12 +9,12 @@
  * Registered in the dialog system as 'ai-config'.
  */
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Search, FilePlus, FolderPlus } from 'lucide-react';
+import { Search, FilePlus, FolderPlus, Blocks } from 'lucide-react';
 import { DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem,
+  ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 } from '@/components/ui/context-menu';
 import { FileTree, type FileTreeHandle } from '@/components/editor/FileTree';
 import { EditorPanel } from './EditorPanel';
@@ -30,6 +30,8 @@ type Tab = 'prompts' | 'skills';
 
 const MIN_PANEL_WIDTH = 180;
 const MAX_PANEL_WIDTH = 480;
+
+const PROMPT_TEMPLATE = `---\nname: new-prompt\ndescription: ""\n---\n\n`;
 
 // ─── Component ───
 
@@ -179,6 +181,14 @@ export function AIConfigDialog() {
                 >
                   <FolderPlus className="size-4" />
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={() => fileTreeRef.current?.createSkill()}
+                  title="创建 Skill"
+                >
+                  <Blocks className="size-4" />
+                </Button>
               </>
             )}
           </div>
@@ -195,18 +205,29 @@ export function AIConfigDialog() {
                   refreshKey={refreshKey}
                   searchTerm={search || undefined}
                   allowNewFolder={!isPrompts}
+                  newFileTemplate={isPrompts ? PROMPT_TEMPLATE : ''}
+                  createFileLabel={isPrompts ? '新建 Prompt' : '新建文件'}
                 />
               </div>
             </ContextMenuTrigger>
             <ContextMenuContent>
               {isPrompts ? (
                 <ContextMenuItem onClick={() => fileTreeRef.current?.createFile()}>
-                  <FilePlus className="size-3.5 mr-2" /> 新建文件
+                  <FilePlus className="size-3.5 mr-2" /> 新建 Prompt
                 </ContextMenuItem>
               ) : (
-                <ContextMenuItem onClick={() => fileTreeRef.current?.createFolder()}>
-                  <FolderPlus className="size-3.5 mr-2" /> 新建文件夹
-                </ContextMenuItem>
+                <>
+                  <ContextMenuItem onClick={() => fileTreeRef.current?.createFile()}>
+                    <FilePlus className="size-3.5 mr-2" /> 新建文件
+                  </ContextMenuItem>
+                  <ContextMenuItem onClick={() => fileTreeRef.current?.createFolder()}>
+                    <FolderPlus className="size-3.5 mr-2" /> 新建文件夹
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem onClick={() => fileTreeRef.current?.createSkill()}>
+                    <Blocks className="size-3.5 mr-2" /> 创建 Skill
+                  </ContextMenuItem>
+                </>
               )}
             </ContextMenuContent>
           </ContextMenu>

@@ -26,6 +26,7 @@ interface TreeNodeData {
 export interface FileTreeHandle {
   createFile: (parentId?: string) => void;
   createFolder: (parentId?: string) => void;
+  createSkill: () => void;
 }
 
 interface FileTreeProps {
@@ -41,6 +42,10 @@ interface FileTreeProps {
   searchTerm?: string;
   /** Allow creating subfolders. false = flat file list (Prompts). */
   allowNewFolder?: boolean;
+  /** Template content for new files (e.g. prompt frontmatter). */
+  newFileTemplate?: string;
+  /** Label for the create-file context menu item. */
+  createFileLabel?: string;
 }
 
 // ─── VFS → tree data builder ───
@@ -97,6 +102,7 @@ function FileIcon({ name, className }: { name: string; className?: string }) {
 function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeNodeData>) {
   const isSkillMd = node.data.name === 'SKILL.md';
   const allowNewFolder = (tree.props as any).allowNewFolder ?? true;
+  const createFileLabel: string = (tree.props as any).createFileLabel ?? '新建文件';
   const editStartRef = useRef<number>(0);
 
   const handleClick = (e: React.MouseEvent) => {
@@ -118,6 +124,13 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
         node.isDragging && 'opacity-40',
       )}
       onClick={handleClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Delete' && !node.isEditing) {
+          e.preventDefault();
+          tree.delete(node.id);
+        }
+      }}
+      tabIndex={-1}
     >
       {/* Expand/collapse arrow for folders */}
       {node.isInternal ? (
@@ -153,7 +166,8 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
           onKeyDown={(e) => {
             if (e.key === 'Enter') node.submit((e.target as HTMLInputElement).value);
             if (e.key === 'Escape') {
-              e.stopPropagation(); // prevent Dialog from closing
+              e.stopPropagation();
+              e.preventDefault(); // prevent Radix Dialog from closing
               node.reset();
             }
           }}
@@ -185,7 +199,7 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
     menuItems = (
       <>
         <ContextMenuItem onClick={() => (tree.props as any).onCreateFile?.(node.id)}>
-          <FilePlus className="size-3.5 mr-2" /> 新建文件
+          <FilePlus className="size-3.5 mr-2" /> {createFileLabel}
         </ContextMenuItem>
         {allowNewFolder && (
           <ContextMenuItem onClick={() => (tree.props as any).onCreateFolder?.(node.id)}>
@@ -231,7 +245,7 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
 // ─── Main component ───
 
 export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
-  function FileTree({ root, selectedFile, onSelect, refreshKey, searchTerm, allowNewFolder = true }, ref) {
+  function FileTree({ root, selectedFile, onSelect, refreshKey, searchTerm, allowNewFolder = true, newFileTemplate = '', createFileLabel = '新建文件' }, ref) {
   const [data, setData] = useState<TreeNodeData[]>([]);
   const treeRef = useRef<TreeApi<TreeNodeData>>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -290,20 +304,20 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
   // ─── VFS-first create helpers ───
 
   const doCreateFile = useCallback(async (parentId?: string) => {
-    if (treeRef.current?.isEditing) return; // don't create while editing
+    if (treeRef.current?.isEditing) return;
     const parent = resolveCreateParent(parentId);
     const name = await uniqueName(parent, 'untitled', '.md');
     const fullPath = `${parent}/${name}`;
     try {
-      await vfs.writeFile(fullPath, '');
+      await vfs.writeFile(fullPath, newFileTemplate);
       placeholdersRef.current.add(fullPath);
       await scan();
       setPendingEditId(fullPath);
     } catch { /* ignore */ }
-  }, [resolveCreateParent, scan]);
+  }, [resolveCreateParent, scan, newFileTemplate]);
 
   const doCreateFolder = useCallback(async (parentId?: string) => {
-    if (treeRef.current?.isEditing) return; // don't create while editing
+    if (treeRef.current?.isEditing) return;
     const parent = resolveCreateParent(parentId);
     const name = await uniqueName(parent, 'new-folder');
     const fullPath = `${parent}/${name}`;
@@ -315,11 +329,27 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
     } catch { /* ignore */ }
   }, [resolveCreateParent, scan]);
 
+  const doCreateSkill = useCallback(async () => {
+    if (treeRef.current?.isEditing) return;
+    const parent = resolveCreateParent();
+    const name = await uniqueName(parent, 'new-skill');
+    const fullPath = `${parent}/${name}`;
+    const template = `---\nname: ${name}\ndescription: "TODO — describe what this skill does and when to use it."\nmetadata:\n  matched-url: "*"\n---\n\n## Instructions\n\n(Write your skill instructions here)\n`;
+    try {
+      await vfs.mkdir(fullPath, { recursive: true });
+      await vfs.writeFile(`${fullPath}/SKILL.md`, template);
+      placeholdersRef.current.add(fullPath);
+      await scan();
+      setPendingEditId(fullPath);
+    } catch { /* ignore */ }
+  }, [resolveCreateParent, scan]);
+
   // Expose imperative methods
   useImperativeHandle(ref, () => ({
     createFile: doCreateFile,
     createFolder: doCreateFolder,
-  }), [doCreateFile, doCreateFolder]);
+    createSkill: doCreateSkill,
+  }), [doCreateFile, doCreateFolder, doCreateSkill]);
 
   // ─── Data handlers (controlled mode) ───
 
@@ -427,7 +457,7 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
         paddingTop={6}
         paddingBottom={6}
         // Pass through custom props for NodeRenderer to read
-        {...{ allowNewFolder, onCreateFile: doCreateFile, onCreateFolder: doCreateFolder } as any}
+        {...{ allowNewFolder, createFileLabel, onCreateFile: doCreateFile, onCreateFolder: doCreateFolder, onCreateSkill: doCreateSkill } as any}
       >
         {NodeRenderer}
       </Tree>
