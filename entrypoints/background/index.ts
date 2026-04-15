@@ -1,10 +1,12 @@
 import { setupOAuthRefresh } from './oauth-refresh';
+import { seedDevStorage } from './dev-seed';
 import { agentManager } from './agent-manager';
 import { sessionStore } from './session-store';
 import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage } from '@/lib/protocol';
 
 export default defineBackground(() => {
   console.log('Cebian background started', { id: browser.runtime.id });
+  seedDevStorage();
 
   chrome.sidePanel
     .setPanelBehavior({ openPanelOnActionClick: true })

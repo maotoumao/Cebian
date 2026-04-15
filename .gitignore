@@ -24,3 +24,6 @@ web-ext.config.ts
 *.njsproj
 *.sln
 *.sw?
+
+# Dev-only storage seed (contains API keys)
+entrypoints/background/dev-seed.ts
