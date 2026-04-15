@@ -2,27 +2,36 @@
  * AIConfigDialog — main dialog for managing Prompts and Skills.
  *
  * Two-tab layout (Prompts / Skills), each with a unified two-column design:
- *   Left:  FileTree (rooted at the relevant VFS directory) + toolbar
+ *   Left:  Toolbar + FileTree with right-click context menu
  *   Right: EditorPanel (pure file editor)
+ *   Divider: draggable to resize, width persisted in storage
  *
  * Registered in the dialog system as 'ai-config'.
  */
-import { useState, useCallback } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { Plus, Search, FilePlus, FolderPlus } from 'lucide-react';
 import { DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { FileTree } from '@/components/editor/FileTree';
+import {
+  ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem,
+} from '@/components/ui/context-menu';
+import { FileTree, type FileTreeHandle } from '@/components/editor/FileTree';
 import { EditorPanel } from './EditorPanel';
 import { useIsDark } from '@/hooks/useIsDark';
+import { useStorageItem } from '@/hooks/useStorageItem';
 import { CEBIAN_PROMPTS_DIR, CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE } from '@/lib/constants';
 import { validateSkillName } from '@/lib/ai-config/skill-validator';
+import { aiConfigPanelWidth as aiConfigPanelWidthStorage } from '@/lib/storage';
 import { vfs } from '@/lib/vfs';
 import { cn } from '@/lib/utils';
 
 // ─── Types ───
 
 type Tab = 'prompts' | 'skills';
+
+const MIN_PANEL_WIDTH = 180;
+const MAX_PANEL_WIDTH = 480;
 
 // ─── Component ───
 
@@ -44,23 +53,24 @@ export function AIConfigDialog() {
   const [newSkillName, setNewSkillName] = useState('');
   const [newSkillError, setNewSkillError] = useState('');
 
+  // Resizable panel
+  const [panelWidth, setPanelWidth] = useStorageItem(aiConfigPanelWidthStorage, 240);
+  const [dragWidth, setDragWidth] = useState<number | null>(null);
+  const dragStartRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const latestDragWidthRef = useRef<number>(240);
+
+  // FileTree ref for imperative create
+  const fileTreeRef = useRef<FileTreeHandle>(null);
+
   const handleSave = useCallback(() => {
     if (tab === 'prompts') setPromptRefreshKey((k) => k + 1);
     else setSkillRefreshKey((k) => k + 1);
   }, [tab]);
 
-  // ─── New prompt ───
+  // ─── New prompt (via tree inline create) ───
 
-  const handleNewPrompt = async () => {
-    try {
-      const template = `---\nname: new-prompt\ndescription: ""\n---\n\n`;
-      let fileName = 'new-prompt.md';
-      let n = 1;
-      while (await vfs.exists(`${CEBIAN_PROMPTS_DIR}/${fileName}`)) fileName = `new-prompt-${n++}.md`;
-      await vfs.writeFile(`${CEBIAN_PROMPTS_DIR}/${fileName}`, template);
-      setPromptRefreshKey((k) => k + 1);
-      setPromptFile(`${CEBIAN_PROMPTS_DIR}/${fileName}`);
-    } catch { /* ignore — VFS write failure */ }
+  const handleNewPrompt = () => {
+    fileTreeRef.current?.createFile();
   };
 
   // ─── New skill ───
@@ -85,6 +95,43 @@ export function AIConfigDialog() {
     setSkillFile(`${dirPath}/${SKILL_ENTRY_FILE}`);
   };
 
+  // ─── Drag handle ───
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startWidth = dragWidth ?? panelWidth;
+    dragStartRef.current = { startX: e.clientX, startWidth };
+    latestDragWidthRef.current = startWidth;
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!dragStartRef.current) return;
+      const delta = ev.clientX - dragStartRef.current.startX;
+      const newWidth = Math.max(MIN_PANEL_WIDTH, Math.min(MAX_PANEL_WIDTH, dragStartRef.current.startWidth + delta));
+      latestDragWidthRef.current = newWidth;
+      setDragWidth(newWidth);
+    };
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setPanelWidth(latestDragWidthRef.current);
+      setDragWidth(null);
+      dragStartRef.current = null;
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  };
+
+  // Cleanup body styles if component unmounts mid-drag
+  useEffect(() => {
+    return () => {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, []);
+
   // ─── Tab switching resets search ───
 
   const switchTab = (t: Tab) => {
@@ -100,15 +147,16 @@ export function AIConfigDialog() {
   const selectedFile = isPrompts ? promptFile : skillFile;
   const onSelect = isPrompts ? setPromptFile : setSkillFile;
   const refreshKey = isPrompts ? promptRefreshKey : skillRefreshKey;
+  const currentWidth = dragWidth ?? panelWidth;
 
   return (
     <div className="flex flex-col h-[85vh]">
-      <DialogHeader className="shrink-0 px-4 pt-4 pb-2">
-        <DialogTitle>AI 配置</DialogTitle>
+      <DialogHeader className="shrink-0 px-5 pt-5 pb-3">
+        <DialogTitle className="text-base">AI 配置</DialogTitle>
       </DialogHeader>
 
       {/* Tabs */}
-      <div className="flex gap-1 px-4 pb-2 shrink-0" role="tablist">
+      <div className="flex gap-1 px-5 pb-3 shrink-0" role="tablist">
         {(['prompts', 'skills'] as const).map((t) => (
           <button
             key={t}
@@ -116,7 +164,7 @@ export function AIConfigDialog() {
             aria-selected={tab === t}
             onClick={() => switchTab(t)}
             className={cn(
-              'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+              'px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors',
               tab === t ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
             )}
           >
@@ -128,16 +176,16 @@ export function AIConfigDialog() {
       {/* Two-column body */}
       <div className="flex flex-1 min-h-0 border-t border-border">
         {/* Left panel: toolbar + file tree */}
-        <div className="w-52 shrink-0 border-r border-border flex flex-col">
+        <div className="shrink-0 border-r border-border flex flex-col" style={{ width: currentWidth }}>
           {/* Toolbar */}
-          <div className="flex items-center gap-1.5 p-2 border-b border-border shrink-0">
+          <div className="flex items-center gap-2 p-2.5 border-b border-border shrink-0">
             <div className="relative flex-1">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="搜索..."
-                className="h-7 pl-7 text-xs"
+                className="h-8 pl-8 text-[13px]"
               />
             </div>
             <Button
@@ -152,7 +200,7 @@ export function AIConfigDialog() {
 
           {/* New skill inline input */}
           {!isPrompts && showNewSkillInput && (
-            <div className="p-2 border-b border-border shrink-0">
+            <div className="p-2.5 border-b border-border shrink-0">
               <Input
                 value={newSkillName}
                 onChange={(e) => { setNewSkillName(e.target.value); setNewSkillError(''); }}
@@ -160,25 +208,47 @@ export function AIConfigDialog() {
                   if (e.key === 'Enter') handleNewSkillSubmit();
                   if (e.key === 'Escape') { setShowNewSkillInput(false); setNewSkillName(''); setNewSkillError(''); }
                 }}
+                onBlur={() => {
+                  if (!newSkillName.trim()) { setShowNewSkillInput(false); setNewSkillName(''); setNewSkillError(''); }
+                }}
                 placeholder="skill-name"
-                className="h-7 text-xs"
+                className="h-8 text-[13px]"
                 autoFocus
               />
               {newSkillError && <p className="text-xs text-destructive mt-1">{newSkillError}</p>}
             </div>
           )}
 
-          {/* File tree */}
-          <div className="flex-1 min-h-0">
-            <FileTree
-              root={root}
-              selectedFile={selectedFile}
-              onSelect={onSelect}
-              refreshKey={refreshKey}
-              searchTerm={search || undefined}
-            />
-          </div>
+          {/* File tree with right-click on empty area */}
+          <ContextMenu>
+            <ContextMenuTrigger asChild>
+              <div className="flex-1 min-h-0">
+                <FileTree
+                  ref={fileTreeRef}
+                  root={root}
+                  selectedFile={selectedFile}
+                  onSelect={onSelect}
+                  refreshKey={refreshKey}
+                  searchTerm={search || undefined}
+                />
+              </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem onClick={() => fileTreeRef.current?.createFile()}>
+                <FilePlus className="size-3.5 mr-2" /> 新建文件
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => fileTreeRef.current?.createFolder()}>
+                <FolderPlus className="size-3.5 mr-2" /> 新建文件夹
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
         </div>
+
+        {/* Drag handle */}
+        <div
+          className="w-1 shrink-0 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors"
+          onMouseDown={handleDragStart}
+        />
 
         {/* Right panel: editor */}
         <div className="flex-1 min-w-0">

@@ -106,3 +106,8 @@ export const maxRounds = storage.defineItem<number>(
   'local:maxRounds',
   { fallback: 200 },
 );
+
+export const aiConfigPanelWidth = storage.defineItem<number>(
+  'local:aiConfigPanelWidth',
+  { fallback: 240 },
+);

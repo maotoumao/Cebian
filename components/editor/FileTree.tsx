@@ -1,10 +1,10 @@
 /**
  * FileTree — VFS file tree powered by react-arborist.
  *
- * Features: drag & drop, inline rename, keyboard navigation,
+ * Features: drag & drop, inline rename/create (VS Code style), keyboard navigation,
  * virtualized rendering, file-type icons, right-click context menu.
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Tree, type NodeRendererProps, type NodeApi, type TreeApi } from 'react-arborist';
 import { ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileType, Trash2, FilePlus, FolderPlus, Pencil, Star } from 'lucide-react';
 import {
@@ -16,9 +16,14 @@ import { cn } from '@/lib/utils';
 // ─── Types ───
 
 interface TreeNodeData {
-  id: string;       // full VFS path
+  id: string;       // full VFS path (or temp id for uncommitted nodes)
   name: string;     // file/folder name
   children?: TreeNodeData[];
+}
+
+export interface FileTreeHandle {
+  createFile: (parentId?: string) => void;
+  createFolder: (parentId?: string) => void;
 }
 
 interface FileTreeProps {
@@ -79,7 +84,7 @@ function Node({ node, style, dragHandle }: NodeRendererProps<TreeNodeData>) {
       ref={dragHandle}
       style={style}
       className={cn(
-        'flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-xs cursor-pointer select-none group',
+        'flex items-center gap-1.5 px-2 py-1 rounded-sm text-[13px] cursor-pointer select-none group',
         node.isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
         node.willReceiveDrop && 'bg-primary/10 ring-1 ring-primary/30',
         node.isDragging && 'opacity-40',
@@ -88,20 +93,20 @@ function Node({ node, style, dragHandle }: NodeRendererProps<TreeNodeData>) {
     >
       {/* Expand/collapse arrow for folders */}
       {node.isInternal ? (
-        <span className="shrink-0 size-3.5 flex items-center justify-center" onClick={(e) => { e.stopPropagation(); node.toggle(); }}>
-          {node.isOpen ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+        <span className="shrink-0 size-4 flex items-center justify-center" onClick={(e) => { e.stopPropagation(); node.toggle(); }}>
+          {node.isOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
         </span>
       ) : (
-        <span className="shrink-0 size-3.5" />
+        <span className="shrink-0 size-4" />
       )}
 
       {/* Icon */}
       {node.isInternal ? (
         node.isOpen
-          ? <FolderOpen className="size-3.5 shrink-0 text-muted-foreground" />
-          : <Folder className="size-3.5 shrink-0 text-muted-foreground" />
+          ? <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
+          : <Folder className="size-4 shrink-0 text-muted-foreground" />
       ) : (
-        <FileIcon name={node.data.name} className="size-3.5 shrink-0 text-muted-foreground" />
+        <FileIcon name={node.data.name} className="size-4 shrink-0 text-muted-foreground" />
       )}
 
       {/* Name or rename input */}
@@ -109,7 +114,7 @@ function Node({ node, style, dragHandle }: NodeRendererProps<TreeNodeData>) {
         <input
           type="text"
           defaultValue={node.data.name}
-          className="flex-1 min-w-0 h-5 text-xs px-1 py-0 border rounded bg-background outline-none"
+          className="flex-1 min-w-0 h-[22px] text-[13px] px-1 py-0 border rounded bg-background outline-none focus:ring-1 focus:ring-primary/40"
           autoFocus
           onFocus={(e) => {
             const dotIdx = e.target.value.lastIndexOf('.');
@@ -119,7 +124,11 @@ function Node({ node, style, dragHandle }: NodeRendererProps<TreeNodeData>) {
             if (e.key === 'Enter') node.submit((e.target as HTMLInputElement).value);
             if (e.key === 'Escape') node.reset();
           }}
-          onBlur={(e) => node.submit(e.target.value)}
+          onBlur={(e) => {
+            const val = e.target.value.trim();
+            if (val) node.submit(val);
+            else node.reset();
+          }}
         />
       ) : (
         <span className="truncate flex-1">{node.data.name}</span>
@@ -136,26 +145,26 @@ function Node({ node, style, dragHandle }: NodeRendererProps<TreeNodeData>) {
   const menuItems = node.isInternal ? (
     <>
       <ContextMenuItem onClick={() => node.tree.create({ parentId: node.id, type: 'leaf' })}>
-        <FilePlus className="size-3.5" /> 新建文件
+        <FilePlus className="size-3.5 mr-2" /> 新建文件
       </ContextMenuItem>
       <ContextMenuItem onClick={() => node.tree.create({ parentId: node.id, type: 'internal' })}>
-        <FolderPlus className="size-3.5" /> 新建文件夹
+        <FolderPlus className="size-3.5 mr-2" /> 新建文件夹
       </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem onClick={() => node.edit()}>
-        <Pencil className="size-3.5" /> 重命名
+        <Pencil className="size-3.5 mr-2" /> 重命名
       </ContextMenuItem>
       <ContextMenuItem onClick={() => node.tree.delete(node.id)} className="text-destructive focus:text-destructive">
-        <Trash2 className="size-3.5" /> 删除
+        <Trash2 className="size-3.5 mr-2" /> 删除
       </ContextMenuItem>
     </>
   ) : (
     <>
       <ContextMenuItem onClick={() => node.edit()}>
-        <Pencil className="size-3.5" /> 重命名
+        <Pencil className="size-3.5 mr-2" /> 重命名
       </ContextMenuItem>
       <ContextMenuItem onClick={() => node.tree.delete(node.id)} className="text-destructive focus:text-destructive">
-        <Trash2 className="size-3.5" /> 删除
+        <Trash2 className="size-3.5 mr-2" /> 删除
       </ContextMenuItem>
     </>
   );
@@ -163,7 +172,9 @@ function Node({ node, style, dragHandle }: NodeRendererProps<TreeNodeData>) {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        {content}
+        <div onContextMenu={(e) => e.stopPropagation()}>
+          {content}
+        </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
         {menuItems}
@@ -174,11 +185,25 @@ function Node({ node, style, dragHandle }: NodeRendererProps<TreeNodeData>) {
 
 // ─── Main component ───
 
-export function FileTree({ root, selectedFile, onSelect, refreshKey, searchTerm }: FileTreeProps) {
+export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
+  function FileTree({ root, selectedFile, onSelect, refreshKey, searchTerm }, ref) {
   const [data, setData] = useState<TreeNodeData[]>([]);
   const treeRef = useRef<TreeApi<TreeNodeData>>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dims, setDims] = useState({ width: 200, height: 400 });
+
+  // Track temporary node ids created via tree.create() that haven't been committed to VFS yet
+  const pendingCreatesRef = useRef<Map<string, 'leaf' | 'internal'>>(new Map());
+
+  // Expose imperative methods so parent can trigger create from toolbar / context menu
+  useImperativeHandle(ref, () => ({
+    createFile: (parentId?: string) => {
+      treeRef.current?.create({ parentId: parentId ?? null, type: 'leaf' });
+    },
+    createFolder: (parentId?: string) => {
+      treeRef.current?.create({ parentId: parentId ?? null, type: 'internal' });
+    },
+  }), []);
 
   // Native ResizeObserver for dynamic sizing
   useEffect(() => {
@@ -200,28 +225,45 @@ export function FileTree({ root, selectedFile, onSelect, refreshKey, searchTerm 
 
   // ─── Data handlers (controlled mode) ───
 
-  const onCreate = async ({ parentId, type }: { parentId: string | null; index: number; type: 'internal' | 'leaf' }) => {
+  // onCreate: return a temp node so react-arborist shows an inline input.
+  // The actual VFS write happens in onRename when the user confirms the name.
+  const onCreate = ({ parentId, type }: { parentId: string | null; index: number; type: 'internal' | 'leaf' }) => {
     const parent = parentId ?? root;
-    if (type === 'internal') {
-      let name = 'new-folder';
-      let n = 1;
-      while (await vfs.exists(`${parent}/${name}`)) name = `new-folder-${n++}`;
-      await vfs.mkdir(`${parent}/${name}`, { recursive: true });
-      await scan();
-      return { id: `${parent}/${name}`, name };
-    } else {
-      let name = 'new-file.md';
-      let n = 1;
-      while (await vfs.exists(`${parent}/${name}`)) name = `new-file-${n++}.md`;
-      await vfs.writeFile(`${parent}/${name}`, '');
-      await scan();
-      onSelect(`${parent}/${name}`);
-      return { id: `${parent}/${name}`, name };
-    }
+    const tempId = `${parent}/__new_${Date.now()}`;
+    pendingCreatesRef.current.set(tempId, type);
+    return { id: tempId, name: '', children: type === 'internal' ? [] : undefined };
   };
 
   const onRename = async ({ id, name }: { id: string; name: string }) => {
     const trimmed = name.trim();
+
+    // ─── Handle pending create (new file/folder) ───
+    const pendingType = pendingCreatesRef.current.get(id);
+    if (pendingType !== undefined) {
+      pendingCreatesRef.current.delete(id);
+
+      // Empty name or Escape → cancel creation
+      if (!trimmed) {
+        await scan();
+        return;
+      }
+
+      const parentDir = id.substring(0, id.lastIndexOf('/'));
+      const newPath = `${parentDir}/${trimmed}`;
+
+      try {
+        if (pendingType === 'internal') {
+          await vfs.mkdir(newPath, { recursive: true });
+        } else {
+          await vfs.writeFile(newPath, '');
+          onSelect(newPath);
+        }
+      } catch { /* ignore */ }
+      await scan();
+      return;
+    }
+
+    // ─── Handle regular rename ───
     if (!trimmed) return;
     const parentDir = id.substring(0, id.lastIndexOf('/'));
     const newPath = `${parentDir}/${trimmed}`;
@@ -250,15 +292,19 @@ export function FileTree({ root, selectedFile, onSelect, refreshKey, searchTerm 
   };
 
   const onDelete = async ({ ids }: { ids: string[] }) => {
-    for (const path of ids) {
+    // Filter out any pending temp nodes
+    const realIds = ids.filter((id) => !pendingCreatesRef.current.has(id));
+    for (const path of realIds) {
       try {
         const stat = await vfs.stat(path);
         if (stat.isDirectory()) await vfs.rm(path, { recursive: true, force: true });
         else await vfs.unlink(path);
       } catch { /* ignore */ }
     }
+    // Clean up any pending temp nodes
+    for (const id of ids) pendingCreatesRef.current.delete(id);
     await scan();
-    if (selectedFile && ids.some((id) => selectedFile === id || selectedFile.startsWith(id + '/'))) {
+    if (selectedFile && realIds.some((id) => selectedFile === id || selectedFile.startsWith(id + '/'))) {
       onSelect('');
     }
   };
@@ -268,13 +314,8 @@ export function FileTree({ root, selectedFile, onSelect, refreshKey, searchTerm 
   };
 
   return (
-    <div ref={containerRef} className="h-full w-full">
-      {data.length === 0 ? (
-        <div className="h-full flex items-center justify-center text-xs text-muted-foreground py-4">
-          空文件夹
-        </div>
-      ) : (
-        <Tree<TreeNodeData>
+    <div ref={containerRef} className="h-full w-full relative">
+      <Tree<TreeNodeData>
         ref={treeRef}
         data={data}
         onCreate={onCreate}
@@ -289,14 +330,18 @@ export function FileTree({ root, selectedFile, onSelect, refreshKey, searchTerm 
         searchMatch={(node, term) => node.data.name.toLowerCase().includes(term.toLowerCase())}
         width={dims.width}
         height={dims.height}
-        indent={14}
-        rowHeight={26}
-        paddingTop={4}
-        paddingBottom={4}
+        indent={16}
+        rowHeight={30}
+        paddingTop={6}
+        paddingBottom={6}
       >
         {Node}
       </Tree>
+      {data.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground pointer-events-none">
+          空文件夹
+        </div>
       )}
     </div>
   );
-}
+});
