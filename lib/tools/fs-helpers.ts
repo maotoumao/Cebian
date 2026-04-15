@@ -1,4 +1,5 @@
 import { vfs } from '@/lib/vfs';
+import { normalizePath } from '@/lib/vfs';
 import picomatch from 'picomatch';
 import { CEBIAN_SKILLS_DIR } from '@/lib/constants';
 import { invalidateSkillIndex } from '@/lib/ai-config/scanner';
@@ -69,7 +70,9 @@ export function isBinaryContent(data: Uint8Array): boolean {
  * to the background to clear the cached skill index.
  */
 export function invalidateSkillIndexIfNeeded(path: string): void {
-  if (path.startsWith(CEBIAN_SKILLS_DIR + '/') || path === CEBIAN_SKILLS_DIR) {
+  const normalized = normalizePath(path);
+  const skillsRoot = normalizePath(CEBIAN_SKILLS_DIR);
+  if (normalized.startsWith(skillsRoot + '/') || normalized === skillsRoot) {
     invalidateSkillIndex();
   }
 }

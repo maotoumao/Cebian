@@ -4,7 +4,7 @@
 // - Prompts: reads ~/.cebian/prompts/*.md, parses frontmatter (name + description).
 // - Skills: reads ~/.cebian/skills/<name>/SKILL.md, parses frontmatter.
 //
-// Skill index is cached in-memory with a 30s TTL and can be proactively invalidated.
+// Skill index is cached in-memory with a 30-minute TTL and can be proactively invalidated.
 //
 import { vfs } from '@/lib/vfs';
 import { CEBIAN_PROMPTS_DIR, CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE, SKILLS_PREAMBLE } from '@/lib/constants';
