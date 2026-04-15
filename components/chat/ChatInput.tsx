@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback, type KeyboardEvent } from 'react';
-import { Send, Square, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X } from 'lucide-react';
+import { Send, Square, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X, FileType } from 'lucide-react';
 import { showDialog } from '@/lib/dialog';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,11 @@ import { getModel } from '@mariozechner/pi-ai';
 import { isCustomProvider, findCustomModel, mergeCustomProviders } from '@/lib/custom-models';
 import { PRESET_PROVIDERS } from '@/lib/constants';
 import { startElementPicker, cancelElementPicker } from '@/lib/element-picker';
+import { scanPrompts, type PromptMeta } from '@/lib/ai-config/scanner';
+import { replaceTemplateVars, gatherTemplateVars } from '@/lib/ai-config/template';
+import { vfs } from '@/lib/vfs';
+import { parseFrontmatter } from '@/lib/ai-config/frontmatter';
+import { CEBIAN_PROMPTS_DIR } from '@/lib/constants';
 import {
   MAX_ATTACHMENT_COUNT, MAX_IMAGE_SIZE, MAX_TEXT_FILE_SIZE,
   isImageFile, isTextFile, formatFileSize,
@@ -30,6 +35,7 @@ interface ChatInputProps {
 export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [showSlash, setShowSlash] = useState(false);
+  const [prompts, setPrompts] = useState<PromptMeta[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isPicking, setIsPicking] = useState(false);
   const { isActiveTabMobile, toggle: toggleMobile } = useMobileEmulation();
@@ -120,6 +126,34 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
   const handleInput = (val: string) => {
     setValue(val);
     setShowSlash(val.startsWith('/'));
+  };
+
+  // Scan prompts when slash menu opens
+  useEffect(() => {
+    if (!showSlash) return;
+    scanPrompts().then(setPrompts).catch(() => setPrompts([]));
+  }, [showSlash]);
+
+  // Filter prompts by typed search (after '/')
+  const slashFilter = value.startsWith('/') ? value.slice(1).toLowerCase() : '';
+  const filteredPrompts = slashFilter
+    ? prompts.filter((p) => p.name.toLowerCase().includes(slashFilter) || p.description.toLowerCase().includes(slashFilter))
+    : prompts;
+
+  // Handle prompt selection from slash menu
+  const handlePromptSelect = async (prompt: PromptMeta) => {
+    try {
+      const raw = await vfs.readFile(`${CEBIAN_PROMPTS_DIR}/${prompt.fileName}`, 'utf8');
+      const content = typeof raw === 'string' ? raw : new TextDecoder().decode(raw as Uint8Array);
+      const { body } = parseFrontmatter(content);
+      const vars = await gatherTemplateVars();
+      const replaced = replaceTemplateVars(body.trim(), vars);
+      setValue(replaced);
+      setShowSlash(false);
+      textareaRef.current?.focus();
+    } catch {
+      toast.error('读取 Prompt 失败');
+    }
   };
 
   const handlePickElement = async () => {
@@ -231,10 +265,32 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
 
   return (
     <footer className="px-4 py-4 border-t border-border bg-background relative">
-      {/* Slash menu — will be replaced with dynamic VFS prompts in P6 */}
+      {/* Slash menu — dynamic VFS prompts */}
       {showSlash && (
-        <div className="absolute bottom-full left-4 right-4 mb-3 bg-popover border border-border rounded-lg p-2.5 shadow-xl z-50 animate-in slide-in-from-bottom-1 fade-in duration-150">
-          <p className="text-xs text-muted-foreground text-center py-2">暂无 Prompt，前往 AI 配置创建</p>
+        <div className="absolute bottom-full left-4 right-4 mb-3 bg-popover border border-border rounded-lg shadow-xl z-50 animate-in slide-in-from-bottom-1 fade-in duration-150 max-h-60 overflow-y-auto">
+          {filteredPrompts.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-3 px-2.5">
+              {prompts.length === 0 ? '暂无 Prompt，前往 AI 配置创建' : '无匹配结果'}
+            </p>
+          ) : (
+            <div className="py-1">
+              {filteredPrompts.map((p) => (
+                <button
+                  key={p.fileName}
+                  onClick={() => handlePromptSelect(p)}
+                  className="w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-accent/50 transition-colors"
+                >
+                  <FileType className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">/{p.name}</p>
+                    {p.description && (
+                      <p className="text-xs text-muted-foreground truncate">{p.description}</p>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
