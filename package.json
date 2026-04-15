@@ -15,6 +15,7 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "@isomorphic-git/lightning-fs": "^4.6.2",
     "@mariozechner/pi-agent-core": "^0.66.1",
     "@mariozechner/pi-ai": "^0.66.1",
     "@mozilla/readability": "^0.6.0",
@@ -40,6 +41,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.2",
     "@types/chrome": "^0.1.40",
+    "@types/isomorphic-git__lightning-fs": "^4.4.8",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/turndown": "^5.0.6",
