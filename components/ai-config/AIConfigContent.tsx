@@ -20,7 +20,7 @@ import { useIsDark } from '@/hooks/useIsDark';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { CEBIAN_PROMPTS_DIR, CEBIAN_SKILLS_DIR } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import type { WxtStorageItem } from '@/hooks/useStorageItem';
+import type { StorageItem } from '@/hooks/useStorageItem';
 
 // ─── Types ───
 
@@ -33,7 +33,7 @@ const PROMPT_TEMPLATE = `---\nname: new-prompt\ndescription: ""\n---\n\n(Write y
 
 interface AIConfigContentProps {
   /** Storage item for persisting panel width (different key for dialog vs tab page). */
-  panelWidthStorage: WxtStorageItem<number>;
+  panelWidthStorage: StorageItem<number>;
   /** Default panel width. */
   defaultPanelWidth?: number;
   /** Optional CSS class for the container. */

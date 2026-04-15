@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 
-export type WxtStorageItem<T> = {
+export type StorageItem<T> = {
   getValue(): Promise<T>;
   setValue(value: T): Promise<void>;
   watch(cb: (newValue: T, oldValue: T) => void): () => void;
 };
 
-export function useStorageItem<T>(item: WxtStorageItem<T>, fallback: T): [T, (value: T) => Promise<void>] {
+export function useStorageItem<T>(item: StorageItem<T>, fallback: T): [T, (value: T) => Promise<void>] {
   const [value, setValueState] = useState<T>(fallback);
 
   useEffect(() => {

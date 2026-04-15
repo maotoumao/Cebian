@@ -139,6 +139,9 @@ export const CEBIAN_SKILLS_DIR = '~/.cebian/skills';
 /** Standard entry file for a skill package. */
 export const SKILL_ENTRY_FILE = 'SKILL.md';
 
+/** Minimum sidepanel width (px) to show AI Config as dialog; below this, opens in a new tab. */
+export const AI_CONFIG_MIN_DIALOG_WIDTH = 680;
+
 // ─── Skills preamble (injected into <agent-config>) ───
 
 export const SKILLS_PREAMBLE = `Skills provide specialized domain knowledge and workflows for producing high-quality outputs.
