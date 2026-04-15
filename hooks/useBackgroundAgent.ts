@@ -219,6 +219,10 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
 
   const send = useCallback((text: string, attachments?: Attachment[]) => {
     if (!text.trim()) return;
+    if (!portRef.current) {
+      setState(prev => ({ ...prev, lastError: '未连接到后台服务，请稍后再试' }));
+      return;
+    }
     const sessionId = sessionIdRef.current;
     // Optimistically add user message to local state for immediate UI feedback
     setState(prev => {
