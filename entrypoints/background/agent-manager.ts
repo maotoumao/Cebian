@@ -6,6 +6,7 @@ import type { Api, Model } from '@mariozechner/pi-ai';
 import { getModels, type KnownProvider } from '@mariozechner/pi-ai';
 import { createCebianAgent } from '@/lib/agent';
 import { DEFAULT_SYSTEM_PROMPT } from '@/lib/constants';
+import { scanSkillIndex, buildSkillsBlock } from '@/lib/ai-config/scanner';
 import { sessionStore } from './session-store';
 import { gatherPageContext } from '@/lib/page-context';
 import { buildTextPrefix, extractImages, type Attachment } from '@/lib/attachments';
@@ -31,8 +32,10 @@ import { PRESET_PROVIDERS } from '@/lib/constants';
 async function buildStructuredMessage(text: string, attachments: Attachment[]): Promise<string> {
   const parts: string[] = [];
 
-  // ① Session-dynamic config (placeholder for future skills/instructions/agents)
-  parts.push('<agent-config>\n</agent-config>');
+  // ① Session-dynamic config: inject skill index
+  const skillMetas = await scanSkillIndex();
+  const skillsBlock = buildSkillsBlock(skillMetas);
+  parts.push(`<agent-config>\n${skillsBlock}\n</agent-config>`);
 
   // ② Tool/behavior reminders (placeholder)
   parts.push('<reminder-instructions>\n</reminder-instructions>');

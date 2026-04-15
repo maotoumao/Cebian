@@ -2,6 +2,7 @@ import { setupOAuthRefresh } from './oauth-refresh';
 import { seedDevStorage } from './dev-seed';
 import { agentManager } from './agent-manager';
 import { sessionStore } from './session-store';
+import { invalidateSkillIndex } from '@/lib/ai-config/scanner';
 import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage } from '@/lib/protocol';
 
 export default defineBackground(() => {
@@ -172,4 +173,12 @@ export default defineBackground(() => {
       }
     }
   }
+
+  // ─── Skill index invalidation listener ───
+
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg?.type === 'invalidate_skill_index') {
+      invalidateSkillIndex();
+    }
+  });
 });

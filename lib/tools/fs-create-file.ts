@@ -2,6 +2,7 @@ import { Type } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_FS_CREATE_FILE } from '@/lib/types';
 import { vfs } from '@/lib/vfs';
+import { invalidateSkillIndexIfNeeded } from './fs-helpers';
 
 const FsCreateFileParameters = Type.Object({
   path: Type.String({
@@ -32,6 +33,7 @@ export const fsCreateFileTool: AgentTool<typeof FsCreateFileParameters> = {
         };
       }
       await vfs.writeFile(params.path, params.content, 'utf8');
+      invalidateSkillIndexIfNeeded(params.path);
       const byteLen = new TextEncoder().encode(params.content).length;
       return {
         content: [{ type: 'text', text: `Created ${params.path} (${byteLen} bytes)` }],

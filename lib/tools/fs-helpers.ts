@@ -1,5 +1,7 @@
 import { vfs } from '@/lib/vfs';
 import picomatch from 'picomatch';
+import { CEBIAN_SKILLS_DIR } from '@/lib/constants';
+import { invalidateSkillIndex } from '@/lib/ai-config/scanner';
 
 /** Maximum file content size (bytes) returned by fs_read_file before truncation. */
 export const MAX_READ_SIZE = 100 * 1024; // 100 KB
@@ -60,4 +62,14 @@ export function isBinaryContent(data: Uint8Array): boolean {
     if (data[i] === 0) return true;
   }
   return false;
+}
+
+/**
+ * If the given path is under ~/.cebian/skills/, send an invalidation message
+ * to the background to clear the cached skill index.
+ */
+export function invalidateSkillIndexIfNeeded(path: string): void {
+  if (path.startsWith(CEBIAN_SKILLS_DIR + '/') || path === CEBIAN_SKILLS_DIR) {
+    invalidateSkillIndex();
+  }
 }
