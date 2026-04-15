@@ -54,3 +54,5 @@ export const TOOL_FS_READ_FILE = 'fs_read_file' as const;
 export const TOOL_FS_LIST = 'fs_list' as const;
 /** Tool that searches for files by name or content */
 export const TOOL_FS_SEARCH = 'fs_search' as const;
+/** Tool that executes skill scripts in the background with declared chrome.* permissions */
+export const TOOL_EXECUTE_SKILL_CODE = 'execute_skill_code' as const;

@@ -55,7 +55,7 @@ function ensureDefaults(): Promise<void> {
  * deduplicate slashes, strip trailing slash, ensure absolute.
  * Prevents path confusion from agent-generated inputs.
  */
-function normalizePath(p: string): string {
+export function normalizePath(p: string): string {
   // Resolve ~ and ~/ to /home/user
   if (p === '~') p = '/home/user';
   else if (p.startsWith('~/')) p = '/home/user/' + p.slice(2);
