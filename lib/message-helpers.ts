@@ -7,8 +7,6 @@ import type {
   ToolCall,
   ImageContent,
 } from '@mariozechner/pi-ai';
-import { CONTEXT_STRIP_RE } from './page-context';
-import { ATTACHMENT_STRIP_RE } from './attachments';
 
 // ─── Parsed attachment metadata for UI display ───
 
@@ -47,24 +45,32 @@ export function findToolResult(
   );
 }
 
-/** Extract plain text from a user message (handles string and block-array formats).
- *  Strips <cebian-context> blocks so the UI only shows the user's actual input. */
-export function extractUserText(msg: Message): string {
-  if (msg.role !== 'user') return '';
-  let raw = '';
-  if (typeof msg.content === 'string') {
-    raw = msg.content;
-  } else if (Array.isArray(msg.content)) {
-    raw = msg.content
+const USER_REQUEST_RE = /<user-request>\s*([\s\S]*?)\s*<\/user-request>/;
+
+/** Extract the raw text string from a user message (handles string and block-array formats). */
+function getRawUserText(msg: Message): string {
+  if (typeof msg.content === 'string') return msg.content;
+  if (Array.isArray(msg.content)) {
+    return msg.content
       .filter((b): b is { type: 'text'; text: string } => 'type' in b && b.type === 'text')
       .map(b => b.text)
       .join('');
   }
-  return raw.replace(CONTEXT_STRIP_RE, '').replace(ATTACHMENT_STRIP_RE, '').trim();
+  return '';
+}
+
+/** Extract the user's actual input text from a structured user message.
+ *  Reads the content of the <user-request> block. */
+export function extractUserText(msg: Message): string {
+  if (msg.role !== 'user') return '';
+  const raw = getRawUserText(msg);
+  const match = raw.match(USER_REQUEST_RE);
+  return match ? match[1].trim() : raw.trim();
 }
 
 const ELEMENT_RE = /<selected-element\s+selector="([^"]*)"[^>]*>/g;
 const FILE_RE = /<attached-file\s+name="([^"]*)"\s+type="([^"]*)">/g;
+const ATTACHMENTS_BLOCK_RE = /<attachments>([\s\S]*?)<\/attachments>/;
 
 /** Extract attachment metadata from a user message for display in the chat bubble. */
 export function extractUserAttachments(msg: Message): ParsedUserAttachments {
@@ -81,21 +87,14 @@ export function extractUserAttachments(msg: Message): ParsedUserAttachments {
     }
   }
 
-  // Extract element/file metadata from text via regex
-  let raw = '';
-  if (typeof msg.content === 'string') {
-    raw = msg.content;
-  } else if (Array.isArray(msg.content)) {
-    raw = msg.content
-      .filter((b): b is { type: 'text'; text: string } => 'type' in b && b.type === 'text')
-      .map(b => b.text)
-      .join('');
-  }
+  // Extract element/file metadata from the <attachments> block
+  const raw = getRawUserText(msg);
+  const attachBlock = raw.match(ATTACHMENTS_BLOCK_RE)?.[1] ?? '';
 
-  for (const m of raw.matchAll(ELEMENT_RE)) {
+  for (const m of attachBlock.matchAll(ELEMENT_RE)) {
     result.elements.push({ selector: m[1].replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&') });
   }
-  for (const m of raw.matchAll(FILE_RE)) {
+  for (const m of attachBlock.matchAll(FILE_RE)) {
     result.files.push({
       name: m[1].replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'),
       type: m[2].replace(/&amp;/g, '&'),

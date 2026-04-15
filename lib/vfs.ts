@@ -10,6 +10,7 @@
  * to the host page origin there, not the extension origin.
  */
 import FS from '@isomorphic-git/lightning-fs';
+import { CEBIAN_HOME } from './constants';
 
 // Lazy-initialized singleton — defers IndexedDB connection until first use.
 let _pfs: FS.PromisifiedFS | null = null;
@@ -18,14 +19,46 @@ function pfs(): FS.PromisifiedFS {
   return _pfs;
 }
 
+// ─── Bootstrap: ensure default directories exist ───
+
+const DEFAULT_DIRS = [
+  '/home', '/home/user', CEBIAN_HOME,
+  `${CEBIAN_HOME}/skills`, `${CEBIAN_HOME}/prompts`,
+  '/workspaces',
+];
+let _bootstrapPromise: Promise<void> | null = null;
+
+/**
+ * Ensure /home/user and /workspace directories exist.
+ * Called once lazily before the first VFS operation.
+ * Uses a shared promise so concurrent callers all await the same bootstrap.
+ */
+function ensureDefaults(): Promise<void> {
+  if (!_bootstrapPromise) {
+    _bootstrapPromise = (async () => {
+      for (const dir of DEFAULT_DIRS) {
+        try {
+          await pfs().mkdir(dir);
+        } catch (e: any) {
+          if (e.code !== 'EEXIST') throw e;
+        }
+      }
+    })();
+  }
+  return _bootstrapPromise;
+}
+
 // ─── Helpers ───
 
 /**
- * Normalize a virtual path: resolve `.` / `..`, deduplicate slashes,
- * strip trailing slash, ensure absolute. Prevents path confusion from
- * agent-generated inputs.
+ * Normalize a virtual path: resolve `~` to `/home/user`, resolve `.` / `..`,
+ * deduplicate slashes, strip trailing slash, ensure absolute.
+ * Prevents path confusion from agent-generated inputs.
  */
 function normalizePath(p: string): string {
+  // Resolve ~ and ~/ to /home/user
+  if (p === '~') p = '/home/user';
+  else if (p.startsWith('~/')) p = '/home/user/' + p.slice(2);
   if (!p || p[0] !== '/') p = '/' + p;
   const parts = p.split('/');
   const resolved: string[] = [];
@@ -54,6 +87,7 @@ interface MkdirOptions {
  * Create a directory. Supports `{ recursive: true }` like Node.js.
  */
 async function mkdir(dirPath: string, opts?: MkdirOptions | number): Promise<void> {
+  await ensureDefaults();
   dirPath = normalizePath(dirPath);
   const recursive = typeof opts === 'object' && opts?.recursive;
   const mode = typeof opts === 'number' ? opts : (typeof opts === 'object' ? opts?.mode : undefined);
@@ -84,6 +118,7 @@ interface RmOptions {
  * Remove a file or directory. Supports `{ recursive: true, force: true }` like Node.js.
  */
 async function rm(targetPath: string, opts?: RmOptions): Promise<void> {
+  await ensureDefaults();
   targetPath = normalizePath(targetPath);
   const recursive = opts?.recursive ?? false;
   const force = opts?.force ?? false;
@@ -118,6 +153,7 @@ async function rm(targetPath: string, opts?: RmOptions): Promise<void> {
  * Throws ENOENT if it doesn't exist.
  */
 async function access(targetPath: string): Promise<void> {
+  await ensureDefaults();
   await pfs().stat(normalizePath(targetPath));
 }
 
@@ -125,6 +161,7 @@ async function access(targetPath: string): Promise<void> {
  * Check whether a path exists. Convenience wrapper over access().
  */
 async function exists(targetPath: string): Promise<boolean> {
+  await ensureDefaults();
   try {
     await pfs().stat(normalizePath(targetPath));
     return true;
@@ -145,12 +182,13 @@ async function writeFile(
   data: string | Uint8Array,
   opts?: WriteFileOpts,
 ): Promise<void> {
+  await ensureDefaults();
   filePath = normalizePath(filePath);
   const dir = parentDir(filePath);
   if (dir !== '/') {
     await mkdir(dir, { recursive: true });
   }
-  return pfs().writeFile(filePath, data, opts);
+  return pfs().writeFile(filePath, data, opts as FS.WriteFileOptions);
 }
 
 /**
@@ -162,6 +200,7 @@ async function appendFile(
   data: string,
   opts?: 'utf8' | { encoding?: 'utf8' },
 ): Promise<void> {
+  await ensureDefaults();
   filePath = normalizePath(filePath);
   let existing = '';
   try {
@@ -176,6 +215,7 @@ async function appendFile(
  * Copy a file from src to dest.
  */
 async function copyFile(src: string, dest: string): Promise<void> {
+  await ensureDefaults();
   src = normalizePath(src);
   dest = normalizePath(dest);
   const data = await pfs().readFile(src);
@@ -186,34 +226,44 @@ async function copyFile(src: string, dest: string): Promise<void> {
 
 // Typed wrappers instead of .bind() to preserve overload signatures
 export const vfs = {
-  readFile(path: string, opts?: 'utf8' | { encoding?: 'utf8' }) {
+  async readFile(path: string, opts?: 'utf8' | { encoding?: 'utf8' }) {
+    await ensureDefaults();
     return pfs().readFile(normalizePath(path), opts);
   },
-  readdir(path: string) {
+  async readdir(path: string) {
+    await ensureDefaults();
     return pfs().readdir(normalizePath(path));
   },
-  stat(path: string) {
+  async stat(path: string) {
+    await ensureDefaults();
     return pfs().stat(normalizePath(path));
   },
-  lstat(path: string) {
+  async lstat(path: string) {
+    await ensureDefaults();
     return pfs().lstat(normalizePath(path));
   },
-  rename(oldPath: string, newPath: string) {
+  async rename(oldPath: string, newPath: string) {
+    await ensureDefaults();
     return pfs().rename(normalizePath(oldPath), normalizePath(newPath));
   },
-  symlink(target: string, path: string) {
+  async symlink(target: string, path: string) {
+    await ensureDefaults();
     return pfs().symlink(target, normalizePath(path));
   },
-  readlink(path: string) {
+  async readlink(path: string) {
+    await ensureDefaults();
     return pfs().readlink(normalizePath(path));
   },
-  unlink(path: string) {
+  async unlink(path: string) {
+    await ensureDefaults();
     return pfs().unlink(normalizePath(path));
   },
-  rmdir(path: string) {
+  async rmdir(path: string) {
+    await ensureDefaults();
     return pfs().rmdir(normalizePath(path));
   },
-  du(path: string) {
+  async du(path: string) {
+    await ensureDefaults();
     return pfs().du(normalizePath(path));
   },
 

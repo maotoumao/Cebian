@@ -35,3 +35,22 @@ export const TOOL_INTERACT = 'interact' as const;
 export const TOOL_TAB = 'tab' as const;
 /** Tool that captures a screenshot of the active tab */
 export const TOOL_SCREENSHOT = 'screenshot' as const;
+
+// ─── Filesystem tool name constants ───
+
+/** Tool that creates a new file in the virtual filesystem */
+export const TOOL_FS_CREATE_FILE = 'fs_create_file' as const;
+/** Tool that edits a file via precise string replacement */
+export const TOOL_FS_EDIT_FILE = 'fs_edit_file' as const;
+/** Tool that creates a directory in the virtual filesystem */
+export const TOOL_FS_MKDIR = 'fs_mkdir' as const;
+/** Tool that renames or moves a file/directory */
+export const TOOL_FS_RENAME = 'fs_rename' as const;
+/** Tool that deletes a file or directory */
+export const TOOL_FS_DELETE = 'fs_delete' as const;
+/** Tool that reads file content from the virtual filesystem */
+export const TOOL_FS_READ_FILE = 'fs_read_file' as const;
+/** Tool that lists directory contents */
+export const TOOL_FS_LIST = 'fs_list' as const;
+/** Tool that searches for files by name or content */
+export const TOOL_FS_SEARCH = 'fs_search' as const;

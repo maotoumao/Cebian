@@ -151,8 +151,7 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
     clearActiveModelIfNeeded(key);
   };
 
-  // Merge preset providers (not yet added as custom) into the preset list
-  const presetConfigs = PRESET_PROVIDERS;
+  // Filter out preset providers from user customs
   const userCustoms = customs.filter(
     c => !PRESET_PROVIDERS.some(p => p.id === c.id),
   );
@@ -189,32 +188,34 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
           {/* API Key providers */}
           <div className="mt-4 space-y-4">
             <p className="text-xs text-muted-foreground">通过 API Key</p>
-            {APIKEY_PROVIDERS.map((p, i) => (
-              <Fragment key={p.provider}>
-                {i > 0 && <Separator />}
-                <ProviderApiKeyItem
-                  provider={p.provider}
-                  label={p.label}
-                  credential={providers[p.provider] as ApiKeyCredential | undefined}
-                  onSave={(cred) => handleCredentialSave(p.provider, cred)}
-                  onRemove={() => handleApiKeyRemove(p.provider)}
-                />
-              </Fragment>
-            ))}
-
-            {/* Preset custom providers (DeepSeek etc.) — same UI as built-in */}
-            {presetConfigs.map((p) => {
-              const key = customProviderKey(p.id);
+            {APIKEY_PROVIDERS.map((p, i) => {
+              if ('preset' in p && p.preset) {
+                const presetConfig = PRESET_PROVIDERS.find(pp => pp.id === p.provider);
+                if (!presetConfig) return null;
+                const key = customProviderKey(presetConfig.id);
+                return (
+                  <Fragment key={key}>
+                    {i > 0 && <Separator />}
+                    <ProviderApiKeyItem
+                      provider={key}
+                      label={presetConfig.name}
+                      models={getCustomModels(presetConfig)}
+                      credential={providers[key] as ApiKeyCredential | undefined}
+                      onSave={(cred) => handleCredentialSave(key, cred)}
+                      onRemove={() => handleApiKeyRemove(key)}
+                    />
+                  </Fragment>
+                );
+              }
               return (
-                <Fragment key={key}>
-                  <Separator />
+                <Fragment key={p.provider}>
+                  {i > 0 && <Separator />}
                   <ProviderApiKeyItem
-                    provider={key}
-                    label={p.name}
-                    models={getCustomModels(p)}
-                    credential={providers[key] as ApiKeyCredential | undefined}
-                    onSave={(cred) => handleCredentialSave(key, cred)}
-                    onRemove={() => handleApiKeyRemove(key)}
+                    provider={p.provider}
+                    label={p.label}
+                    credential={providers[p.provider] as ApiKeyCredential | undefined}
+                    onSave={(cred) => handleCredentialSave(p.provider, cred)}
+                    onRemove={() => handleApiKeyRemove(p.provider)}
                   />
                 </Fragment>
               );

@@ -26,6 +26,9 @@ export interface ElementAttachment {
   attributes: Record<string, string>;
   textContent?: string;  // first 200 chars of innerText
   rect?: { x: number; y: number; width: number; height: number };
+  tabId?: number;
+  tabUrl?: string;
+  windowId?: number;
   frameId?: number;      // 0 or undefined = top frame
   frameUrl?: string;
 }
@@ -33,9 +36,6 @@ export interface ElementAttachment {
 export type Attachment = ImageAttachment | TextFileAttachment | ElementAttachment;
 
 // ─── Size / type limits ───
-
-/** Regex to strip attachment XML blocks from user messages for display. */
-export const ATTACHMENT_STRIP_RE = /<selected-element[\s\S]*?<\/selected-element>\s*|<attached-file[\s\S]*?<\/attached-file>\s*/g;
 
 export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;      // 5 MB
 export const MAX_TEXT_FILE_SIZE = 100 * 1024;         // 100 KB
@@ -76,8 +76,8 @@ function escXmlAttr(s: string): string {
 }
 
 /**
- * Build XML text prefix from element and file attachments.
- * This text is prepended to the user message before page context.
+ * Build XML text from element and file attachments, wrapped in <attachments>.
+ * Returns empty string if there are no element/file attachments.
  */
 export function buildTextPrefix(attachments: Attachment[]): string {
   const blocks: string[] = [];
@@ -107,7 +107,7 @@ export function buildTextPrefix(attachments: Attachment[]): string {
     }
   }
 
-  return blocks.join('\n\n');
+  return blocks.length > 0 ? `<attachments>\n${blocks.join('\n\n')}\n</attachments>` : '';
 }
 
 /**

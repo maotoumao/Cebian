@@ -1,0 +1,175 @@
+{
+  "project": "Cebian Customizations Manager",
+  "planDocument": "docs/plans/2026-04-15-customizations-manager.md",
+  "lastUpdated": "2026-04-15T18:30:00+08:00",
+  "phases": [
+    {
+      "id": "P0",
+      "title": "Install deps + foundation libs",
+      "status": "completed",
+      "commits": [
+        "feat: P0 — install CodeMirror 6 + create foundation libs",
+        "refactor: extract VFS path constants + SKILLS_PREAMBLE to lib/constants, remove SLASH_COMMANDS"
+      ],
+      "filesCreated": [
+        "lib/customizations/frontmatter.ts",
+        "lib/customizations/scanner.ts",
+        "lib/customizations/template.ts",
+        "lib/customizations/skill-validator.ts"
+      ],
+      "filesModified": [
+        "package.json",
+        "pnpm-lock.yaml",
+        "lib/constants.ts",
+        "lib/vfs.ts",
+        "components/chat/ChatInput.tsx"
+      ],
+      "dependencies": {
+        "added": [
+          "codemirror",
+          "@codemirror/view",
+          "@codemirror/state",
+          "@codemirror/lang-markdown",
+          "@codemirror/lang-yaml",
+          "@codemirror/lang-javascript",
+          "@codemirror/language",
+          "@codemirror/autocomplete",
+          "@codemirror/commands",
+          "@codemirror/theme-one-dark",
+          "gray-matter"
+        ]
+      },
+      "notes": [
+        "SLASH_COMMANDS removed from lib/constants.ts — replaced by dynamic prompts (P6)",
+        "VFS path constants extracted: CEBIAN_HOME, CEBIAN_PROMPTS_DIR, CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE",
+        "SKILLS_PREAMBLE constant added for agent injection",
+        "gray-matter used instead of hand-written YAML parser"
+      ]
+    },
+    {
+      "id": "P1",
+      "title": "CodeMirror editor components",
+      "status": "completed",
+      "commits": [
+        "feat: P1 — CodeMirror 6 editor wrapper + template highlight/completion extensions"
+      ],
+      "filesCreated": [
+        "components/editor/CodeMirrorEditor.tsx",
+        "components/editor/extensions/template-highlight.ts",
+        "components/editor/extensions/template-completion.ts"
+      ],
+      "notes": [
+        "Uses Compartment for theme/readOnly — no editor recreation on toggle",
+        "Template vars: MatchDecorator for {{var}} highlighting, autocomplete on {{ trigger",
+        "defaultHighlightStyle with { fallback: true } to avoid clash with oneDark"
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "Customizations Dialog UI",
+      "status": "completed",
+      "commits": [
+        "feat: P2 — Customizations Dialog UI",
+        "refactor: EditorPanel — remove detectMode/resolveFullPath/tab, use explicit mode + full VFS path",
+        "refactor: remove EditorMode — EditorPanel is now a pure file editor",
+        "refactor: extract useIsDark hook, add FileTree with context menu, replace SkillTree with SkillList + workspace EditorPanel"
+      ],
+      "filesCreated": [
+        "components/customizations/CustomizationsDialog.tsx",
+        "components/customizations/EditorPanel.tsx",
+        "components/customizations/PromptList.tsx",
+        "components/customizations/SkillList.tsx",
+        "components/editor/FileTree.tsx",
+        "components/ui/context-menu.tsx",
+        "hooks/useIsDark.ts"
+      ],
+      "filesDeleted": [
+        "components/customizations/SkillTree.tsx"
+      ],
+      "notes": [
+        "EditorPanel supports optional 'workspace' prop — shows embedded FileTree when set",
+        "SkillTree replaced by SkillList (simple folder list) + FileTree (reusable, with right-click context menu)",
+        "EditorMode removed entirely — EditorPanel is a pure file editor, no frontmatter parsing",
+        "useIsDark hook extracted for reuse",
+        "FileTree supports: right-click context menu (new file/folder, rename, delete), inline rename, collision detection"
+      ]
+    },
+    {
+      "id": "P3",
+      "title": "Header + Dialog registration",
+      "status": "completed",
+      "commits": [
+        "feat: P3 — Header button + dialog registration",
+        "fix: dialog width fixes (multiple commits)"
+      ],
+      "filesModified": [
+        "components/layout/Header.tsx",
+        "entrypoints/sidepanel/App.tsx",
+        "components/dialogs/index.ts",
+        "components/dialogs/outlet.tsx",
+        "components/ui/dialog.tsx"
+      ],
+      "notes": [
+        "Blocks icon button added to Header between theme toggle and settings",
+        "CustomizationsDialog registered as 'customizations' in dialog registry",
+        "App.tsx calls showDialog('customizations', {}) on button click",
+        "CustomizationsDialog reads theme internally via useIsDark — no props needed",
+        "sm:max-w-xl removed from dialog.tsx base to allow full-width dialogs",
+        "Dialog height fixed at 85vh"
+      ]
+    },
+    {
+      "id": "P4",
+      "title": "Agent injection (skill index)",
+      "status": "not-started",
+      "description": "Modify agent-manager.ts buildStructuredMessage() to scan VFS skills and inject full index into <agent-config><skills> block",
+      "filesToModify": [
+        "entrypoints/background/agent-manager.ts",
+        "entrypoints/background/index.ts",
+        "lib/tools/fs-create-file.ts",
+        "lib/tools/fs-edit-file.ts",
+        "lib/tools/fs-delete.ts"
+      ]
+    },
+    {
+      "id": "P5",
+      "title": "execute_skill_code tool",
+      "status": "not-started",
+      "description": "New tool for executing skill scripts in background SW with declared chrome.* permissions (oil-monkey model)",
+      "filesToCreate": [
+        "lib/tools/execute-skill-code.ts"
+      ],
+      "filesToModify": [
+        "lib/tools/index.ts",
+        "lib/types.ts"
+      ]
+    },
+    {
+      "id": "P6",
+      "title": "Prompt / command panel",
+      "status": "not-started",
+      "description": "Replace removed SLASH_COMMANDS with dynamic VFS prompt scan + template variable substitution in ChatInput",
+      "filesToModify": [
+        "components/chat/ChatInput.tsx"
+      ]
+    },
+    {
+      "id": "P7",
+      "title": "Build verification + final review",
+      "status": "not-started",
+      "description": "Full build, code review all changes, update design doc"
+    }
+  ],
+  "architectureDecisions": {
+    "storage": "VFS (~/.cebian/) via IndexedDB, not chrome.storage",
+    "editor": "CodeMirror 6 (~150KB gzip, no Web Workers)",
+    "frontmatterParsing": "gray-matter (replaced hand-written parser)",
+    "skillSpec": "agentskills.io specification compliant",
+    "skillInjection": "Full index in every user message <agent-config><skills> block",
+    "skillCodeExecution": "execute_skill_code tool with metadata.permissions sandboxing",
+    "themeManagement": "useIsDark hook (shared between App.tsx and dialogs)",
+    "editorPanel": "Generic file editor with optional workspace prop for embedded FileTree",
+    "noInstructions": "Instructions module removed — Settings system prompt covers the use case",
+    "noSlashCommands": "SLASH_COMMANDS removed — unified under dynamic prompts mechanism"
+  }
+}

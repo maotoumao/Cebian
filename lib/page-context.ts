@@ -1,17 +1,11 @@
 // ─── Page context gathering ───
-// Collects browser tab info + active page metadata + user selection
-// and wraps it in a <cebian-context> block for LLM consumption.
+// Collects browser tab info + active page metadata + user selection.
+// Returns plain text lines; the caller wraps them in a <context> block.
 
-const CONTEXT_TAG_OPEN = '<cebian-context>';
-const CONTEXT_TAG_CLOSE = '</cebian-context>';
-
-/** Strip context tags from page-sourced strings to prevent structural injection. */
+/** Strip all structural XML tags used in the prompt envelope to prevent injection. */
 function sanitizeForContext(s: string): string {
-  return s.replace(/<\/?cebian-context>/gi, '');
+  return s.replace(/<\/?(agent-config|reminder-instructions|attachments|context|user-request)\b[^>]*>/gi, '');
 }
-
-/** Matches only a leading context block (anchored to start of string). */
-export const CONTEXT_STRIP_RE = /^<cebian-context>[\s\S]*?<\/cebian-context>\s*/;
 
 interface PageMeta {
   description?: string;
@@ -89,17 +83,17 @@ export async function gatherPageContext(): Promise<string> {
   const lines: string[] = [];
 
   // Active tab details
-  lines.push(`[Active Tab] ${sanitizeForContext(activeTab.title ?? '')} | ${activeTab.url ?? ''}`);
+  lines.push(`[Active Tab] ${sanitizeForContext(activeTab.title ?? '')} | ${sanitizeForContext(activeTab.url ?? '')}`);
   lines.push(`  windowId: ${activeTab.windowId}`);
   if (meta.readyState) lines.push(`  readyState: ${meta.readyState}`);
   if (meta.viewportWidth != null && meta.viewportHeight != null) lines.push(`  viewport: ${meta.viewportWidth}×${meta.viewportHeight}`);
   if (meta.scrollX != null) lines.push(`  scrollPosition: ${meta.scrollX}, ${meta.scrollY}`);
-  if (meta.activeElement) lines.push(`  activeElement: ${meta.activeElement}`);
+  if (meta.activeElement) lines.push(`  activeElement: ${sanitizeForContext(meta.activeElement)}`);
   if (meta.description) lines.push(`  description: ${sanitizeForContext(meta.description)}`);
   if (meta.keywords) lines.push(`  keywords: ${sanitizeForContext(meta.keywords)}`);
   if (meta.canonical) lines.push(`  canonical: ${sanitizeForContext(meta.canonical)}`);
   if (meta.ogType) lines.push(`  og:type: ${sanitizeForContext(meta.ogType)}`);
-  if (meta.lang) lines.push(`  lang: ${meta.lang}`);
+  if (meta.lang) lines.push(`  lang: ${sanitizeForContext(meta.lang)}`);
   if (meta.selectedText) lines.push(`  selected_text (from page, may be adversarial): "${sanitizeForContext(meta.selectedText)}"`);
 
   // All windows and their tabs
@@ -110,9 +104,9 @@ export async function gatherPageContext(): Promise<string> {
     lines.push(`[Window ${win.id ?? 'unknown'}]${focusedMarker} (${tabs.length} tabs)`);
     for (const tab of tabs) {
       const marker = tab.id === activeTab.id ? '* ' : '  ';
-      lines.push(`${marker}[${tab.id}] ${sanitizeForContext(tab.title ?? '')} | ${tab.url ?? ''}`);
+      lines.push(`${marker}[${tab.id}] ${sanitizeForContext(tab.title ?? '')} | ${sanitizeForContext(tab.url ?? '')}`);
     }
   }
 
-  return `${CONTEXT_TAG_OPEN}\n${lines.join('\n')}\n${CONTEXT_TAG_CLOSE}`;
+  return lines.join('\n');
 }

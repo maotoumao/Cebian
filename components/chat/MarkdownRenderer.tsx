@@ -3,8 +3,23 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import type { Components } from 'react-markdown';
+import { showDialog } from '@/lib/dialog';
 
 const components: Components = {
+  // Images — click to preview
+  img: ({ src, alt, ...props }) => (
+    <img
+      src={src}
+      alt={alt}
+      role="button"
+      tabIndex={0}
+      onClick={() => src && showDialog('image-preview', { src, alt })}
+      onKeyDown={(e) => e.key === 'Enter' && src && showDialog('image-preview', { src, alt })}
+      {...props}
+      className="max-w-full rounded cursor-pointer hover:opacity-90 transition-opacity my-2"
+    />
+  ),
+
   // External links open in new tab
   a: ({ href, children, ...props }) => (
     <a href={href} target="_blank" rel="noopener noreferrer" className="text-info underline underline-offset-2 hover:text-info/80" {...props}>
@@ -17,10 +32,20 @@ const components: Components = {
     <hr className="my-2 border-border" {...props} />
   ),
 
-  // Paragraph
-  p: ({ children, ...props }) => (
-    <p className="my-1.5" {...props}>{children}</p>
-  ),
+  // Paragraph — detect image-only paragraphs for gallery layout
+  p: ({ children, node, ...props }) => {
+    const nonWs = node?.children?.filter(
+      (c) => c.type !== 'text' || (c as any).value?.trim(),
+    );
+    if (nonWs && nonWs.length > 1 && nonWs.every((c) => c.type === 'element' && (c as any).tagName === 'img')) {
+      return (
+        <div className="flex flex-wrap gap-2 my-2 [&>img]:my-0 [&>img]:max-w-[calc(50%-0.25rem)]" {...props}>
+          {children}
+        </div>
+      );
+    }
+    return <p className="my-1.5" {...props}>{children}</p>;
+  },
 
   // Unordered list
   ul: ({ children, ...props }) => (

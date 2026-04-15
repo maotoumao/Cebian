@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getModels, type KnownProvider, type Api, type Model } from '@mariozechner/pi-ai';
 import { Check, ChevronDown, Settings } from 'lucide-react';
 
@@ -38,6 +38,7 @@ export function ModelSelector({
     const verified = Object.entries(configuredProviders).filter(
       ([, cred]) => cred.verified,
     );
+
     const groups: { provider: string; label: string; models: Model<Api>[] }[] = [];
 
     for (const [provider] of verified) {
@@ -65,6 +66,15 @@ export function ModelSelector({
     }
     return groups;
   }, [configuredProviders, customProviders]);
+
+  // Auto-select first available model when none is selected
+  useEffect(() => {
+    if (activeModel) return;
+    const first = providerModels[0];
+    if (first?.models.length > 0) {
+      onSelect(first.provider, first.models[0].id);
+    }
+  }, [activeModel, providerModels, onSelect]);
 
   const activeModelName = useMemo(() => {
     if (!activeModel) return null;

@@ -17,9 +17,32 @@ export function getToolLabel(name: string, args: Record<string, any> = {}): stri
       return '正在截取页面截图';
     case 'ask_user':
       return '等待用户回答';
+    case 'fs_create_file':
+      return `正在创建文件 ${truncPath(args.path)}`;
+    case 'fs_edit_file':
+      return `正在编辑文件 ${truncPath(args.path)}`;
+    case 'fs_mkdir':
+      return `正在创建目录 ${truncPath(args.path)}`;
+    case 'fs_rename':
+      return `正在重命名 ${truncPath(args.old_path)}`;
+    case 'fs_delete':
+      return `正在删除 ${truncPath(args.path)}`;
+    case 'fs_read_file':
+      return `正在读取文件 ${truncPath(args.path)}`;
+    case 'fs_list':
+      return `正在列出目录 ${truncPath(args.path)}`;
+    case 'fs_search':
+      return args.mode === 'content'
+        ? `正在搜索文件内容 "${truncPath(args.pattern)}"`
+        : `正在搜索文件 "${truncPath(args.pattern)}"`;
     default:
       return name;
   }
+}
+
+function truncPath(p?: string): string {
+  if (!p) return '';
+  return p.length > 30 ? '...' + p.slice(-27) : p;
 }
 
 function getInteractLabel(args: Record<string, any>): string {

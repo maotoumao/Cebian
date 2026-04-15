@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect, useMemo, type KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback, type KeyboardEvent } from 'react';
 import { Send, Square, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X } from 'lucide-react';
+import { showDialog } from '@/lib/dialog';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +11,7 @@ import { useStorageItem } from '@/hooks/useStorageItem';
 import { activeModel, thinkingLevel, providerCredentials, customProviders as customProvidersStorage, type ThinkingLevel } from '@/lib/storage';
 import { getModel } from '@mariozechner/pi-ai';
 import { isCustomProvider, findCustomModel, mergeCustomProviders } from '@/lib/custom-models';
-import { SLASH_COMMANDS, PRESET_PROVIDERS } from '@/lib/constants';
+import { PRESET_PROVIDERS } from '@/lib/constants';
 import { startElementPicker, cancelElementPicker } from '@/lib/element-picker';
 import {
   MAX_ATTACHMENT_COUNT, MAX_IMAGE_SIZE, MAX_TEXT_FILE_SIZE,
@@ -59,9 +60,9 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
     }
   }, [currentModel, allCustomProviders]);
 
-  const handleModelSelect = (provider: string, modelId: string) => {
+  const handleModelSelect = useCallback((provider: string, modelId: string) => {
     setCurrentModel({ provider, modelId });
-  };
+  }, [setCurrentModel]);
 
   const handleThinkingSelect = (level: ThinkingLevel) => {
     setCurrentThinkingLevel(level);
@@ -97,6 +98,12 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
 
   const handleSend = () => {
     if (!canSend) return;
+    if (!currentModel) {
+      toast.error('请先选择一个 AI 模型', {
+        action: onOpenSettings ? { label: '前往设置', onClick: onOpenSettings } : undefined,
+      });
+      return;
+    }
     onSend(value.trim(), attachments.length > 0 ? attachments : undefined);
     setValue('');
     setAttachments([]);
@@ -224,32 +231,10 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
 
   return (
     <footer className="px-4 py-4 border-t border-border bg-background relative">
-      {/* Slash menu */}
+      {/* Slash menu — will be replaced with dynamic VFS prompts in P6 */}
       {showSlash && (
-        <div className="absolute bottom-full left-4 right-4 mb-3 bg-popover border border-border rounded-lg p-1.5 shadow-xl z-50 animate-in slide-in-from-bottom-1 fade-in duration-150">
-          {SLASH_COMMANDS.map((cmd) => (
-            <button
-              key={cmd.name}
-              className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-accent transition-colors text-left cursor-pointer"
-              onClick={() => {
-                setValue(cmd.name + ' ');
-                setShowSlash(false);
-                textareaRef.current?.focus();
-              }}
-            >
-              <span className="text-sm w-6 h-6 grid place-items-center rounded bg-accent/50 shrink-0">
-                {cmd.icon}
-              </span>
-              <div className="flex items-baseline gap-2 min-w-0">
-                <span className="text-[0.8rem] font-medium font-mono shrink-0">
-                  {cmd.name}
-                </span>
-                <span className="text-[0.65rem] text-muted-foreground truncate">
-                  {cmd.desc}
-                </span>
-              </div>
-            </button>
-          ))}
+        <div className="absolute bottom-full left-4 right-4 mb-3 bg-popover border border-border rounded-lg p-2.5 shadow-xl z-50 animate-in slide-in-from-bottom-1 fade-in duration-150">
+          <p className="text-xs text-muted-foreground text-center py-2">暂无 Prompt，前往定制管理创建</p>
         </div>
       )}
 
@@ -307,7 +292,11 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
                       <img
                         src={`data:${att.mimeType};base64,${att.data}`}
                         alt={att.name || '截图'}
-                        className="h-3.5 w-auto rounded-sm object-cover"
+                        className="h-3.5 w-5 rounded-sm object-cover cursor-pointer"
+                        onClick={() => showDialog('image-preview', {
+                          src: `data:${att.mimeType};base64,${att.data}`,
+                          alt: att.name || '截图',
+                        })}
                       />
                       <span className="truncate max-w-24">
                         {att.name || (att.source === 'screenshot' ? '截图' : '图片')}

@@ -26,6 +26,38 @@ import { getCopilotBaseUrl } from '@/lib/oauth';
 import { mergeCustomProviders, isCustomProvider, findCustomModel } from '@/lib/custom-models';
 import { PRESET_PROVIDERS } from '@/lib/constants';
 
+// ─── Structured user message builder ───
+
+async function buildStructuredMessage(text: string, attachments: Attachment[]): Promise<string> {
+  const parts: string[] = [];
+
+  // ① Session-dynamic config (placeholder for future skills/instructions/agents)
+  parts.push('<agent-config>\n</agent-config>');
+
+  // ② Tool/behavior reminders (placeholder)
+  parts.push('<reminder-instructions>\n</reminder-instructions>');
+
+  // ③ Attachments (elements + files; images go via multimodal content blocks)
+  const attachmentBlock = buildTextPrefix(attachments);
+  if (attachmentBlock) parts.push(attachmentBlock);
+
+  // ④ Context: date + page state
+  const ctxLines: string[] = [];
+  ctxLines.push(`The current date is ${new Date().toLocaleDateString('en-CA')}.`);
+  const pageCtx = await gatherPageContext();
+  if (pageCtx) {
+    ctxLines.push('');
+    ctxLines.push(pageCtx);
+  }
+  parts.push(`<context>\n${ctxLines.join('\n')}\n</context>`);
+
+  // ⑤ User request (always last)
+  // TODO: user text is NOT sanitized — users are trusted; stripping structural tags would alter their intent.
+  parts.push(`<user-request>\n${text.trim()}\n</user-request>`);
+
+  return parts.join('\n\n');
+}
+
 // ─── Types ───
 
 interface ManagedSession {
@@ -270,14 +302,7 @@ class AgentManager {
       }
     }
 
-    const ctx = await gatherPageContext();
-
-    const parts: string[] = [];
-    if (ctx) parts.push(ctx);
-    const prefix = buildTextPrefix(attachments);
-    if (prefix) parts.push(prefix);
-    parts.push(text.trim());
-    const enriched = parts.join('\n\n');
+    const enriched = await buildStructuredMessage(text, attachments);
 
     const images = extractImages(attachments);
 

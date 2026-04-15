@@ -3,6 +3,9 @@ import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_EXECUTE_JS } from '@/lib/types';
 import { getActiveTabId } from './chrome-api';
 
+/** Sentinel value returned by the injected func when CSP blocks new Function(). */
+const CSP_BLOCKED = '__cebian_csp_blocked__';
+
 const ExecuteJsParameters = Type.Object({
   code: Type.String({
     description:
@@ -20,6 +23,43 @@ const ExecuteJsParameters = Type.Object({
     }),
   ),
 });
+
+/**
+ * Execute code via CDP Runtime.evaluate (debugger fallback).
+ * Used when the page's CSP blocks new Function() / eval().
+ */
+async function executeViaDebugger(tabId: number, code: string): Promise<string> {
+  const target = { tabId };
+  try {
+    await chrome.debugger.attach(target, '1.3');
+  } catch (e: any) {
+    // Already attached (e.g. by a previous call) — continue.
+    if (!e.message?.includes('Already attached')) throw e;
+  }
+
+  try {
+    // Wrap in async IIFE so `return` and `await` work inside user code.
+    const expression = `(async () => { ${code} })()`;
+    const result = await chrome.debugger.sendCommand(target, 'Runtime.evaluate', {
+      expression,
+      awaitPromise: true,
+      returnByValue: true,
+    }) as any;
+
+    if (result.exceptionDetails) {
+      const errMsg = result.exceptionDetails.exception?.description
+        ?? result.exceptionDetails.text
+        ?? 'Unknown error';
+      return `Error: ${errMsg}`;
+    }
+
+    const value = result.result?.value;
+    if (value === undefined) return '(no return value)';
+    return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+  } finally {
+    try { await chrome.debugger.detach(target); } catch { /* ignore */ }
+  }
+}
 
 export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
   name: TOOL_EXECUTE_JS,
@@ -41,23 +81,41 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
       ? { tabId, frameIds: [params.frameId] }
       : { tabId };
 
+    // Try executing via chrome.scripting.executeScript (MAIN world).
+    // If the page has a strict CSP that blocks eval/new Function, the injected
+    // func catches the error and returns a sentinel so we can fall back to CDP.
     const results = await chrome.scripting.executeScript({
       target,
-      func: (code: string) => {
-        return new Function(`return (async () => { ${code} })()`)();
+      func: async (code: string, cspSentinel: string) => {
+        try {
+          return await new Function(`return (async () => { ${code} })()`)();
+        } catch (e: any) {
+          if (e.message && /unsafe-eval|Content Security Policy/i.test(e.message)) {
+            return cspSentinel;
+          }
+          throw e;
+        }
       },
-      args: [params.code],
+      args: [params.code, CSP_BLOCKED],
       ...({ world: 'MAIN' } as any),
     });
 
     const result = results?.[0];
-    const output = result?.result;
-
     let text: string;
-    try {
-      text = output === undefined ? '(no return value)' : JSON.stringify(output, null, 2);
-    } catch {
-      text = `(result could not be serialized — got ${typeof output})`;
+
+    if ((result as any)?.error) {
+      const err = (result as any).error;
+      text = `Error: ${err.message ?? JSON.stringify(err)}`;
+    } else if (result?.result === CSP_BLOCKED) {
+      // CSP blocked eval — fall back to CDP Runtime.evaluate
+      text = await executeViaDebugger(tabId, params.code);
+    } else {
+      const output = result?.result;
+      try {
+        text = output === undefined ? '(no return value)' : JSON.stringify(output, null, 2);
+      } catch {
+        text = `(result could not be serialized — got ${typeof output})`;
+      }
     }
 
     return {

@@ -87,9 +87,9 @@ export const thinkingLevel = storage.defineItem<ThinkingLevel>(
   { fallback: 'medium' },
 );
 
-export const themePreference = storage.defineItem<'dark' | 'light'>(
+export const themePreference = storage.defineItem<'dark' | 'light' | 'system'>(
   'local:theme',
-  { fallback: 'dark' },
+  { fallback: 'system' },
 );
 
 export const cebianSettings = storage.defineItem<CebianSettings>(

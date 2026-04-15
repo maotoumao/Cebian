@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
 import { extractUserText, extractUserAttachments } from '@/lib/message-helpers';
+import { showDialog } from '@/lib/dialog';
 import type { Message } from '@mariozechner/pi-ai';
 
 /* ─── User Message ─── */
@@ -14,7 +15,7 @@ export function UserMessageBubble({ msg, children }: { msg?: Message; children?:
 
   return (
     <div className="self-end max-w-[95%]">
-      <div className="bg-card border border-border px-4 py-3 rounded-2xl text-[0.9rem] leading-relaxed">
+      <div className="bg-card border border-border px-4 py-3 rounded-2xl text-[0.9rem] leading-relaxed w-fit ml-auto">
         {text ?? children}
       </div>
 
@@ -29,7 +30,10 @@ export function UserMessageBubble({ msg, children }: { msg?: Message; children?:
               <img
                 src={`data:${img.mimeType};base64,${img.data}`}
                 alt="附件图片"
-                className="h-3.5 w-auto rounded-sm object-cover"
+                className="h-3.5 w-auto rounded-sm object-cover cursor-pointer"
+                onClick={() => showDialog('image-preview', {
+                  src: `data:${img.mimeType};base64,${img.data}`,
+                })}
               />
               图片
             </Badge>

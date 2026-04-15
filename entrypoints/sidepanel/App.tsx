@@ -2,15 +2,31 @@ import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
+import { DialogOutlet } from '@/components/dialogs/outlet';
 import { Header } from '@/components/layout/Header';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { HistoryPanel } from '@/components/layout/HistoryPanel';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { themePreference } from '@/lib/storage';
+import { showDialog } from '@/lib/dialog';
 import { ChatPage } from './pages/chat';
 
+/** Resolve 'system' to the actual theme based on OS preference (defaults to 'light'). */
+function resolveTheme(pref: 'dark' | 'light' | 'system'): 'dark' | 'light' {
+  if (pref !== 'system') return pref;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function applyTheme(resolved: 'dark' | 'light') {
+  if (resolved === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+}
+
 function App() {
-  const [theme, setTheme] = useStorageItem(themePreference, 'dark');
+  const [theme, setTheme] = useStorageItem(themePreference, 'system');
   const [themeReady, setThemeReady] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -22,12 +38,7 @@ function App() {
   // Load theme from storage before first render
   useEffect(() => {
     themePreference.getValue().then((val) => {
-      const t = val ?? 'dark';
-      if (t === 'light') {
-        document.documentElement.setAttribute('data-theme', 'light');
-      } else {
-        document.documentElement.removeAttribute('data-theme');
-      }
+      applyTheme(resolveTheme(val ?? 'system'));
       setThemeReady(true);
     });
   }, []);
@@ -35,15 +46,22 @@ function App() {
   // Sync theme changes after initial load
   useEffect(() => {
     if (!themeReady) return;
-    if (theme === 'light') {
-      document.documentElement.setAttribute('data-theme', 'light');
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-    }
+    applyTheme(resolveTheme(theme));
   }, [theme, themeReady]);
 
-  const toggleTheme = () =>
-    setTheme(theme === 'dark' ? 'light' : 'dark');
+  // Listen for OS theme changes when in 'system' mode
+  useEffect(() => {
+    if (theme !== 'system') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e: MediaQueryListEvent) => applyTheme(e.matches ? 'dark' : 'light');
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    const next = theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system';
+    setTheme(next);
+  };
 
   const handleNewChat = useCallback(() => {
     // If already on /chat/new, do nothing
@@ -75,6 +93,7 @@ function App() {
           theme={theme}
           onToggleTheme={toggleTheme}
           onOpenSettings={() => setSettingsOpen(true)}
+          onOpenCustomizations={() => showDialog('customizations', {})}
           onNewChat={handleNewChat}
           onOpenHistory={() => setHistoryOpen(true)}
         />
@@ -97,7 +116,8 @@ function App() {
           onDeleteSession={handleDeleteSession}
         />
 
-        <Toaster theme={theme === 'light' ? 'light' : 'dark'} />
+        <Toaster theme={resolveTheme(theme)} />
+        <DialogOutlet />
       </div>
     </TooltipProvider>
   );

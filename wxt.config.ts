@@ -1,5 +1,6 @@
 import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
+import path from 'node:path';
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
@@ -13,5 +14,13 @@ export default defineConfig({
   },
   vite: () => ({
     plugins: [tailwindcss()],
+    resolve: {
+      alias: {
+        // Replace isomorphic-textencoder with a shim that uses native
+        // TextEncoder/TextDecoder — the upstream package crashes in Chrome
+        // service worker strict mode (fast-text-encoding scope detection bug).
+        'isomorphic-textencoder': path.resolve(__dirname, 'lib/shims/isomorphic-textencoder.js'),
+      },
+    },
   }),
 });

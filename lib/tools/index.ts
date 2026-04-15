@@ -5,12 +5,22 @@ import { readPageTool } from './read-page';
 import { interactTool } from './interact';
 import { tabTool } from './tab';
 import { screenshotTool } from './screenshot';
+import { fsCreateFileTool } from './fs-create-file';
+import { fsEditFileTool } from './fs-edit-file';
+import { fsMkdirTool } from './fs-mkdir';
+import { fsRenameTool } from './fs-rename';
+import { fsDeleteTool } from './fs-delete';
+import { fsReadFileTool } from './fs-read-file';
+import { fsListTool } from './fs-list';
+import { fsSearchTool } from './fs-search';
 import { SessionToolContext } from './session-context';
 import { TOOL_ASK_USER } from '@/lib/types';
 
 /** Non-interactive tools shared by all sessions. */
 const sharedTools: AgentTool<any>[] = [
   executeJsTool, readPageTool, interactTool, tabTool, screenshotTool,
+  fsCreateFileTool, fsEditFileTool, fsMkdirTool, fsRenameTool, fsDeleteTool,
+  fsReadFileTool, fsListTool, fsSearchTool,
 ];
 
 /**

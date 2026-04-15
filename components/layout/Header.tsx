@@ -1,4 +1,4 @@
-import { Sun, Moon, Settings, SquarePen, History } from 'lucide-react';
+import { Sun, Moon, Monitor, Settings, SquarePen, History, Blocks } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -8,14 +8,15 @@ import {
 
 interface HeaderProps {
   title?: string;
-  theme: 'dark' | 'light';
+  theme: 'dark' | 'light' | 'system';
   onToggleTheme: () => void;
   onOpenSettings: () => void;
+  onOpenCustomizations: () => void;
   onNewChat: () => void;
   onOpenHistory: () => void;
 }
 
-export function Header({ title, theme, onToggleTheme, onOpenSettings, onNewChat, onOpenHistory }: HeaderProps) {
+export function Header({ title, theme, onToggleTheme, onOpenSettings, onOpenCustomizations, onNewChat, onOpenHistory }: HeaderProps) {
   return (
     <header className="flex items-center justify-between px-5 py-4 border-b border-border bg-background/80 backdrop-blur-xl z-10">
       <div className="flex items-center gap-2">
@@ -50,10 +51,23 @@ export function Header({ title, theme, onToggleTheme, onOpenSettings, onNewChat,
               size="icon-xs"
               onClick={onToggleTheme}
             >
-              {theme === 'dark' ? <Sun className="size-4.5" /> : <Moon className="size-4.5" />}
+              {theme === 'system' ? <Monitor className="size-4.5" /> : theme === 'dark' ? <Sun className="size-4.5" /> : <Moon className="size-4.5" />}
             </Button>
           </TooltipTrigger>
           <TooltipContent>切换主题</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={onOpenCustomizations}
+            >
+              <Blocks className="size-4.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>定制</TooltipContent>
         </Tooltip>
 
         <Tooltip>

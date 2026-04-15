@@ -325,6 +325,9 @@ export async function startElementPicker(): Promise<ElementAttachment | null> {
             attributes: msg.attributes,
             textContent: msg.textContent || undefined,
             rect: msg.rect,
+            tabId: sender.tab?.id,
+            tabUrl: sender.tab?.url,
+            windowId: sender.tab?.windowId,
             frameId: frameId || undefined,
             frameUrl: frameId ? (sender.url || undefined) : undefined,
           });
