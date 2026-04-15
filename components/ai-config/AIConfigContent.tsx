@@ -66,7 +66,11 @@ export function AIConfigContent({ panelWidthStorage, defaultPanelWidth = 240, cl
 
   const handleSave = useCallback(() => {
     if (tab === 'prompts') setPromptRefreshKey((k) => k + 1);
-    else setSkillRefreshKey((k) => k + 1);
+    else {
+      setSkillRefreshKey((k) => k + 1);
+      // Notify background to clear cached skill index
+      try { chrome.runtime.sendMessage({ type: 'invalidate_skill_index' }); } catch { /* ignore */ }
+    }
   }, [tab]);
 
   // ─── Drag handle ───

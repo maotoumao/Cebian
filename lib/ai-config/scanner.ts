@@ -30,7 +30,7 @@ export interface SkillMeta {
 
 // ─── Constants ───
 
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 // ─── Skill Index Cache ───
 
