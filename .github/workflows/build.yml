@@ -1,0 +1,77 @@
+name: Build and Upload Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      browser:
+        description: 'Target browser'
+        required: true
+        default: 'chrome'
+        type: choice
+        options:
+          - chrome
+          - firefox
+          - all
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        browser: ${{ fromJSON(github.event.inputs.browser == 'all' && '["chrome", "firefox"]' || format('["{0}"]', github.event.inputs.browser)) }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Create dev-seed stub for CI
+        run: |
+          # Create a stub for the dev-only seed file that is gitignored
+          echo 'export function seedDevStorage(): void {}' > entrypoints/background/dev-seed.ts
+
+      - name: Build extension
+        run: |
+          if [ "${{ matrix.browser }}" = "firefox" ]; then
+            pnpm build:firefox
+          else
+            pnpm build
+          fi
+
+      - name: Zip extension
+        run: |
+          if [ "${{ matrix.browser }}" = "firefox" ]; then
+            pnpm zip:firefox
+          else
+            pnpm zip
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cebian-${{ matrix.browser }}-build
+          path: .output/${{ matrix.browser == 'firefox' && 'firefox-mv2' || 'chrome-mv3' }}/
+          retention-days: 30
+
+      - name: Upload zip artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cebian-${{ matrix.browser }}-zip
+          path: .output/*-${{ matrix.browser }}.zip
+          retention-days: 30
