@@ -111,3 +111,8 @@ export const aiConfigDialogPanelWidth = storage.defineItem<number>(
   'local:aiConfigDialogPanelWidth',
   { fallback: 240 },
 );
+
+export const aiConfigPagePanelWidth = storage.defineItem<number>(
+  'local:aiConfigPagePanelWidth',
+  { fallback: 280 },
+);

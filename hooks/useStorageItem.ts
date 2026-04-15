@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-type WxtStorageItem<T> = {
+export type WxtStorageItem<T> = {
   getValue(): Promise<T>;
   setValue(value: T): Promise<void>;
   watch(cb: (newValue: T, oldValue: T) => void): () => void;
