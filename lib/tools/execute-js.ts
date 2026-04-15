@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_EXECUTE_JS } from '@/lib/types';
-import { getActiveTabId } from './chrome-api';
+import { getActiveTabId, executeViaDebugger } from './chrome-api';
 
 /** Sentinel value returned by the injected func when CSP blocks new Function(). */
 const CSP_BLOCKED = '__cebian_csp_blocked__';
@@ -23,43 +23,6 @@ const ExecuteJsParameters = Type.Object({
     }),
   ),
 });
-
-/**
- * Execute code via CDP Runtime.evaluate (debugger fallback).
- * Used when the page's CSP blocks new Function() / eval().
- */
-async function executeViaDebugger(tabId: number, code: string): Promise<string> {
-  const target = { tabId };
-  try {
-    await chrome.debugger.attach(target, '1.3');
-  } catch (e: any) {
-    // Already attached (e.g. by a previous call) — continue.
-    if (!e.message?.includes('Already attached')) throw e;
-  }
-
-  try {
-    // Wrap in async IIFE so `return` and `await` work inside user code.
-    const expression = `(async () => { ${code} })()`;
-    const result = await chrome.debugger.sendCommand(target, 'Runtime.evaluate', {
-      expression,
-      awaitPromise: true,
-      returnByValue: true,
-    }) as any;
-
-    if (result.exceptionDetails) {
-      const errMsg = result.exceptionDetails.exception?.description
-        ?? result.exceptionDetails.text
-        ?? 'Unknown error';
-      return `Error: ${errMsg}`;
-    }
-
-    const value = result.result?.value;
-    if (value === undefined) return '(no return value)';
-    return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-  } finally {
-    try { await chrome.debugger.detach(target); } catch { /* ignore */ }
-  }
-}
 
 export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
   name: TOOL_EXECUTE_JS,

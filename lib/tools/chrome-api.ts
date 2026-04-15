@@ -52,6 +52,43 @@ export async function executeInTabWithArgs<TArgs extends any[], T>(
   return results?.[0]?.result as T;
 }
 
+// ─── CDP debugger execution ───
+
+/**
+ * Execute code via CDP Runtime.evaluate (debugger).
+ * Used when page CSP blocks new Function() / eval(), or when direct CDP access is needed.
+ */
+export async function executeViaDebugger(tabId: number, code: string): Promise<string> {
+  const target = { tabId };
+  try {
+    await chrome.debugger.attach(target, '1.3');
+  } catch (e: any) {
+    if (!e.message?.includes('Already attached')) throw e;
+  }
+
+  try {
+    const expression = `(async () => { ${code} })()`;
+    const result = await chrome.debugger.sendCommand(target, 'Runtime.evaluate', {
+      expression,
+      awaitPromise: true,
+      returnByValue: true,
+    }) as any;
+
+    if (result.exceptionDetails) {
+      const errMsg = result.exceptionDetails.exception?.description
+        ?? result.exceptionDetails.text
+        ?? 'Unknown error';
+      return `Error: ${errMsg}`;
+    }
+
+    const value = result.result?.value;
+    if (value === undefined) return '(no return value)';
+    return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+  } finally {
+    try { await chrome.debugger.detach(target); } catch { /* ignore */ }
+  }
+}
+
 // ─── Navigation waiting ───
 
 /**

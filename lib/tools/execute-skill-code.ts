@@ -4,6 +4,7 @@ import { TOOL_EXECUTE_SKILL_CODE } from '@/lib/types';
 import { CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE } from '@/lib/constants';
 import { vfs, normalizePath } from '@/lib/vfs';
 import { parseFrontmatter } from '@/lib/ai-config/frontmatter';
+import { getActiveTabId, executeViaDebugger } from './chrome-api';
 
 // ─── Permission grant storage ───
 
@@ -58,10 +59,10 @@ function buildSandbox(permissions: string[], args: Record<string, unknown>): { k
   ];
 
   // Build a scoped chrome object with only declared namespaces
-  if (permissions.length > 0) {
+  const chromePerms = permissions.filter((p) => p.startsWith('chrome.'));
+  if (chromePerms.length > 0) {
     const chromeSubset: Record<string, unknown> = {};
-    for (const perm of permissions) {
-      // perm format: "chrome.bookmarks", "chrome.history", etc.
+    for (const perm of chromePerms) {
       const ns = perm.replace(/^chrome\./, '');
       if (ns && (chrome as any)[ns]) {
         chromeSubset[ns] = (chrome as any)[ns];
@@ -71,6 +72,15 @@ function buildSandbox(permissions: string[], args: Record<string, unknown>): { k
       keys.push('chrome');
       values.push(chromeSubset);
     }
+  }
+
+  // Inject executeInPage if page.executeJs permission is declared
+  if (permissions.includes('page.executeJs')) {
+    keys.push('executeInPage');
+    values.push(async (code: string): Promise<string> => {
+      const tabId = await getActiveTabId();
+      return executeViaDebugger(tabId, code);
+    });
   }
 
   return { keys, values };
@@ -103,6 +113,8 @@ export const executeSkillCodeTool: AgentTool<typeof ExecuteSkillCodeParameters> 
     'Execute a JavaScript file from a skill\'s scripts/ directory in the extension background context. ' +
     'The script runs with chrome.* APIs as declared in the skill\'s metadata.permissions. ' +
     'If the skill declares no permissions, only basic JS APIs (fetch, JSON, crypto, etc.) are available. ' +
+    'If the skill declares "page.executeJs" permission, an executeInPage(code) async function is available ' +
+    'to run JavaScript in the active browser tab via CDP and return the result. ' +
     'The script body runs as an async function — use `return` to produce a result. ' +
     'Arguments are accessible via the `args` variable. Returns JSON-serialized result.\n\n' +
     'PERMISSION FLOW: On first call, if the skill has not been granted permission, ' +
