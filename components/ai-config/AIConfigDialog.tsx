@@ -31,7 +31,7 @@ type Tab = 'prompts' | 'skills';
 const MIN_PANEL_WIDTH = 180;
 const MAX_PANEL_WIDTH = 480;
 
-const PROMPT_TEMPLATE = `---\nname: new-prompt\ndescription: ""\n---\n\n`;
+const PROMPT_TEMPLATE = `---\nname: new-prompt\ndescription: ""\n---\n\n(Write your prompt here)\n`;
 
 // ─── Component ───
 

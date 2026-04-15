@@ -8,7 +8,7 @@
  */
 import { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Tree, type NodeRendererProps, type NodeApi, type TreeApi } from 'react-arborist';
-import { ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileType, Trash2, FilePlus, FolderPlus, Pencil, Star } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileType, Trash2, FilePlus, FolderPlus, Pencil } from 'lucide-react';
 import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 } from '@/components/ui/context-menu';
@@ -100,7 +100,6 @@ function FileIcon({ name, className }: { name: string; className?: string }) {
 // ─── Custom node renderer ───
 
 function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeNodeData>) {
-  const isSkillMd = node.data.name === 'SKILL.md';
   const allowNewFolder = (tree.props as any).allowNewFolder ?? true;
   const createFileLabel: string = (tree.props as any).createFileLabel ?? '新建文件';
   const editStartRef = useRef<number>(0);
@@ -124,12 +123,6 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
         node.isDragging && 'opacity-40',
       )}
       onClick={handleClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Delete' && !node.isEditing) {
-          e.preventDefault();
-          tree.delete(node.id);
-        }
-      }}
       tabIndex={-1}
     >
       {/* Expand/collapse arrow for folders */}
@@ -186,10 +179,6 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
         <span className="truncate flex-1">{node.data.name}</span>
       )}
 
-      {/* SKILL.md star badge */}
-      {isSkillMd && !node.isEditing && (
-        <Star className="size-3 shrink-0 text-amber-500 fill-amber-500" />
-      )}
     </div>
   );
 
@@ -292,14 +281,16 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
 
   const resolveCreateParent = useCallback((explicitParent?: string): string => {
     if (explicitParent) return explicitParent;
-    if (!selectedFile) return root;
-    // Check if selectedFile is a directory in the tree
-    const node = treeRef.current?.get(selectedFile);
-    if (node?.isInternal) return selectedFile; // folder → create inside
-    // file → create in same directory (parent)
-    const lastSlash = selectedFile.lastIndexOf('/');
-    return lastSlash > 0 ? selectedFile.substring(0, lastSlash) : root;
-  }, [root, selectedFile]);
+    // Use react-arborist's focused node (tracks clicks on both files and folders)
+    const focused = treeRef.current?.focusedNode;
+    if (focused?.isInternal) return focused.id; // folder → create inside
+    if (focused?.isLeaf) {
+      // file → create in same directory (parent)
+      const lastSlash = focused.id.lastIndexOf('/');
+      return lastSlash > 0 ? focused.id.substring(0, lastSlash) : root;
+    }
+    return root;
+  }, [root]);
 
   // ─── VFS-first create helpers ───
 
@@ -334,10 +325,12 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
     const parent = resolveCreateParent();
     const name = await uniqueName(parent, 'new-skill');
     const fullPath = `${parent}/${name}`;
-    const template = `---\nname: ${name}\ndescription: "TODO — describe what this skill does and when to use it."\nmetadata:\n  matched-url: "*"\n---\n\n## Instructions\n\n(Write your skill instructions here)\n`;
+    const skillMd = `---\nname: ${name}\ndescription: "TODO - describe what this skill does and when to use it."\nmetadata:\n  matched-url: "*"\n  author: ""\n  version: "1.0"\n---\n\n## Instructions\n\n(Write your skill instructions here)\n`;
     try {
       await vfs.mkdir(fullPath, { recursive: true });
-      await vfs.writeFile(`${fullPath}/SKILL.md`, template);
+      await vfs.mkdir(`${fullPath}/scripts`, { recursive: true });
+      await vfs.mkdir(`${fullPath}/references`, { recursive: true });
+      await vfs.writeFile(`${fullPath}/SKILL.md`, skillMd);
       placeholdersRef.current.add(fullPath);
       await scan();
       setPendingEditId(fullPath);
@@ -437,7 +430,21 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
   const showEmptyOverlay = data.length === 0 && !pendingEditId;
 
   return (
-    <div ref={containerRef} className="h-full w-full relative">
+    <div
+      ref={containerRef}
+      className="h-full w-full relative"
+      onKeyDown={(e) => {
+        if (e.key === 'Delete') {
+          const tree = treeRef.current;
+          if (!tree || tree.isEditing) return;
+          const ids = Array.from(tree.selectedIds);
+          if (ids.length > 0) {
+            e.preventDefault();
+            tree.delete(ids);
+          }
+        }
+      }}
+    >
       <Tree<TreeNodeData>
         ref={treeRef}
         data={data}

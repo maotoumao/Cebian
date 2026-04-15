@@ -38,6 +38,9 @@ importers:
       '@isomorphic-git/lightning-fs':
         specifier: ^4.6.2
         version: 4.6.2
+      '@lezer/highlight':
+        specifier: ^1.2.3
+        version: 1.2.3
       '@mariozechner/pi-agent-core':
         specifier: ^0.66.1
         version: 0.66.1(@modelcontextprotocol/sdk@1.29.0(zod@4.3.6))(ws@8.20.0)(zod@4.3.6)
