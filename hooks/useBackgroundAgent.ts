@@ -55,15 +55,20 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
   const callbacksRef = useRef(callbacks);
   callbacksRef.current = callbacks;
 
-  // Connect to background on mount
+  // Connect to background on mount, with auto-reconnect on disconnect.
   useEffect(() => {
-    const port = chrome.runtime.connect({ name: AGENT_PORT_NAME });
-    portRef.current = port;
+    let unmounted = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryCount = 0;
+    const MAX_RETRY_DELAY = 30_000;
+    const BASE_DELAY = 500;
 
     const handleMessage = (msg: ServerMessage) => {
+      if (unmounted) return;
       switch (msg.type) {
         case 'connected':
-          setState(prev => ({ ...prev, connected: true }));
+          retryCount = 0;
+          setState(prev => ({ ...prev, connected: true, lastError: null }));
           break;
 
         case 'session_state':
@@ -161,16 +166,47 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
       }
     };
 
-    port.onMessage.addListener(handleMessage);
+    function scheduleRetry() {
+      if (unmounted) return;
+      const delay = Math.min(BASE_DELAY * 2 ** retryCount, MAX_RETRY_DELAY);
+      retryCount++;
+      if (retryCount === 5) {
+        setState(prev => ({
+          ...prev,
+          lastError: 'Service Worker 连接失败，正在重试…',
+        }));
+      }
+      retryTimer = setTimeout(connect, delay);
+    }
 
-    port.onDisconnect.addListener(() => {
-      setState(prev => ({ ...prev, connected: false }));
-      portRef.current = null;
-    });
+    function connect() {
+      if (unmounted) return;
+
+      let port: chrome.runtime.Port;
+      try {
+        port = chrome.runtime.connect({ name: AGENT_PORT_NAME });
+      } catch {
+        scheduleRetry();
+        return;
+      }
+      portRef.current = port;
+
+      port.onMessage.addListener(handleMessage);
+
+      port.onDisconnect.addListener(() => {
+        if (unmounted) return;
+        portRef.current = null;
+        setState(prev => ({ ...prev, connected: false }));
+        scheduleRetry();
+      });
+    }
+
+    connect();
 
     return () => {
-      port.onMessage.removeListener(handleMessage);
-      port.disconnect();
+      unmounted = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      portRef.current?.disconnect();
       portRef.current = null;
     };
   }, []);
