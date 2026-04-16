@@ -1,5 +1,5 @@
 import type { ElementAttachment } from './attachments';
-import { getActiveTabId } from './tools/chrome-api';
+import { getActiveTabId } from '@/lib/tab-helpers';
 
 // ─── Injected picker script (self-contained, runs in content-script isolated world) ───
 // IMPORTANT: This function must be fully self-contained — no closures over external variables.
