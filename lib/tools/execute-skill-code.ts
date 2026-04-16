@@ -1,6 +1,6 @@
 import { Type } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
-import { TOOL_EXECUTE_SKILL_CODE } from '@/lib/types';
+import { TOOL_RUN_SKILL } from '@/lib/types';
 import { CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE } from '@/lib/constants';
 import { vfs, normalizePath } from '@/lib/vfs';
 import { parseFrontmatter } from '@/lib/ai-config/frontmatter';
@@ -110,8 +110,8 @@ const ExecuteSkillCodeParameters = Type.Object({
 });
 
 export const executeSkillCodeTool: AgentTool<typeof ExecuteSkillCodeParameters> = {
-  name: TOOL_EXECUTE_SKILL_CODE,
-  label: 'Execute Skill Code',
+  name: TOOL_RUN_SKILL,
+  label: 'Run Skill',
   description:
     'Execute a JavaScript file from a skill\'s scripts/ directory in the extension background context. ' +
     'The script runs with chrome.* APIs as declared in the skill\'s metadata.permissions. ' +
@@ -241,7 +241,7 @@ export const executeSkillCodeTool: AgentTool<typeof ExecuteSkillCodeParameters> 
                 `Requested permissions:\n${permList}\n\n` +
                 `confirmation_nonce: ${nonce}\n\n` +
                 `Use ask_user to ask the user for confirmation with options: "拒绝", "本次允许", "始终允许此技能". ` +
-                `If approved, call execute_skill_code again with the same skill/script/args plus confirmation_nonce="${nonce}". ` +
+                `If approved, call run_skill again with the same skill/script/args plus confirmation_nonce="${nonce}". ` +
                 `If "always allow", also set always_allow=true. If denied, do not call again.`,
             }],
             details: { status: 'permission_required' },
