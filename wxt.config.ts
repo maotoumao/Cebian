@@ -19,6 +19,10 @@ export default defineConfig({
   },
   vite: () => ({
     plugins: [tailwindcss()],
+    server: {
+      // Sandbox pages have origin: null — allow CORS from any origin in dev mode
+      cors: true,
+    },
     resolve: {
       alias: {
         // Replace isomorphic-textencoder with a shim that uses native
