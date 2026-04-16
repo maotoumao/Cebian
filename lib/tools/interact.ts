@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_INTERACT } from '@/lib/types';
-import { resolveTabId, executeInTabWithArgs, waitForNavigation } from './chrome-api';
+import { resolveTabId, executeInTabWithArgs, waitForNavigation } from '@/lib/tab-helpers';
 
 // ─── Shared field schemas (reused by top-level params and sequence steps) ───
 

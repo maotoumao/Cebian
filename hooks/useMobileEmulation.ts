@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
-import { getActiveTabId } from '@/lib/tools/chrome-api';
+import { getActiveTabId } from '@/lib/tab-helpers';
 import { attachEmulation, detachEmulation } from '@/lib/mobile-emulation';
 
 export function useMobileEmulation() {

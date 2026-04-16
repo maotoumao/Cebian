@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_TAB } from '@/lib/types';
-import { resolveTabId } from './chrome-api';
+import { resolveTabId } from '@/lib/tab-helpers';
 
 // ─── Parameters: single flat object (OpenAI requires top-level "type": "object") ───
 

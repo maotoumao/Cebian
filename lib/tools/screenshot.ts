@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_SCREENSHOT } from '@/lib/types';
-import { getActiveTabId, resolveTabId, executeInTabWithArgs } from './chrome-api';
+import { getActiveTabId, resolveTabId, executeInTabWithArgs } from '@/lib/tab-helpers';
 import { ensureOffscreen } from './offscreen';
 import type { OffscreenRequest, OffscreenResponse } from '@/entrypoints/offscreen/main';
 

@@ -5,7 +5,7 @@
  */
 
 import { ensureOffscreen } from './offscreen';
-import { resolveTabId, executeViaDebugger } from './chrome-api';
+import { resolveTabId, executeViaDebugger } from '@/lib/tab-helpers';
 import { isChromeCallAllowed } from './chrome-api-whitelist';
 
 // ─── Pending run requests ───

@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_EXECUTE_JS } from '@/lib/types';
-import { resolveTabId, executeViaDebugger } from './chrome-api';
+import { resolveTabId, executeViaDebugger } from '@/lib/tab-helpers';
 
 /** Sentinel value returned by the injected func when CSP blocks new Function(). */
 const CSP_BLOCKED = '__cebian_csp_blocked__';
