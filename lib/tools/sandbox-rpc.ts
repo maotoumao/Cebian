@@ -6,45 +6,7 @@
 
 import { ensureOffscreen } from './offscreen';
 import { resolveTabId, executeViaDebugger } from './chrome-api';
-
-// ─── Chrome API whitelist (shared with chrome-api-tool.ts ALLOWED_APIS) ───
-
-const SANDBOX_CHROME_WHITELIST = new Set([
-  // tabs
-  'tabs.query', 'tabs.get', 'tabs.create', 'tabs.update', 'tabs.remove', 'tabs.reload',
-  'tabs.captureVisibleTab', 'tabs.duplicate', 'tabs.move', 'tabs.group', 'tabs.ungroup',
-  // windows
-  'windows.getAll', 'windows.get', 'windows.create', 'windows.update', 'windows.remove',
-  'windows.getCurrent', 'windows.getLastFocused',
-  // alarms
-  'alarms.get', 'alarms.getAll', 'alarms.create', 'alarms.clear', 'alarms.clearAll',
-  // webNavigation
-  'webNavigation.getFrame', 'webNavigation.getAllFrames',
-  // bookmarks
-  'bookmarks.getTree', 'bookmarks.getChildren', 'bookmarks.get', 'bookmarks.search',
-  'bookmarks.create', 'bookmarks.update', 'bookmarks.remove', 'bookmarks.move',
-  // history
-  'history.search', 'history.getVisits', 'history.addUrl', 'history.deleteUrl', 'history.deleteRange',
-  // cookies
-  'cookies.get', 'cookies.getAll', 'cookies.set', 'cookies.remove', 'cookies.getAllCookieStores',
-  // topSites
-  'topSites.get',
-  // sessions
-  'sessions.getRecentlyClosed', 'sessions.getDevices', 'sessions.restore',
-  // downloads
-  'downloads.search', 'downloads.pause', 'downloads.resume', 'downloads.cancel', 'downloads.download',
-  // notifications
-  'notifications.create', 'notifications.update', 'notifications.clear',
-  'notifications.getAll', 'notifications.getPermissionLevel',
-  // debugger (for executeInPage)
-  'debugger.attach', 'debugger.detach', 'debugger.sendCommand',
-  // scripting
-  'scripting.executeScript',
-]);
-
-function isChromeCallAllowed(namespace: string, method: string): boolean {
-  return SANDBOX_CHROME_WHITELIST.has(`${namespace}.${method}`);
-}
+import { isChromeCallAllowed } from './chrome-api-whitelist';
 
 // ─── Pending run requests ───
 

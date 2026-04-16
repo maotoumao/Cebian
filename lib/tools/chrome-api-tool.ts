@@ -1,44 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_CHROME_API } from '@/lib/types';
-
-// ─── Whitelist: allowed chrome.* API calls ───
-// Only APIs whose permission is declared in manifest are included.
-// To add new namespaces, also add the permission in wxt.config.ts.
-
-const ALLOWED_APIS: Record<string, Set<string>> = {
-  tabs: new Set([
-    'query', 'get', 'create', 'update', 'remove', 'reload',
-    'captureVisibleTab', 'duplicate', 'move', 'group', 'ungroup',
-  ]),
-  windows: new Set([
-    'getAll', 'get', 'create', 'update', 'remove',
-    'getCurrent', 'getLastFocused',
-  ]),
-  alarms: new Set(['get', 'getAll', 'create', 'clear', 'clearAll']),
-  webNavigation: new Set(['getFrame', 'getAllFrames']),
-  bookmarks: new Set(['getTree', 'getChildren', 'get', 'search', 'create', 'update', 'remove', 'move']),
-  history: new Set(['search', 'getVisits', 'addUrl', 'deleteUrl', 'deleteRange']),
-  cookies: new Set(['get', 'getAll', 'set', 'remove', 'getAllCookieStores']),
-  topSites: new Set(['get']),
-  sessions: new Set(['getRecentlyClosed', 'getDevices', 'restore']),
-  downloads: new Set(['search', 'pause', 'resume', 'cancel', 'download']),
-  notifications: new Set(['create', 'update', 'clear', 'getAll', 'getPermissionLevel']),
-};
-
-/** Parts that must never appear in method paths (prototype pollution guard) */
-const FORBIDDEN_PATH_PARTS = new Set(['__proto__', 'constructor', 'prototype']);
-
-function isAllowed(namespace: string, method: string): boolean {
-  // Block prototype pollution attempts
-  const parts = method.split('.');
-  if (parts.some(p => FORBIDDEN_PATH_PARTS.has(p))) return false;
-
-  // Flat method names only (no dots)
-  if (method.includes('.')) return false;
-
-  return ALLOWED_APIS[namespace]?.has(method) ?? false;
-}
+import { CHROME_API_WHITELIST, isChromeCallAllowed } from './chrome-api-whitelist';
 
 // ─── API documentation for help mode ───
 
@@ -463,8 +426,8 @@ export const chromeApiTool: AgentTool<typeof ChromeApiParameters> = {
     }
 
     // Validate against whitelist
-    if (!isAllowed(namespace, method)) {
-      const supported = Object.keys(ALLOWED_APIS).join(', ');
+    if (!isChromeCallAllowed(namespace, method)) {
+      const supported = Object.keys(CHROME_API_WHITELIST).join(', ');
       return {
         content: [{
           type: 'text',

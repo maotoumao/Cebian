@@ -13,7 +13,7 @@ import { fsDeleteTool } from './fs-delete';
 import { fsReadFileTool } from './fs-read-file';
 import { fsListTool } from './fs-list';
 import { fsSearchTool } from './fs-search';
-import { executeSkillCodeTool } from './execute-skill-code';
+import { runSkillTool } from './run-skill';
 import { chromeApiTool } from './chrome-api-tool';
 import { SessionToolContext } from './session-context';
 import { TOOL_ASK_USER } from '@/lib/types';
@@ -23,7 +23,7 @@ const sharedTools: AgentTool<any>[] = [
   executeJsTool, readPageTool, interactTool, tabTool, screenshotTool,
   fsCreateFileTool, fsEditFileTool, fsMkdirTool, fsRenameTool, fsDeleteTool,
   fsReadFileTool, fsListTool, fsSearchTool,
-  executeSkillCodeTool,
+  runSkillTool,
   chromeApiTool,
 ];
 

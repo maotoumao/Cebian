@@ -42,7 +42,7 @@ function permissionsMatch(stored: string[], current: string[]): boolean {
 
 // ─── Tool definition ───
 
-const ExecuteSkillCodeParameters = Type.Object({
+const RunSkillParameters = Type.Object({
   skill: Type.String({
     description: 'Skill folder name (e.g. "web-summary"). Must match a directory under ~/.cebian/skills/.',
   }),
@@ -63,7 +63,7 @@ const ExecuteSkillCodeParameters = Type.Object({
   })),
 });
 
-export const executeSkillCodeTool: AgentTool<typeof ExecuteSkillCodeParameters> = {
+export const runSkillTool: AgentTool<typeof RunSkillParameters> = {
   name: TOOL_RUN_SKILL,
   label: 'Run Skill',
   description:
@@ -79,7 +79,7 @@ export const executeSkillCodeTool: AgentTool<typeof ExecuteSkillCodeParameters> 
     'to the user with options: "拒绝", "本次允许", "始终允许此技能". ' +
     'If the user approves, call this tool again with the same parameters plus the confirmation_nonce. ' +
     'If "always allow", also set always_allow=true. If the user denies, do not call this tool again.',
-  parameters: ExecuteSkillCodeParameters,
+  parameters: RunSkillParameters,
 
   async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
     signal?.throwIfAborted();
