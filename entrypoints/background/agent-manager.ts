@@ -79,14 +79,37 @@ type BroadcastFn = (sessionId: string, msg: ServerMessage) => void;
 
 // ─── Agent Manager ───
 
+// Service Worker keepalive interval (25 s) — resets Chrome's 30 s idle timer.
+// Reference: https://developer.chrome.com/docs/extensions/develop/migrate/to-service-workers#keep-sw-alive
+// Since Chrome 110, any extension API call resets the idle timer.
+const SW_KEEPALIVE_INTERVAL_MS = 25_000;
+
 class AgentManager {
   private sessions = new Map<string, ManagedSession>();
   /** Guards against concurrent getOrCreateAgent calls for the same session. */
   private creating = new Map<string, Promise<ManagedSession>>();
   private broadcast: BroadcastFn = () => {};
+  /** Periodic timer that calls a trivial Chrome API to prevent SW termination while agents run. */
+  private keepAliveTimer: number | null = null;
 
   setBroadcast(fn: BroadcastFn): void {
     this.broadcast = fn;
+  }
+
+  /**
+   * Start or stop the SW keepalive timer based on whether any session is running.
+   * Uses chrome.runtime.getPlatformInfo — a no-op read-only API — to reset
+   * Chrome's 30 s idle shutdown timer every 25 s.
+   * Ref: https://developer.chrome.com/docs/extensions/develop/migrate/to-service-workers#keep-sw-alive
+   */
+  private updateKeepAlive(): void {
+    const hasRunning = [...this.sessions.values()].some(s => s.isRunning);
+    if (hasRunning && !this.keepAliveTimer) {
+      this.keepAliveTimer = setInterval(chrome.runtime.getPlatformInfo, SW_KEEPALIVE_INTERVAL_MS) as unknown as number;
+    } else if (!hasRunning && this.keepAliveTimer) {
+      clearInterval(this.keepAliveTimer);
+      this.keepAliveTimer = null;
+    }
   }
 
   private async resolveModelObj(): Promise<{ model: Model<Api>; provider: string; modelId: string } | null> {
@@ -220,6 +243,7 @@ class AgentManager {
       case 'agent_start':
         managed.isRunning = true;
         this.broadcast(sessionId, { type: 'agent_start', sessionId });
+        this.updateKeepAlive();
         break;
 
       case 'message_update':
@@ -243,6 +267,7 @@ class AgentManager {
 
       case 'agent_end': {
         managed.isRunning = false;
+        this.updateKeepAlive();
         // Cancel any pending interactive tools on this session
         managed.toolCtx.cancelAll();
         const messages = [...agent.state.messages];
@@ -299,7 +324,9 @@ class AgentManager {
         const wasCreated = managed.sessionCreated;
         managed.unsubscribeAgent();
         managed.unsubscribeToolCtx();
+        managed.toolCtx.dispose();
         this.sessions.delete(sessionId);
+        this.updateKeepAlive();
         managed = await this.getOrCreateAgent(sessionId, currentMessages);
         managed.sessionCreated = wasCreated;
       }
@@ -334,6 +361,7 @@ class AgentManager {
       managed.unsubscribeAgent();
       managed.toolCtx.dispose();
       this.sessions.delete(sessionId);
+      this.updateKeepAlive();
       // Ensure client knows the agent stopped (abort may not fire agent_end)
       this.broadcast(sessionId, {
         type: 'agent_end',
@@ -375,6 +403,7 @@ class AgentManager {
       managed.toolCtx.dispose();
       managed.agent.abort();
       this.sessions.delete(sessionId);
+      this.updateKeepAlive();
     }
   }
 }
