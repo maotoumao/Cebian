@@ -52,6 +52,12 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
 
   const { messages, isAgentRunning, sessionId: activeSessionId, sessionTitle, lastError } = state;
 
+  // When an interactive tool (e.g. ask_user) is pending, the agent is blocked
+  // waiting for user input — treat as "not running" so the input is usable.
+  // Sending a message during this state triggers steer + cancelAll in the
+  // background agent manager automatically.
+  const effectiveRunning = isAgentRunning && pendingTools.size === 0;
+
   // Subscribe to existing session or unsubscribe for new chat
   useEffect(() => {
     if (isNewChat) {
@@ -81,7 +87,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
 
   const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
-  const showWaitingPlaceholder = isAgentRunning && lastMsg && 'role' in lastMsg && lastMsg.role === 'user';
+  const showWaitingPlaceholder = effectiveRunning && lastMsg && 'role' in lastMsg && lastMsg.role === 'user';
 
   // Session loading state: we're loading if a session route is targeted but no messages or state yet
   const sessionLoading = !isNewChat && routeSessionId !== activeSessionId && messages.length === 0;
@@ -111,7 +117,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
               const text = getAssistantText(assistantMsg);
               const toolCalls = getToolCalls(assistantMsg);
               const isLast = idx === messages.length - 1;
-              const isStreaming = isLast && isAgentRunning;
+              const isStreaming = isLast && effectiveRunning;
               const isError = assistantMsg.stopReason === 'error';
 
               // Show header only for the first assistant message in a consecutive group
@@ -243,7 +249,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
         </div>
       </ScrollArea>
 
-      <ChatInput onSend={send} onCancel={cancel} isAgentRunning={isAgentRunning} onOpenSettings={onOpenSettings} />
+      <ChatInput onSend={send} onCancel={cancel} isAgentRunning={effectiveRunning} onOpenSettings={onOpenSettings} />
     </>
   );
 }

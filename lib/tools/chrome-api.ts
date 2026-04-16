@@ -17,6 +17,14 @@ export async function getActiveTabId(): Promise<number> {
   return tab.id;
 }
 
+/**
+ * Resolve a tab ID: use the provided tabId if given, otherwise fall back to the active tab.
+ */
+export async function resolveTabId(tabId?: number): Promise<number> {
+  if (tabId != null) return tabId;
+  return getActiveTabId();
+}
+
 // ─── Script execution wrappers ───
 
 /**

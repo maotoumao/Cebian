@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_TAB } from '@/lib/types';
-import { getActiveTabId } from './chrome-api';
+import { resolveTabId } from './chrome-api';
 
 // ─── Parameters: single flat object (OpenAI requires top-level "type": "object") ───
 
@@ -29,7 +29,7 @@ export const tabTool: AgentTool<typeof TabParameters> = {
   description:
     'Manage browser tabs: open a new tab (http/https only, optionally in a specific window via windowId), ' +
     'close a tab, switch to a tab, reload, ' +
-    'or list all frames (including iframes) in the active tab. ' +
+    'or list all frames (including iframes) in a tab (defaults to active tab). ' +
     'Use the tab list from the context block to find tab IDs and window IDs.',
   parameters: TabParameters,
 
@@ -108,7 +108,7 @@ export const tabTool: AgentTool<typeof TabParameters> = {
         }
 
         case 'list_frames': {
-          const tabId = await getActiveTabId();
+          const tabId = await resolveTabId(params.tabId);
           const results = await (chrome.scripting.executeScript as any)({
             target: { tabId, allFrames: true },
             func: () => ({

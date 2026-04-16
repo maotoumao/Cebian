@@ -73,6 +73,8 @@ VFS directory layout:
 - ~/.cebian/prompts/ — global prompt templates.
 - ~ resolves to /home/user.
 
+VFS Browser: Users can view files in the VFS browser at {{VFS_BASE_URL}}#<absolute-path>. After creating or editing a file, include a clickable Markdown link so the user can view it, e.g. [查看文件]({{VFS_BASE_URL}}#/workspaces/abc/report.md). For directories use the same pattern, e.g. [打开目录]({{VFS_BASE_URL}}#/workspaces/abc).
+
 USER MESSAGE STRUCTURE:
 Each user message is wrapped in structured XML blocks:
 - <agent-config>: session-dynamic configuration (skills, instructions — may be empty).

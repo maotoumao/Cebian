@@ -4,7 +4,7 @@ import { TOOL_EXECUTE_SKILL_CODE } from '@/lib/types';
 import { CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE } from '@/lib/constants';
 import { vfs, normalizePath } from '@/lib/vfs';
 import { parseFrontmatter } from '@/lib/ai-config/frontmatter';
-import { getActiveTabId, executeViaDebugger } from './chrome-api';
+import { resolveTabId, executeViaDebugger } from './chrome-api';
 
 // ─── Permission grant storage ───
 
@@ -49,7 +49,7 @@ const BASE_SANDBOX_KEYS = [
   'args',
 ];
 
-function buildSandbox(permissions: string[], args: Record<string, unknown>): { keys: string[]; values: unknown[] } {
+function buildSandbox(permissions: string[], args: Record<string, unknown>, tabId?: number): { keys: string[]; values: unknown[] } {
   const keys = [...BASE_SANDBOX_KEYS];
   const values: unknown[] = [
     fetch, JSON, console, crypto,
@@ -78,8 +78,8 @@ function buildSandbox(permissions: string[], args: Record<string, unknown>): { k
   if (permissions.includes('page.executeJs')) {
     keys.push('executeInPage');
     values.push(async (code: string): Promise<string> => {
-      const tabId = await getActiveTabId();
-      return executeViaDebugger(tabId, code);
+      const resolved = await resolveTabId(tabId);
+      return executeViaDebugger(resolved, code);
     });
   }
 
@@ -98,6 +98,9 @@ const ExecuteSkillCodeParameters = Type.Object({
   args: Type.Optional(Type.Record(Type.String(), Type.Unknown(), {
     description: 'Arguments passed to the script, accessible via the `args` variable.',
   })),
+  tabId: Type.Optional(Type.Number({
+    description: 'Tab ID for page.executeJs context. Omit to use the active tab. Get tab IDs from the context block.',
+  })),
   confirmation_nonce: Type.Optional(Type.String({
     description: 'Nonce returned by a previous permission_required response. Include after user confirms via ask_user.',
   })),
@@ -114,7 +117,7 @@ export const executeSkillCodeTool: AgentTool<typeof ExecuteSkillCodeParameters> 
     'The script runs with chrome.* APIs as declared in the skill\'s metadata.permissions. ' +
     'If the skill declares no permissions, only basic JS APIs (fetch, JSON, crypto, etc.) are available. ' +
     'If the skill declares "page.executeJs" permission, an executeInPage(code) async function is available ' +
-    'to run JavaScript in the active browser tab via CDP and return the result. ' +
+    'to run JavaScript in a browser tab via CDP and return the result. ' +
     'The script body runs as an async function — use `return` to produce a result. ' +
     'Arguments are accessible via the `args` variable. Returns JSON-serialized result.\n\n' +
     'PERMISSION FLOW: On first call, if the skill has not been granted permission, ' +
@@ -127,7 +130,7 @@ export const executeSkillCodeTool: AgentTool<typeof ExecuteSkillCodeParameters> 
   async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
     signal?.throwIfAborted();
 
-    const { skill, script, args = {}, confirmation_nonce, always_allow = false } = params;
+    const { skill, script, args = {}, tabId, confirmation_nonce, always_allow = false } = params;
 
     // ─── Path traversal protection ───
 
@@ -254,7 +257,7 @@ export const executeSkillCodeTool: AgentTool<typeof ExecuteSkillCodeParameters> 
     // Fallback: execute in a sandboxed page via postMessage.
 
     try {
-      const { keys, values } = buildSandbox(permissions, args as Record<string, unknown>);
+      const { keys, values } = buildSandbox(permissions, args as Record<string, unknown>, tabId);
       const fn = new Function(...keys, `return (async () => { ${code} })()`);
       const result = await fn(...values);
       const serialized = result !== undefined ? JSON.stringify(result, null, 2) : '(no return value)';

@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_INTERACT } from '@/lib/types';
-import { getActiveTabId, executeInTabWithArgs, waitForNavigation } from './chrome-api';
+import { resolveTabId, executeInTabWithArgs, waitForNavigation } from './chrome-api';
 
 // ─── Shared field schemas (reused by top-level params and sequence steps) ───
 
@@ -75,6 +75,9 @@ const InteractParameters = Type.Object({
   })),
   frameId: Type.Optional(Type.Number({
     description: 'Frame ID to interact with. Omit for top frame. Use tab({ action: "list_frames" }) to discover IDs.',
+  })),
+  tabId: Type.Optional(Type.Number({
+    description: 'Tab ID to interact with. Omit to use the active tab. Get tab IDs from the context block.',
   })),
   steps: Type.Optional(Type.Array(
     Type.Object({
@@ -410,7 +413,7 @@ export const interactTool: AgentTool<typeof InteractParameters> = {
   name: TOOL_INTERACT,
   label: 'Interact',
   description:
-    'Simulate user interactions on the active page. ' +
+    'Simulate user interactions on a browser tab (defaults to the active tab). ' +
     'Actions: click, dblclick, rightclick, hover (target by CSS selector or x/y coordinates), ' +
     'type (text input), clear, select (dropdown), scroll (page or element via selector), keypress, ' +
     'wait (element appears), wait_hidden (element disappears), ' +
@@ -424,7 +427,7 @@ export const interactTool: AgentTool<typeof InteractParameters> = {
 
   async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
     signal?.throwIfAborted();
-    const tabId = await getActiveTabId();
+    const tabId = await resolveTabId(params.tabId);
 
     // wait_navigation runs in extension context (not in-page)
     if (params.action === 'wait_navigation') {

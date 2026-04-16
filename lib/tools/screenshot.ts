@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_SCREENSHOT } from '@/lib/types';
-import { getActiveTabId, executeInTabWithArgs } from './chrome-api';
+import { getActiveTabId, resolveTabId, executeInTabWithArgs } from './chrome-api';
 import { ensureOffscreen } from './offscreen';
 import type { OffscreenRequest, OffscreenResponse } from '@/entrypoints/offscreen/main';
 
@@ -28,6 +28,14 @@ const ScreenshotParameters = Type.Object({
       height: Type.Number({ description: 'Region height (px).' }),
     }, {
       description: 'Viewport region to capture (pixels). Ignored if selector is provided.',
+    }),
+  ),
+  tabId: Type.Optional(
+    Type.Number({
+      description:
+        'Tab ID to capture. Omit to use the active tab. ' +
+        'If the tab is not visible, it will be temporarily activated for the screenshot. ' +
+        'Get tab IDs from the context block.',
     }),
   ),
 });
@@ -74,7 +82,7 @@ export const screenshotTool: AgentTool<typeof ScreenshotParameters> = {
   name: TOOL_SCREENSHOT,
   label: 'Screenshot',
   description:
-    'Capture a screenshot of the active tab. ' +
+    'Capture a screenshot of a browser tab (defaults to the active tab). ' +
     'By default captures the full visible area. ' +
     'To capture a specific element, provide its CSS selector — the element is scrolled into view and cropped automatically. ' +
     'To capture a viewport sub-area, provide a clip region {x, y, width, height}. ' +
@@ -84,49 +92,65 @@ export const screenshotTool: AgentTool<typeof ScreenshotParameters> = {
   async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
     signal?.throwIfAborted();
     const quality = params.quality ?? 80;
+    const tabId = await resolveTabId(params.tabId);
 
-    // Determine crop region
-    let crop: { x: number; y: number; width: number; height: number; dpr: number } | null = null;
+    // If the target tab is not active, temporarily switch for captureVisibleTab
+    let previousTabId: number | undefined;
+    const activeTabId = await getActiveTabId();
+    if (tabId !== activeTabId) {
+      previousTabId = activeTabId;
+      await chrome.tabs.update(tabId, { active: true });
+      // Wait for the tab to render
+      await new Promise(r => setTimeout(r, 300));
+    }
 
-    if (params.selector) {
-      const tabId = await getActiveTabId();
-      const rect = await executeInTabWithArgs(tabId, getElementRect, [params.selector]);
-      if (!rect) {
+    try {
+      // Determine crop region
+      let crop: { x: number; y: number; width: number; height: number; dpr: number } | null = null;
+
+      if (params.selector) {
+        const rect = await executeInTabWithArgs(tabId, getElementRect, [params.selector]);
+        if (!rect) {
+          return {
+            content: [{ type: 'text', text: `Error: element not found: ${params.selector}` }],
+            details: { status: 'error' },
+          };
+        }
+        crop = rect;
+      } else if (params.clip) {
+        const dpr = await executeInTabWithArgs(tabId, () => window.devicePixelRatio ?? 1, []);
+        crop = { ...params.clip, dpr };
+      }
+
+      // Validate crop dimensions
+      if (crop && (crop.width <= 0 || crop.height <= 0)) {
         return {
-          content: [{ type: 'text', text: `Error: element not found: ${params.selector}` }],
+          content: [{ type: 'text', text: 'Error: crop region has zero or negative dimensions.' }],
           details: { status: 'error' },
         };
       }
-      crop = rect;
-    } else if (params.clip) {
-      const tabId = await getActiveTabId();
-      const dpr = await executeInTabWithArgs(tabId, () => window.devicePixelRatio ?? 1, []);
-      crop = { ...params.clip, dpr };
-    }
 
-    // Validate crop dimensions
-    if (crop && (crop.width <= 0 || crop.height <= 0)) {
+      // Capture full visible tab
+      const dataUrl = await chrome.tabs.captureVisibleTab({ format: 'jpeg', quality });
+      const base64 = dataUrl.replace(/^data:image\/jpeg;base64,/, '');
+
+      // Crop if needed
+      let finalBase64 = base64;
+      if (crop) {
+        finalBase64 = await cropViaOffscreen(base64, crop);
+      }
+
       return {
-        content: [{ type: 'text', text: 'Error: crop region has zero or negative dimensions.' }],
-        details: { status: 'error' },
+        content: [
+          { type: 'image', data: finalBase64, mimeType: 'image/jpeg' },
+        ],
+        details: { status: 'done' },
       };
+    } finally {
+      // Restore the previous tab if we swapped
+      if (previousTabId != null) {
+        try { await chrome.tabs.update(previousTabId, { active: true }); } catch { /* tab may have been closed */ }
+      }
     }
-
-    // Capture full visible tab
-    const dataUrl = await chrome.tabs.captureVisibleTab({ format: 'jpeg', quality });
-    const base64 = dataUrl.replace(/^data:image\/jpeg;base64,/, '');
-
-    // Crop if needed
-    let finalBase64 = base64;
-    if (crop) {
-      finalBase64 = await cropViaOffscreen(base64, crop);
-    }
-
-    return {
-      content: [
-        { type: 'image', data: finalBase64, mimeType: 'image/jpeg' },
-      ],
-      details: { status: 'done' },
-    };
   },
 };

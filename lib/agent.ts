@@ -26,7 +26,9 @@ export function createCebianAgent(options: CreateAgentOptions): Agent {
     tools: agentTools,
   } = options;
 
-  const effectivePrompt = systemPrompt.trim() || DEFAULT_SYSTEM_PROMPT;
+  const vfsBaseUrl = chrome.runtime.getURL('vfs.html');
+  const effectivePrompt = (systemPrompt.trim() || DEFAULT_SYSTEM_PROMPT)
+    .replaceAll('{{VFS_BASE_URL}}', vfsBaseUrl);
 
   const agentOptions: AgentOptions = {
     initialState: {

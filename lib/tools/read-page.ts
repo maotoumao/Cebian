@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_READ_PAGE } from '@/lib/types';
-import { getActiveTabId, executeInTabWithArgs } from './chrome-api';
+import { resolveTabId, executeInTabWithArgs } from './chrome-api';
 import { ensureOffscreen } from './offscreen';
 import type { OffscreenRequest, OffscreenResponse } from '@/entrypoints/offscreen/main';
 
@@ -42,6 +42,13 @@ const ReadPageParameters = Type.Object({
       description:
         'Frame ID to read from. Omit or 0 for the top frame. ' +
         'Use tab({ action: "list_frames" }) to discover frame IDs.',
+    }),
+  ),
+  tabId: Type.Optional(
+    Type.Number({
+      description:
+        'Tab ID to read from. Omit to use the active tab. ' +
+        'Get tab IDs from the context block.',
     }),
   ),
 });
@@ -514,7 +521,7 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
   name: TOOL_READ_PAGE,
   label: 'Read Page',
   description:
-    'Extract content from the current page. ' +
+    'Extract content from a browser tab (defaults to the active tab). ' +
     'Modes: "markdown" (default, full-page as markdown — works for any page), ' +
     '"article" (reader-mode extraction as markdown — for news/blogs/docs), ' +
     '"outline" (page structure overview — visual regions with selectors, positions, interactive elements; use to understand layout before acting), ' +
@@ -525,7 +532,7 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
 
   async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
     signal?.throwIfAborted();
-    const tabId = await getActiveTabId();
+    const tabId = await resolveTabId(params.tabId);
     const mode = params.mode ?? 'markdown';
     const maxLength = params.maxLength ?? 20000;
 

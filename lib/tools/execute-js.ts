@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_EXECUTE_JS } from '@/lib/types';
-import { getActiveTabId, executeViaDebugger } from './chrome-api';
+import { resolveTabId, executeViaDebugger } from './chrome-api';
 
 /** Sentinel value returned by the injected func when CSP blocks new Function(). */
 const CSP_BLOCKED = '__cebian_csp_blocked__';
@@ -9,7 +9,7 @@ const CSP_BLOCKED = '__cebian_csp_blocked__';
 const ExecuteJsParameters = Type.Object({
   code: Type.String({
     description:
-      'JavaScript code to execute in the active tab. ' +
+      'JavaScript code to execute in the browser tab (defaults to active tab). ' +
       'The code is inserted as the body of `async () => { YOUR_CODE }` — use `return` directly to produce a result ' +
       '(e.g. `return document.title`). You can use `await` directly. ' +
       'NEVER wrap code in an IIFE like `(()=>{ return x })()` — the inner return does not propagate and the result will be null. ' +
@@ -22,13 +22,20 @@ const ExecuteJsParameters = Type.Object({
         'Use tab({ action: "list_frames" }) to discover frame IDs.',
     }),
   ),
+  tabId: Type.Optional(
+    Type.Number({
+      description:
+        'Tab ID to execute in. Omit to use the active tab. ' +
+        'Get tab IDs from the context block.',
+    }),
+  ),
 });
 
 export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
   name: TOOL_EXECUTE_JS,
   label: 'Execute JavaScript',
   description:
-    'Execute JavaScript code in the active browser tab and return the result. ' +
+    'Execute JavaScript code in a browser tab and return the result. ' +
     'The code runs as an async function body — use `return` to produce a result (e.g. `return document.title`). ' +
     'Use for DOM operations, data extraction, page modifications, ' +
     'calling page APIs, or reading localStorage/sessionStorage. ' +
@@ -38,7 +45,7 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
 
   async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
     signal?.throwIfAborted();
-    const tabId = await getActiveTabId();
+    const tabId = await resolveTabId(params.tabId);
 
     const target = params.frameId != null
       ? { tabId, frameIds: [params.frameId] }
