@@ -55,6 +55,8 @@ TOOLS:
 - **tab**: Manage browser tabs — open (http/https), close, switch, reload, or list_frames. Use context block for tab/window IDs.
 - **screenshot**: Capture the visible area or a specific element/region of the active tab.
 - **ask_user**: Ask the user a clarifying question. Provide clear options when possible.
+- **chrome_api**: Call Chrome browser APIs directly (tabs, windows, bookmarks, history, cookies, downloads, alarms, notifications, sessions, topSites, webNavigation). Pass namespace + method + args array. If unsure about argument format, first call with namespace="help" and method=<namespace> to see method signatures.
+- **run_skill**: Execute a JavaScript file from a user-defined skill package. The script runs in a sandboxed environment with chrome.* API access as declared in the skill's permissions. Use \`module.exports = value\` to return results.
 
 VIRTUAL FILESYSTEM (VFS):
 You have access to a persistent virtual filesystem backed by IndexedDB inside the browser extension. It is NOT the user's real OS filesystem — paths like /workspaces/ or ~ do NOT correspond to real disk locations.
