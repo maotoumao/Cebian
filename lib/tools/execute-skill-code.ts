@@ -4,7 +4,7 @@ import { TOOL_RUN_SKILL } from '@/lib/types';
 import { CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE } from '@/lib/constants';
 import { vfs, normalizePath } from '@/lib/vfs';
 import { parseFrontmatter } from '@/lib/ai-config/frontmatter';
-import { resolveTabId, executeViaDebugger } from './chrome-api';
+import { runInSandbox } from './sandbox-rpc';
 
 // ─── Permission grant storage ───
 
@@ -40,52 +40,6 @@ function permissionsMatch(stored: string[], current: string[]): boolean {
   return sorted1.every((v, i) => v === sorted2[i]);
 }
 
-// ─── Sandbox construction ───
-
-const BASE_SANDBOX_KEYS = [
-  'fetch', 'JSON', 'console', 'crypto',
-  'TextEncoder', 'TextDecoder', 'URL', 'URLSearchParams',
-  'atob', 'btoa', 'setTimeout', 'clearTimeout', 'AbortController',
-  'args',
-];
-
-function buildSandbox(permissions: string[], args: Record<string, unknown>, tabId?: number): { keys: string[]; values: unknown[] } {
-  const keys = [...BASE_SANDBOX_KEYS];
-  const values: unknown[] = [
-    fetch, JSON, console, crypto,
-    TextEncoder, TextDecoder, URL, URLSearchParams,
-    atob, btoa, setTimeout, clearTimeout, AbortController,
-    args,
-  ];
-
-  // Build a scoped chrome object with only declared namespaces
-  const chromePerms = permissions.filter((p) => p.startsWith('chrome.'));
-  if (chromePerms.length > 0) {
-    const chromeSubset: Record<string, unknown> = {};
-    for (const perm of chromePerms) {
-      const ns = perm.replace(/^chrome\./, '');
-      if (ns && (chrome as any)[ns]) {
-        chromeSubset[ns] = (chrome as any)[ns];
-      }
-    }
-    if (Object.keys(chromeSubset).length > 0) {
-      keys.push('chrome');
-      values.push(chromeSubset);
-    }
-  }
-
-  // Inject executeInPage if page.executeJs permission is declared
-  if (permissions.includes('page.executeJs')) {
-    keys.push('executeInPage');
-    values.push(async (code: string): Promise<string> => {
-      const resolved = await resolveTabId(tabId);
-      return executeViaDebugger(resolved, code);
-    });
-  }
-
-  return { keys, values };
-}
-
 // ─── Tool definition ───
 
 const ExecuteSkillCodeParameters = Type.Object({
@@ -113,12 +67,12 @@ export const executeSkillCodeTool: AgentTool<typeof ExecuteSkillCodeParameters> 
   name: TOOL_RUN_SKILL,
   label: 'Run Skill',
   description:
-    'Execute a JavaScript file from a skill\'s scripts/ directory in the extension background context. ' +
+    'Execute a JavaScript file from a skill\'s scripts/ directory in a sandboxed environment. ' +
     'The script runs with chrome.* APIs as declared in the skill\'s metadata.permissions. ' +
     'If the skill declares no permissions, only basic JS APIs (fetch, JSON, crypto, etc.) are available. ' +
     'If the skill declares "page.executeJs" permission, an executeInPage(code) async function is available ' +
     'to run JavaScript in a browser tab via CDP and return the result. ' +
-    'The script body runs as an async function — use `return` to produce a result. ' +
+    'The script runs as a complete JavaScript file — use `module.exports = value` to set the return value. ' +
     'Arguments are accessible via the `args` variable. Returns JSON-serialized result.\n\n' +
     'PERMISSION FLOW: On first call, if the skill has not been granted permission, ' +
     'the tool returns a permission prompt with a confirmation_nonce. You must then use ask_user to show the prompt ' +
@@ -252,14 +206,10 @@ export const executeSkillCodeTool: AgentTool<typeof ExecuteSkillCodeParameters> 
 
     signal?.throwIfAborted();
 
-    // ─── ④ Build sandbox and execute ───
-    // TODO: new Function() may be blocked by MV3 CSP in background SW.
-    // Fallback: execute in a sandboxed page via postMessage.
+    // ─── ④ Execute in sandbox ───
 
     try {
-      const { keys, values } = buildSandbox(permissions, args as Record<string, unknown>, tabId);
-      const fn = new Function(...keys, `return (async () => { ${code} })()`);
-      const result = await fn(...values);
+      const result = await runInSandbox(code, args as Record<string, unknown>, permissions, tabId);
       const serialized = result !== undefined ? JSON.stringify(result, null, 2) : '(no return value)';
 
       return {

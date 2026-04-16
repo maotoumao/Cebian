@@ -73,22 +73,45 @@ async function cropImage(
 // ─── Message listener ───
 
 chrome.runtime.onMessage.addListener(
-  (message: OffscreenRequest, _sender, sendResponse) => {
-    if (message.type === 'crop-image') {
-      cropImage(message.imageData, message.crop)
+  (message: OffscreenRequest | SandboxRelayMessage, _sender, sendResponse) => {
+    // ─── Sandbox relay: forward messages to/from sandbox iframe ───
+    if ('type' in message && typeof message.type === 'string' && message.type.startsWith('sandbox:')) {
+      const sandboxMsg = message as SandboxRelayMessage;
+
+      // Messages TO sandbox (run, chrome_result, page_exec_result)
+      if (sandboxMsg.type === 'sandbox:run' ||
+          sandboxMsg.type === 'sandbox:chrome_result' ||
+          sandboxMsg.type === 'sandbox:page_exec_result') {
+        ensureSandboxFrame();
+        if (sandboxReady) {
+          sandboxFrame!.contentWindow?.postMessage(sandboxMsg, '*');
+        } else {
+          pendingSandboxMessages.push(sandboxMsg);
+        }
+        sendResponse({ ok: true });
+        return false;
+      }
+
+      return false;
+    }
+
+    // ─── Original offscreen handlers ───
+    const req = message as OffscreenRequest;
+    if (req.type === 'crop-image') {
+      cropImage(req.imageData, req.crop)
         .then(result => sendResponse({ result } satisfies OffscreenResponse))
         .catch(err => sendResponse({ error: (err as Error).message } satisfies OffscreenResponse));
       return true;
     }
 
-    if (message.type !== 'html-to-markdown') return;
+    if (req.type !== 'html-to-markdown') return;
 
     try {
-      let html = message.html;
+      let html = req.html;
 
       // Optionally run Readability first
-      if (message.readability) {
-        const articleHtml = parseWithReadability(html, message.readability.url);
+      if (req.readability) {
+        const articleHtml = parseWithReadability(html, req.readability.url);
         if (!articleHtml) {
           sendResponse({ error: 'readability-failed' } satisfies OffscreenResponse);
           return true;
@@ -105,3 +128,43 @@ chrome.runtime.onMessage.addListener(
     return true; // keep sendResponse channel open
   },
 );
+
+// ─── Sandbox iframe host ───
+// The sandbox page cannot be embedded directly by the background SW.
+// Offscreen document acts as host: embeds sandbox iframe and relays
+// messages between background (chrome.runtime.onMessage) and sandbox (postMessage).
+
+type SandboxRelayMessage = { type: string; [key: string]: unknown };
+
+let sandboxFrame: HTMLIFrameElement | null = null;
+let sandboxReady = false;
+const pendingSandboxMessages: SandboxRelayMessage[] = [];
+
+function ensureSandboxFrame(): void {
+  if (sandboxFrame) return;
+  sandboxFrame = document.createElement('iframe');
+  sandboxFrame.src = chrome.runtime.getURL('/sandbox.html');
+  sandboxFrame.style.display = 'none';
+  document.body.appendChild(sandboxFrame);
+}
+
+// Relay messages from sandbox iframe → background
+window.addEventListener('message', (event) => {
+  const msg = event.data;
+  if (!msg || typeof msg.type !== 'string') return;
+
+  if (msg.type === 'sandbox:ready') {
+    sandboxReady = true;
+    // Flush any messages that arrived before sandbox was ready
+    for (const queued of pendingSandboxMessages) {
+      sandboxFrame?.contentWindow?.postMessage(queued, '*');
+    }
+    pendingSandboxMessages.length = 0;
+    return;
+  }
+
+  // Forward sandbox responses to background (chrome_call, page_exec, run_result)
+  if (msg.type.startsWith('sandbox:')) {
+    chrome.runtime.sendMessage(msg).catch(() => {});
+  }
+});
