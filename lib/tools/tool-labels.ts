@@ -37,6 +37,9 @@ export function getToolLabel(name: string, args: Record<string, any> = {}): stri
         : `正在搜索文件 "${truncPath(args.pattern)}"`;
     case 'execute_skill_code':
       return `正在执行技能脚本 ${args.skill ?? ''}`;
+    case 'chrome_api':
+      if (args.namespace === 'help') return `正在查询 Chrome API 文档`;
+      return `正在调用 chrome.${args.namespace ?? ''}.${args.method ?? ''}`;
     default:
       return name;
   }

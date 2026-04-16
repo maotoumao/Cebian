@@ -6,7 +6,12 @@ import path from 'node:path';
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: {
-    permissions: ['sidePanel', 'activeTab', 'tabs', 'scripting', 'storage', 'alarms', 'offscreen', 'debugger', 'webNavigation'],
+    permissions: [
+      'sidePanel', 'activeTab', 'tabs', 'scripting', 'storage', 'alarms',
+      'offscreen', 'debugger', 'webNavigation',
+      'bookmarks', 'history', 'cookies', 'topSites', 'sessions',
+      'downloads', 'notifications',
+    ],
     host_permissions: ['<all_urls>'],
     action: {
       default_title: '点击打开侧边栏',

@@ -14,6 +14,7 @@ import { fsReadFileTool } from './fs-read-file';
 import { fsListTool } from './fs-list';
 import { fsSearchTool } from './fs-search';
 import { executeSkillCodeTool } from './execute-skill-code';
+import { chromeApiTool } from './chrome-api-tool';
 import { SessionToolContext } from './session-context';
 import { TOOL_ASK_USER } from '@/lib/types';
 
@@ -23,6 +24,7 @@ const sharedTools: AgentTool<any>[] = [
   fsCreateFileTool, fsEditFileTool, fsMkdirTool, fsRenameTool, fsDeleteTool,
   fsReadFileTool, fsListTool, fsSearchTool,
   executeSkillCodeTool,
+  chromeApiTool,
 ];
 
 /**
