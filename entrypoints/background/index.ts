@@ -3,11 +3,36 @@ import { seedDevStorage } from './dev-seed';
 import { agentManager } from './agent-manager';
 import { sessionStore } from './session-store';
 import { invalidateSkillIndex } from '@/lib/ai-config/scanner';
+import { settingsFilePanelWidth } from '@/lib/storage';
 import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage } from '@/lib/protocol';
+
+/**
+ * One-shot migration: pre-Stage-5 installs used `aiConfigPagePanelWidth` and
+ * `aiConfigDialogPanelWidth` keys. Copy the page key's value to the new key
+ * (if not already set) and remove both legacy keys so they don't linger.
+ */
+async function migrateLegacyStorageKeys() {
+  try {
+    const data = await chrome.storage.local.get(['aiConfigPagePanelWidth', 'aiConfigDialogPanelWidth']);
+    const legacyPageWidth = data['aiConfigPagePanelWidth'];
+    if (typeof legacyPageWidth === 'number') {
+      const existing = await settingsFilePanelWidth.getValue();
+      if (existing === undefined || existing === 280) {
+        await settingsFilePanelWidth.setValue(legacyPageWidth);
+      }
+    }
+    if ('aiConfigPagePanelWidth' in data || 'aiConfigDialogPanelWidth' in data) {
+      await chrome.storage.local.remove(['aiConfigPagePanelWidth', 'aiConfigDialogPanelWidth']);
+    }
+  } catch (err) {
+    console.warn('[cebian] legacy storage migration failed', err);
+  }
+}
 
 export default defineBackground(() => {
   console.log('Cebian background started', { id: browser.runtime.id });
   seedDevStorage();
+  void migrateLegacyStorageKeys();
 
   chrome.sidePanel
     .setPanelBehavior({ openPanelOnActionClick: true })

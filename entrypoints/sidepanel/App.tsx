@@ -7,8 +7,6 @@ import { Header } from '@/components/layout/Header';
 import { HistoryPanel } from '@/components/layout/HistoryPanel';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { themePreference } from '@/lib/storage';
-import { showDialog } from '@/lib/dialog';
-import { AI_CONFIG_MIN_DIALOG_WIDTH } from '@/lib/constants';
 import { ChatPage } from './pages/chat';
 import { SettingsRoutes } from './pages/settings';
 
@@ -94,14 +92,6 @@ function App() {
             theme={theme}
             onToggleTheme={toggleTheme}
             onOpenSettings={() => navigate('/settings')}
-            onOpenAIConfig={() => {
-              const width = document.documentElement.clientWidth;
-              if (width >= AI_CONFIG_MIN_DIALOG_WIDTH) {
-                showDialog('ai-config', {});
-              } else {
-                chrome.tabs.create({ url: browser.runtime.getURL('/settings.html') });
-              }
-            }}
             onNewChat={handleNewChat}
             onOpenHistory={() => setHistoryOpen(true)}
           />

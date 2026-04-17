@@ -86,13 +86,9 @@ export const maxRounds = storage.defineItem<number>(
   { fallback: 200 },
 );
 
-export const aiConfigDialogPanelWidth = storage.defineItem<number>(
-  'local:aiConfigDialogPanelWidth',
-  { fallback: 240 },
-);
-
-export const aiConfigPagePanelWidth = storage.defineItem<number>(
-  'local:aiConfigPagePanelWidth',
+/** Width of the file-tree panel inside FileWorkspace (Prompts / Skills sections). */
+export const settingsFilePanelWidth = storage.defineItem<number>(
+  'local:settingsFilePanelWidth',
   { fallback: 280 },
 );
 

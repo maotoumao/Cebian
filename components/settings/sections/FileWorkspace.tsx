@@ -22,7 +22,7 @@ import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 } from '@/components/ui/context-menu';
 import { FileTree, type FileTreeHandle } from '@/components/editor/FileTree';
-import { EditorPanel } from '@/components/ai-config/EditorPanel';
+import { EditorPanel } from './EditorPanel';
 import { useIsDark } from '@/hooks/useIsDark';
 import { useStorageItem, type StorageItem } from '@/hooks/useStorageItem';
 import { cn } from '@/lib/utils';

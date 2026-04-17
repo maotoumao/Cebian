@@ -6,7 +6,7 @@ import {
   type FileWorkspaceAction, type FileWorkspaceHandle,
 } from './FileWorkspace';
 import { CEBIAN_SKILLS_DIR } from '@/lib/constants';
-import { aiConfigPagePanelWidth } from '@/lib/storage';
+import { settingsFilePanelWidth } from '@/lib/storage';
 import { createSkillTemplate } from '@/lib/ai-config/skill-creator';
 import type { SettingsOutletContext } from '@/components/settings/SettingsLayout';
 
@@ -73,7 +73,7 @@ export function SkillsSection() {
         onSelectRelative={handleSelect}
         onSave={handleSave}
         allowNewFolder
-        panelWidthStorage={aiConfigPagePanelWidth}
+        panelWidthStorage={settingsFilePanelWidth}
         compactMode={breakpoint === 'compact'}
         className="flex-1"
         toolbarActions={toolbarActions}

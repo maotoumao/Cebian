@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { FileWorkspace, encodeRelPath } from './FileWorkspace';
 import { CEBIAN_PROMPTS_DIR } from '@/lib/constants';
-import { aiConfigPagePanelWidth } from '@/lib/storage';
+import { settingsFilePanelWidth } from '@/lib/storage';
 import type { SettingsOutletContext } from '@/components/settings/SettingsLayout';
 
 const PROMPT_TEMPLATE = `---\nname: new-prompt\ndescription: ""\n---\n\n(Write your prompt here)\n`;
@@ -44,7 +44,7 @@ export function PromptsSection() {
         onSelectRelative={handleSelect}
         newFileTemplate={PROMPT_TEMPLATE}
         enableTemplateVars
-        panelWidthStorage={aiConfigPagePanelWidth}
+        panelWidthStorage={settingsFilePanelWidth}
         compactMode={breakpoint === 'compact'}
         className="flex-1"
       />

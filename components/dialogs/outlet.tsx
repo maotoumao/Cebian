@@ -10,12 +10,13 @@ export function DialogOutlet() {
 
   if (!state) return null;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const Component = dialogRenderers[state.name] as React.ComponentType<any>;
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) setState(null); }}>
       <DialogContent className="max-w-[calc(100%-2rem)] max-h-[90vh] flex flex-col gap-0 p-0" autoFocus={false}>
-        <Component {...(state.options as Record<string, unknown>)} />
+        <Component {...state.options} />
       </DialogContent>
     </Dialog>
   );
