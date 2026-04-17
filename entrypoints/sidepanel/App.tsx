@@ -4,13 +4,13 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 import { DialogOutlet } from '@/components/dialogs/outlet';
 import { Header } from '@/components/layout/Header';
-import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { HistoryPanel } from '@/components/layout/HistoryPanel';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { themePreference } from '@/lib/storage';
 import { showDialog } from '@/lib/dialog';
 import { AI_CONFIG_MIN_DIALOG_WIDTH } from '@/lib/constants';
 import { ChatPage } from './pages/chat';
+import { SettingsRoutes } from './pages/settings';
 
 /** Resolve 'system' to the actual theme based on OS preference (defaults to 'light'). */
 function resolveTheme(pref: 'dark' | 'light' | 'system'): 'dark' | 'light' {
@@ -29,7 +29,6 @@ function applyTheme(resolved: 'dark' | 'light') {
 function App() {
   const [theme, setTheme] = useStorageItem(themePreference, 'system');
   const [themeReady, setThemeReady] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [chatTitle, setChatTitle] = useState('');
 
@@ -89,33 +88,31 @@ function App() {
   return (
     <TooltipProvider delayDuration={300}>
       <div className="flex flex-col h-screen overflow-hidden relative">
-        <Header
-          title={chatTitle}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-          onOpenSettings={() => setSettingsOpen(true)}
-          onOpenAIConfig={() => {
-            const width = document.documentElement.clientWidth;
-            if (width >= AI_CONFIG_MIN_DIALOG_WIDTH) {
-              showDialog('ai-config', {});
-            } else {
-              chrome.tabs.create({ url: browser.runtime.getURL('/ai-config.html') });
-            }
-          }}
-          onNewChat={handleNewChat}
-          onOpenHistory={() => setHistoryOpen(true)}
-        />
+        {!location.pathname.startsWith('/settings') && (
+          <Header
+            title={chatTitle}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            onOpenSettings={() => navigate('/settings')}
+            onOpenAIConfig={() => {
+              const width = document.documentElement.clientWidth;
+              if (width >= AI_CONFIG_MIN_DIALOG_WIDTH) {
+                showDialog('ai-config', {});
+              } else {
+                chrome.tabs.create({ url: browser.runtime.getURL('/ai-config.html') });
+              }
+            }}
+            onNewChat={handleNewChat}
+            onOpenHistory={() => setHistoryOpen(true)}
+          />
+        )}
 
         <Routes>
-          <Route path="/chat/new" element={<ChatPage onOpenSettings={() => setSettingsOpen(true)} onTitleChange={setChatTitle} />} />
-          <Route path="/chat/:sessionId" element={<ChatPage onOpenSettings={() => setSettingsOpen(true)} onTitleChange={setChatTitle} />} />
+          <Route path="/chat/new" element={<ChatPage onOpenSettings={() => navigate('/settings')} onTitleChange={setChatTitle} />} />
+          <Route path="/chat/:sessionId" element={<ChatPage onOpenSettings={() => navigate('/settings')} onTitleChange={setChatTitle} />} />
+          <Route path="/settings/*" element={<SettingsRoutes showBackButton />} />
           <Route path="*" element={<Navigate to="/chat/new" replace />} />
         </Routes>
-
-        <SettingsPanel
-          open={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-        />
 
         <HistoryPanel
           open={historyOpen}

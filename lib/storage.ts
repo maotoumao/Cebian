@@ -95,3 +95,12 @@ export const aiConfigPagePanelWidth = storage.defineItem<number>(
   'local:aiConfigPagePanelWidth',
   { fallback: 280 },
 );
+
+/**
+ * Remembers the last-visited Settings section so reopening /settings lands where the user left off.
+ * Stores a relative section path such as 'prompts' | 'providers' | 'skills' | ...
+ */
+export const lastSettingsSection = storage.defineItem<string>(
+  'local:lastSettingsSection',
+  { fallback: 'prompts' },
+);
