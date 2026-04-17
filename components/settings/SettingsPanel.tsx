@@ -107,7 +107,8 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 onChange={(e) => setCurrentInstructions(e.target.value)}
                 placeholder={'例如：\n- 用中文回复\n- 回答尽量简洁\n- 讨论代码时默认使用 TypeScript'}
                 rows={4}
-                className="text-xs"
+                maxLength={2000}
+                className="text-xs max-h-48 overflow-y-auto"
               />
             </div>
             <div className="space-y-2">
@@ -127,7 +128,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
         <Separator className="my-1" />
 
-        {/* Section 4: 关于 */}
+        {/* Section 3: 关于 */}
         <div>
           <h3 className="text-xs text-muted-foreground font-medium tracking-wide uppercase mb-3">
             关于
