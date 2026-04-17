@@ -13,12 +13,11 @@ function createPickerInPage() {
   // ── Shadow DOM host ──
   // The host has pointer-events:auto with a full-viewport overlay inside the
   // shadow root. Hit-testing stops at the overlay so page element-level
-  // handlers (on the underlying <a>, <img>, etc.) are never invoked.
-  // NOTE: pointer/mouse/click/wheel/touch events are *composed* and still
-  // cross the shadow boundary to bubble/capture at window/document (retargeted
-  // to the host). Page-registered window-capture listeners can therefore still
-  // fire. We also install defensive window-capture listeners below to swallow
-  // such events when their composedPath includes our shadow tree.
+  // handlers (on the underlying <a>, <img>, etc.) are never invoked — from
+  // the page's perspective, event.target is the shadow host, not the page
+  // element the user was aiming at. Truly target-agnostic window-level page
+  // handlers (e.g. global analytics on window) can still fire; that is a
+  // known limitation of any shadow-DOM-based inspector.
   const host = document.createElement('div');
   host.id = 'cebian-picker-host';
   host.style.cssText = 'all:initial !important;position:fixed !important;inset:0 !important;pointer-events:auto !important;z-index:2147483647 !important;';
@@ -289,18 +288,6 @@ function createPickerInPage() {
     e.stopImmediatePropagation();
   }
 
-  // Defensive line: composed events (click/pointer/mouse/wheel/touch) still
-  // traverse window capture even when dispatched inside our closed shadow root.
-  // Stop them as soon as they touch any window-level capture listener IF the
-  // event originated in our shadow tree — this prevents target-agnostic page
-  // handlers (SPA router hijackers, analytics, etc.) from firing.
-  function onWindowCapture(e: Event) {
-    const path = e.composedPath();
-    if (path.length > 0 && path.indexOf(host) !== -1) {
-      e.stopImmediatePropagation();
-    }
-  }
-
   // ── Event: keydown — only intercept Escape ──
   function onKeyDown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
@@ -317,37 +304,21 @@ function createPickerInPage() {
     // to its DOM-removal fallback instead of calling a half-dismantled picker.
     try { delete (window as any).__cebianPickerCleanup; } catch { /* non-configurable */ }
     window.removeEventListener('keydown', onKeyDown, true);
-    window.removeEventListener('click', onWindowCapture, true);
-    window.removeEventListener('pointerdown', onWindowCapture, true);
-    window.removeEventListener('pointerup', onWindowCapture, true);
-    window.removeEventListener('mousedown', onWindowCapture, true);
-    window.removeEventListener('mouseup', onWindowCapture, true);
-    window.removeEventListener('contextmenu', onWindowCapture, true);
-    window.removeEventListener('wheel', onWindowCapture, true);
-    window.removeEventListener('touchstart', onWindowCapture, true);
-    window.removeEventListener('touchmove', onWindowCapture, true);
     try { cursorStyle.remove(); } catch { /* detached */ }
     try { host.remove(); } catch { /* detached */ }
   }
 
-  // Overlay listeners handle the actual picker UX.
+  // Overlay listeners handle the actual picker UX. Events targeted at the
+  // overlay are retargeted to the shadow host from the page's perspective,
+  // so page handlers using e.target.closest(...) won't match any page element
+  // — that's the core guarantee. Truly target-agnostic window-level page
+  // handlers (e.g. global `window.onclick`) can still fire; this is a known
+  // limitation of any shadow-DOM-based inspector.
   overlay.addEventListener('pointermove', onPointerMove);
   overlay.addEventListener('click', onClick);
   overlay.addEventListener('contextmenu', onBlockEvent);
   overlay.addEventListener('wheel', onBlockEvent, { passive: false });
   overlay.addEventListener('touchmove', onBlockEvent, { passive: false });
-
-  // Defensive window-capture listeners: stop composed events that originated
-  // in our shadow tree before any page-registered window-capture handler runs.
-  window.addEventListener('click', onWindowCapture, true);
-  window.addEventListener('pointerdown', onWindowCapture, true);
-  window.addEventListener('pointerup', onWindowCapture, true);
-  window.addEventListener('mousedown', onWindowCapture, true);
-  window.addEventListener('mouseup', onWindowCapture, true);
-  window.addEventListener('contextmenu', onWindowCapture, true);
-  window.addEventListener('wheel', onWindowCapture, true);
-  window.addEventListener('touchstart', onWindowCapture, true);
-  window.addEventListener('touchmove', onWindowCapture, true);
 
   // Keyboard events bypass hit-testing, so Escape must be registered on window.
   window.addEventListener('keydown', onKeyDown, true);
