@@ -8,7 +8,7 @@ import { useContainerWidth } from '@/hooks/useContainerWidth';
 
 /** Breakpoints for the Settings hub layout. */
 const COMPACT_MAX = 640;   // below: compact (pills + master-detail)
-const MEDIUM_MAX = 960;    // below: medium (top icon+text tabs, two-column body)
+const MEDIUM_MAX = 1200;   // below: medium (top icon+text tabs, two-column body)
 
 export type SettingsBreakpoint = 'compact' | 'medium' | 'wide';
 
