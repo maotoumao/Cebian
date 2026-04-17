@@ -101,12 +101,15 @@ function createPickerInPage() {
   // belt-and-suspenders — `pointer-events` doesn't cascade to descendants, so
   // relying on host alone could miss edge cases where the overlay is hit-tested
   // independently. Restored synchronously, no repaint required.
+  // NOTE: host's cssText sets `pointer-events:auto !important`, so we must use
+  // setProperty with 'important' priority to override; assigning via `.style.x`
+  // does not set the priority flag and may be beaten by the original !important.
   function getUnderlyingElement(x: number, y: number): Element | null {
-    host.style.pointerEvents = 'none';
-    overlay.style.pointerEvents = 'none';
+    host.style.setProperty('pointer-events', 'none', 'important');
+    overlay.style.setProperty('pointer-events', 'none', 'important');
     const el = document.elementFromPoint(x, y);
-    host.style.pointerEvents = 'auto';
-    overlay.style.pointerEvents = 'auto';
+    host.style.setProperty('pointer-events', 'auto', 'important');
+    overlay.style.setProperty('pointer-events', 'auto', 'important');
     if (!el || el === host || el === document.documentElement) return null;
     return el;
   }
