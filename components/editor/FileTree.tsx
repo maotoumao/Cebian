@@ -322,10 +322,11 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
 
   const doCreateSkill = useCallback(async () => {
     if (treeRef.current?.isEditing) return;
-    const parent = resolveCreateParent();
+    // Skills must always be created at the root directory
+    const parent = root;
     const name = await uniqueName(parent, 'new-skill');
     const fullPath = `${parent}/${name}`;
-    const skillMd = `---\nname: ${name}\ndescription: "TODO - describe what this skill does and when to use it."\nmetadata:\n  matched-url: "*"\n  author: ""\n  version: "1.0"\n---\n\n## Instructions\n\n(Write your skill instructions here)\n`;
+    const skillMd = `---\nname: ${name}\ndescription: "TODO - describe what this skill does and when to use it."\nmetadata:\n  matched-url:\n    - "*"\n  author: ""\n  version: "1.0"\n---\n\n## Instructions\n\n(Write your skill instructions here)\n`;
     try {
       await vfs.mkdir(fullPath, { recursive: true });
       await vfs.mkdir(`${fullPath}/scripts`, { recursive: true });
@@ -335,7 +336,7 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
       await scan();
       setPendingEditId(fullPath);
     } catch { /* ignore */ }
-  }, [resolveCreateParent, scan]);
+  }, [root, scan]);
 
   // Expose imperative methods
   useImperativeHandle(ref, () => ({
