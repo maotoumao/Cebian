@@ -110,7 +110,7 @@ function App() {
         <Routes>
           <Route path="/chat/new" element={<ChatPage onOpenSettings={() => navigate('/settings')} onTitleChange={setChatTitle} />} />
           <Route path="/chat/:sessionId" element={<ChatPage onOpenSettings={() => navigate('/settings')} onTitleChange={setChatTitle} />} />
-          <Route path="/settings/*" element={<SettingsRoutes showBackButton />} />
+          <Route path="/settings/*" element={<SettingsRoutes basePath="/settings" showBackButton />} />
           <Route path="*" element={<Navigate to="/chat/new" replace />} />
         </Routes>
 

@@ -17,18 +17,28 @@ export const SETTINGS_SECTIONS: SectionNavItem[] = [
   { path: 'about', label: '关于', icon: Info },
 ];
 
+interface SectionNavProps {
+  /** Absolute base path of the Settings hub (e.g. '/settings' in sidepanel, '' in tab page). */
+  basePath: string;
+}
+
 /**
  * SectionNav — vertical sidebar navigation for Settings sections.
- * Stage 3 will add responsive top-pills variant for narrower containers.
+ *
+ * Uses absolute paths derived from `basePath` to avoid the relative-path
+ * pitfalls of nested routes and splat children (e.g. `prompts/:filename`).
+ *
+ * Stage 3 will add a responsive top-pills variant for narrower containers.
  */
-export function SectionNav() {
+export function SectionNav({ basePath }: SectionNavProps) {
   return (
-    <nav aria-label="设置导航" className="w-[180px] shrink-0 border-r border-border py-2 overflow-y-auto">
+    <nav aria-label="设置导航" className="w-45 shrink-0 border-r border-border py-2 overflow-y-auto">
       <ul className="flex flex-col gap-0.5 px-2">
         {SETTINGS_SECTIONS.map(({ path, label, icon: Icon }) => (
           <li key={path}>
             <NavLink
-              to={path}
+              to={`${basePath}/${path}`}
+              replace
               className={({ isActive }) =>
                 cn(
                   'flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',

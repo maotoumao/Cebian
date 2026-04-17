@@ -11,6 +11,8 @@ import { AboutSection } from '@/components/settings/sections/AboutSection';
 import { lastSettingsSection } from '@/lib/storage';
 
 interface SettingsRoutesProps {
+  /** Absolute base path where SettingsRoutes is mounted (e.g. '/settings'). */
+  basePath: string;
   /** Show back button in the top bar. True in sidepanel, false in standalone tab page. */
   showBackButton?: boolean;
 }
@@ -20,12 +22,13 @@ interface SettingsRoutesProps {
  *
  * Mounted at `/settings/*` in sidepanel (MemoryRouter) and at `/*` in the
  * standalone tab page (HashRouter). Only relative paths are used internally
- * so the same tree works under both routers.
+ * so the same tree works under both routers. `basePath` is forwarded to
+ * `SettingsLayout`/`SectionNav` so they can build absolute NavLinks.
  */
-export function SettingsRoutes({ showBackButton = false }: SettingsRoutesProps) {
+export function SettingsRoutes({ basePath, showBackButton = false }: SettingsRoutesProps) {
   return (
     <Routes>
-      <Route element={<SettingsLayout showBackButton={showBackButton} />}>
+      <Route element={<SettingsLayout basePath={basePath} showBackButton={showBackButton} />}>
         <Route index element={<SettingsIndexRedirect />} />
         <Route path="providers" element={<ProvidersSection />} />
         <Route path="instructions" element={<InstructionsSection />} />

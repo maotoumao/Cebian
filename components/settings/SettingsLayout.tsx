@@ -6,6 +6,8 @@ import { SectionNav } from './SectionNav';
 import { lastSettingsSection } from '@/lib/storage';
 
 interface SettingsLayoutProps {
+  /** Absolute base path of the Settings hub (e.g. '/settings' in sidepanel). */
+  basePath: string;
   /** Show the "← 返回" button in the top bar (sidepanel only). */
   showBackButton?: boolean;
 }
@@ -16,25 +18,23 @@ interface SettingsLayoutProps {
  * Top bar (optional back button + title) + SectionNav + <Outlet />.
  * Responsive nav layout (left vs top pills) and master-detail mode land in stage 3.
  */
-export function SettingsLayout({ showBackButton = false }: SettingsLayoutProps) {
+export function SettingsLayout({ basePath, showBackButton = false }: SettingsLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Persist current section (second path segment) so `/settings` redirects here next time.
-  const section = location.pathname.split('/')[2];
+  // Persist current section (path segment after basePath) so reopening lands here.
+  const relative = location.pathname.startsWith(basePath)
+    ? location.pathname.slice(basePath.length).replace(/^\//, '')
+    : '';
+  const section = relative.split('/')[0];
   useEffect(() => {
     if (section) lastSettingsSection.setValue(section);
   }, [section]);
 
-  // Use the router's own history signal — `window.history.length` is meaningless under MemoryRouter.
-  const canGoBack = location.key !== 'default';
+  // Back button always exits Settings entirely — single-step escape, no history stepping.
   const handleBack = useCallback(() => {
-    if (canGoBack) {
-      navigate(-1);
-    } else {
-      navigate('/chat/new', { replace: true });
-    }
-  }, [canGoBack, navigate]);
+    navigate('/chat/new', { replace: true });
+  }, [navigate]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -54,7 +54,7 @@ export function SettingsLayout({ showBackButton = false }: SettingsLayoutProps) 
       </div>
 
       <div className="flex flex-1 min-h-0">
-        <SectionNav />
+        <SectionNav basePath={basePath} />
         <div className="flex-1 min-w-0 overflow-y-auto">
           <Outlet />
         </div>
