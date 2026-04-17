@@ -20,17 +20,53 @@ export const SETTINGS_SECTIONS: SectionNavItem[] = [
 interface SectionNavProps {
   /** Absolute base path of the Settings hub (e.g. '/settings' in sidepanel, '' in tab page). */
   basePath: string;
+  /** Render as a horizontal icon-only pill row (used when container is narrow). */
+  compact?: boolean;
 }
 
 /**
- * SectionNav — vertical sidebar navigation for Settings sections.
+ * SectionNav — navigation for Settings sections.
  *
- * Uses absolute paths derived from `basePath` to avoid the relative-path
- * pitfalls of nested routes and splat children (e.g. `prompts/:filename`).
+ * Two variants:
+ * - Standard (default): vertical labeled sidebar on the left.
+ * - Compact: horizontal icon-only pill row above the content (labels via `title`).
  *
- * Stage 3 will add a responsive top-pills variant for narrower containers.
+ * Uses absolute paths derived from `basePath` so the same component works
+ * under splat routes (`prompts/*`) without relative-path gotchas.
  */
-export function SectionNav({ basePath }: SectionNavProps) {
+export function SectionNav({ basePath, compact = false }: SectionNavProps) {
+  if (compact) {
+    return (
+      <nav
+        aria-label="设置导航"
+        className="shrink-0 border-b border-border px-2 py-1.5 overflow-x-auto"
+      >
+        <ul className="flex items-center gap-0.5">
+          {SETTINGS_SECTIONS.map(({ path, label, icon: Icon }) => (
+            <li key={path}>
+              <NavLink
+                to={`${basePath}/${path}`}
+                replace
+                title={label}
+                aria-label={label}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center justify-center size-8 rounded-md transition-colors',
+                    isActive
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+                  )
+                }
+              >
+                <Icon className="size-4" />
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    );
+  }
+
   return (
     <nav aria-label="设置导航" className="w-45 shrink-0 border-r border-border py-2 overflow-y-auto">
       <ul className="flex flex-col gap-0.5 px-2">

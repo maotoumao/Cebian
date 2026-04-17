@@ -14,7 +14,7 @@ import {
   useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef,
   Fragment, type ReactNode, type ComponentType,
 } from 'react';
-import { Search, FilePlus, FolderPlus, MoreHorizontal } from 'lucide-react';
+import { Search, FilePlus, FolderPlus, MoreHorizontal, ArrowLeft } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -88,6 +88,12 @@ export interface FileWorkspaceProps {
   defaultPanelWidth?: number;
   /** Section-contributed actions (rendered in toolbar + right-click menu). */
   toolbarActions?: FileWorkspaceAction[];
+  /**
+   * Compact / master-detail mode. When true, only one panel is visible at a
+   * time: file list when no selection, editor (with a back button) when a
+   * file is selected. Drag handle is hidden.
+   */
+  compactMode?: boolean;
   /** Optional extra class for the root container. */
   className?: string;
   /** Optional empty-state content to render when `relativePath` is undefined. */
@@ -105,6 +111,7 @@ export const FileWorkspace = forwardRef<FileWorkspaceHandle, FileWorkspaceProps>
   panelWidthStorage,
   defaultPanelWidth = 280,
   toolbarActions,
+  compactMode = false,
   className,
   emptyState,
 }, ref) {
@@ -224,15 +231,17 @@ export const FileWorkspace = forwardRef<FileWorkspaceHandle, FileWorkspaceProps>
 
   // ─── Render ───
 
-  return (
-    <div className={cn('flex min-h-0', className)}>
-      {/* Left panel: toolbar + file tree */}
-      <div
-        className="shrink-0 border-r border-border flex flex-col"
-        style={{ width: currentWidth }}
-      >
-        {/* Toolbar */}
-        <div className="flex items-center gap-1 p-2.5 border-b border-border shrink-0">
+  // In compact mode, list and editor each take full width of the container;
+  // in standard mode, the list uses the (draggable) stored width.
+  const leftPanelWidthStyle = compactMode ? undefined : { width: currentWidth };
+  const leftPanelClass = compactMode
+    ? 'flex-1 min-w-0 flex flex-col'
+    : 'shrink-0 border-r border-border flex flex-col';
+
+  const leftPanel = (
+    <div className={leftPanelClass} style={leftPanelWidthStyle}>
+      {/* Toolbar */}
+      <div className="flex items-center gap-1 p-2.5 border-b border-border shrink-0">
           <div className="relative flex-1 min-w-0">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
             <Input
@@ -341,6 +350,59 @@ export const FileWorkspace = forwardRef<FileWorkspaceHandle, FileWorkspaceProps>
           </ContextMenuContent>
         </ContextMenu>
       </div>
+  );
+
+  const editorPanel = selectedAbs ? (
+    <EditorPanel
+      filePath={selectedAbs}
+      rootPath={root}
+      isDark={isDark}
+      enableTemplateVars={enableTemplateVars}
+      onSave={handleSave}
+    />
+  ) : (
+    emptyState ?? (
+      <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+        从左侧选择或创建文件
+      </div>
+    )
+  );
+
+  if (compactMode) {
+    // Master-detail: show the list when no file is selected, or the editor
+    // (with a back button) when a file is selected. No drag handle.
+    return (
+      <div className={cn('flex min-h-0', className)}>
+        {selectedAbs ? (
+          <div className="flex-1 min-w-0 flex flex-col">
+            <div className="flex items-center gap-1 px-2.5 py-1.5 border-b border-border shrink-0">
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => onSelectRelative(null)}
+                title="返回文件列表"
+                aria-label="返回文件列表"
+              >
+                <ArrowLeft className="size-4" />
+              </Button>
+              {relativePath && (
+                <span className="text-[13px] text-muted-foreground truncate">{relativePath}</span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0 min-h-0">
+              {editorPanel}
+            </div>
+          </div>
+        ) : (
+          leftPanel
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn('flex min-h-0', className)}>
+      {leftPanel}
 
       {/* Drag handle */}
       <div
@@ -352,21 +414,7 @@ export const FileWorkspace = forwardRef<FileWorkspaceHandle, FileWorkspaceProps>
 
       {/* Right panel: editor */}
       <div className="flex-1 min-w-0">
-        {selectedAbs ? (
-          <EditorPanel
-            filePath={selectedAbs}
-            rootPath={root}
-            isDark={isDark}
-            enableTemplateVars={enableTemplateVars}
-            onSave={handleSave}
-          />
-        ) : (
-          emptyState ?? (
-            <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-              从左侧选择或创建文件
-            </div>
-          )
-        )}
+        {editorPanel}
       </div>
     </div>
   );
