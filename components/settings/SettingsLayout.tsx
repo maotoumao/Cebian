@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,34 +6,41 @@ import { SectionNav } from './SectionNav';
 import { lastSettingsSection } from '@/lib/storage';
 import { useContainerWidth } from '@/hooks/useContainerWidth';
 
-/** Breakpoint: below this width the Settings hub switches to compact layout. */
-const COMPACT_BREAKPOINT = 640;
+/** Breakpoints for the Settings hub layout. */
+const COMPACT_MAX = 640;   // below: compact (pills + master-detail)
+const MEDIUM_MAX = 960;    // below: medium (top icon+text tabs, two-column body)
+
+export type SettingsBreakpoint = 'compact' | 'medium' | 'wide';
+
+function resolveBreakpoint(width: number | null): SettingsBreakpoint {
+  if (width === null || width >= MEDIUM_MAX) return 'wide';
+  if (width < COMPACT_MAX) return 'compact';
+  return 'medium';
+}
 
 interface SettingsLayoutProps {
   /** Absolute base path of the Settings hub (e.g. '/settings' in sidepanel). */
   basePath: string;
-  /** Show the "鈫?杩斿洖" button in the top bar (sidepanel only). */
+  /** Show the "← 返回" button in the top bar (sidepanel only). */
   showBackButton?: boolean;
 }
 
 /**
- * SettingsLayout 鈥?shell for the Settings hub.
+ * SettingsLayout — shell for the Settings hub.
  *
- * Layout:
- * - Standard (鈮?40px): top bar 鈫?two columns (SectionNav left, Outlet right).
- * - Compact  (<640px): top bar 鈫?horizontal icon-only SectionNav 鈫?full-width Outlet.
+ * Three responsive tiers:
+ * - compact (<640px): top icon-only pills → full-width Outlet (master-detail).
+ * - medium (640–960): top icon+text tabs   → full-width Outlet (two-column still).
+ * - wide   (≥960px):  left labeled sidebar → Outlet on the right.
  *
- * The `compact` flag is forwarded to sections via `SettingsOutletContext` so
- * they can opt into master-detail (FileWorkspace) or other compact adaptations.
+ * The resolved breakpoint is forwarded to sections via `SettingsOutletContext`.
  */
 export function SettingsLayout({ basePath, showBackButton = false }: SettingsLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const containerRef = useRef<HTMLDivElement>(null);
   const width = useContainerWidth(containerRef);
-  // Default to non-compact until first measurement to avoid a compact鈫抴ide flash
-  // on the tab page. Sidepanel (~380px) flips to compact on the first measure.
-  const compact = width !== null && width < COMPACT_BREAKPOINT;
+  const breakpoint = resolveBreakpoint(width);
 
   // Persist current section (path segment after basePath) so reopening lands here.
   const relative = location.pathname.startsWith(basePath)
@@ -44,12 +51,15 @@ export function SettingsLayout({ basePath, showBackButton = false }: SettingsLay
     if (section) lastSettingsSection.setValue(section);
   }, [section]);
 
-  // Back button always exits Settings entirely 鈥?single-step escape, no history stepping.
+  // Back button always exits Settings entirely — single-step escape, no history stepping.
   const handleBack = useCallback(() => {
     navigate('/chat/new', { replace: true });
   }, [navigate]);
 
-  const outletCtx: SettingsOutletContext = { basePath, compact };
+  const outletCtx: SettingsOutletContext = { basePath, breakpoint };
+
+  const topNav = breakpoint !== 'wide';
+  const navVariant = breakpoint === 'compact' ? 'pills' : breakpoint === 'medium' ? 'tabs' : 'labels';
 
   return (
     <div ref={containerRef} className="flex flex-col flex-1 min-h-0">
@@ -59,25 +69,25 @@ export function SettingsLayout({ basePath, showBackButton = false }: SettingsLay
             variant="ghost"
             size="icon-xs"
             onClick={handleBack}
-            aria-label="杩斿洖"
+            aria-label="返回"
           >
             <ArrowLeft className="size-4.5" />
           </Button>
         )}
-        <h1 className="font-semibold text-sm">璁剧疆</h1>
-        {/* TODO(stage 4): "鍦ㄦ柊鏍囩椤垫墦寮€" button (sidepanel only) carrying current location.pathname. */}
+        <h1 className="font-semibold text-sm">设置</h1>
+        {/* TODO(stage 4): "在新标签页打开" button (sidepanel only) carrying current location.pathname. */}
       </div>
 
-      {compact ? (
+      {topNav ? (
         <div className="flex flex-col flex-1 min-h-0">
-          <SectionNav basePath={basePath} compact />
+          <SectionNav basePath={basePath} variant={navVariant} />
           <div className="flex-1 min-w-0 min-h-0 flex flex-col">
             <Outlet context={outletCtx} />
           </div>
         </div>
       ) : (
         <div className="flex flex-1 min-h-0">
-          <SectionNav basePath={basePath} />
+          <SectionNav basePath={basePath} variant="labels" />
           <div className="flex-1 min-w-0 min-h-0 flex flex-col">
             <Outlet context={outletCtx} />
           </div>
@@ -91,6 +101,6 @@ export function SettingsLayout({ basePath, showBackButton = false }: SettingsLay
 export interface SettingsOutletContext {
   /** Absolute base path of the Settings hub (e.g. '/settings'). */
   basePath: string;
-  /** True when the Settings container is narrower than the compact breakpoint. */
-  compact: boolean;
+  /** Resolved responsive breakpoint of the Settings container. */
+  breakpoint: SettingsBreakpoint;
 }

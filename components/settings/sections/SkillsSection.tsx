@@ -21,7 +21,7 @@ import type { SettingsOutletContext } from '@/components/settings/SettingsLayout
  * stays free of any business concepts.
  */
 export function SkillsSection() {
-  const { basePath, compact } = useOutletContext<SettingsOutletContext>();
+  const { basePath, breakpoint } = useOutletContext<SettingsOutletContext>();
   const params = useParams();
   const navigate = useNavigate();
   const workspaceRef = useRef<FileWorkspaceHandle>(null);
@@ -74,7 +74,7 @@ export function SkillsSection() {
         onSave={handleSave}
         allowNewFolder
         panelWidthStorage={aiConfigPagePanelWidth}
-        compactMode={compact}
+        compactMode={breakpoint === 'compact'}
         className="flex-1"
         toolbarActions={toolbarActions}
       />

@@ -14,7 +14,7 @@ const PROMPT_TEMPLATE = `---\nname: new-prompt\ndescription: ""\n---\n\n(Write y
  * and the back/forward buttons coherent.
  */
 export function PromptsSection() {
-  const { basePath, compact } = useOutletContext<SettingsOutletContext>();
+  const { basePath, breakpoint } = useOutletContext<SettingsOutletContext>();
   const params = useParams();
   const navigate = useNavigate();
 
@@ -45,7 +45,7 @@ export function PromptsSection() {
         newFileTemplate={PROMPT_TEMPLATE}
         enableTemplateVars
         panelWidthStorage={aiConfigPagePanelWidth}
-        compactMode={compact}
+        compactMode={breakpoint === 'compact'}
         className="flex-1"
       />
     </div>

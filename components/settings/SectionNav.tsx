@@ -17,25 +17,29 @@ export const SETTINGS_SECTIONS: SectionNavItem[] = [
   { path: 'about', label: '关于', icon: Info },
 ];
 
+/** Visual variant for SectionNav, mapped from SettingsLayout's breakpoint. */
+export type SectionNavVariant = 'pills' | 'tabs' | 'labels';
+
 interface SectionNavProps {
   /** Absolute base path of the Settings hub (e.g. '/settings' in sidepanel, '' in tab page). */
   basePath: string;
-  /** Render as a horizontal icon-only pill row (used when container is narrow). */
-  compact?: boolean;
+  /**
+   * Visual variant:
+   * - `pills`  — horizontal icon-only row, compact sidepanel.
+   * - `tabs`   — horizontal icon + text tabs.
+   * - `labels` — vertical labeled sidebar (default).
+   */
+  variant?: SectionNavVariant;
 }
 
 /**
  * SectionNav — navigation for Settings sections.
  *
- * Two variants:
- * - Standard (default): vertical labeled sidebar on the left.
- * - Compact: horizontal icon-only pill row above the content (labels via `title`).
- *
  * Uses absolute paths derived from `basePath` so the same component works
  * under splat routes (`prompts/*`) without relative-path gotchas.
  */
-export function SectionNav({ basePath, compact = false }: SectionNavProps) {
-  if (compact) {
+export function SectionNav({ basePath, variant = 'labels' }: SectionNavProps) {
+  if (variant === 'pills') {
     return (
       <nav
         aria-label="设置导航"
@@ -67,6 +71,38 @@ export function SectionNav({ basePath, compact = false }: SectionNavProps) {
     );
   }
 
+  if (variant === 'tabs') {
+    return (
+      <nav
+        aria-label="设置导航"
+        className="shrink-0 border-b border-border px-2 py-1.5 overflow-x-auto"
+      >
+        <ul className="flex items-center gap-0.5">
+          {SETTINGS_SECTIONS.map(({ path, label, icon: Icon }) => (
+            <li key={path}>
+              <NavLink
+                to={`${basePath}/${path}`}
+                replace
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-1.5 h-8 px-2.5 rounded-md text-[13px] transition-colors whitespace-nowrap',
+                    isActive
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+                  )
+                }
+              >
+                <Icon className="size-4 shrink-0" />
+                {label}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    );
+  }
+
+  // variant === 'labels'
   return (
     <nav aria-label="设置导航" className="w-45 shrink-0 border-r border-border py-2 overflow-y-auto">
       <ul className="flex flex-col gap-0.5 px-2">
