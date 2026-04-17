@@ -15,6 +15,8 @@ interface SettingsRoutesProps {
   basePath: string;
   /** Show back button in the top bar. True in sidepanel, false in standalone tab page. */
   showBackButton?: boolean;
+  /** Show "open in new tab" button. True in sidepanel only. */
+  showOpenInTab?: boolean;
 }
 
 /**
@@ -25,10 +27,10 @@ interface SettingsRoutesProps {
  * so the same tree works under both routers. `basePath` is forwarded to
  * `SettingsLayout`/`SectionNav` so they can build absolute NavLinks.
  */
-export function SettingsRoutes({ basePath, showBackButton = false }: SettingsRoutesProps) {
+export function SettingsRoutes({ basePath, showBackButton = false, showOpenInTab = false }: SettingsRoutesProps) {
   return (
     <Routes>
-      <Route element={<SettingsLayout basePath={basePath} showBackButton={showBackButton} />}>
+      <Route element={<SettingsLayout basePath={basePath} showBackButton={showBackButton} showOpenInTab={showOpenInTab} />}>
         <Route index element={<SettingsIndexRedirect />} />
         <Route path="providers" element={<ProvidersSection />} />
         <Route path="instructions" element={<InstructionsSection />} />

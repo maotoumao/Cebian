@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { browser } from 'wxt/browser';
 import { Button } from '@/components/ui/button';
 import { SectionNav } from './SectionNav';
 import { lastSettingsSection } from '@/lib/storage';
@@ -21,21 +22,21 @@ function resolveBreakpoint(width: number | null): SettingsBreakpoint {
 interface SettingsLayoutProps {
   /** Absolute base path of the Settings hub (e.g. '/settings' in sidepanel). */
   basePath: string;
-  /** Show the "← 返回" button in the top bar (sidepanel only). */
+  /** Show the back button in the top bar (sidepanel only). */
   showBackButton?: boolean;
+  /** Show the "open in new tab" button in the top bar (sidepanel only). */
+  showOpenInTab?: boolean;
 }
 
 /**
- * SettingsLayout — shell for the Settings hub.
+ * SettingsLayout - shell for the Settings hub.
  *
  * Three responsive tiers:
- * - compact (<640px): top icon-only pills → full-width Outlet (master-detail).
- * - medium (640–960): top icon+text tabs   → full-width Outlet (two-column still).
- * - wide   (≥960px):  left labeled sidebar → Outlet on the right.
- *
- * The resolved breakpoint is forwarded to sections via `SettingsOutletContext`.
+ * - compact (<640px): top icon-only pills -> full-width Outlet (master-detail).
+ * - medium (640-1200): top icon+text tabs -> full-width Outlet (two-column still).
+ * - wide   (>=1200px): left labeled sidebar -> Outlet on the right.
  */
-export function SettingsLayout({ basePath, showBackButton = false }: SettingsLayoutProps) {
+export function SettingsLayout({ basePath, showBackButton = false, showOpenInTab = false }: SettingsLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -47,14 +48,23 @@ export function SettingsLayout({ basePath, showBackButton = false }: SettingsLay
     ? location.pathname.slice(basePath.length).replace(/^\//, '')
     : '';
   const section = relative.split('/')[0];
+  // Only persist the landing section when running inside the sidepanel
+  // (showBackButton is our proxy for that). The tab page is deep-linkable via
+  // hash and should not influence which section the sidepanel opens to next.
   useEffect(() => {
-    if (section) lastSettingsSection.setValue(section);
-  }, [section]);
+    if (section && showBackButton) lastSettingsSection.setValue(section);
+  }, [section, showBackButton]);
 
-  // Back button always exits Settings entirely — single-step escape, no history stepping.
+  // Back button always exits Settings entirely - single-step escape.
   const handleBack = useCallback(() => {
     navigate('/chat/new', { replace: true });
   }, [navigate]);
+
+  // Open the current Settings path in the standalone tab page.
+  const handleOpenInTab = useCallback(() => {
+    const url = browser.runtime.getURL('/settings.html') + '#/' + relative;
+    void browser.tabs.create({ url });
+  }, [relative]);
 
   const outletCtx: SettingsOutletContext = { basePath, breakpoint };
 
@@ -75,7 +85,18 @@ export function SettingsLayout({ basePath, showBackButton = false }: SettingsLay
           </Button>
         )}
         <h1 className="font-semibold text-sm">设置</h1>
-        {/* TODO(stage 4): "在新标签页打开" button (sidepanel only) carrying current location.pathname. */}
+        {showOpenInTab && (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={handleOpenInTab}
+            aria-label="在新标签页打开"
+            title="在新标签页打开"
+            className="ml-auto"
+          >
+            <ExternalLink className="size-4" />
+          </Button>
+        )}
       </div>
 
       {topNav ? (

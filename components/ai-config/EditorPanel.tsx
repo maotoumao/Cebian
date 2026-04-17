@@ -1,14 +1,21 @@
 /**
- * EditorPanel — pure VFS file editor.
+ * EditorPanel — VFS file editor with auto-save.
  *
- * Displays a CodeMirror editor for the given filePath, with save/reset controls.
+ * Save strategy:
+ * - Debounced write 500ms after content stops changing.
+ * - Immediate flush on Ctrl/Cmd+S, file switch, unmount, or page unload.
+ * - Subtle footer status ("已保存 · 保存中 · 未保存") — no buttons.
+ * - Write errors surface via `sonner` toast but don't block further edits.
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { CodeMirrorEditor } from '@/components/editor/CodeMirrorEditor';
 import { vfs } from '@/lib/vfs';
+import { cn } from '@/lib/utils';
 
-// ─── Types ───
+const AUTOSAVE_DEBOUNCE_MS = 500;
+
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 interface EditorPanelProps {
   /** Full VFS path to edit. */
@@ -19,7 +26,7 @@ interface EditorPanelProps {
   isDark: boolean;
   /** Enable {{variable}} template highlighting + autocomplete. */
   enableTemplateVars?: boolean;
-  /** Called after save. */
+  /** Called after a successful save. */
   onSave?: () => void;
 }
 
@@ -29,64 +36,177 @@ function detectLanguage(filePath: string): 'markdown' | 'yaml' | 'javascript' {
   return 'markdown';
 }
 
-// ─── Component ───
-
 export function EditorPanel({ filePath, rootPath, isDark, enableTemplateVars = false, onSave }: EditorPanelProps) {
   const [body, setBody] = useState('');
   const [savedContent, setSavedContent] = useState('');
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<SaveStatus>('idle');
 
+  // ─── Refs (kept fresh for effects / handlers) ───
   const filePathRef = useRef(filePath);
+  const bodyRef = useRef(body);
+  const savedRef = useRef(savedContent);
+  const onSaveRef = useRef(onSave);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Path of the file whose content is currently loaded into `body`/`savedContent`.
+  // Only set at the end of a successful load; the auto-save flush refuses to write
+  // until this matches the current `filePath`, which prevents the previous file's
+  // body from being written to a newly-selected file while its load is in flight.
+  const loadedPathRef = useRef<string | undefined>(undefined);
   filePathRef.current = filePath;
+  bodyRef.current = body;
+  savedRef.current = savedContent;
+  onSaveRef.current = onSave;
 
   const language = filePath ? detectLanguage(filePath) : 'markdown';
   const dirty = !!filePath && body !== savedContent;
 
-  // Load file content
-  const loadFile = useCallback(async () => {
-    if (!filePath) return;
-    setLoading(true);
+  // ─── Core flush: write current body to `targetPath` (or the current file). ───
+  const flush = useCallback(async (targetPath?: string): Promise<void> => {
+    const path = targetPath ?? filePathRef.current;
+    if (!path) return;
+    const content = bodyRef.current;
+    // Refuse to write until the body actually belongs to `path`. Without this
+    // guard, a pending debounce scheduled while loading a new file would write
+    // the previous file's body to the new file. `loadedPathRef` is only set
+    // after a successful read.
+    if (path !== loadedPathRef.current) return;
+    if (path !== filePathRef.current) return;
+    if (content === savedRef.current) return;
+    setStatus('saving');
     try {
-      const raw = await vfs.readFile(filePath, 'utf8');
-      const content = typeof raw === 'string' ? raw : new TextDecoder().decode(raw as Uint8Array);
-      if (filePath !== filePathRef.current) return;
-      setSavedContent(content);
-      setBody(content);
-    } catch {
+      await vfs.writeFile(path, content);
+      // Only commit UI state if the file is still current.
+      if (path === filePathRef.current) {
+        setSavedContent(content);
+        setStatus('saved');
+      }
+      onSaveRef.current?.();
+    } catch (err) {
+      console.error('[EditorPanel] autosave failed', err);
+      setStatus('error');
+      toast.error('保存失败', {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }, []);
+
+  // ─── Load file whenever filePath changes. Flush previous on switch. ───
+  useEffect(() => {
+    // Flush any pending debounce for the previous file before loading the new one.
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    if (!filePath) {
+      loadedPathRef.current = undefined;
       setBody('');
       setSavedContent('');
-    } finally {
-      setLoading(false);
+      setStatus('idle');
+      return;
     }
+
+    let cancelled = false;
+    setLoading(true);
+    setStatus('idle');
+    // Mark the loaded path as stale until the new read completes; this blocks
+    // the auto-save effect from writing during the load window.
+    loadedPathRef.current = undefined;
+    (async () => {
+      try {
+        const raw = await vfs.readFile(filePath, 'utf8');
+        const content = typeof raw === 'string' ? raw : new TextDecoder().decode(raw as Uint8Array);
+        if (cancelled || filePath !== filePathRef.current) return;
+        setSavedContent(content);
+        setBody(content);
+        loadedPathRef.current = filePath;
+      } catch {
+        if (cancelled) return;
+        setBody('');
+        setSavedContent('');
+        loadedPathRef.current = filePath;
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, [filePath]);
 
-  useEffect(() => { loadFile(); }, [loadFile]);
+  // ─── Debounced auto-save on body change. ───
+  useEffect(() => {
+    if (!filePath) return;
+    if (body === savedContent) return;
+    setStatus('idle');
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    const pathAtSchedule = filePath;
+    debounceTimerRef.current = setTimeout(() => {
+      debounceTimerRef.current = null;
+      void flush(pathAtSchedule);
+    }, AUTOSAVE_DEBOUNCE_MS);
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+    };
+  }, [body, filePath, savedContent, flush]);
 
-  const handleSave = useCallback(async () => {
-    if (!filePath || body === savedContent) return;
-    await vfs.writeFile(filePath, body);
-    setSavedContent(body);
-    onSave?.();
-  }, [filePath, body, savedContent, onSave]);
-
-  const handleReset = () => {
-    setBody(savedContent);
-  };
-
-  // Ctrl+S keyboard shortcut
-  const handleSaveRef = useRef(handleSave);
-  handleSaveRef.current = handleSave;
-
+  // ─── Ctrl/Cmd+S: immediate flush. ───
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        handleSaveRef.current();
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = null;
+        }
+        void flush();
       }
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [flush]);
+
+  // ─── Flush on visibility change / page unload. ───
+  // `visibilitychange → hidden` fires on tab switch, minimise, and the normal
+  // lifecycle leading up to close — this is the reliable persistence hook for
+  // IndexedDB. `beforeunload` is kept as a last-ditch best-effort queue.
+  useEffect(() => {
+    const maybeFlush = () => {
+      if (bodyRef.current !== savedRef.current && filePathRef.current) {
+        void flush();
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') maybeFlush();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('beforeunload', maybeFlush);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('beforeunload', maybeFlush);
+    };
+  }, [flush]);
+
+  // ─── On unmount, flush any pending changes. ───
+  useEffect(() => {
+    return () => {
+      if (bodyRef.current !== savedRef.current && filePathRef.current) {
+        void flush(filePathRef.current);
+      }
+    };
+  }, [flush]);
+
+  // ─── Auto-fade "已保存" to "idle" after a moment for calm UI. ───
+  useEffect(() => {
+    if (status !== 'saved') return;
+    const t = setTimeout(() => setStatus('idle'), 2000);
+    return () => clearTimeout(t);
+  }, [status]);
+
+  // ─── Render ───
 
   if (!filePath) {
     return (
@@ -106,17 +226,28 @@ export function EditorPanel({ filePath, rootPath, isDark, enableTemplateVars = f
 
   // Compute breadcrumb segments relative to rootPath
   const breadcrumb = (() => {
-    if (!filePath) return [];
     const base = rootPath ?? '';
     const rel = base && filePath.startsWith(base + '/') ? filePath.substring(base.length + 1) : filePath;
     return rel.split('/');
   })();
 
+  const statusLabel =
+    status === 'saving' ? '保存中…'
+    : status === 'error' ? '保存失败'
+    : dirty ? '未保存'
+    : status === 'saved' ? '已保存'
+    : '';
+
+  const statusClass =
+    status === 'error' ? 'text-destructive'
+    : status === 'saved' ? 'text-muted-foreground'
+    : 'text-muted-foreground/70';
+
   return (
     <div className="flex flex-col h-full">
-      {/* Breadcrumb */}
-      {breadcrumb.length > 0 && (
-        <div className="flex items-center gap-1 px-3 py-1.5 text-xs text-muted-foreground border-b border-border shrink-0 overflow-hidden">
+      {/* Breadcrumb + save status */}
+      <div className="flex items-center gap-2 px-3 py-1.5 text-xs border-b border-border shrink-0 overflow-hidden">
+        <div className="flex items-center gap-1 min-w-0 flex-1 text-muted-foreground">
           {breadcrumb.map((seg, i) => (
             <span key={i} className="flex items-center gap-1 min-w-0">
               {i > 0 && <span className="text-muted-foreground/50">/</span>}
@@ -124,7 +255,13 @@ export function EditorPanel({ filePath, rootPath, isDark, enableTemplateVars = f
             </span>
           ))}
         </div>
-      )}
+        {statusLabel && (
+          <span className={cn('shrink-0 text-[11px] transition-opacity', statusClass)}>
+            {statusLabel}
+          </span>
+        )}
+      </div>
+
       <div className="flex-1 min-h-0">
         <CodeMirrorEditor
           value={body}
@@ -134,15 +271,6 @@ export function EditorPanel({ filePath, rootPath, isDark, enableTemplateVars = f
           enableTemplateVars={enableTemplateVars}
           className="h-full"
         />
-      </div>
-      <div className="flex items-center justify-end gap-2 p-2 border-t border-border shrink-0">
-        <Button variant="ghost" size="sm" onClick={handleReset} disabled={!dirty}>
-          重置
-        </Button>
-        <Button size="sm" onClick={handleSave} disabled={!dirty}>
-          {dirty && <span className="mr-1">●</span>}
-          保存
-        </Button>
       </div>
     </div>
   );

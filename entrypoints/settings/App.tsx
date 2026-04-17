@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
+import { HashRouter } from 'react-router-dom';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { AIConfigContent } from '@/components/ai-config/AIConfigContent';
+import { SettingsRoutes } from '@/entrypoints/sidepanel/pages/settings';
 import { useStorageItem } from '@/hooks/useStorageItem';
-import { themePreference, aiConfigPagePanelWidth } from '@/lib/storage';
+import { themePreference } from '@/lib/storage';
 
 function resolveTheme(pref: 'dark' | 'light' | 'system'): 'dark' | 'light' {
   if (pref !== 'system') return pref;
@@ -17,6 +18,13 @@ function applyTheme(resolved: 'dark' | 'light') {
   }
 }
 
+/**
+ * Standalone Settings tab page.
+ *
+ * Hosts the full Settings hub at `/settings.html#/<section>[/<file>]`.
+ * Uses HashRouter so deep-links like `#/skills/foo/SKILL.md` survive
+ * navigation and can be opened from the sidepanel's "open in new tab" button.
+ */
 export default function App() {
   const [theme] = useStorageItem(themePreference, 'system');
   const [themeReady, setThemeReady] = useState(false);
@@ -46,14 +54,9 @@ export default function App() {
   return (
     <TooltipProvider delayDuration={300}>
       <div className="flex flex-col h-screen bg-background text-foreground">
-        <header className="flex items-center px-5 py-3 border-b border-border shrink-0">
-          <h1 className="text-base font-semibold">AI 配置</h1>
-        </header>
-        <AIConfigContent
-          panelWidthStorage={aiConfigPagePanelWidth}
-          defaultPanelWidth={280}
-          className="flex-1 min-h-0"
-        />
+        <HashRouter>
+          <SettingsRoutes basePath="" />
+        </HashRouter>
       </div>
     </TooltipProvider>
   );

@@ -7,6 +7,7 @@
  */
 import { useState, useEffect } from 'react';
 import { ExternalLink } from 'lucide-react';
+import { browser } from 'wxt/browser';
 import { DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { AIConfigContent } from './AIConfigContent';
@@ -25,7 +26,7 @@ export function AIConfigDialog() {
   }, []);
 
   const openInTab = () => {
-    chrome.tabs.create({ url: browser.runtime.getURL('/ai-config.html') });
+    void browser.tabs.create({ url: browser.runtime.getURL('/settings.html') });
   };
 
   if (tooNarrow) {
