@@ -4,7 +4,7 @@
  */
 export function AboutSection() {
   return (
-    <div className="p-6 space-y-6">
+    <div className="flex-1 overflow-y-auto p-6 space-y-6">
       <h2 className="text-base font-semibold">关于</h2>
 
       <div className="space-y-1">

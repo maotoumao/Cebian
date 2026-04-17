@@ -24,9 +24,12 @@ interface TreeNodeData {
 }
 
 export interface FileTreeHandle {
-  createFile: (parentId?: string) => void;
+  /** Create a new empty file. Optional `initialContent` populates the file on disk. */
+  createFile: (parentId?: string, initialContent?: string) => void;
+  /** Create a new folder (placeholder → inline rename). */
   createFolder: (parentId?: string) => void;
-  createSkill: () => void;
+  /** Re-scan the VFS and redraw the tree. */
+  refresh: () => void;
 }
 
 interface FileTreeProps {
@@ -40,12 +43,8 @@ interface FileTreeProps {
   refreshKey?: number;
   /** Filter tree nodes by name. */
   searchTerm?: string;
-  /** Allow creating subfolders. false = flat file list (Prompts). */
+  /** Allow creating subfolders. false = flat file list. */
   allowNewFolder?: boolean;
-  /** Template content for new files (e.g. prompt frontmatter). */
-  newFileTemplate?: string;
-  /** Label for the create-file context menu item. */
-  createFileLabel?: string;
 }
 
 // ─── VFS → tree data builder ───
@@ -101,7 +100,6 @@ function FileIcon({ name, className }: { name: string; className?: string }) {
 
 function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeNodeData>) {
   const allowNewFolder = (tree.props as any).allowNewFolder ?? true;
-  const createFileLabel: string = (tree.props as any).createFileLabel ?? '新建文件';
   const editStartRef = useRef<number>(0);
 
   const handleClick = (e: React.MouseEvent) => {
@@ -188,7 +186,7 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
     menuItems = (
       <>
         <ContextMenuItem onClick={() => (tree.props as any).onCreateFile?.(node.id)}>
-          <FilePlus className="size-3.5 mr-2" /> {createFileLabel}
+          <FilePlus className="size-3.5 mr-2" /> 新建文件
         </ContextMenuItem>
         {allowNewFolder && (
           <ContextMenuItem onClick={() => (tree.props as any).onCreateFolder?.(node.id)}>
@@ -234,7 +232,7 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
 // ─── Main component ───
 
 export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
-  function FileTree({ root, selectedFile, onSelect, refreshKey, searchTerm, allowNewFolder = true, newFileTemplate = '', createFileLabel = '新建文件' }, ref) {
+  function FileTree({ root, selectedFile, onSelect, refreshKey, searchTerm, allowNewFolder = true }, ref) {
   const [data, setData] = useState<TreeNodeData[]>([]);
   const treeRef = useRef<TreeApi<TreeNodeData>>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -294,18 +292,26 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
 
   // ─── VFS-first create helpers ───
 
-  const doCreateFile = useCallback(async (parentId?: string) => {
+  // Expand the parent folder (unless it's root) so the newly created node is visible.
+  const revealParent = useCallback((parent: string) => {
+    if (parent === root) return;
+    // Defer: scan() has just queued a data update; open after the tree renders it.
+    setTimeout(() => treeRef.current?.open(parent), 50);
+  }, [root]);
+
+  const doCreateFile = useCallback(async (parentId?: string, initialContent: string = '') => {
     if (treeRef.current?.isEditing) return;
     const parent = resolveCreateParent(parentId);
     const name = await uniqueName(parent, 'untitled', '.md');
     const fullPath = `${parent}/${name}`;
     try {
-      await vfs.writeFile(fullPath, newFileTemplate);
+      await vfs.writeFile(fullPath, initialContent);
       placeholdersRef.current.add(fullPath);
       await scan();
+      revealParent(parent);
       setPendingEditId(fullPath);
     } catch { /* ignore */ }
-  }, [resolveCreateParent, scan, newFileTemplate]);
+  }, [resolveCreateParent, scan, revealParent]);
 
   const doCreateFolder = useCallback(async (parentId?: string) => {
     if (treeRef.current?.isEditing) return;
@@ -316,34 +322,17 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
       await vfs.mkdir(fullPath, { recursive: true });
       placeholdersRef.current.add(fullPath);
       await scan();
+      revealParent(parent);
       setPendingEditId(fullPath);
     } catch { /* ignore */ }
-  }, [resolveCreateParent, scan]);
-
-  const doCreateSkill = useCallback(async () => {
-    if (treeRef.current?.isEditing) return;
-    // Skills must always be created at the root directory
-    const parent = root;
-    const name = await uniqueName(parent, 'new-skill');
-    const fullPath = `${parent}/${name}`;
-    const skillMd = `---\nname: ${name}\ndescription: "TODO - describe what this skill does and when to use it."\nmetadata:\n  matched-url:\n    - "*"\n  author: ""\n  version: "1.0"\n---\n\n## Instructions\n\n(Write your skill instructions here)\n`;
-    try {
-      await vfs.mkdir(fullPath, { recursive: true });
-      await vfs.mkdir(`${fullPath}/scripts`, { recursive: true });
-      await vfs.mkdir(`${fullPath}/references`, { recursive: true });
-      await vfs.writeFile(`${fullPath}/SKILL.md`, skillMd);
-      placeholdersRef.current.add(fullPath);
-      await scan();
-      setPendingEditId(fullPath);
-    } catch { /* ignore */ }
-  }, [root, scan]);
+  }, [resolveCreateParent, scan, revealParent]);
 
   // Expose imperative methods
   useImperativeHandle(ref, () => ({
     createFile: doCreateFile,
     createFolder: doCreateFolder,
-    createSkill: doCreateSkill,
-  }), [doCreateFile, doCreateFolder, doCreateSkill]);
+    refresh: scan,
+  }), [doCreateFile, doCreateFolder, scan]);
 
   // ─── Data handlers (controlled mode) ───
 
@@ -465,7 +454,7 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
         paddingTop={6}
         paddingBottom={6}
         // Pass through custom props for NodeRenderer to read
-        {...{ allowNewFolder, createFileLabel, onCreateFile: doCreateFile, onCreateFolder: doCreateFolder, onCreateSkill: doCreateSkill } as any}
+        {...{ allowNewFolder, onCreateFile: doCreateFile, onCreateFolder: doCreateFolder } as any}
       >
         {NodeRenderer}
       </Tree>

@@ -55,10 +55,16 @@ export function SettingsLayout({ basePath, showBackButton = false }: SettingsLay
 
       <div className="flex flex-1 min-h-0">
         <SectionNav basePath={basePath} />
-        <div className="flex-1 min-w-0 overflow-y-auto">
-          <Outlet />
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+          <Outlet context={{ basePath } satisfies SettingsOutletContext} />
         </div>
       </div>
     </div>
   );
+}
+
+/** Shared context passed from SettingsLayout to each section via <Outlet>. */
+export interface SettingsOutletContext {
+  /** Absolute base path of the Settings hub (e.g. '/settings'). */
+  basePath: string;
 }

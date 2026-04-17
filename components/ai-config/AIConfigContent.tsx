@@ -19,6 +19,7 @@ import { EditorPanel } from './EditorPanel';
 import { useIsDark } from '@/hooks/useIsDark';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { CEBIAN_PROMPTS_DIR, CEBIAN_SKILLS_DIR } from '@/lib/constants';
+import { createSkillTemplate } from '@/lib/ai-config/skill-creator';
 import { cn } from '@/lib/utils';
 import type { StorageItem } from '@/hooks/useStorageItem';
 
@@ -165,7 +166,7 @@ export function AIConfigContent({ panelWidthStorage, defaultPanelWidth = 240, cl
               <Button
                 variant="ghost"
                 size="icon-xs"
-                onClick={() => fileTreeRef.current?.createFile()}
+                onClick={() => fileTreeRef.current?.createFile(undefined, PROMPT_TEMPLATE)}
                 title="新建 Prompt"
               >
                 <FilePlus className="size-4" />
@@ -191,7 +192,11 @@ export function AIConfigContent({ panelWidthStorage, defaultPanelWidth = 240, cl
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  onClick={() => fileTreeRef.current?.createSkill()}
+                  onClick={async () => {
+                    const { entryFile } = await createSkillTemplate(CEBIAN_SKILLS_DIR);
+                    fileTreeRef.current?.refresh();
+                    setSkillFile(entryFile);
+                  }}
                   title="创建 Skill"
                 >
                   <Blocks className="size-4" />
@@ -212,14 +217,12 @@ export function AIConfigContent({ panelWidthStorage, defaultPanelWidth = 240, cl
                   refreshKey={refreshKey}
                   searchTerm={search || undefined}
                   allowNewFolder={!isPrompts}
-                  newFileTemplate={isPrompts ? PROMPT_TEMPLATE : ''}
-                  createFileLabel={isPrompts ? '新建 Prompt' : '新建文件'}
                 />
               </div>
             </ContextMenuTrigger>
             <ContextMenuContent>
               {isPrompts ? (
-                <ContextMenuItem onClick={() => fileTreeRef.current?.createFile()}>
+                <ContextMenuItem onClick={() => fileTreeRef.current?.createFile(undefined, PROMPT_TEMPLATE)}>
                   <FilePlus className="size-3.5 mr-2" /> 新建 Prompt
                 </ContextMenuItem>
               ) : (
@@ -231,7 +234,11 @@ export function AIConfigContent({ panelWidthStorage, defaultPanelWidth = 240, cl
                     <FolderPlus className="size-3.5 mr-2" /> 新建文件夹
                   </ContextMenuItem>
                   <ContextMenuSeparator />
-                  <ContextMenuItem onClick={() => fileTreeRef.current?.createSkill()}>
+                  <ContextMenuItem onClick={async () => {
+                    const { entryFile } = await createSkillTemplate(CEBIAN_SKILLS_DIR);
+                    fileTreeRef.current?.refresh();
+                    setSkillFile(entryFile);
+                  }}>
                     <Blocks className="size-3.5 mr-2" /> 创建 Skill
                   </ContextMenuItem>
                 </>

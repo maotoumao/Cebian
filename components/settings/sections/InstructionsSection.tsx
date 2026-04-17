@@ -11,7 +11,7 @@ export function InstructionsSection() {
   const [currentInstructions, setCurrentInstructions] = useStorageItem(userInstructionsStorage, '');
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="flex-1 overflow-y-auto p-6 space-y-6">
       <h2 className="text-base font-semibold">指引</h2>
 
       <div className="space-y-2">

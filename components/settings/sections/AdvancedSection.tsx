@@ -11,7 +11,7 @@ export function AdvancedSection() {
   const [currentMaxRounds, setCurrentMaxRounds] = useStorageItem(maxRoundsStorage, 200);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="flex-1 overflow-y-auto p-6 space-y-6">
       <h2 className="text-base font-semibold">高级</h2>
 
       <div className="space-y-2">

@@ -152,7 +152,7 @@ export function ProvidersSection() {
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="flex-1 overflow-y-auto p-6 space-y-6">
       <h2 className="text-base font-semibold">AI 提供商</h2>
 
       {/* OAuth providers */}
