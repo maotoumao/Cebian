@@ -5,13 +5,23 @@ import { getActiveTabId } from '@/lib/tab-helpers';
 // IMPORTANT: This function must be fully self-contained — no closures over external variables.
 
 function createPickerInPage() {
-  // Guard: prevent double injection
+  // Guard: prevent double injection. Also clean up any orphaned remnants from
+  // a crashed previous session so we never end up with a stale cursor style.
   if (document.getElementById('cebian-picker-host')) return;
+  document.getElementById('cebian-picker-cursor')?.remove();
 
   // ── Shadow DOM host ──
+  // The host has pointer-events:auto with a full-viewport overlay inside the
+  // shadow root. Hit-testing stops at the overlay so page element-level
+  // handlers (on the underlying <a>, <img>, etc.) are never invoked.
+  // NOTE: pointer/mouse/click/wheel/touch events are *composed* and still
+  // cross the shadow boundary to bubble/capture at window/document (retargeted
+  // to the host). Page-registered window-capture listeners can therefore still
+  // fire. We also install defensive window-capture listeners below to swallow
+  // such events when their composedPath includes our shadow tree.
   const host = document.createElement('div');
   host.id = 'cebian-picker-host';
-  host.style.cssText = 'all:initial !important;position:fixed !important;top:0 !important;left:0 !important;width:0 !important;height:0 !important;overflow:visible !important;pointer-events:none !important;z-index:2147483647 !important;';
+  host.style.cssText = 'all:initial !important;position:fixed !important;inset:0 !important;pointer-events:auto !important;z-index:2147483647 !important;';
   document.documentElement.appendChild(host);
 
   const shadow = host.attachShadow({ mode: 'closed' });
@@ -25,10 +35,17 @@ function createPickerInPage() {
   // ── Shadow DOM UI ──
   const style = document.createElement('style');
   style.textContent = `
+    .overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: auto;
+      z-index: 1;
+      background: transparent;
+    }
     .highlight {
       position: fixed;
       pointer-events: none;
-      z-index: 2147483646;
+      z-index: 2;
       border: 2px solid #e8a43a;
       background: rgba(232, 164, 58, 0.08);
       border-radius: 2px;
@@ -37,7 +54,7 @@ function createPickerInPage() {
     .tooltip {
       position: fixed;
       pointer-events: none;
-      z-index: 2147483647;
+      z-index: 3;
       display: flex;
       align-items: baseline;
       gap: 6px;
@@ -57,6 +74,11 @@ function createPickerInPage() {
   `;
   shadow.appendChild(style);
 
+  // Full-viewport overlay that absorbs all pointer events before the page sees them.
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  shadow.appendChild(overlay);
+
   const highlightEl = document.createElement('div');
   highlightEl.className = 'highlight';
   highlightEl.style.display = 'none';
@@ -73,6 +95,22 @@ function createPickerInPage() {
   shadow.appendChild(tooltipEl);
 
   let currentEl: Element | null = null;
+
+  // ── Underlying element lookup ──
+  // Temporarily disable hit-testing on BOTH the host and the overlay so
+  // `elementFromPoint` returns the real page element. Toggling both is
+  // belt-and-suspenders — `pointer-events` doesn't cascade to descendants, so
+  // relying on host alone could miss edge cases where the overlay is hit-tested
+  // independently. Restored synchronously, no repaint required.
+  function getUnderlyingElement(x: number, y: number): Element | null {
+    host.style.pointerEvents = 'none';
+    overlay.style.pointerEvents = 'none';
+    const el = document.elementFromPoint(x, y);
+    host.style.pointerEvents = 'auto';
+    overlay.style.pointerEvents = 'auto';
+    if (!el || el === host || el === document.documentElement) return null;
+    return el;
+  }
 
   // ── Selector: minimal unique CSS selector ──
   function computeSelector(el: Element): string {
@@ -165,10 +203,10 @@ function createPickerInPage() {
     return attrs;
   }
 
-  // ── Event: mousemove (capture, NOT suppressed — page hover effects still work) ──
-  function onMouseMove(e: MouseEvent) {
-    const target = e.target as Element;
-    if (!target || target === host || target === document.documentElement || target === document.body) {
+  // ── Event: pointermove on overlay — track hovered element ──
+  function onPointerMove(e: PointerEvent) {
+    const target = getUnderlyingElement(e.clientX, e.clientY);
+    if (!target) {
       highlightEl.style.display = 'none';
       tooltipEl.style.display = 'none';
       currentEl = null;
@@ -208,7 +246,7 @@ function createPickerInPage() {
     tooltipEl.style.top = ty + 'px';
   }
 
-  // ── Event: click (capture, suppressed — prevent page navigation/actions) ──
+  // ── Event: click on overlay — resolve pick ──
   function onClick(e: MouseEvent) {
     e.preventDefault();
     e.stopImmediatePropagation();
@@ -245,12 +283,22 @@ function createPickerInPage() {
     cleanupPicker();
   }
 
-  // ── Event: suppress mousedown/mouseup/contextmenu/pointer/touch/dblclick/auxclick
-  //    to prevent page side-effects. These can open menus, dropdowns, dialogs,
-  //    trigger navigation, or start drag/selection before `click` even fires.
-  function onSuppressEvent(e: Event) {
+  // Block scroll and right-click context menu while picker is active.
+  function onBlockEvent(e: Event) {
     e.preventDefault();
     e.stopImmediatePropagation();
+  }
+
+  // Defensive line: composed events (click/pointer/mouse/wheel/touch) still
+  // traverse window capture even when dispatched inside our closed shadow root.
+  // Stop them as soon as they touch any window-level capture listener IF the
+  // event originated in our shadow tree — this prevents target-agnostic page
+  // handlers (SPA router hijackers, analytics, etc.) from firing.
+  function onWindowCapture(e: Event) {
+    const path = e.composedPath();
+    if (path.length > 0 && path.indexOf(host) !== -1) {
+      e.stopImmediatePropagation();
+    }
   }
 
   // ── Event: keydown — only intercept Escape ──
@@ -265,37 +313,48 @@ function createPickerInPage() {
 
   // ── Cleanup ──
   function cleanupPicker() {
-    window.removeEventListener('mousemove', onMouseMove, true);
-    window.removeEventListener('click', onClick, true);
-    window.removeEventListener('mousedown', onSuppressEvent, true);
-    window.removeEventListener('mouseup', onSuppressEvent, true);
-    window.removeEventListener('dblclick', onSuppressEvent, true);
-    window.removeEventListener('auxclick', onSuppressEvent, true);
-    window.removeEventListener('contextmenu', onSuppressEvent, true);
-    window.removeEventListener('pointerdown', onSuppressEvent, true);
-    window.removeEventListener('pointerup', onSuppressEvent, true);
-    window.removeEventListener('touchstart', onSuppressEvent, true);
-    window.removeEventListener('touchend', onSuppressEvent, true);
+    // Delete the global hook first so any racing external cancel falls through
+    // to its DOM-removal fallback instead of calling a half-dismantled picker.
+    try { delete (window as any).__cebianPickerCleanup; } catch { /* non-configurable */ }
     window.removeEventListener('keydown', onKeyDown, true);
-    cursorStyle.remove();
-    host.remove();
+    window.removeEventListener('click', onWindowCapture, true);
+    window.removeEventListener('pointerdown', onWindowCapture, true);
+    window.removeEventListener('pointerup', onWindowCapture, true);
+    window.removeEventListener('mousedown', onWindowCapture, true);
+    window.removeEventListener('mouseup', onWindowCapture, true);
+    window.removeEventListener('contextmenu', onWindowCapture, true);
+    window.removeEventListener('wheel', onWindowCapture, true);
+    window.removeEventListener('touchstart', onWindowCapture, true);
+    window.removeEventListener('touchmove', onWindowCapture, true);
+    try { cursorStyle.remove(); } catch { /* detached */ }
+    try { host.remove(); } catch { /* detached */ }
   }
 
-  // Register capture-phase listeners on `window` so we fire before any
-  // document-level capture listeners the page may have installed.
-  // `touchstart`/`touchend` need passive: false to allow preventDefault.
-  window.addEventListener('mousemove', onMouseMove, true);
-  window.addEventListener('click', onClick, true);
-  window.addEventListener('mousedown', onSuppressEvent, true);
-  window.addEventListener('mouseup', onSuppressEvent, true);
-  window.addEventListener('dblclick', onSuppressEvent, true);
-  window.addEventListener('auxclick', onSuppressEvent, true);
-  window.addEventListener('contextmenu', onSuppressEvent, true);
-  window.addEventListener('pointerdown', onSuppressEvent, true);
-  window.addEventListener('pointerup', onSuppressEvent, true);
-  window.addEventListener('touchstart', onSuppressEvent, { capture: true, passive: false });
-  window.addEventListener('touchend', onSuppressEvent, { capture: true, passive: false });
+  // Overlay listeners handle the actual picker UX.
+  overlay.addEventListener('pointermove', onPointerMove);
+  overlay.addEventListener('click', onClick);
+  overlay.addEventListener('contextmenu', onBlockEvent);
+  overlay.addEventListener('wheel', onBlockEvent, { passive: false });
+  overlay.addEventListener('touchmove', onBlockEvent, { passive: false });
+
+  // Defensive window-capture listeners: stop composed events that originated
+  // in our shadow tree before any page-registered window-capture handler runs.
+  window.addEventListener('click', onWindowCapture, true);
+  window.addEventListener('pointerdown', onWindowCapture, true);
+  window.addEventListener('pointerup', onWindowCapture, true);
+  window.addEventListener('mousedown', onWindowCapture, true);
+  window.addEventListener('mouseup', onWindowCapture, true);
+  window.addEventListener('contextmenu', onWindowCapture, true);
+  window.addEventListener('wheel', onWindowCapture, true);
+  window.addEventListener('touchstart', onWindowCapture, true);
+  window.addEventListener('touchmove', onWindowCapture, true);
+
+  // Keyboard events bypass hit-testing, so Escape must be registered on window.
   window.addEventListener('keydown', onKeyDown, true);
+
+  // Expose cleanup so the extension side can tear down the picker on cancel
+  // (e.g. user navigates tabs or calls startElementPicker again).
+  (window as any).__cebianPickerCleanup = cleanupPicker;
 }
 
 // ─── Extension-side orchestration (runs in sidepanel) ───
@@ -366,10 +425,18 @@ export async function startElementPicker(): Promise<ElementAttachment | null> {
     // Setup: wire up cleanup so external callers can cancel
     currentCleanup = () => {
       cleanup();
-      // Remove picker UI + cursor style from the page
+      // Invoke the in-page cleanup hook in every frame so iframe pickers are
+      // also torn down (the user may have entered an iframe before cancelling).
+      // Fallback to removing the host/cursor directly in case the hook is
+      // missing (e.g. previous session crashed before installing it).
       chrome.scripting.executeScript({
-        target: { tabId },
+        target: { tabId, allFrames: true },
         func: () => {
+          const w = window as any;
+          if (typeof w.__cebianPickerCleanup === 'function') {
+            w.__cebianPickerCleanup();
+            return;
+          }
           document.getElementById('cebian-picker-host')?.remove();
           document.getElementById('cebian-picker-cursor')?.remove();
         },
