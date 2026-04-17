@@ -4,20 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import {
   providerCredentials,
   customProviders as customProvidersStorage,
-  cebianSettings,
-  DEFAULT_SETTINGS,
-  systemPrompt as systemPromptStorage,
+  userInstructions as userInstructionsStorage,
   maxRounds as maxRoundsStorage,
 } from '@/lib/storage';
 import { mergeCustomProviders } from '@/lib/custom-models';
 import { PRESET_PROVIDERS } from '@/lib/constants';
-import { DEFAULT_SYSTEM_PROMPT } from '@/lib/constants';
 import { ProviderSummary } from '@/components/settings/provider/ProviderSummary';
 import { ProviderManagerDialog } from '@/components/settings/provider/ProviderManagerDialog';
 
@@ -29,8 +25,7 @@ interface SettingsPanelProps {
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const [providers] = useStorageItem(providerCredentials, {});
   const [customProviderList] = useStorageItem(customProvidersStorage, []);
-  const [settings, setSettings] = useStorageItem(cebianSettings, DEFAULT_SETTINGS);
-  const [currentSystemPrompt, setCurrentSystemPrompt] = useStorageItem(systemPromptStorage, '');
+  const [currentInstructions, setCurrentInstructions] = useStorageItem(userInstructionsStorage, '');
   const [currentMaxRounds, setCurrentMaxRounds] = useStorageItem(maxRoundsStorage, 200);
   const [providerDialogOpen, setProviderDialogOpen] = useState(false);
 
@@ -96,77 +91,21 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
         <Separator className="my-1" />
 
-        {/* Section 2: 行为 */}
-        <div>
-          <h3 className="text-xs text-muted-foreground font-medium tracking-wide uppercase mb-3">
-            行为
-          </h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-sm">执行前确认</Label>
-                <p className="text-xs text-muted-foreground">执行脚本前弹窗确认</p>
-              </div>
-              <Switch
-                checked={settings.behavior.confirmBeforeExec}
-                onCheckedChange={(confirmBeforeExec) =>
-                  setSettings({
-                    ...settings,
-                    behavior: { ...settings.behavior, confirmBeforeExec },
-                  })
-                }
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-sm">流式输出</Label>
-                <p className="text-xs text-muted-foreground">实时显示 AI 回复</p>
-              </div>
-              <Switch
-                checked={settings.behavior.streaming}
-                onCheckedChange={(streaming) =>
-                  setSettings({
-                    ...settings,
-                    behavior: { ...settings.behavior, streaming },
-                  })
-                }
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-sm">后台任务持久化</Label>
-                <p className="text-xs text-muted-foreground">
-                  使用 Offscreen Document 保持定时任务
-                </p>
-              </div>
-              <Switch
-                checked={settings.behavior.backgroundPersist}
-                onCheckedChange={(backgroundPersist) =>
-                  setSettings({
-                    ...settings,
-                    behavior: { ...settings.behavior, backgroundPersist },
-                  })
-                }
-              />
-            </div>
-          </div>
-        </div>
-
-        <Separator className="my-1" />
-
-        {/* Section 3: Agent */}
+        {/* Section 2: Agent */}
         <div>
           <h3 className="text-xs text-muted-foreground font-medium tracking-wide uppercase mb-3">
             Agent
           </h3>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-sm">系统提示词</Label>
-              <p className="text-xs text-muted-foreground">留空使用默认值</p>
+              <Label className="text-sm">自定义指引</Label>
+              <p className="text-xs text-muted-foreground">
+                追加到默认规则之后，用于调整回复语言、风格或角色。无法覆盖工具协议和安全规则。
+              </p>
               <Textarea
-                value={currentSystemPrompt}
-                onChange={(e) => setCurrentSystemPrompt(e.target.value)}
-                placeholder={DEFAULT_SYSTEM_PROMPT.slice(0, 120) + '...'}
+                value={currentInstructions}
+                onChange={(e) => setCurrentInstructions(e.target.value)}
+                placeholder={'例如：\n- 用中文回复\n- 回答尽量简洁\n- 讨论代码时默认使用 TypeScript'}
                 rows={4}
                 className="text-xs"
               />

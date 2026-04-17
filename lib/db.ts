@@ -9,7 +9,7 @@ export interface SessionRecord {
   title: string;
   model: string;
   provider: string;
-  systemPrompt: string;
+  userInstructions: string;
   thinkingLevel: string;
   messageCount: number;
   totalInputTokens: number;

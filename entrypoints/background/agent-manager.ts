@@ -5,7 +5,6 @@ import { Agent, type AgentEvent, type AgentMessage } from '@mariozechner/pi-agen
 import type { Api, Model } from '@mariozechner/pi-ai';
 import { getModels, type KnownProvider } from '@mariozechner/pi-ai';
 import { createCebianAgent } from '@/lib/agent';
-import { DEFAULT_SYSTEM_PROMPT } from '@/lib/constants';
 import { scanSkillIndex, buildSkillsBlock } from '@/lib/ai-config/scanner';
 import { sessionStore } from './session-store';
 import { gatherPageContext } from '@/lib/page-context';
@@ -19,7 +18,7 @@ import {
   customProviders as customProvidersStorage,
   activeModel as activeModelStorage,
   thinkingLevel as thinkingLevelStorage,
-  systemPrompt as systemPromptStorage,
+  userInstructions as userInstructionsStorage,
   maxRounds as maxRoundsStorage,
 } from '@/lib/storage';
 import { getCopilotBaseUrl } from '@/lib/oauth';
@@ -169,9 +168,9 @@ class AgentManager {
     const resolved = await this.resolveModelObj();
     if (!resolved) throw new Error('No model selected or model not found');
 
-    const [thinkingLvl, sysPrompt, rounds] = await Promise.all([
+    const [thinkingLvl, instructions, rounds] = await Promise.all([
       thinkingLevelStorage.getValue(),
-      systemPromptStorage.getValue(),
+      userInstructionsStorage.getValue(),
       maxRoundsStorage.getValue(),
     ]);
 
@@ -189,7 +188,7 @@ class AgentManager {
 
     const agent = createCebianAgent({
       model: resolved.model,
-      systemPrompt: sysPrompt || DEFAULT_SYSTEM_PROMPT,
+      userInstructions: instructions || '',
       thinkingLevel: (thinkingLvl || 'medium') as any,
       maxRounds: rounds || 200,
       messages,
@@ -304,9 +303,9 @@ class AgentManager {
     // waiting for agent_end. Messages are filled in by the throttled writer
     // on subsequent message_end events.
     if (!managed.sessionCreated) {
-      const [modelCfg, sysPrompt, thinkingLvl] = await Promise.all([
+      const [modelCfg, instructions, thinkingLvl] = await Promise.all([
         activeModelStorage.getValue(),
-        systemPromptStorage.getValue(),
+        userInstructionsStorage.getValue(),
         thinkingLevelStorage.getValue(),
       ]);
       const title = text.trim().slice(0, 50) + (text.trim().length > 50 ? '...' : '');
@@ -315,7 +314,7 @@ class AgentManager {
         title: title || '新对话',
         model: modelCfg?.modelId ?? '',
         provider: modelCfg?.provider ?? '',
-        systemPrompt: sysPrompt || '',
+        userInstructions: instructions || '',
         thinkingLevel: thinkingLvl || 'medium',
         messageCount: 0,
         totalInputTokens: 0,

@@ -49,22 +49,6 @@ export interface CustomProviderConfig {
 
 export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high';
 
-// ─── Settings ───
-
-export interface BehaviorSettings {
-  confirmBeforeExec: boolean;
-  streaming: boolean;
-  backgroundPersist: boolean;
-}
-
-export interface CebianSettings {
-  behavior: BehaviorSettings;
-}
-
-export const DEFAULT_SETTINGS: CebianSettings = {
-  behavior: { confirmBeforeExec: true, streaming: true, backgroundPersist: true },
-};
-
 // ─── Storage items (WXT defineItem) ───
 
 export const providerCredentials = storage.defineItem<ProviderCredentials>(
@@ -92,13 +76,8 @@ export const themePreference = storage.defineItem<'dark' | 'light' | 'system'>(
   { fallback: 'system' },
 );
 
-export const cebianSettings = storage.defineItem<CebianSettings>(
-  'local:settings',
-  { fallback: DEFAULT_SETTINGS },
-);
-
-export const systemPrompt = storage.defineItem<string>(
-  'local:systemPrompt',
+export const userInstructions = storage.defineItem<string>(
+  'local:userInstructions',
   { fallback: '' },
 );
 

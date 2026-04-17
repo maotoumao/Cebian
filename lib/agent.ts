@@ -8,7 +8,11 @@ import { DEFAULT_SYSTEM_PROMPT } from './constants';
 
 export interface CreateAgentOptions {
   model: Model<Api>;
-  systemPrompt: string;
+  /**
+   * Optional user-provided instructions appended to the built-in system prompt.
+   * Intended for style/language/role tweaks; cannot override tool protocol or safety rules.
+   */
+  userInstructions: string;
   thinkingLevel: 'off' | 'minimal' | 'low' | 'medium' | 'high';
   maxRounds: number;
   messages?: AgentMessage[];
@@ -19,7 +23,7 @@ export interface CreateAgentOptions {
 export function createCebianAgent(options: CreateAgentOptions): Agent {
   const {
     model,
-    systemPrompt,
+    userInstructions,
     thinkingLevel,
     maxRounds,
     messages = [],
@@ -27,8 +31,11 @@ export function createCebianAgent(options: CreateAgentOptions): Agent {
   } = options;
 
   const vfsBaseUrl = chrome.runtime.getURL('vfs.html');
-  const effectivePrompt = (systemPrompt.trim() || DEFAULT_SYSTEM_PROMPT)
-    .replaceAll('{{VFS_BASE_URL}}', vfsBaseUrl);
+  const basePrompt = DEFAULT_SYSTEM_PROMPT.replaceAll('{{VFS_BASE_URL}}', vfsBaseUrl);
+  const trimmedInstructions = userInstructions.trim();
+  const effectivePrompt = trimmedInstructions
+    ? `${basePrompt}\n\n<user-instructions>\n${trimmedInstructions}\n</user-instructions>`
+    : basePrompt;
 
   const agentOptions: AgentOptions = {
     initialState: {
