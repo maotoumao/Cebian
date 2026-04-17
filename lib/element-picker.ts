@@ -245,7 +245,9 @@ function createPickerInPage() {
     cleanupPicker();
   }
 
-  // ── Event: suppress mousedown/mouseup/contextmenu to prevent side-effects ──
+  // ── Event: suppress mousedown/mouseup/contextmenu/pointer/touch/dblclick/auxclick
+  //    to prevent page side-effects. These can open menus, dropdowns, dialogs,
+  //    trigger navigation, or start drag/selection before `click` even fires.
   function onSuppressEvent(e: Event) {
     e.preventDefault();
     e.stopImmediatePropagation();
@@ -263,23 +265,37 @@ function createPickerInPage() {
 
   // ── Cleanup ──
   function cleanupPicker() {
-    document.removeEventListener('mousemove', onMouseMove, true);
-    document.removeEventListener('click', onClick, true);
-    document.removeEventListener('mousedown', onSuppressEvent, true);
-    document.removeEventListener('mouseup', onSuppressEvent, true);
-    document.removeEventListener('contextmenu', onSuppressEvent, true);
-    document.removeEventListener('keydown', onKeyDown, true);
+    window.removeEventListener('mousemove', onMouseMove, true);
+    window.removeEventListener('click', onClick, true);
+    window.removeEventListener('mousedown', onSuppressEvent, true);
+    window.removeEventListener('mouseup', onSuppressEvent, true);
+    window.removeEventListener('dblclick', onSuppressEvent, true);
+    window.removeEventListener('auxclick', onSuppressEvent, true);
+    window.removeEventListener('contextmenu', onSuppressEvent, true);
+    window.removeEventListener('pointerdown', onSuppressEvent, true);
+    window.removeEventListener('pointerup', onSuppressEvent, true);
+    window.removeEventListener('touchstart', onSuppressEvent, true);
+    window.removeEventListener('touchend', onSuppressEvent, true);
+    window.removeEventListener('keydown', onKeyDown, true);
     cursorStyle.remove();
     host.remove();
   }
 
-  // Register capture-phase listeners
-  document.addEventListener('mousemove', onMouseMove, true);
-  document.addEventListener('click', onClick, true);
-  document.addEventListener('mousedown', onSuppressEvent, true);
-  document.addEventListener('mouseup', onSuppressEvent, true);
-  document.addEventListener('contextmenu', onSuppressEvent, true);
-  document.addEventListener('keydown', onKeyDown, true);
+  // Register capture-phase listeners on `window` so we fire before any
+  // document-level capture listeners the page may have installed.
+  // `touchstart`/`touchend` need passive: false to allow preventDefault.
+  window.addEventListener('mousemove', onMouseMove, true);
+  window.addEventListener('click', onClick, true);
+  window.addEventListener('mousedown', onSuppressEvent, true);
+  window.addEventListener('mouseup', onSuppressEvent, true);
+  window.addEventListener('dblclick', onSuppressEvent, true);
+  window.addEventListener('auxclick', onSuppressEvent, true);
+  window.addEventListener('contextmenu', onSuppressEvent, true);
+  window.addEventListener('pointerdown', onSuppressEvent, true);
+  window.addEventListener('pointerup', onSuppressEvent, true);
+  window.addEventListener('touchstart', onSuppressEvent, { capture: true, passive: false });
+  window.addEventListener('touchend', onSuppressEvent, { capture: true, passive: false });
+  window.addEventListener('keydown', onKeyDown, true);
 }
 
 // ─── Extension-side orchestration (runs in sidepanel) ───
