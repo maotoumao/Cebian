@@ -10,7 +10,6 @@ import { scanSkillIndex, buildSkillsBlock } from '@/lib/ai-config/scanner';
 import { sessionStore } from './session-store';
 import { gatherPageContext } from '@/lib/page-context';
 import { buildTextPrefix, extractImages, type Attachment } from '@/lib/attachments';
-import { extractUserText } from '@/lib/message-helpers';
 import { createSessionTools } from '@/lib/tools';
 import type { SessionToolContext } from '@/lib/tools/session-context';
 import type { ServerMessage } from '@/lib/protocol';
@@ -272,39 +271,7 @@ class AgentManager {
         managed.toolCtx.cancelAll();
         const messages = [...agent.state.messages];
         this.broadcast(sessionId, { type: 'agent_end', sessionId, messages });
-
-        if (!managed.sessionCreated && messages.length > 0) {
-          const modelCfg = await activeModelStorage.getValue();
-          const sysPrompt = await systemPromptStorage.getValue();
-          const thinkingLvl = await thinkingLevelStorage.getValue();
-
-          const firstUserText = extractUserText(messages[0]);
-          const title = firstUserText.slice(0, 50) + (firstUserText.length > 50 ? '...' : '');
-          const session: SessionRecord = {
-            id: sessionId,
-            title: title || '新对话',
-            model: modelCfg?.modelId ?? '',
-            provider: modelCfg?.provider ?? '',
-            systemPrompt: sysPrompt || '',
-            thinkingLevel: thinkingLvl || 'medium',
-            messageCount: messages.length,
-            totalInputTokens: 0,
-            totalOutputTokens: 0,
-            totalCost: 0,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            messages,
-          };
-          await sessionStore.create(session);
-          managed.sessionCreated = true;
-          this.broadcast(sessionId, {
-            type: 'session_created',
-            sessionId,
-            title: session.title,
-          });
-        } else if (managed.sessionCreated) {
-          await sessionStore.flush(sessionId);
-        }
+        await sessionStore.flush(sessionId);
         break;
       }
     }
@@ -330,6 +297,41 @@ class AgentManager {
         managed = await this.getOrCreateAgent(sessionId, currentMessages);
         managed.sessionCreated = wasCreated;
       }
+    }
+
+    // Persist the session on first prompt so the UI can navigate to /chat/<id>
+    // immediately (unlocking "new chat" and history visibility) instead of
+    // waiting for agent_end. Messages are filled in by the throttled writer
+    // on subsequent message_end events.
+    if (!managed.sessionCreated) {
+      const [modelCfg, sysPrompt, thinkingLvl] = await Promise.all([
+        activeModelStorage.getValue(),
+        systemPromptStorage.getValue(),
+        thinkingLevelStorage.getValue(),
+      ]);
+      const title = text.trim().slice(0, 50) + (text.trim().length > 50 ? '...' : '');
+      const session: SessionRecord = {
+        id: sessionId,
+        title: title || '新对话',
+        model: modelCfg?.modelId ?? '',
+        provider: modelCfg?.provider ?? '',
+        systemPrompt: sysPrompt || '',
+        thinkingLevel: thinkingLvl || 'medium',
+        messageCount: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        totalCost: 0,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        messages: [],
+      };
+      await sessionStore.create(session);
+      managed.sessionCreated = true;
+      this.broadcast(sessionId, {
+        type: 'session_created',
+        sessionId,
+        title: session.title,
+      });
     }
 
     const enriched = await buildStructuredMessage(text, attachments);

@@ -223,7 +223,13 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
       setState(prev => ({ ...prev, lastError: '未连接到后台服务，请稍后再试' }));
       return;
     }
-    const sessionId = sessionIdRef.current;
+    // Allocate sessionId client-side on first send so cancel() works even if
+    // the user aborts before the background broadcasts 'session_created'.
+    let sessionId = sessionIdRef.current;
+    if (!sessionId) {
+      sessionId = crypto.randomUUID();
+      sessionIdRef.current = sessionId;
+    }
     // Optimistically add user message to local state for immediate UI feedback
     setState(prev => {
       const content: any[] = [{ type: 'text' as const, text: text.trim() }];

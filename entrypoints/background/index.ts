@@ -107,16 +107,10 @@ export default defineBackground(() => {
       case 'prompt': {
         const sessionId = msg.sessionId ?? crypto.randomUUID();
         state.subscribedSession = sessionId;
-        // If this is a new session (no existing sessionId), notify the client so it can navigate
-        if (!msg.sessionId) {
-          port.postMessage({
-            type: 'session_state',
-            sessionId,
-            messages: [],
-            isRunning: true,
-          } satisfies ServerMessage);
-        }
-        // Start the agent (async — events will be broadcast)
+        // Start the agent (async — events will be broadcast).
+        // For new sessions, agentManager.prompt() persists the session and
+        // broadcasts 'session_created' before starting, so the client can
+        // navigate to /chat/<id> immediately.
         agentManager.prompt(sessionId, msg.text, msg.attachments).catch((err) => {
           port.postMessage({
             type: 'error',
