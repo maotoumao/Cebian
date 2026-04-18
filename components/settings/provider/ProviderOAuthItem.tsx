@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
+import { t } from '@/lib/i18n';
 import type { OAuthCredential } from '@/lib/storage';
 
 export type OAuthPhase =
@@ -46,15 +47,15 @@ export function ProviderOAuthItem({
 
   const statusBadge = () => {
     if (isAuthorizing) {
-      return <Badge variant="outline" className="text-blue-500 border-blue-500/20 bg-blue-500/5 text-[0.65rem] h-4 px-1.5">授权中</Badge>;
+      return <Badge variant="outline" className="text-blue-500 border-blue-500/20 bg-blue-500/5 text-[0.65rem] h-4 px-1.5">{t('provider.oauth.authorizing')}</Badge>;
     }
     if (oauthState.phase === 'error') {
-      return <Badge variant="outline" className="text-destructive border-destructive/20 bg-destructive/5 text-[0.65rem] h-4 px-1.5">失败</Badge>;
+      return <Badge variant="outline" className="text-destructive border-destructive/20 bg-destructive/5 text-[0.65rem] h-4 px-1.5">{t('provider.status.failed')}</Badge>;
     }
     if (isLoggedIn) {
-      return <Badge variant="outline" className="text-success border-success/20 bg-success/5 text-[0.65rem] h-4 px-1.5">已登录</Badge>;
+      return <Badge variant="outline" className="text-success border-success/20 bg-success/5 text-[0.65rem] h-4 px-1.5">{t('provider.oauth.loggedIn')}</Badge>;
     }
-    return <Badge variant="outline" className="text-muted-foreground border-border text-[0.65rem] h-4 px-1.5">未登录</Badge>;
+    return <Badge variant="outline" className="text-muted-foreground border-border text-[0.65rem] h-4 px-1.5">{t('provider.oauth.notLoggedIn')}</Badge>;
   };
 
   return (
@@ -72,17 +73,17 @@ export function ProviderOAuthItem({
           {isAuthorizing ? (
             <Button variant="ghost" size="sm" onClick={onCancel}>
               <X className="size-3.5" />
-              取消
+              {t('common.cancel')}
             </Button>
           ) : isLoggedIn ? (
             <Button variant="outline" size="sm" onClick={onLogout}>
               <LogOut className="size-3.5" />
-              退出
+              {t('provider.oauth.signOut')}
             </Button>
           ) : (
             <Button size="sm" onClick={onLogin} disabled={isAuthorizing}>
               <LogIn className="size-3.5" />
-              登录
+              {t('provider.oauth.signIn')}
             </Button>
           )}
         </div>
@@ -93,14 +94,14 @@ export function ProviderOAuthItem({
         <div className="flex items-center gap-2 rounded-md bg-accent/50 border border-border px-3 py-2">
           <Spinner className="size-3.5 shrink-0" />
           <p className="text-xs text-muted-foreground flex-1">
-            请在浏览器中输入代码：
+            {t('provider.oauth.enterCode')}
           </p>
           <code className="text-sm font-mono font-bold tracking-wider">{oauthState.deviceCode}</code>
           <Button
             variant="ghost"
             size="icon-xs"
             onClick={() => handleCopyCode(oauthState.deviceCode!)}
-            title="复制"
+            title={t('common.copy')}
           >
             {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
           </Button>
@@ -112,7 +113,7 @@ export function ProviderOAuthItem({
         <div className="flex items-center gap-2 rounded-md bg-accent/50 border border-border px-3 py-2">
           <Spinner className="size-3.5 shrink-0" />
           <p className="text-xs text-muted-foreground">
-            请在弹出的浏览器窗口中完成授权...
+            {t('provider.oauth.completeInBrowser')}
           </p>
         </div>
       )}

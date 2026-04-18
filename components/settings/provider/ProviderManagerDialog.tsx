@@ -22,6 +22,7 @@ import {
 import { OAUTH_PROVIDERS, APIKEY_PROVIDERS, PRESET_PROVIDERS } from '@/lib/constants';
 import { customProviderKey, getCustomModels } from '@/lib/custom-models';
 import { loginGitHubCopilot, loginOpenAICodex, loginGeminiCli } from '@/lib/oauth';
+import { t } from '@/lib/i18n';
 
 interface ProviderManagerDialogProps {
   open: boolean;
@@ -102,7 +103,7 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
       if (abort.signal.aborted) return;
       setOAuthState(provider, {
         phase: 'error',
-        message: err instanceof Error ? err.message : '授权失败',
+        message: err instanceof Error ? err.message : t('provider.oauth.authFailed'),
       });
     } finally {
       delete abortRefs.current[provider];
@@ -160,7 +161,7 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] flex flex-col gap-0 p-0">
         <DialogHeader className="shrink-0 p-6 pb-4">
-          <DialogTitle>管理 AI 提供商</DialogTitle>
+          <DialogTitle>{t('provider.manager.title')}</DialogTitle>
         </DialogHeader>
 
         <div className="overflow-y-auto min-h-0 px-6 pb-6 space-y-4">
@@ -187,7 +188,7 @@ export function ProviderManagerDialog({ open, onOpenChange }: ProviderManagerDia
 
           {/* API Key providers */}
           <div className="mt-4 space-y-4">
-            <p className="text-xs text-muted-foreground">通过 API Key</p>
+            <p className="text-xs text-muted-foreground">{t('provider.section.viaApiKey')}</p>
             {APIKEY_PROVIDERS.map((p, i) => {
               if ('preset' in p && p.preset) {
                 const presetConfig = PRESET_PROVIDERS.find(pp => pp.id === p.provider);

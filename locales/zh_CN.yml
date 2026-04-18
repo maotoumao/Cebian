@@ -20,6 +20,9 @@ common:
   save: "保存"
   delete: "删除"
   rename: "重命名"
+  edit: "编辑"
+  add: "添加"
+  copy: "复制"
   newFile: "新建文件"
   newFolder: "新建文件夹"
   search: "搜索"
@@ -57,6 +60,8 @@ settings:
     skills: "技能"
     advanced: "高级"
     about: "关于"
+  providers:
+    title: "AI 提供商"
   about:
     title: "关于"
     tagline: "AI 浏览器侧边栏助手"
@@ -140,3 +145,49 @@ chat:
     loading: "加载会话中\u2026"
     modelError: "模型返回错误"
     welcomeReady: "有什么我可以帮你的？"
+
+# ─── 提供商子组件（OAuth / API Key / 自定义）───
+provider:
+  manager:
+    title: "管理 AI 提供商"
+  section:
+    viaApiKey: "通过 API Key"
+  status:
+    connected: "已连接"
+    notConfigured: "未配置"
+    unverified: "未验证"
+    verifying: "验证中"
+    connectFailed: "连接失败"
+    failed: "失败"
+  oauth:
+    signIn: "登录"
+    signOut: "退出"
+    loggedIn: "已登录"
+    notLoggedIn: "未登录"
+    authorizing: "授权中"
+    authFailed: "授权失败"
+    enterCode: "请在浏览器中输入代码："
+    completeInBrowser: "请在弹出的浏览器窗口中完成授权\u2026"
+  apiKey:
+    placeholder: "输入 API Key"
+    disconnect: "断开连接"
+    noModels: "无可用模型"
+    verifyNoResponse: "验证失败：未收到预期响应"
+    # $1 = 模型数量
+    connectedWithCount: "已连接 · $1 个模型"
+  summary:
+    # $1 = 认证方式（OAuth / API Key），$2 = 模型数量
+    modelsAvailable: "$1 · $2 个模型可用"
+  form:
+    name: "名称"
+    namePlaceholder: "例如：My Ollama"
+    baseUrl: "Base URL"
+    baseUrlPlaceholder: "例如：http://localhost:11434/v1"
+    apiKeyOptional: "API Key（可选）"
+    apiKeyPlaceholder: "留空则不传认证"
+    models: "模型列表"
+    autoFetch: "自动获取"
+    reasoning: "推理"
+    manualModelPlaceholder: "手动输入 Model ID"
+    addCustom: "添加自定义提供商"
+    fetchFailed: "无法获取模型列表，请手动添加"

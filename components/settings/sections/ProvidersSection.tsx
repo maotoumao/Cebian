@@ -16,6 +16,7 @@ import {
 import { OAUTH_PROVIDERS, APIKEY_PROVIDERS, PRESET_PROVIDERS } from '@/lib/constants';
 import { customProviderKey, getCustomModels } from '@/lib/custom-models';
 import { loginGitHubCopilot, loginOpenAICodex, loginGeminiCli } from '@/lib/oauth';
+import { t } from '@/lib/i18n';
 
 /**
  * ProvidersSection — Settings hub section for managing AI providers.
@@ -97,7 +98,7 @@ export function ProvidersSection() {
       if (abort.signal.aborted) return;
       setOAuthState(provider, {
         phase: 'error',
-        message: err instanceof Error ? err.message : '授权失败',
+        message: err instanceof Error ? err.message : t('provider.oauth.authFailed'),
       });
     } finally {
       delete abortRefs.current[provider];
@@ -153,7 +154,7 @@ export function ProvidersSection() {
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
-      <h2 className="text-base font-semibold">AI 提供商</h2>
+      <h2 className="text-base font-semibold">{t('settings.providers.title')}</h2>
 
       {/* OAuth providers */}
       <div className="space-y-4">
@@ -178,7 +179,7 @@ export function ProvidersSection() {
 
       {/* API Key providers */}
       <div className="space-y-4">
-        <h3 className="text-xs text-muted-foreground font-medium tracking-wide uppercase">通过 API Key</h3>
+        <h3 className="text-xs text-muted-foreground font-medium tracking-wide uppercase">{t('provider.section.viaApiKey')}</h3>
         {APIKEY_PROVIDERS.map((p, i) => {
           if ('preset' in p && p.preset) {
             const presetConfig = PRESET_PROVIDERS.find((pp) => pp.id === p.provider);

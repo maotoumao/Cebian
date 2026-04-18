@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import type { CustomProviderConfig, CustomModelDef } from '@/lib/storage';
 import { fetchRemoteModels } from '@/lib/custom-models';
+import { t } from '@/lib/i18n';
 
 // ─── Shared form body (used by both create and edit) ───
 
@@ -48,32 +49,32 @@ function ProviderFormBody({
   return (
     <div className="space-y-3 border border-border rounded-lg p-3">
       <div className="space-y-2">
-        <Label className="text-xs">名称</Label>
+        <Label className="text-xs">{t('provider.form.name')}</Label>
         <Input
           value={fields.name}
           onChange={e => onFieldChange({ name: e.target.value })}
-          placeholder="例如：My Ollama"
+          placeholder={t('provider.form.namePlaceholder')}
           className="h-8 text-sm"
         />
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs">Base URL</Label>
+        <Label className="text-xs">{t('provider.form.baseUrl')}</Label>
         <Input
           value={fields.baseUrl}
           onChange={e => onFieldChange({ baseUrl: e.target.value })}
-          placeholder="例如：http://localhost:11434/v1"
+          placeholder={t('provider.form.baseUrlPlaceholder')}
           className="h-8 text-sm"
         />
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs">API Key（可选）</Label>
+        <Label className="text-xs">{t('provider.form.apiKeyOptional')}</Label>
         <Input
           type="password"
           value={fields.apiKey}
           onChange={e => onFieldChange({ apiKey: e.target.value })}
-          placeholder="留空则不传认证"
+          placeholder={t('provider.form.apiKeyPlaceholder')}
           className="h-8 text-sm"
         />
       </div>
@@ -83,7 +84,7 @@ function ProviderFormBody({
       {/* Fetch models */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label className="text-xs">模型列表</Label>
+          <Label className="text-xs">{t('provider.form.models')}</Label>
           <Button
             variant="ghost"
             size="xs"
@@ -91,7 +92,7 @@ function ProviderFormBody({
             disabled={fields.fetching || !fields.baseUrl.trim()}
           >
             {fields.fetching ? <Spinner className="size-3" /> : <RefreshCw className="size-3" />}
-            自动获取
+            {t('provider.form.autoFetch')}
           </Button>
         </div>
 
@@ -106,7 +107,7 @@ function ProviderFormBody({
               <div key={m.modelId} className="flex items-center gap-2 text-xs">
                 <span className="flex-1 font-mono truncate">{m.modelId}</span>
                 <div className="flex items-center gap-1">
-                  <Label className="text-[0.6rem] text-muted-foreground">推理</Label>
+                  <Label className="text-[0.6rem] text-muted-foreground">{t('provider.form.reasoning')}</Label>
                   <Switch
                     checked={m.reasoning}
                     onCheckedChange={() => onToggleReasoning(m.modelId)}
@@ -132,7 +133,7 @@ function ProviderFormBody({
             value={fields.manualModelId}
             onChange={e => onFieldChange({ manualModelId: e.target.value })}
             onKeyDown={e => e.key === 'Enter' && onAddManualModel()}
-            placeholder="手动输入 Model ID"
+            placeholder={t('provider.form.manualModelPlaceholder')}
             className="h-7 text-xs flex-1"
           />
           <Button
@@ -150,7 +151,7 @@ function ProviderFormBody({
 
       <div className="flex items-center gap-2 justify-end">
         <Button variant="ghost" size="sm" onClick={onCancel}>
-          取消
+          {t('common.cancel')}
         </Button>
         <Button
           size="sm"
@@ -194,7 +195,7 @@ function useProviderForm(initial?: { name: string; baseUrl: string; apiKey: stri
       setModels(remote.map(m => ({ modelId: m.id, name: m.id, reasoning: false })));
       setFetchError('');
     } catch {
-      setFetchError('无法获取模型列表，请手动添加');
+      setFetchError(t('provider.form.fetchFailed'));
     } finally {
       setFetching(false);
     }
@@ -270,7 +271,7 @@ export function CustomProviderForm({ onAdd }: CustomProviderFormProps) {
         onClick={() => setExpanded(true)}
       >
         <Plus className="size-3.5" />
-        添加自定义提供商
+        {t('provider.form.addCustom')}
       </Button>
     );
   }
@@ -285,7 +286,7 @@ export function CustomProviderForm({ onAdd }: CustomProviderFormProps) {
       onToggleReasoning={form.handleToggleReasoning}
       onSubmit={handleSubmit}
       onCancel={handleCancel}
-      submitLabel="添加"
+      submitLabel={t('common.add')}
       submitDisabled={!form.fields.name.trim() || !form.fields.baseUrl.trim() || form.fields.models.length === 0}
     />
   );
@@ -353,17 +354,17 @@ export function CustomProviderCard({ config, apiKey, verified, onUpdate, onRemov
         onToggleReasoning={form.handleToggleReasoning}
         onSubmit={handleSave}
         onCancel={handleCancel}
-        submitLabel="保存"
+        submitLabel={t('common.save')}
         submitDisabled={!form.fields.name.trim() || !form.fields.baseUrl.trim() || form.fields.models.length === 0}
       />
     );
   }
 
   const badgeState = verified
-    ? { label: '已连接', className: 'text-success border-success/20 bg-success/5' }
+    ? { label: t('provider.status.connected'), className: 'text-success border-success/20 bg-success/5' }
     : apiKey
-      ? { label: '未验证', className: 'text-yellow-500 border-yellow-500/20 bg-yellow-500/5' }
-      : { label: '未配置', className: 'text-muted-foreground border-border' };
+      ? { label: t('provider.status.unverified'), className: 'text-yellow-500 border-yellow-500/20 bg-yellow-500/5' }
+      : { label: t('provider.status.notConfigured'), className: 'text-muted-foreground border-border' };
 
   return (
     <div className="space-y-1">
@@ -380,7 +381,7 @@ export function CustomProviderCard({ config, apiKey, verified, onUpdate, onRemov
             variant="ghost"
             size="icon-xs"
             onClick={openEdit}
-            title="编辑"
+            title={t('common.edit')}
           >
             <Pencil className="size-3" />
           </Button>
@@ -389,7 +390,7 @@ export function CustomProviderCard({ config, apiKey, verified, onUpdate, onRemov
             size="icon-xs"
             className="text-destructive hover:text-destructive hover:bg-destructive/10"
             onClick={onRemove}
-            title="删除"
+            title={t('common.delete')}
           >
             <Trash2 className="size-3" />
           </Button>

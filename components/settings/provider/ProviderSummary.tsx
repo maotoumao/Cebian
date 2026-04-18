@@ -1,6 +1,7 @@
 import { getModels, type KnownProvider, type Api, type Model } from '@mariozechner/pi-ai';
 import type { ProviderCredential, CustomProviderConfig } from '@/lib/storage';
 import { isCustomProvider, findCustomProvider, getCustomModels } from '@/lib/custom-models';
+import { t } from '@/lib/i18n';
 
 interface ProviderSummaryProps {
   provider: string;
@@ -31,9 +32,9 @@ export function ProviderSummary({ provider, credential, customProviders }: Provi
   const verified = credential.verified;
   const statusText = verified
     ? credential.authType === 'oauth'
-      ? '✓ 已登录'
-      : '✓ 已连接'
-    : '未验证';
+      ? t('provider.oauth.loggedIn')
+      : t('provider.status.connected')
+    : t('provider.status.unverified');
 
   return (
     <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2.5">
@@ -46,11 +47,11 @@ export function ProviderSummary({ provider, credential, customProviders }: Provi
           <span
             className={`text-xs ${verified ? 'text-emerald-500' : 'text-muted-foreground'}`}
           >
-            {statusText}
+            {verified ? '✓ ' : ''}{statusText}
           </span>
         </div>
         <div className="text-xs text-muted-foreground pl-4">
-          {authLabel} · {modelCount} 个模型可用
+          {t('provider.summary.modelsAvailable', [authLabel, modelCount])}
         </div>
       </div>
     </div>

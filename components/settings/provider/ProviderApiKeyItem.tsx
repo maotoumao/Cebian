@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
 import { isCustomProvider } from "@/lib/custom-models";
+import { t } from "@/lib/i18n";
 import type { ApiKeyCredential } from "@/lib/storage";
 
 interface ProviderApiKeyItemProps {
@@ -83,14 +84,17 @@ export function ProviderApiKeyItem({
         .join("");
 
       if (!text.toLowerCase().includes("ok")) {
-        throw new Error("验证失败：未收到预期响应");
+        throw new Error(t('provider.apiKey.verifyNoResponse'));
       }
 
       onSave({ authType: "apiKey", apiKey: key, verified: true });
-      setStatus({ type: "success", message: `已连接 · ${modelCount} 个模型` });
+      setStatus({ type: "success", message: t('provider.apiKey.connectedWithCount', [modelCount]) });
     } catch (err) {
       console.error(`[ApiKey Verify] ${provider}:`, err);
-      setStatus({ type: "error", message: "连接失败" });
+      setStatus({
+        type: "error",
+        message: err instanceof Error && err.message ? err.message : t('provider.status.connectFailed'),
+      });
     } finally {
       setSaving(false);
     }
@@ -104,7 +108,7 @@ export function ProviderApiKeyItem({
           variant="outline"
           className="text-blue-500 border-blue-500/20 bg-blue-500/5 text-[0.65rem] h-4 px-1.5"
         >
-          验证中
+          {t('provider.status.verifying')}
         </Badge>
       );
     }
@@ -115,7 +119,7 @@ export function ProviderApiKeyItem({
           variant="outline"
           className="text-destructive border-destructive/20 bg-destructive/5 text-[0.65rem] h-4 px-1.5"
         >
-          连接失败
+          {t('provider.status.connectFailed')}
         </Badge>
       );
     }
@@ -126,7 +130,7 @@ export function ProviderApiKeyItem({
           variant="outline"
           className="text-success border-success/20 bg-success/5 text-[0.65rem] h-4 px-1.5"
         >
-          已连接
+          {t('provider.status.connected')}
         </Badge>
       );
     }
@@ -137,7 +141,7 @@ export function ProviderApiKeyItem({
           variant="outline"
           className="text-yellow-500 border-yellow-500/20 bg-yellow-500/5 text-[0.65rem] h-4 px-1.5"
         >
-          未验证
+          {t('provider.status.unverified')}
         </Badge>
       );
     }
@@ -147,7 +151,7 @@ export function ProviderApiKeyItem({
         variant="outline"
         className="text-muted-foreground border-border text-[0.65rem] h-4 px-1.5"
       >
-        未配置
+        {t('provider.status.notConfigured')}
       </Badge>
     );
   };
@@ -160,7 +164,7 @@ export function ProviderApiKeyItem({
           variant="outline"
           className="text-muted-foreground border-border text-[0.65rem] h-4 px-1.5"
         >
-          无可用模型
+          {t('provider.apiKey.noModels')}
         </Badge>
       </div>
     );
@@ -179,7 +183,7 @@ export function ProviderApiKeyItem({
             type={showKey ? "text" : "password"}
             value={key}
             onChange={(e) => setKey(e.target.value)}
-            placeholder="输入 API Key"
+            placeholder={t('provider.apiKey.placeholder')}
             className="pr-8"
           />
           <Button
@@ -203,7 +207,7 @@ export function ProviderApiKeyItem({
           variant="ghost"
           disabled={saving || !key.trim()}
           onClick={handleSave}
-          title="保存"
+          title={t('common.save')}
         >
           {saving ? (
             <Spinner className="size-3.5" />
@@ -222,7 +226,7 @@ export function ProviderApiKeyItem({
             setKey("");
             setStatus(null);
           }}
-          title="断开连接"
+          title={t('provider.apiKey.disconnect')}
         >
           <Unplug className="size-3.5" />
         </Button>

@@ -20,6 +20,9 @@ common:
   save: "儲存"
   delete: "刪除"
   rename: "重新命名"
+  edit: "編輯"
+  add: "新增"
+  copy: "複製"
   newFile: "新增檔案"
   newFolder: "新增資料夾"
   search: "搜尋"
@@ -57,6 +60,8 @@ settings:
     skills: "技能"
     advanced: "進階"
     about: "關於"
+  providers:
+    title: "AI 供應商"
   about:
     title: "關於"
     tagline: "AI 瀏覽器側邊欄助手"
@@ -140,3 +145,49 @@ chat:
     loading: "載入工作階段\u2026"
     modelError: "模型回傳錯誤"
     welcomeReady: "有什麼我可以幫忙的？"
+
+# ─── 供應商子元件（OAuth / API Key / 自訂）───
+provider:
+  manager:
+    title: "管理 AI 供應商"
+  section:
+    viaApiKey: "透過 API Key"
+  status:
+    connected: "已連線"
+    notConfigured: "尚未設定"
+    unverified: "未驗證"
+    verifying: "驗證中"
+    connectFailed: "連線失敗"
+    failed: "失敗"
+  oauth:
+    signIn: "登入"
+    signOut: "登出"
+    loggedIn: "已登入"
+    notLoggedIn: "未登入"
+    authorizing: "授權中"
+    authFailed: "授權失敗"
+    enterCode: "請在瀏覽器中輸入代碼："
+    completeInBrowser: "請在彈出的瀏覽器視窗中完成授權\u2026"
+  apiKey:
+    placeholder: "輸入 API Key"
+    disconnect: "中斷連線"
+    noModels: "無可用模型"
+    verifyNoResponse: "驗證失敗：未收到預期回應"
+    # $1 = 模型數量
+    connectedWithCount: "已連線 · $1 個模型"
+  summary:
+    # $1 = 認證方式（OAuth / API Key），$2 = 模型數量
+    modelsAvailable: "$1 · $2 個模型可用"
+  form:
+    name: "名稱"
+    namePlaceholder: "例如：My Ollama"
+    baseUrl: "Base URL"
+    baseUrlPlaceholder: "例如：http://localhost:11434/v1"
+    apiKeyOptional: "API Key（選填）"
+    apiKeyPlaceholder: "留空則不傳送驗證"
+    models: "模型清單"
+    autoFetch: "自動擷取"
+    reasoning: "推理"
+    manualModelPlaceholder: "手動輸入 Model ID"
+    addCustom: "新增自訂供應商"
+    fetchFailed: "無法擷取模型清單，請手動新增"

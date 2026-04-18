@@ -21,6 +21,9 @@ common:
   save: "Save"
   delete: "Delete"
   rename: "Rename"
+  edit: "Edit"
+  add: "Add"
+  copy: "Copy"
   newFile: "New file"
   newFolder: "New folder"
   search: "Search"
@@ -61,6 +64,8 @@ settings:
     skills: "Skills"
     advanced: "Advanced"
     about: "About"
+  providers:
+    title: "AI providers"
   about:
     title: "About"
     tagline: "AI browser sidebar assistant"
@@ -144,3 +149,49 @@ chat:
     loading: "Loading session\u2026"
     modelError: "Model returned an error"
     welcomeReady: "What can I help you with?"
+
+# ─── Provider sub-components (OAuth / API Key / custom) ───
+provider:
+  manager:
+    title: "Manage AI providers"
+  section:
+    viaApiKey: "Via API Key"
+  status:
+    connected: "Connected"
+    notConfigured: "Not configured"
+    unverified: "Unverified"
+    verifying: "Verifying"
+    connectFailed: "Connection failed"
+    failed: "Failed"
+  oauth:
+    signIn: "Sign in"
+    signOut: "Sign out"
+    loggedIn: "Signed in"
+    notLoggedIn: "Not signed in"
+    authorizing: "Authorizing"
+    authFailed: "Authorization failed"
+    enterCode: "Enter the code in the browser:"
+    completeInBrowser: "Complete authorization in the popup browser window\u2026"
+  apiKey:
+    placeholder: "Enter API Key"
+    disconnect: "Disconnect"
+    noModels: "No available models"
+    verifyNoResponse: "Verification failed: unexpected response"
+    # $1 = model count
+    connectedWithCount: "Connected · $1 models"
+  summary:
+    # $1 = auth label (OAuth / API Key), $2 = model count
+    modelsAvailable: "$1 · $2 models available"
+  form:
+    name: "Name"
+    namePlaceholder: "e.g. My Ollama"
+    baseUrl: "Base URL"
+    baseUrlPlaceholder: "e.g. http://localhost:11434/v1"
+    apiKeyOptional: "API Key (optional)"
+    apiKeyPlaceholder: "Leave empty to skip auth"
+    models: "Models"
+    autoFetch: "Auto-fetch"
+    reasoning: "Reasoning"
+    manualModelPlaceholder: "Manual Model ID"
+    addCustom: "Add custom provider"
+    fetchFailed: "Failed to fetch models, please add manually"
