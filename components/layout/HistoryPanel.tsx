@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { listSessions, type SessionRecord } from '@/lib/db';
 import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage } from '@/lib/protocol';
+import { t } from '@/lib/i18n';
 
 interface HistoryPanelProps {
   open: boolean;
@@ -15,16 +16,16 @@ interface HistoryPanelProps {
 function formatRelativeTime(timestamp: number): string {
   const diff = Date.now() - timestamp;
   const seconds = Math.floor(diff / 1000);
-  if (seconds < 60) return '刚刚';
+  if (seconds < 60) return t('common.time.justNow');
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} 分钟前`;
+  if (minutes < 60) return t('common.time.minutesAgo', [minutes]);
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} 小时前`;
+  if (hours < 24) return t('common.time.hoursAgo', [hours]);
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days} 天前`;
+  if (days < 30) return t('common.time.daysAgo', [days]);
   const months = Math.floor(days / 30);
-  if (months < 12) return `${months} 个月前`;
-  return `${Math.floor(months / 12)} 年前`;
+  if (months < 12) return t('common.time.monthsAgo', [months]);
+  return t('common.time.yearsAgo', [Math.floor(months / 12)]);
 }
 
 export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }: HistoryPanelProps) {
@@ -83,7 +84,7 @@ export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }
         <Button variant="ghost" size="icon-xs" onClick={onClose}>
           <ArrowLeft className="size-5" />
         </Button>
-        <span className="font-semibold">历史记录</span>
+        <span className="font-semibold">{t('common.history')}</span>
       </div>
 
       {/* Body */}
@@ -91,14 +92,14 @@ export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }
         <div className="px-5 py-3 space-y-1">
           {loading && (
             <div className="text-center text-sm text-muted-foreground py-12">
-              加载中…
+              {t('common.loading')}
             </div>
           )}
 
           {!loading && sessions.length === 0 && (
             <div className="flex flex-col items-center gap-2 py-16 text-center">
               <MessageSquare className="size-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">暂无历史记录</p>
+              <p className="text-sm text-muted-foreground">{t('common.empty.history')}</p>
             </div>
           )}
 
@@ -118,7 +119,7 @@ export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }
                 <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
                   {session.model && <span>{session.model}</span>}
                   <span>·</span>
-                  <span>{session.messageCount} 条消息</span>
+                  <span>{t('common.session.messageCount', session.messageCount)}</span>
                   <span>·</span>
                   <span>{formatRelativeTime(session.updatedAt)}</span>
                 </div>

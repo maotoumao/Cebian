@@ -10,3 +10,29 @@ actionTitle: "打开 Cebian 侧边栏"
 common:
   newChat: "新对话"
   send: "发送"
+  history: "历史记录"
+  toggleTheme: "切换主题"
+  settings: "设置"
+  back: "返回"
+  openInNewTab: "在新标签页打开"
+  loading: "加载中…"
+  empty:
+    history: "暂无历史记录"
+  time:
+    justNow: "刚刚"
+    # $1 = 分钟数
+    minutesAgo: "$1 分钟前"
+    # $1 = 小时数
+    hoursAgo: "$1 小时前"
+    # $1 = 天数
+    daysAgo: "$1 天前"
+    # $1 = 月数
+    monthsAgo: "$1 个月前"
+    # $1 = 年数
+    yearsAgo: "$1 年前"
+  session:
+    # $1 = 消息数
+    messageCount:
+      0: "暂无消息"
+      1: "1 条消息"
+      n: "$1 条消息"

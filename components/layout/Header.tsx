@@ -35,7 +35,7 @@ export function Header({ title, theme, onToggleTheme, onOpenSettings, onNewChat,
               <History className="size-4.5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>历史记录</TooltipContent>
+          <TooltipContent>{t('common.history')}</TooltipContent>
         </Tooltip>
       </div>
 
@@ -54,7 +54,7 @@ export function Header({ title, theme, onToggleTheme, onOpenSettings, onNewChat,
               {theme === 'system' ? <Monitor className="size-4.5" /> : theme === 'dark' ? <Sun className="size-4.5" /> : <Moon className="size-4.5" />}
             </Button>
           </TooltipTrigger>
-          <TooltipContent>切换主题</TooltipContent>
+          <TooltipContent>{t('common.toggleTheme')}</TooltipContent>
         </Tooltip>
 
         <Tooltip>
@@ -67,7 +67,7 @@ export function Header({ title, theme, onToggleTheme, onOpenSettings, onNewChat,
               <Settings className="size-4.5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>设置</TooltipContent>
+          <TooltipContent>{t('common.settings')}</TooltipContent>
         </Tooltip>
       </div>
     </header>

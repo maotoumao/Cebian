@@ -10,3 +10,29 @@ actionTitle: "開啟 Cebian 側邊欄"
 common:
   newChat: "新對話"
   send: "傳送"
+  history: "歷史記錄"
+  toggleTheme: "切換主題"
+  settings: "設定"
+  back: "返回"
+  openInNewTab: "在新分頁開啟"
+  loading: "載入中…"
+  empty:
+    history: "尚無歷史記錄"
+  time:
+    justNow: "剛剛"
+    # $1 = 分鐘數
+    minutesAgo: "$1 分鐘前"
+    # $1 = 小時數
+    hoursAgo: "$1 小時前"
+    # $1 = 天數
+    daysAgo: "$1 天前"
+    # $1 = 月數
+    monthsAgo: "$1 個月前"
+    # $1 = 年數
+    yearsAgo: "$1 年前"
+  session:
+    # $1 = 訊息數
+    messageCount:
+      0: "尚無訊息"
+      1: "1 則訊息"
+      n: "$1 則訊息"

@@ -11,3 +11,32 @@ actionTitle: "Open Cebian sidebar"
 common:
   newChat: "New chat"
   send: "Send"
+  history: "History"
+  toggleTheme: "Toggle theme"
+  settings: "Settings"
+  back: "Back"
+  openInNewTab: "Open in new tab"
+  loading: "Loading…"
+  empty:
+    history: "No history yet"
+  time:
+    justNow: "Just now"
+    # Time labels intentionally use abbreviations (min/h/d/mo/y) to avoid
+    # English plural-vs-singular branching at the call site ("1 min ago"
+    # reads naturally without a separate 0/1/n map).
+    # $1 = number of minutes
+    minutesAgo: "$1 min ago"
+    # $1 = number of hours
+    hoursAgo: "$1 h ago"
+    # $1 = number of days
+    daysAgo: "$1 d ago"
+    # $1 = number of months
+    monthsAgo: "$1 mo ago"
+    # $1 = number of years
+    yearsAgo: "$1 y ago"
+  session:
+    # $1 = message count
+    messageCount:
+      0: "No messages"
+      1: "1 message"
+      n: "$1 messages"

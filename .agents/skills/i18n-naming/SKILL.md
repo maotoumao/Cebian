@@ -231,7 +231,7 @@ usage frequently picks a different word entirely.
 | Open              | 打开             | 開啟             | TW: 開啟 (not 打開)                |
 | Close             | 关闭             | 關閉             |                                    |
 | New chat          | 新对话           | 新對話           |                                    |
-| History           | 历史             | 歷史             |                                    |
+| History           | 历史 / 历史记录  | 歷史 / 歷史記錄  | Use longer form as panel title     |
 | Search            | 搜索             | 搜尋             | TW: 搜尋 (not 搜索)                |
 | File              | 文件             | 檔案             | TW: 檔案 (not 文件)                |
 | Folder            | 文件夹           | 資料夾           | TW: 資料夾                          |

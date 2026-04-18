@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { SectionNav } from './SectionNav';
 import { lastSettingsSection } from '@/lib/storage';
 import { useContainerWidth } from '@/hooks/useContainerWidth';
+import { t } from '@/lib/i18n';
 
 /** Breakpoints for the Settings hub layout. */
 const COMPACT_MAX = 640;   // below: compact (pills + master-detail)
@@ -79,19 +80,19 @@ export function SettingsLayout({ basePath, showBackButton = false, showOpenInTab
             variant="ghost"
             size="icon-xs"
             onClick={handleBack}
-            aria-label="返回"
+            aria-label={t('common.back')}
           >
             <ArrowLeft className="size-4.5" />
           </Button>
         )}
-        <h1 className="font-semibold text-sm">设置</h1>
+        <h1 className="font-semibold text-sm">{t('common.settings')}</h1>
         {showOpenInTab && (
           <Button
             variant="ghost"
             size="icon-xs"
             onClick={handleOpenInTab}
-            aria-label="在新标签页打开"
-            title="在新标签页打开"
+            aria-label={t('common.openInNewTab')}
+            title={t('common.openInNewTab')}
             className="ml-auto"
           >
             <ExternalLink className="size-4" />
