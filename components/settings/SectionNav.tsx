@@ -1,20 +1,27 @@
 import { NavLink } from 'react-router-dom';
 import { Key, MessageSquare, FileText, Blocks, Sliders, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 export interface SectionNavItem {
   path: string;
-  label: string;
+  /**
+   * Resolves the label at render time so locale changes (and tree-shaking
+   * of unused i18n keys) work correctly. Use a function instead of a key
+   * string because `@wxt-dev/i18n`'s overloaded `t` collapses
+   * `Parameters<typeof t>[0]` to `never`.
+   */
+  getLabel: () => string;
   icon: React.ComponentType<{ className?: string }>;
 }
 
 export const SETTINGS_SECTIONS: SectionNavItem[] = [
-  { path: 'providers', label: 'Providers', icon: Key },
-  { path: 'instructions', label: '指引', icon: MessageSquare },
-  { path: 'prompts', label: 'Prompts', icon: FileText },
-  { path: 'skills', label: 'Skills', icon: Blocks },
-  { path: 'advanced', label: '高级', icon: Sliders },
-  { path: 'about', label: '关于', icon: Info },
+  { path: 'providers', getLabel: () => t('settings.nav.providers'), icon: Key },
+  { path: 'instructions', getLabel: () => t('settings.nav.instructions'), icon: MessageSquare },
+  { path: 'prompts', getLabel: () => t('settings.nav.prompts'), icon: FileText },
+  { path: 'skills', getLabel: () => t('settings.nav.skills'), icon: Blocks },
+  { path: 'advanced', getLabel: () => t('settings.nav.advanced'), icon: Sliders },
+  { path: 'about', getLabel: () => t('settings.nav.about'), icon: Info },
 ];
 
 /** Visual variant for SectionNav, mapped from SettingsLayout's breakpoint. */
@@ -42,11 +49,13 @@ export function SectionNav({ basePath, variant = 'labels' }: SectionNavProps) {
   if (variant === 'pills') {
     return (
       <nav
-        aria-label="设置导航"
+        aria-label={t('settings.nav.aria')}
         className="shrink-0 border-b border-border px-2 py-1.5 overflow-x-auto"
       >
         <ul className="flex items-center gap-0.5">
-          {SETTINGS_SECTIONS.map(({ path, label, icon: Icon }) => (
+          {SETTINGS_SECTIONS.map(({ path, getLabel, icon: Icon }) => {
+            const label = getLabel();
+            return (
             <li key={path}>
               <NavLink
                 to={`${basePath}/${path}`}
@@ -65,7 +74,8 @@ export function SectionNav({ basePath, variant = 'labels' }: SectionNavProps) {
                 <Icon className="size-4" />
               </NavLink>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </nav>
     );
@@ -74,11 +84,11 @@ export function SectionNav({ basePath, variant = 'labels' }: SectionNavProps) {
   if (variant === 'tabs') {
     return (
       <nav
-        aria-label="设置导航"
+        aria-label={t('settings.nav.aria')}
         className="shrink-0 border-b border-border px-2 py-1.5 overflow-x-auto"
       >
         <ul className="flex items-center gap-0.5">
-          {SETTINGS_SECTIONS.map(({ path, label, icon: Icon }) => (
+          {SETTINGS_SECTIONS.map(({ path, getLabel, icon: Icon }) => (
             <li key={path}>
               <NavLink
                 to={`${basePath}/${path}`}
@@ -93,7 +103,7 @@ export function SectionNav({ basePath, variant = 'labels' }: SectionNavProps) {
                 }
               >
                 <Icon className="size-4 shrink-0" />
-                {label}
+                {getLabel()}
               </NavLink>
             </li>
           ))}
@@ -104,9 +114,9 @@ export function SectionNav({ basePath, variant = 'labels' }: SectionNavProps) {
 
   // variant === 'labels'
   return (
-    <nav aria-label="设置导航" className="w-45 shrink-0 border-r border-border py-2 overflow-y-auto">
+    <nav aria-label={t('settings.nav.aria')} className="w-45 shrink-0 border-r border-border py-2 overflow-y-auto">
       <ul className="flex flex-col gap-0.5 px-2">
-        {SETTINGS_SECTIONS.map(({ path, label, icon: Icon }) => (
+        {SETTINGS_SECTIONS.map(({ path, getLabel, icon: Icon }) => (
           <li key={path}>
             <NavLink
               to={`${basePath}/${path}`}
@@ -121,7 +131,7 @@ export function SectionNav({ basePath, variant = 'labels' }: SectionNavProps) {
               }
             >
               <Icon className="size-4" />
-              {label}
+              {getLabel()}
             </NavLink>
           </li>
         ))}

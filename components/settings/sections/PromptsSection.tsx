@@ -4,6 +4,7 @@ import { FileWorkspace, encodeRelPath } from './FileWorkspace';
 import { CEBIAN_PROMPTS_DIR } from '@/lib/constants';
 import { settingsFilePanelWidth } from '@/lib/storage';
 import type { SettingsOutletContext } from '@/components/settings/SettingsLayout';
+import { t } from '@/lib/i18n';
 
 const PROMPT_TEMPLATE = `---\nname: new-prompt\ndescription: ""\n---\n\n(Write your prompt here)\n`;
 
@@ -35,7 +36,12 @@ export function PromptsSection() {
       <div className="px-6 pt-6 pb-4 shrink-0 border-b border-border">
         <h2 className="text-base font-semibold">Prompts</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          可复用的提示模板，通过 <code className="text-[11px]">/</code> 命令在聊天输入中触发。
+          {(() => {
+            // settings.prompts.hint embeds $1 where the trigger char appears,
+            // so we can render <code>/</code> in the middle of translated text.
+            const parts = t('settings.prompts.hint', ['\u0000']).split('\u0000');
+            return <>{parts[0]}<code className="text-[11px]">/</code>{parts[1] ?? ''}</>;
+          })()}
         </p>
       </div>
       <FileWorkspace

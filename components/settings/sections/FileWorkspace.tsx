@@ -26,6 +26,7 @@ import { EditorPanel } from './EditorPanel';
 import { useIsDark } from '@/hooks/useIsDark';
 import { useStorageItem, type StorageItem } from '@/hooks/useStorageItem';
 import { cn } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 const MIN_PANEL_WIDTH = 180;
 const MAX_PANEL_WIDTH = 480;
@@ -247,7 +248,7 @@ export const FileWorkspace = forwardRef<FileWorkspaceHandle, FileWorkspaceProps>
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="搜索..."
+              placeholder={t('common.searchPlaceholder')}
               className="h-8 pl-8 text-[13px]"
             />
           </div>
@@ -255,7 +256,7 @@ export const FileWorkspace = forwardRef<FileWorkspaceHandle, FileWorkspaceProps>
             variant="ghost"
             size="icon-xs"
             onClick={() => fileTreeRef.current?.createFile(undefined, newFileTemplate)}
-            title="新建文件"
+            title={t('common.newFile')}
           >
             <FilePlus className="size-4" />
           </Button>
@@ -264,7 +265,7 @@ export const FileWorkspace = forwardRef<FileWorkspaceHandle, FileWorkspaceProps>
               variant="ghost"
               size="icon-xs"
               onClick={() => fileTreeRef.current?.createFolder()}
-              title="新建文件夹"
+              title={t('common.newFolder')}
             >
               <FolderPlus className="size-4" />
             </Button>
@@ -286,7 +287,7 @@ export const FileWorkspace = forwardRef<FileWorkspaceHandle, FileWorkspaceProps>
           {overflowCustom.length > 0 && (
             <Popover open={overflowOpen} onOpenChange={setOverflowOpen}>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon-xs" title="更多操作">
+                <Button variant="ghost" size="icon-xs" title={t('common.moreActions')}>
                   <MoreHorizontal className="size-4" />
                 </Button>
               </PopoverTrigger>
@@ -329,11 +330,11 @@ export const FileWorkspace = forwardRef<FileWorkspaceHandle, FileWorkspaceProps>
           </ContextMenuTrigger>
           <ContextMenuContent>
             <ContextMenuItem onClick={() => fileTreeRef.current?.createFile(undefined, newFileTemplate)}>
-              <FilePlus className="size-3.5 mr-2" /> 新建文件
+              <FilePlus className="size-3.5 mr-2" /> {t('common.newFile')}
             </ContextMenuItem>
             {allowNewFolder && (
               <ContextMenuItem onClick={() => fileTreeRef.current?.createFolder()}>
-                <FolderPlus className="size-3.5 mr-2" /> 新建文件夹
+                <FolderPlus className="size-3.5 mr-2" /> {t('common.newFolder')}
               </ContextMenuItem>
             )}
             {customActions.map((a) => {
@@ -363,7 +364,7 @@ export const FileWorkspace = forwardRef<FileWorkspaceHandle, FileWorkspaceProps>
   ) : (
     emptyState ?? (
       <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-        从左侧选择或创建文件
+        {t('settings.files.selectOrCreate')}
       </div>
     )
   );
@@ -380,8 +381,8 @@ export const FileWorkspace = forwardRef<FileWorkspaceHandle, FileWorkspaceProps>
                 variant="ghost"
                 size="icon-xs"
                 onClick={() => onSelectRelative(null)}
-                title="返回文件列表"
-                aria-label="返回文件列表"
+                title={t('settings.files.backToList')}
+                aria-label={t('settings.files.backToList')}
               >
                 <ArrowLeft className="size-4" />
               </Button>

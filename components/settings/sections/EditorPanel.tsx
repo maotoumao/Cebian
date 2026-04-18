@@ -4,7 +4,7 @@
  * Save strategy:
  * - Debounced write 500ms after content stops changing.
  * - Immediate flush on Ctrl/Cmd+S, file switch, unmount, or page unload.
- * - Subtle footer status ("已保存 · 保存中 · 未保存") — no buttons.
+ * - Subtle footer status (settings.editor.{saved,saving,unsaved}) — no buttons.
  * - Write errors surface via `sonner` toast but don't block further edits.
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { CodeMirrorEditor } from '@/components/editor/CodeMirrorEditor';
 import { vfs } from '@/lib/vfs';
 import { cn } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 const AUTOSAVE_DEBOUNCE_MS = 500;
 
@@ -85,7 +86,7 @@ export function EditorPanel({ filePath, rootPath, isDark, enableTemplateVars = f
     } catch (err) {
       console.error('[EditorPanel] autosave failed', err);
       setStatus('error');
-      toast.error('保存失败', {
+      toast.error(t('settings.editor.saveFailed'), {
         description: err instanceof Error ? err.message : String(err),
       });
     }
@@ -199,7 +200,7 @@ export function EditorPanel({ filePath, rootPath, isDark, enableTemplateVars = f
     };
   }, [flush]);
 
-  // ─── Auto-fade "已保存" to "idle" after a moment for calm UI. ───
+  // ─── Auto-fade "settings.editor.saved" to "idle" after a moment for calm UI. ───
   useEffect(() => {
     if (status !== 'saved') return;
     const t = setTimeout(() => setStatus('idle'), 2000);
@@ -211,7 +212,7 @@ export function EditorPanel({ filePath, rootPath, isDark, enableTemplateVars = f
   if (!filePath) {
     return (
       <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-        选择一个文件开始编辑
+        {t('settings.editor.selectFile')}
       </div>
     );
   }
@@ -219,7 +220,7 @@ export function EditorPanel({ filePath, rootPath, isDark, enableTemplateVars = f
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-        加载中...
+        {t('common.loading')}
       </div>
     );
   }
@@ -232,10 +233,10 @@ export function EditorPanel({ filePath, rootPath, isDark, enableTemplateVars = f
   })();
 
   const statusLabel =
-    status === 'saving' ? '保存中…'
-    : status === 'error' ? '保存失败'
-    : dirty ? '未保存'
-    : status === 'saved' ? '已保存'
+    status === 'saving' ? t('settings.editor.saving')
+    : status === 'error' ? t('settings.editor.saveFailed')
+    : dirty ? t('settings.editor.unsaved')
+    : status === 'saved' ? t('settings.editor.saved')
     : '';
 
   const statusClass =

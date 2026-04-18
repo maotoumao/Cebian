@@ -16,8 +16,18 @@ common:
   back: "返回"
   openInNewTab: "在新标签页打开"
   loading: "加载中…"
+  cancel: "取消"
+  save: "保存"
+  delete: "删除"
+  rename: "重命名"
+  newFile: "新建文件"
+  newFolder: "新建文件夹"
+  search: "搜索"
+  searchPlaceholder: "搜索…"
+  moreActions: "更多操作"
   empty:
     history: "暂无历史记录"
+    folder: "空文件夹"
   time:
     justNow: "刚刚"
     # $1 = 分钟数
@@ -36,3 +46,43 @@ common:
       0: "暂无消息"
       1: "1 条消息"
       n: "$1 条消息"
+
+# ─── 设置 ───
+settings:
+  nav:
+    aria: "设置导航"
+    providers: "提供商"
+    instructions: "指引"
+    prompts: "提示词"
+    skills: "技能"
+    advanced: "高级"
+    about: "关于"
+  about:
+    title: "关于"
+    tagline: "AI 浏览器侧边栏助手"
+    feedback: "反馈"
+  advanced:
+    title: "高级"
+    maxRounds:
+      label: "最大对话轮数"
+      hint: "超出后自动截断早期消息"
+  instructions:
+    title: "指引"
+    label: "自定义指引"
+    hint: "追加到默认规则之后，用于调整回复语言、风格或角色。无法覆盖工具协议和安全规则。"
+    placeholder: "例如：\n- 用中文回复\n- 回答尽量简洁\n- 讨论代码时默认使用 TypeScript"
+  prompts:
+    # $1 = 触发字符（“/”）
+    hint: "可复用的提示模板，通过 $1 命令在聊天输入中触发。"
+  skills:
+    create: "创建技能"
+    hint: "遵循 agentskills.io 规范的多文件技能包，agent 会按需加载。"
+  editor:
+    selectFile: "选择一个文件开始编辑"
+    saving: "保存中…"
+    saveFailed: "保存失败"
+    unsaved: "未保存"
+    saved: "已保存"
+  files:
+    backToList: "返回文件列表"
+    selectOrCreate: "从左侧选择或创建文件"

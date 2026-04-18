@@ -16,8 +16,18 @@ common:
   back: "返回"
   openInNewTab: "在新分頁開啟"
   loading: "載入中…"
+  cancel: "取消"
+  save: "儲存"
+  delete: "刪除"
+  rename: "重新命名"
+  newFile: "新增檔案"
+  newFolder: "新增資料夾"
+  search: "搜尋"
+  searchPlaceholder: "搜尋…"
+  moreActions: "更多操作"
   empty:
     history: "尚無歷史記錄"
+    folder: "空資料夾"
   time:
     justNow: "剛剛"
     # $1 = 分鐘數
@@ -36,3 +46,43 @@ common:
       0: "尚無訊息"
       1: "1 則訊息"
       n: "$1 則訊息"
+
+# ─── 設定 ───
+settings:
+  nav:
+    aria: "設定導覽"
+    providers: "供應商"
+    instructions: "指引"
+    prompts: "提示詞"
+    skills: "技能"
+    advanced: "進階"
+    about: "關於"
+  about:
+    title: "關於"
+    tagline: "AI 瀏覽器側邊欄助手"
+    feedback: "意見回饋"
+  advanced:
+    title: "進階"
+    maxRounds:
+      label: "最大對話輪數"
+      hint: "超出後自動截斷早期訊息"
+  instructions:
+    title: "指引"
+    label: "自訂指引"
+    hint: "追加在預設規則之後，用於調整回覆語言、風格或角色。無法覆蓋工具協定與安全規則。"
+    placeholder: "例如：\n- 用中文回覆\n- 回答盡量簡潔\n- 討論程式碼時預設使用 TypeScript"
+  prompts:
+    # $1 = 觸發字元（「/」）
+    hint: "可重複使用的提示詞模板，透過 $1 命令在聊天輸入中觸發。"
+  skills:
+    create: "建立技能"
+    hint: "遵循 agentskills.io 規範的多檔案技能包，agent 會按需載入。"
+  editor:
+    selectFile: "選擇一個檔案開始編輯"
+    saving: "儲存中…"
+    saveFailed: "儲存失敗"
+    unsaved: "未儲存"
+    saved: "已儲存"
+  files:
+    backToList: "返回檔案列表"
+    selectOrCreate: "從左側選擇或建立檔案"

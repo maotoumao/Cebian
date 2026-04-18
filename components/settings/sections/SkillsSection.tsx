@@ -9,6 +9,7 @@ import { CEBIAN_SKILLS_DIR } from '@/lib/constants';
 import { settingsFilePanelWidth } from '@/lib/storage';
 import { createSkillTemplate } from '@/lib/ai-config/skill-creator';
 import type { SettingsOutletContext } from '@/components/settings/SettingsLayout';
+import { t } from '@/lib/i18n';
 
 /**
  * SkillsSection — multi-file agent skill manager under /settings/skills[/*].
@@ -16,7 +17,7 @@ import type { SettingsOutletContext } from '@/components/settings/SettingsLayout
  * Supports nested paths (e.g. `my-skill/scripts/foo.js`). On save, notifies
  * the background service worker to clear its cached skill index.
  *
- * Contributes a "创建 Skill" action via `toolbarActions`; the domain
+ * Contributes a "settings.skills.create" action via `toolbarActions`; the domain
  * scaffolding lives in `lib/ai-config/skill-creator.ts` so `FileWorkspace`
  * stays free of any business concepts.
  */
@@ -52,7 +53,7 @@ export function SkillsSection() {
     {
       id: 'new-skill',
       icon: Blocks,
-      label: '创建 Skill',
+      label: t('settings.skills.create'),
       separatorBefore: true,
       onSelect: handleCreateSkill,
     },
@@ -63,7 +64,7 @@ export function SkillsSection() {
       <div className="px-6 pt-6 pb-4 shrink-0 border-b border-border">
         <h2 className="text-base font-semibold">Skills</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          遵循 agentskills.io 规范的多文件技能包，agent 会按需加载。
+          {t('settings.skills.hint')}
         </p>
       </div>
       <FileWorkspace

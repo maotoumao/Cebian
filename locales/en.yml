@@ -17,8 +17,18 @@ common:
   back: "Back"
   openInNewTab: "Open in new tab"
   loading: "Loading…"
+  cancel: "Cancel"
+  save: "Save"
+  delete: "Delete"
+  rename: "Rename"
+  newFile: "New file"
+  newFolder: "New folder"
+  search: "Search"
+  searchPlaceholder: "Search…"
+  moreActions: "More actions"
   empty:
     history: "No history yet"
+    folder: "Empty folder"
   time:
     justNow: "Just now"
     # Time labels intentionally use abbreviations (min/h/d/mo/y) to avoid
@@ -40,3 +50,43 @@ common:
       0: "No messages"
       1: "1 message"
       n: "$1 messages"
+
+# ─── Settings hub ───
+settings:
+  nav:
+    aria: "Settings navigation"
+    providers: "Providers"
+    instructions: "Instructions"
+    prompts: "Prompts"
+    skills: "Skills"
+    advanced: "Advanced"
+    about: "About"
+  about:
+    title: "About"
+    tagline: "AI browser sidebar assistant"
+    feedback: "Feedback"
+  advanced:
+    title: "Advanced"
+    maxRounds:
+      label: "Max conversation rounds"
+      hint: "Older messages are truncated when exceeded"
+  instructions:
+    title: "Instructions"
+    label: "Custom instructions"
+    hint: "Appended after the default rules. Use it to adjust language, tone, or persona. Cannot override tool protocols or safety rules."
+    placeholder: "e.g.\n- Reply in English\n- Keep answers concise\n- Default to TypeScript when discussing code"
+  prompts:
+    # $1 = trigger character ("/")
+    hint: "Reusable prompt templates. Trigger them with $1 in the chat input."
+  skills:
+    create: "Create skill"
+    hint: "Multi-file skill packs that follow the agentskills.io spec; the agent loads them on demand."
+  editor:
+    selectFile: "Select a file to start editing"
+    saving: "Saving…"
+    saveFailed: "Save failed"
+    unsaved: "Unsaved"
+    saved: "Saved"
+  files:
+    backToList: "Back to file list"
+    selectOrCreate: "Select or create a file from the left"
