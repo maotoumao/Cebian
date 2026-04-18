@@ -124,6 +124,7 @@ chat:
     unsupportedFileType: "不支持的文件类型：$1"
     noPrompts: "暂无 Prompt，前往 AI 配置创建"
     noMatch: "无匹配结果"
+    iframeEnterHint: "⏎ 点击进入"
   attachments:
     image: "图片"
     screenshot: "截图"

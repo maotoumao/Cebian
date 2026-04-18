@@ -128,6 +128,7 @@ chat:
     unsupportedFileType: "Unsupported file type: $1"
     noPrompts: "No prompts yet \u2014 create one from AI config"
     noMatch: "No matches"
+    iframeEnterHint: "⏎ enter"
   attachments:
     image: "Image"
     screenshot: "Screenshot"

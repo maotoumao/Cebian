@@ -1,10 +1,12 @@
 import type { ElementAttachment } from './attachments';
 import { getActiveTabId } from '@/lib/tab-helpers';
+import { t } from '@/lib/i18n';
 
 // ─── Injected picker script (self-contained, runs in content-script isolated world) ───
 // IMPORTANT: This function must be fully self-contained — no closures over external variables.
+// Translated strings must be passed via the executeScript `args` array.
 
-function createPickerInPage() {
+function createPickerInPage(iframeEnterHint: string) {
   // Guard: prevent double injection. Also clean up any orphaned remnants from
   // a crashed previous session so we never end up with a stale cursor style.
   if (document.getElementById('cebian-picker-host')) return;
@@ -233,7 +235,7 @@ function createPickerInPage() {
       : '';
 
     let label = tag + id + cls;
-    if (target.tagName === 'IFRAME') label += '  ⏎ 点击进入';
+    if (target.tagName === 'IFRAME') label += '  ' + iframeEnterHint;
 
     tooltipLabel.textContent = label;
     tooltipDims.textContent = Math.round(rect.width) + '×' + Math.round(rect.height);
@@ -425,6 +427,7 @@ export async function startElementPicker(): Promise<ElementAttachment | null> {
     chrome.scripting.executeScript({
       target: { tabId },
       func: createPickerInPage,
+      args: [t('chat.composer.iframeEnterHint')],
     }).catch((err) => {
       console.error('[Element Picker] Injection failed:', err);
       cleanup();
@@ -460,6 +463,7 @@ async function enterIframe(tabId: number, msg: { iframeSrc: string; iframeIndex:
     await chrome.scripting.executeScript({
       target: { tabId, frameIds: [target.frameId] },
       func: createPickerInPage,
+      args: [t('chat.composer.iframeEnterHint')],
     });
   } catch (err) {
     console.warn('[Element Picker] iframe entry failed:', err);
