@@ -1,5 +1,5 @@
-# Cebian 扩展 i18n —— 简体中文（覆盖所有 zh_* 变体）。
-# 修改时请同步 locales/en.yml。规范见 .agents/skills/i18n-naming/SKILL.md。
+# Cebian 扩展 i18n —— 简体中文（zh_CN，大陆用户）。
+# 修改时请同步 locales/en.yml 与 locales/zh_TW.yml。规范见 .agents/skills/i18n-naming/SKILL.md。
 
 # ─── Manifest（扁平顶层 key，见规范"Manifest localization"）───
 extName: "Cebian"

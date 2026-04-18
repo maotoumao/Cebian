@@ -1,6 +1,6 @@
 ---
 name: i18n-naming
-description: Cebian project i18n key naming, placeholder, pluralization, file layout, and glossary conventions. MUST be used whenever adding, editing, refactoring, or reviewing any translation key in `locales/*.yml`, any `t(...)` call in source code, or any `__MSG_*__` placeholder in manifest. Also triggers when reviewing diffs that touch i18n files, when proposing new user-facing strings, or when validating translation completeness/consistency between `en.yml` and `zh_CN.yml`.
+description: Cebian project i18n key naming, placeholder, pluralization, file layout, and glossary conventions. MUST be used whenever adding, editing, refactoring, or reviewing any translation key in `locales/*.yml`, any `t(...)` call in source code, or any `__MSG_*__` placeholder in manifest. Also triggers when reviewing diffs that touch i18n files, when proposing new user-facing strings, or when validating translation completeness/consistency between `en.yml`, `zh_CN.yml`, and `zh_TW.yml`.
 ---
 
 # Cebian i18n Naming & Convention Skill
@@ -12,35 +12,38 @@ translation work — both authoring and review — must follow these rules.
 ## When to apply
 
 - Adding any new `t('...')` call in source.
-- Editing `locales/en.yml` or `locales/zh_CN.yml` (NEVER edit `zh_TW.yml`; it is auto-generated).
+- Editing any of `locales/en.yml`, `locales/zh_CN.yml`, or `locales/zh_TW.yml`.
 - Reviewing a diff that touches i18n.
 - Validating that a translation set is complete & consistent.
 - Adding a manifest-level localized string (`__MSG_*__`).
 
 ## Languages & file layout
 
-Cebian ships **two** locales:
+Cebian ships **three independently maintained** locales:
 
 - `en` — default (fallback for all non-Chinese users)
-- `zh_CN` — Simplified Chinese for Mainland users
-- `zh_TW` — auto-mirrored from `zh_CN` for Taiwan/HK users (Cebian
-  intentionally serves Simplified to all Chinese variants per project
-  decision; Chrome's `_locales` directory does not accept a bare `zh`)
+- `zh_CN` — Simplified Chinese (Mainland conventions)
+- `zh_TW` — Traditional Chinese (Taiwan conventions; also serves HK users
+  via Chrome's `zh_TW → zh → default` fallback chain when no `zh_HK` is
+  present — we do not ship a separate `zh_HK`)
 
 Source files live at:
 
 ```
 locales/en.yml
-locales/zh_CN.yml   # single source of truth for Chinese
-locales/zh_TW.yml   # auto-generated, DO NOT EDIT
+locales/zh_CN.yml
+locales/zh_TW.yml
 ```
 
-`scripts/sync-zh-locales.mjs` mirrors `zh_CN.yml` into `zh_TW.yml`
-before every `wxt prepare`, `wxt`, `wxt build`, and `wxt zip` run. The
-WXT module then compiles them into
+All three are **hand-authored** and must respect each language's idiomatic
+style. `zh_TW` is NOT a mechanical character conversion of `zh_CN`; word
+choice differs (see the Traditional Chinese glossary below).
+
+The WXT module compiles them into
 `.output/<browser>/_locales/{en,zh_CN,zh_TW}/messages.json` at build
-time. Never edit generated `messages.json` files by hand, and never
-edit `zh_TW.yml` by hand.
+time. Never edit generated `messages.json` files by hand. Chrome's
+`_locales/` directory does not accept a bare `zh` folder, which is why
+we ship `zh_CN` and `zh_TW` separately.
 
 ## Key naming rules
 
@@ -196,49 +199,64 @@ requires updating this skill.
 
 ## Glossary (canonical translations)
 
-Authoritative. Any deviation must be discussed and added here.
+Authoritative. Any deviation must be discussed and added here. The
+`zh_TW` column is **not a character-conversion** of `zh_CN` — Taiwan
+usage frequently picks a different word entirely.
 
-| EN                | 简体中文     | Notes                              |
-| ----------------- | ------------ | ---------------------------------- |
-| Cebian            | Cebian       | Brand name, never translated       |
-| Provider          | 提供商       | Not 供应商                          |
-| Model             | 模型         |                                    |
-| Skill             | 技能         | Translated                         |
-| Prompt            | 提示词       | Translated                         |
-| Agent             | 智能体       | Not 代理 (ambiguous with proxy)    |
-| Tool              | 工具         |                                    |
-| Session / Chat    | 会话         |                                    |
-| Thinking          | 思考         |                                    |
-| Settings          | 设置         |                                    |
-| Sidepanel         | 侧边栏       |                                    |
-| Token             | Token        | Keep English                       |
-| API Key           | API Key      | Keep English                       |
-| OAuth             | OAuth        | Keep English                       |
-| Sign in / Login   | 登录         |                                    |
-| Sign out / Logout | 退出         |                                    |
-| Verify            | 验证         |                                    |
-| Save              | 保存         |                                    |
-| Cancel            | 取消         |                                    |
-| Delete            | 删除         |                                    |
-| Confirm           | 确认         |                                    |
-| New chat          | 新对话       |                                    |
-| History           | 历史         |                                    |
+| EN                | 简体中文 (zh_CN) | 繁體中文 (zh_TW) | Notes                              |
+| ----------------- | ---------------- | ---------------- | ---------------------------------- |
+| Cebian            | Cebian           | Cebian           | Brand name, never translated       |
+| Extension         | 扩展             | 擴充功能         | TW prefers 擴充功能 over 擴充/擴展  |
+| Provider          | 提供商           | 供應商           | TW commonly uses 供應商             |
+| Model             | 模型             | 模型             |                                    |
+| Skill             | 技能             | 技能             | Translated                         |
+| Prompt            | 提示词           | 提示詞           | Translated                         |
+| Agent             | 智能体           | 智慧型代理       | TW: 智慧型代理 (avoid bare 代理)   |
+| Tool              | 工具             | 工具             |                                    |
+| Session / Chat    | 会话 / 对话      | 工作階段 / 對話  | TW: 工作階段 for technical session |
+| Thinking          | 思考             | 思考             |                                    |
+| Settings          | 设置             | 設定             | TW: 設定 (not 設置)                |
+| Sidepanel         | 侧边栏           | 側邊欄           |                                    |
+| Token             | Token            | Token            | Keep English                       |
+| API Key           | API Key          | API Key          | Keep English                       |
+| OAuth             | OAuth            | OAuth            | Keep English                       |
+| Sign in / Login   | 登录             | 登入             | TW: 登入 (not 登錄)                |
+| Sign out / Logout | 退出             | 登出             | TW: 登出                           |
+| Verify            | 验证             | 驗證             |                                    |
+| Save              | 保存             | 儲存             | TW: 儲存 (not 保存)                |
+| Cancel            | 取消             | 取消             |                                    |
+| Delete            | 删除             | 刪除             |                                    |
+| Confirm           | 确认             | 確認             |                                    |
+| Send              | 发送             | 傳送             | TW: 傳送 (not 發送)                |
+| Open              | 打开             | 開啟             | TW: 開啟 (not 打開)                |
+| Close             | 关闭             | 關閉             |                                    |
+| New chat          | 新对话           | 新對話           |                                    |
+| History           | 历史             | 歷史             |                                    |
+| Search            | 搜索             | 搜尋             | TW: 搜尋 (not 搜索)                |
+| File              | 文件             | 檔案             | TW: 檔案 (not 文件)                |
+| Folder            | 文件夹           | 資料夾           | TW: 資料夾                          |
+| Network           | 网络             | 網路             | TW: 網路 (not 網絡)                |
+| Default           | 默认             | 預設             | TW: 預設 (not 默認)                |
+| Information       | 信息             | 資訊             | TW: 資訊 (not 訊息/信息)            |
+| Program / Software| 程序 / 软件      | 程式 / 軟體      | TW: 程式, 軟體                      |
+| Data              | 数据             | 資料             | TW: 資料 (not 數據)                |
 
 ## Style rules
 
 - **Buttons / menu items**: imperative verb phrase, no trailing punctuation.
   - en: `Send`, `Open in new tab`
-  - zh: `发送`、`在新标签页打开`
+  - zh_CN: `发送`、`在新标签页打开`
+  - zh_TW: `傳送`、`在新分頁開啟`
 - **Tooltips / aria-label**: same as button text unless it adds info.
 - **Toasts**:
-  - Success: short statement, no exclamation. en: `Saved` / zh: `已保存`
+  - Success: short statement, no exclamation. en: `Saved` / zh_CN: `已保存` / zh_TW: `已儲存`
   - Error: state what failed and (when actionable) why.
 - **Placeholders / empty states**: hint, not instruction.
-  - en: `Search models…`  zh: `搜索模型…`
+  - en: `Search models…`  zh_CN: `搜索模型…`  zh_TW: `搜尋模型…`
 - **Sentence punctuation**:
   - en: ASCII punctuation (`. , ! ? : ;`).
-  - zh: full-width Chinese punctuation (`。，！？：；`).
-  - Ellipsis: single character `…` for both, **never** `...`.
+  - zh_CN / zh_TW: full-width Chinese punctuation (`。，！？：；`).
+  - Ellipsis: single character `…` for all locales, **never** `...`.
 - **Length budget**: a zh string used inside a button or badge should not
   exceed the en string by more than ~30% in rendered width.
 - **Capitalization (en)**: sentence case for body text and tooltips,
@@ -247,26 +265,27 @@ Authoritative. Any deviation must be discussed and added here.
 ## Authoring workflow
 
 1. Add the key to `locales/en.yml` first.
-2. Add the same key to `locales/zh_CN.yml`.
-   **Never edit `locales/zh_TW.yml` — it is auto-mirrored from `zh_CN.yml`
-   by `scripts/sync-zh-locales.mjs` on every build.**
-3. Update the call site to `t('your.key')` (or `t('your.key', [arg1, ...])`).
-4. If using positional placeholders, document the meaning of each `$N`
-   with an inline YAML comment on the preceding line, in both locales.
-5. Run `pnpm compile` (and `pnpm lint:i18n` during the migration phase).
+2. Add the same key to `locales/zh_CN.yml` (Simplified, Mainland style).
+3. Add the same key to `locales/zh_TW.yml` (Traditional, Taiwan style).
+   This is NOT a character conversion of `zh_CN` — use Taiwan-idiomatic
+   word choices per the Traditional Chinese glossary below.
+4. Update the call site to `t('your.key')` (or `t('your.key', [arg1, ...])`).
+5. If using positional placeholders, document the meaning of each `$N`
+   with an inline YAML comment on the preceding line, in all three locales.
+6. Run `pnpm compile` (and `pnpm lint:i18n` during the migration phase).
 
 ## Review checklist
 
 Run through this list explicitly when reviewing any i18n-touching diff.
 Cite each item as pass/fail.
 
-1. **Key parity**: every key in `en.yml` exists in `zh_CN.yml` and vice versa.
-   (`zh_TW.yml` parity is guaranteed by the sync script and need not be reviewed.)
+1. **Key parity**: every key in `en.yml`, `zh_CN.yml`, and `zh_TW.yml`
+   matches the same set. No orphans in any locale.
 2. **Placeholder index parity**: for every key, the set of `$N` indices
-   in en and zh is **identical** (same numeric set, same count). The
-   surrounding text may differ for word order.
+   in en, zh_CN, and zh_TW is **identical** (same numeric set, same
+   count). The surrounding text may differ for word order.
 3. **Pluralization parity**: any plural key (with `0`/`1`/`n` subkeys)
-   has the same subkey set in both languages.
+   has the same subkey set in all three languages.
 4. **Namespace conformance**: every new key sits under one of the
    approved top-level namespaces.
 5. **Naming conformance**: every segment is lowerCamelCase; final segment

@@ -5,15 +5,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/sync-zh-locales.mjs && wxt",
-    "dev:firefox": "node scripts/sync-zh-locales.mjs && wxt -b firefox",
-    "build": "node scripts/sync-zh-locales.mjs && wxt build",
-    "build:firefox": "node scripts/sync-zh-locales.mjs && wxt build -b firefox",
-    "zip": "node scripts/sync-zh-locales.mjs && wxt zip",
-    "zip:firefox": "node scripts/sync-zh-locales.mjs && wxt zip -b firefox",
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "zip": "wxt zip",
+    "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
     "lint:i18n": "node scripts/lint-i18n.mjs",
-    "postinstall": "node scripts/sync-zh-locales.mjs && wxt prepare"
+    "postinstall": "wxt prepare"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.1",

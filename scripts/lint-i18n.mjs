@@ -6,9 +6,11 @@
  *  1. Scans Cebian source for hard-coded Chinese characters in user-facing
  *     positions (JSX text, string literals in components/entrypoints) and
  *     prints a report.
- *  2. Asserts the top-level keys in `locales/en.yml` and `locales/zh_CN.yml`
- *     match the approved allow-list (the manifest exception + namespace
- *     namespaces). Catches accidental flat keys like top-level `cancel: ...`.
+ *  2. Asserts the top-level keys in `locales/en.yml`, `locales/zh_CN.yml`,
+ *     and `locales/zh_TW.yml` match the approved allow-list (the manifest
+ *     exception + namespace namespaces). Catches accidental flat keys
+ *     like top-level `cancel: ...`.
+ *  3. Asserts top-level key parity across all three locale files.
  *
  * Intended to track migration progress; does NOT fail the build.
  *
@@ -96,9 +98,38 @@ async function topLevelKeys(yamlPath) {
   return keys;
 }
 
+/**
+ * Read all flat dotted key paths from a YAML file (e.g. `common.send`,
+ * `chat.notice.0`). Naive indentation parser sufficient for our
+ * constrained locale shape: nested string maps + scalar leaves. Each
+ * indent level uses 2 spaces.
+ */
+async function flatKeyPaths(yamlPath) {
+  const text = await fs.readFile(yamlPath, 'utf8');
+  const stack = []; // [{ key, indent }]
+  const paths = new Set();
+  for (const raw of text.split(/\r?\n/)) {
+    if (raw.trim() === '' || raw.trim().startsWith('#')) continue;
+    const indentMatch = raw.match(/^( *)/);
+    const indent = indentMatch ? indentMatch[1].length : 0;
+    const line = raw.slice(indent);
+    const m = line.match(/^("?)([A-Za-z_0-9][A-Za-z_0-9-]*)\1\s*:\s*(.*)$/);
+    if (!m) continue;
+    const key = m[2];
+    const rest = m[3];
+    while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
+    stack.push({ key, indent });
+    if (rest !== '') {
+      // leaf scalar (quoted or unquoted)
+      paths.add(stack.map((s) => s.key).join('.'));
+    }
+  }
+  return paths;
+}
+
 async function checkLocaleAllowList() {
   const violations = [];
-  for (const file of ['locales/en.yml', 'locales/zh_CN.yml']) {
+  for (const file of ['locales/en.yml', 'locales/zh_CN.yml', 'locales/zh_TW.yml']) {
     const abs = path.join(ROOT, file);
     let keys;
     try { keys = await topLevelKeys(abs); } catch { continue; }
@@ -109,6 +140,29 @@ async function checkLocaleAllowList() {
     }
   }
   return violations;
+}
+
+async function checkKeyParity() {
+  const files = ['locales/en.yml', 'locales/zh_CN.yml', 'locales/zh_TW.yml'];
+  const keySets = {};
+  const readErrors = [];
+  for (const f of files) {
+    try {
+      keySets[f] = await flatKeyPaths(path.join(ROOT, f));
+    } catch (err) {
+      readErrors.push({ file: f, message: err?.message ?? String(err) });
+    }
+  }
+  const present = Object.keys(keySets);
+  const union = new Set();
+  for (const f of present) for (const k of keySets[f]) union.add(k);
+  const missing = [];
+  for (const f of present) {
+    for (const k of union) {
+      if (!keySets[f].has(k)) missing.push({ file: f, key: k });
+    }
+  }
+  return { missing, readErrors };
 }
 
 async function main() {
@@ -122,6 +176,21 @@ async function main() {
     console.log('');
   } else {
     console.log('✓ i18n lint: locale top-level keys conform to allow-list.');
+  }
+
+  // ─── 1b. Full key parity (flat paths) across en/zh_CN/zh_TW ───
+  const { missing: parityMissing, readErrors } = await checkKeyParity();
+  for (const { file, message } of readErrors) {
+    console.log(`✗ i18n lint: failed to read ${file}: ${message}`);
+  }
+  if (parityMissing.length > 0) {
+    console.log(`✗ i18n lint: ${parityMissing.length} key parity gap(s) (flat paths):`);
+    for (const { file, key } of parityMissing) {
+      console.log(`  ${file}: missing \`${key}\``);
+    }
+    console.log('');
+  } else if (readErrors.length === 0) {
+    console.log('✓ i18n lint: all keys are in parity across en/zh_CN/zh_TW.');
   }
 
   // ─── 2. Source scan for hard-coded Chinese ───

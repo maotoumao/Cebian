@@ -1,6 +1,6 @@
 # Cebian extension i18n — English (default).
-# Edit this file along with locales/zh_CN.yml. See .agents/skills/i18n-naming/SKILL.md.
-# (Never edit locales/zh_TW.yml — it is auto-mirrored from zh_CN.yml.)
+# Edit this file along with locales/zh_CN.yml and locales/zh_TW.yml.
+# See .agents/skills/i18n-naming/SKILL.md.
 
 # ─── Manifest (flat top-level keys, see skill "Manifest localization") ───
 extName: "Cebian"
