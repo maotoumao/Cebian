@@ -4,8 +4,11 @@ import path from 'node:path';
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
-  modules: ['@wxt-dev/module-react'],
+  modules: ['@wxt-dev/module-react', '@wxt-dev/i18n/module'],
   manifest: {
+    default_locale: 'en',
+    name: '__MSG_extName__',
+    description: '__MSG_extDescription__',
     permissions: [
       'sidePanel', 'activeTab', 'tabs', 'scripting', 'storage', 'alarms',
       'offscreen', 'debugger', 'webNavigation',
@@ -14,7 +17,7 @@ export default defineConfig({
     ],
     host_permissions: ['<all_urls>'],
     action: {
-      default_title: '点击打开侧边栏',
+      default_title: '__MSG_actionTitle__',
     },
   },
   vite: () => ({

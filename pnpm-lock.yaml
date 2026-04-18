@@ -53,6 +53,9 @@ importers:
       '@sinclair/typebox':
         specifier: 0.34.49
         version: 0.34.49
+      '@wxt-dev/i18n':
+        specifier: ^0.2.5
+        version: 0.2.5(wxt@0.20.20(@types/node@25.6.0)(jiti@2.6.1))
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -2099,6 +2102,14 @@ packages:
 
   '@wxt-dev/browser@0.1.40':
     resolution: {integrity: sha512-h2/v/Hpkj5sz//h84ProqBaAcTsDFRKp9b/JVHOK/r7LT0XLE+ZDs5YN1BnFLUEHdM7G3fUjTyBG84cayXQshQ==}
+
+  '@wxt-dev/i18n@0.2.5':
+    resolution: {integrity: sha512-B9EwzR7eTIZv5HQSsQL9/NaBHXH7G/esEtxMCoBMQyHx6QWWJNMJLX2C4z8slQUbblvlt4bPa+/zIC1IrWc1LA==}
+    peerDependencies:
+      wxt: '>=0.19.7'
+    peerDependenciesMeta:
+      wxt:
+        optional: true
 
   '@wxt-dev/module-react@1.2.2':
     resolution: {integrity: sha512-+lRLi1r9dAXpLySWSIWHLJ1h/nFzR20iQnx3RNrKyA6oJg4+ClOluVXozHjfPg9Okfy/umtffiOopGayASrg6w==}
@@ -7297,6 +7308,15 @@ snapshots:
     dependencies:
       '@types/filesystem': 0.0.36
       '@types/har-format': 1.2.16
+
+  '@wxt-dev/i18n@0.2.5(wxt@0.20.20(@types/node@25.6.0)(jiti@2.6.1))':
+    dependencies:
+      '@wxt-dev/browser': 0.1.40
+      chokidar: 5.0.0
+      confbox: 0.2.4
+      fast-glob: 3.3.3
+    optionalDependencies:
+      wxt: 0.20.20(@types/node@25.6.0)(jiti@2.6.1)
 
   '@wxt-dev/module-react@1.2.2(vite@8.0.8(@types/node@25.6.0)(esbuild@0.27.7)(jiti@2.6.1))(wxt@0.20.20(@types/node@25.6.0)(jiti@2.6.1))':
     dependencies:

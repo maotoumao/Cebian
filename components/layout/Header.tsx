@@ -5,6 +5,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { t } from '@/lib/i18n';
 
 interface HeaderProps {
   title?: string;
@@ -25,7 +26,7 @@ export function Header({ title, theme, onToggleTheme, onOpenSettings, onNewChat,
               <SquarePen className="size-4.5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>新对话</TooltipContent>
+          <TooltipContent>{t('common.newChat')}</TooltipContent>
         </Tooltip>
 
         <Tooltip>

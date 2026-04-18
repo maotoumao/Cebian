@@ -1,0 +1,12 @@
+# Cebian 扩展 i18n —— 简体中文（覆盖所有 zh_* 变体）。
+# 修改时请同步 locales/en.yml。规范见 .agents/skills/i18n-naming/SKILL.md。
+
+# ─── Manifest（扁平顶层 key，见规范"Manifest localization"）───
+extName: "Cebian"
+extDescription: "AI 驱动的浏览器侧边栏助手"
+actionTitle: "打开 Cebian 侧边栏"
+
+# ─── 通用（UI 中复用）───
+common:
+  newChat: "新对话"
+  send: "发送"

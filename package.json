@@ -5,14 +5,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "wxt",
-    "dev:firefox": "wxt -b firefox",
-    "build": "wxt build",
-    "build:firefox": "wxt build -b firefox",
-    "zip": "wxt zip",
-    "zip:firefox": "wxt zip -b firefox",
+    "dev": "node scripts/sync-zh-locales.mjs && wxt",
+    "dev:firefox": "node scripts/sync-zh-locales.mjs && wxt -b firefox",
+    "build": "node scripts/sync-zh-locales.mjs && wxt build",
+    "build:firefox": "node scripts/sync-zh-locales.mjs && wxt build -b firefox",
+    "zip": "node scripts/sync-zh-locales.mjs && wxt zip",
+    "zip:firefox": "node scripts/sync-zh-locales.mjs && wxt zip -b firefox",
     "compile": "tsc --noEmit",
-    "postinstall": "wxt prepare"
+    "lint:i18n": "node scripts/lint-i18n.mjs",
+    "postinstall": "node scripts/sync-zh-locales.mjs && wxt prepare"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.1",
@@ -30,6 +31,7 @@
     "@mariozechner/pi-ai": "^0.67.6",
     "@mozilla/readability": "^0.6.0",
     "@sinclair/typebox": "0.34.49",
+    "@wxt-dev/i18n": "^0.2.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

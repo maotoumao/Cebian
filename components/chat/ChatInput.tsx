@@ -24,6 +24,7 @@ import {
   type Attachment,
 } from '@/lib/attachments';
 import { useMobileEmulation } from '@/hooks/useMobileEmulation';
+import { t } from '@/lib/i18n';
 
 interface ChatInputProps {
   onSend: (message: string, attachments?: Attachment[]) => void;
@@ -441,6 +442,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
                 size="icon-xs"
                 onClick={handleSend}
                 disabled={!canSend}
+                aria-label={t('common.send')}
                 className="bg-foreground text-background hover:bg-primary hover:text-primary-foreground hover:shadow-xs disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <Send className="size-3" />
