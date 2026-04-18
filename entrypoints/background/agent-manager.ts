@@ -24,6 +24,7 @@ import {
 import { getCopilotBaseUrl } from '@/lib/oauth';
 import { mergeCustomProviders, isCustomProvider, findCustomModel } from '@/lib/custom-models';
 import { PRESET_PROVIDERS } from '@/lib/constants';
+import { t } from '@/lib/i18n';
 
 // ─── Structured user message builder ───
 
@@ -311,7 +312,7 @@ class AgentManager {
       const title = text.trim().slice(0, 50) + (text.trim().length > 50 ? '...' : '');
       const session: SessionRecord = {
         id: sessionId,
-        title: title || '新对话',
+        title: title || t('common.newChat'),
         model: modelCfg?.modelId ?? '',
         provider: modelCfg?.provider ?? '',
         userInstructions: instructions || '',

@@ -86,3 +86,57 @@ settings:
   files:
     backToList: "返回文件列表"
     selectOrCreate: "从左侧选择或创建文件"
+
+# ─── 聊天 ───
+chat:
+  composer:
+    pickElement: "选择元素"
+    cancelPick: "取消选择"
+    screenshot: "截图"
+    uploadFile: "上传文件"
+    mobileMode: "移动端模式"
+    needModel: "请先选择一个 AI 模型"
+    goToSettings: "前往设置"
+    readPromptFailed: "读取 Prompt 失败"
+    elementAdded: "该元素已添加"
+    elementPickFailed: "元素选择失败"
+    screenshotFailed: "截图失败"
+    # $1 = 附件上限个数
+    maxAttachments: "最多添加 $1 个附件"
+    # $1 = 实际添加的文件数
+    truncatedFiles: "仅添加前 $1 个文件，已达上限"
+    # $1 = 文件名，$2 = 体积上限（已格式化，如 “5 MB”）
+    fileTooLarge: "$1 超过 $2 限制"
+    # $1 = 文件名
+    readFileFailed: "读取失败：$1"
+    # $1 = 文件名
+    unsupportedFileType: "不支持的文件类型：$1"
+    noPrompts: "暂无 Prompt，前往 AI 配置创建"
+    noMatch: "无匹配结果"
+  attachments:
+    image: "图片"
+    screenshot: "截图"
+    imageAlt: "附件图片"
+  askUser:
+    placeholder: "输入回复\u2026"
+  model:
+    select: "选择模型"
+    searchPlaceholder: "搜索模型\u2026"
+    notFound: "未找到模型"
+    addMore: "前往设置添加更多提供商"
+  thinking:
+    # $1 = 当前等级 label
+    label: "思考：$1"
+    levels:
+      "off": "关闭"
+      minimal: "最小"
+      low: "低"
+      medium: "中"
+      high: "高"
+  tool:
+    args: "参数"
+    result: "结果"
+  session:
+    loading: "加载会话中\u2026"
+    modelError: "模型返回错误"
+    welcomeReady: "有什么我可以帮你的？"

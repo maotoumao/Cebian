@@ -5,14 +5,17 @@ import type { ThinkingLevel } from '@/lib/storage';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { t } from '@/lib/i18n';
 
+// Pairs each level with a getLabel() resolver so locale changes work
+// at render time. See SectionNav for the same pattern + rationale.
 const THINKING_LEVELS = [
-  { value: 'off', label: '关闭' },
-  { value: 'minimal', label: '最小' },
-  { value: 'low', label: '低' },
-  { value: 'medium', label: '中' },
-  { value: 'high', label: '高' },
-] as const;
+  { value: 'off', getLabel: () => t('chat.thinking.levels.off') },
+  { value: 'minimal', getLabel: () => t('chat.thinking.levels.minimal') },
+  { value: 'low', getLabel: () => t('chat.thinking.levels.low') },
+  { value: 'medium', getLabel: () => t('chat.thinking.levels.medium') },
+  { value: 'high', getLabel: () => t('chat.thinking.levels.high') },
+] as const satisfies readonly { value: ThinkingLevel; getLabel: () => string }[];
 
 interface ThinkingLevelSelectorProps {
   level: ThinkingLevel;
@@ -24,13 +27,13 @@ export function ThinkingLevelSelector({
   onSelect,
 }: ThinkingLevelSelectorProps) {
   const [open, setOpen] = useState(false);
-  const currentLabel = THINKING_LEVELS.find(l => l.value === level)?.label ?? level;
+  const currentLabel = THINKING_LEVELS.find(l => l.value === level)?.getLabel() ?? level;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="xs" className="text-[0.7rem]">
-          思考: {currentLabel}
+          {t('chat.thinking.label', [currentLabel])}
           <ChevronDown data-icon />
         </Button>
       </PopoverTrigger>
@@ -49,7 +52,7 @@ export function ThinkingLevelSelector({
                 setOpen(false);
               }}
             >
-              {item.label}
+              {item.getLabel()}
               <Check
                 className={cn(
                   'ml-auto size-4',

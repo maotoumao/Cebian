@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ChevronRight, Loader2, Check, X } from 'lucide-react';
+import { t } from '@/lib/i18n';
 
 interface ToolCardImage {
   data: string;
@@ -50,7 +51,7 @@ export function ToolCard({ label, status, args, result, images }: ToolCardProps)
         <div className="border-t border-border overflow-hidden">
           {/* Arguments */}
           <div className="px-3.5 py-2.5 bg-background">
-            <div className="text-[0.65rem] text-muted-foreground/60 mb-1.5 font-medium">参数</div>
+            <div className="text-[0.65rem] text-muted-foreground/60 mb-1.5 font-medium">{t('chat.tool.args')}</div>
             <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-all font-mono">
               <code>{args}</code>
             </pre>
@@ -59,7 +60,7 @@ export function ToolCard({ label, status, args, result, images }: ToolCardProps)
           {/* Result (if available) */}
           {(result || (images && images.length > 0)) && (
             <div className="px-3.5 py-2.5 bg-background border-t border-border/50">
-              <div className="text-[0.65rem] text-muted-foreground/60 mb-1.5 font-medium">结果</div>
+              <div className="text-[0.65rem] text-muted-foreground/60 mb-1.5 font-medium">{t('chat.tool.result')}</div>
               {result && (
                 <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-all font-mono max-h-48 overflow-y-auto">
                   <code>{result}</code>

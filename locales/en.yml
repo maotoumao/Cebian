@@ -90,3 +90,57 @@ settings:
   files:
     backToList: "Back to file list"
     selectOrCreate: "Select or create a file from the left"
+
+# ─── Chat surface ───
+chat:
+  composer:
+    pickElement: "Pick element"
+    cancelPick: "Cancel pick"
+    screenshot: "Screenshot"
+    uploadFile: "Upload file"
+    mobileMode: "Mobile mode"
+    needModel: "Please select an AI model first"
+    goToSettings: "Go to settings"
+    readPromptFailed: "Failed to read prompt"
+    elementAdded: "Element already added"
+    elementPickFailed: "Failed to pick element"
+    screenshotFailed: "Screenshot failed"
+    # $1 = max attachment count
+    maxAttachments: "Up to $1 attachments"
+    # $1 = number of files actually added
+    truncatedFiles: "Only added the first $1 file(s); limit reached"
+    # $1 = file name, $2 = size limit (formatted, e.g. "5 MB")
+    fileTooLarge: "$1 exceeds $2"
+    # $1 = file name
+    readFileFailed: "Failed to read: $1"
+    # $1 = file name
+    unsupportedFileType: "Unsupported file type: $1"
+    noPrompts: "No prompts yet \u2014 create one from AI config"
+    noMatch: "No matches"
+  attachments:
+    image: "Image"
+    screenshot: "Screenshot"
+    imageAlt: "Attachment image"
+  askUser:
+    placeholder: "Type a reply\u2026"
+  model:
+    select: "Select model"
+    searchPlaceholder: "Search models\u2026"
+    notFound: "No models found"
+    addMore: "Open settings to add more providers"
+  thinking:
+    # $1 = current level label
+    label: "Thinking: $1"
+    levels:
+      "off": "Off"
+      minimal: "Minimal"
+      low: "Low"
+      medium: "Medium"
+      high: "High"
+  tool:
+    args: "Arguments"
+    result: "Result"
+  session:
+    loading: "Loading session\u2026"
+    modelError: "Model returned an error"
+    welcomeReady: "What can I help you with?"

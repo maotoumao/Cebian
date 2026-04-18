@@ -106,8 +106,8 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
   const handleSend = () => {
     if (!canSend) return;
     if (!currentModel) {
-      toast.error('请先选择一个 AI 模型', {
-        action: onOpenSettings ? { label: '前往设置', onClick: onOpenSettings } : undefined,
+      toast.error(t('chat.composer.needModel'), {
+        action: onOpenSettings ? { label: t('chat.composer.goToSettings'), onClick: onOpenSettings } : undefined,
       });
       return;
     }
@@ -153,7 +153,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
       setShowSlash(false);
       textareaRef.current?.focus();
     } catch {
-      toast.error('读取 Prompt 失败');
+      toast.error(t('chat.composer.readPromptFailed'));
     }
   };
 
@@ -171,13 +171,13 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
           (a) => a.type === 'element' && a.selector === result.selector && a.frameId === result.frameId,
         );
         if (isDuplicate) {
-          toast.info('该元素已添加');
+          toast.info(t('chat.composer.elementAdded'));
         } else {
           setAttachments((prev) => [...prev, result]);
         }
       }
     } catch (err) {
-      toast.error('元素选择失败');
+      toast.error(t('chat.composer.elementPickFailed'));
       console.error('[Element Picker]', err);
     } finally {
       setIsPicking(false);
@@ -187,7 +187,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
 
   const handleScreenshot = async () => {
     if (attachments.length >= MAX_ATTACHMENT_COUNT) {
-      toast.warning(`最多添加 ${MAX_ATTACHMENT_COUNT} 个附件`);
+      toast.warning(t('chat.composer.maxAttachments', [MAX_ATTACHMENT_COUNT]));
       return;
     }
     try {
@@ -198,7 +198,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
         { type: 'image', source: 'screenshot', data: base64, mimeType: 'image/jpeg' },
       ]);
     } catch (err) {
-      toast.error('截图失败');
+      toast.error(t('chat.composer.screenshotFailed'));
       console.error('[Screenshot]', err);
     }
   };
@@ -209,20 +209,20 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
 
     const remaining = MAX_ATTACHMENT_COUNT - attachments.length;
     if (remaining <= 0) {
-      toast.warning(`最多添加 ${MAX_ATTACHMENT_COUNT} 个附件`);
+      toast.warning(t('chat.composer.maxAttachments', [MAX_ATTACHMENT_COUNT]));
       e.target.value = '';
       return;
     }
 
     const filesToProcess = Array.from(files).slice(0, remaining);
     if (files.length > remaining) {
-      toast.warning(`仅添加前 ${remaining} 个文件，已达上限`);
+      toast.warning(t('chat.composer.truncatedFiles', [remaining]));
     }
 
     for (const file of filesToProcess) {
       if (isImageFile(file)) {
         if (file.size > MAX_IMAGE_SIZE) {
-          toast.error(`${file.name} 超过 ${formatFileSize(MAX_IMAGE_SIZE)} 限制`);
+          toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_IMAGE_SIZE)]));
           continue;
         }
         const reader = new FileReader();
@@ -235,11 +235,11 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
             return [...prev, { type: 'image', source: 'upload', data: base64, mimeType, name: file.name }];
           });
         };
-        reader.onerror = () => toast.error(`读取失败: ${file.name}`);
+        reader.onerror = () => toast.error(t('chat.composer.readFileFailed', [file.name]));
         reader.readAsDataURL(file);
       } else if (isTextFile(file.name)) {
         if (file.size > MAX_TEXT_FILE_SIZE) {
-          toast.error(`${file.name} 超过 ${formatFileSize(MAX_TEXT_FILE_SIZE)} 限制`);
+          toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_TEXT_FILE_SIZE)]));
           continue;
         }
         const reader = new FileReader();
@@ -249,10 +249,10 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
             return [...prev, { type: 'file', content: reader.result as string, name: file.name, mimeType: file.type || 'text/plain', size: file.size }];
           });
         };
-        reader.onerror = () => toast.error(`读取失败: ${file.name}`);
+        reader.onerror = () => toast.error(t('chat.composer.readFileFailed', [file.name]));
         reader.readAsText(file);
       } else {
-        toast.error(`不支持的文件类型: ${file.name}`);
+        toast.error(t('chat.composer.unsupportedFileType', [file.name]));
       }
     }
 
@@ -271,7 +271,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
         <div className="absolute bottom-full left-4 right-4 mb-3 bg-popover border border-border rounded-lg shadow-xl z-50 animate-in slide-in-from-bottom-1 fade-in duration-150 max-h-60 overflow-y-auto">
           {filteredPrompts.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-3 px-2.5">
-              {prompts.length === 0 ? '暂无 Prompt，前往 AI 配置创建' : '无匹配结果'}
+              {prompts.length === 0 ? t('chat.composer.noPrompts') : t('chat.composer.noMatch')}
             </p>
           ) : (
             <div className="py-1">
@@ -302,16 +302,16 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
           <Button
             variant="ghost"
             size="icon-xs"
-            title={isPicking ? '取消选择' : '选择元素'}
+            title={isPicking ? t('chat.composer.cancelPick') : t('chat.composer.pickElement')}
             onClick={handlePickElement}
             className={isPicking ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}
           >
             <MousePointer2 className="size-3.5" />
           </Button>
-          <Button variant="ghost" size="icon-xs" title="截图" onClick={handleScreenshot}>
+          <Button variant="ghost" size="icon-xs" title={t('chat.composer.screenshot')} onClick={handleScreenshot}>
             <Camera className="size-3.5" />
           </Button>
-          <Button variant="ghost" size="icon-xs" title="上传文件" onClick={() => fileInputRef.current?.click()}>
+          <Button variant="ghost" size="icon-xs" title={t('chat.composer.uploadFile')} onClick={() => fileInputRef.current?.click()}>
             <Paperclip className="size-3.5" />
           </Button>
           <input
@@ -325,7 +325,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
           <Button
             variant="ghost"
             size="icon-xs"
-            title="移动端模式"
+            title={t('chat.composer.mobileMode')}
             className={isActiveTabMobile ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}
             onClick={toggleMobile}
           >
@@ -348,15 +348,15 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
                     >
                       <img
                         src={`data:${att.mimeType};base64,${att.data}`}
-                        alt={att.name || '截图'}
+                        alt={att.name || t('chat.attachments.screenshot')}
                         className="h-3.5 w-5 rounded-sm object-cover cursor-pointer"
                         onClick={() => showDialog('image-preview', {
                           src: `data:${att.mimeType};base64,${att.data}`,
-                          alt: att.name || '截图',
+                          alt: att.name || t('chat.attachments.screenshot'),
                         })}
                       />
                       <span className="truncate max-w-24">
-                        {att.name || (att.source === 'screenshot' ? '截图' : '图片')}
+                        {att.name || (att.source === 'screenshot' ? t('chat.attachments.screenshot') : t('chat.attachments.image'))}
                       </span>
                       <button
                         className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"

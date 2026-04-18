@@ -16,6 +16,7 @@ import {
   CommandSeparator,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { t } from '@/lib/i18n';
 
 interface ModelSelectorProps {
   activeModel: ActiveModel | null;
@@ -102,15 +103,15 @@ export function ModelSelector({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="xs" className="text-[0.7rem]">
-          {activeModelName ?? '选择模型'}
+          {activeModelName ?? t('chat.model.select')}
           <ChevronDown data-icon />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="start">
         <Command>
-          <CommandInput placeholder="搜索模型…" />
+          <CommandInput placeholder={t('chat.model.searchPlaceholder')} />
           <CommandList>
-            <CommandEmpty>未找到模型</CommandEmpty>
+            <CommandEmpty>{t('chat.model.notFound')}</CommandEmpty>
             {providerModels.map((group, i) => (
               <div key={group.provider}>
                 {i > 0 && <CommandSeparator />}
@@ -148,7 +149,7 @@ export function ModelSelector({
                 }}
               >
                 <Settings data-icon />
-                前往设置添加更多提供商
+                {t('chat.model.addMore')}
               </CommandItem>
             </CommandGroup>
           </CommandList>

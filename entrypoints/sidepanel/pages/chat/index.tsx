@@ -18,6 +18,7 @@ import { useBackgroundAgent } from '@/hooks/useBackgroundAgent';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { activeModel } from '@/lib/storage';
 import type { SessionRecord } from '@/lib/db';
+import { t } from '@/lib/i18n';
 
 // ─── ChatPage ───
 
@@ -98,7 +99,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
         <div className="flex flex-col gap-4 p-5">
           {sessionLoading && (
             <div className="text-center text-sm text-muted-foreground py-12">
-              加载会话中…
+              {t('chat.session.loading')}
             </div>
           )}
 
@@ -143,7 +144,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                   {text && <AgentTextBlock content={text} />}
                   {isError && (
                     <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 mt-2">
-                      {assistantMsg.errorMessage ?? '模型返回错误'}
+                      {assistantMsg.errorMessage ?? t('chat.session.modelError')}
                     </div>
                   )}
                   {/* Generic tool rendering */}
@@ -240,9 +241,9 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                 <SquarePen className="size-5 text-primary" />
               </div>
               {!currentModel ? (
-                <p className="text-sm text-muted-foreground">请先选择一个 AI 模型</p>
+                <p className="text-sm text-muted-foreground">{t('chat.composer.needModel')}</p>
               ) : (
-                <p className="text-sm text-muted-foreground">有什么我可以帮你的？</p>
+                <p className="text-sm text-muted-foreground">{t('chat.session.welcomeReady')}</p>
               )}
             </div>
           )}

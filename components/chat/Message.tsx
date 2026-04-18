@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
 import { extractUserText, extractUserAttachments } from '@/lib/message-helpers';
 import { showDialog } from '@/lib/dialog';
+import { t } from '@/lib/i18n';
 import type { Message } from '@mariozechner/pi-ai';
 
 /* ─── User Message ─── */
@@ -29,13 +30,13 @@ export function UserMessageBubble({ msg, children }: { msg?: Message; children?:
             >
               <img
                 src={`data:${img.mimeType};base64,${img.data}`}
-                alt="附件图片"
+                alt={t('chat.attachments.imageAlt')}
                 className="h-3.5 w-auto rounded-sm object-cover cursor-pointer"
                 onClick={() => showDialog('image-preview', {
                   src: `data:${img.mimeType};base64,${img.data}`,
                 })}
               />
-              图片
+              {t('chat.attachments.image')}
             </Badge>
           ))}
           {attachments.elements.map((el, i) => (
@@ -195,7 +196,7 @@ export function AskUserBlock({
             value={freeText}
             onChange={(e) => setFreeText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="输入回复…"
+            placeholder={t('chat.askUser.placeholder')}
             rows={1}
             className="flex-1 resize-none bg-background border border-border rounded-md px-2.5 py-1.5 text-xs leading-relaxed placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
           />

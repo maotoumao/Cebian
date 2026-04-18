@@ -86,3 +86,57 @@ settings:
   files:
     backToList: "返回檔案列表"
     selectOrCreate: "從左側選擇或建立檔案"
+
+# ─── 聊天 ───
+chat:
+  composer:
+    pickElement: "選擇元素"
+    cancelPick: "取消選擇"
+    screenshot: "螢幕截圖"
+    uploadFile: "上傳檔案"
+    mobileMode: "行動裝置模式"
+    needModel: "請先選擇一個 AI 模型"
+    goToSettings: "前往設定"
+    readPromptFailed: "讀取 Prompt 失敗"
+    elementAdded: "此元素已新增"
+    elementPickFailed: "元素選擇失敗"
+    screenshotFailed: "螢幕截圖失敗"
+    # $1 = 附件上限個數
+    maxAttachments: "最多新增 $1 個附件"
+    # $1 = 實際新增的檔案數
+    truncatedFiles: "僅新增前 $1 個檔案，已達上限"
+    # $1 = 檔案名稱，$2 = 容量上限（已格式化，如「5 MB」）
+    fileTooLarge: "$1 超過 $2 限制"
+    # $1 = 檔案名稱
+    readFileFailed: "讀取失敗：$1"
+    # $1 = 檔案名稱
+    unsupportedFileType: "不支援的檔案類型：$1"
+    noPrompts: "尚無 Prompt，前往 AI 設定建立"
+    noMatch: "無相符結果"
+  attachments:
+    image: "圖片"
+    screenshot: "螢幕截圖"
+    imageAlt: "附件圖片"
+  askUser:
+    placeholder: "輸入回覆\u2026"
+  model:
+    select: "選擇模型"
+    searchPlaceholder: "搜尋模型\u2026"
+    notFound: "找不到模型"
+    addMore: "前往設定新增更多供應商"
+  thinking:
+    # $1 = 當前等級 label
+    label: "思考：$1"
+    levels:
+      "off": "關閉"
+      minimal: "最小"
+      low: "低"
+      medium: "中"
+      high: "高"
+  tool:
+    args: "參數"
+    result: "結果"
+  session:
+    loading: "載入工作階段\u2026"
+    modelError: "模型回傳錯誤"
+    welcomeReady: "有什麼我可以幫忙的？"
