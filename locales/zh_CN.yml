@@ -148,8 +148,6 @@ chat:
 
 # ─── 提供商子组件（OAuth / API Key / 自定义）───
 provider:
-  manager:
-    title: "管理 AI 提供商"
   section:
     viaApiKey: "通过 API Key"
   status:

@@ -148,8 +148,6 @@ chat:
 
 # ─── 供應商子元件（OAuth / API Key / 自訂）───
 provider:
-  manager:
-    title: "管理 AI 供應商"
   section:
     viaApiKey: "透過 API Key"
   status:

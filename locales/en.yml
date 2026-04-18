@@ -152,8 +152,6 @@ chat:
 
 # ─── Provider sub-components (OAuth / API Key / custom) ───
 provider:
-  manager:
-    title: "Manage AI providers"
   section:
     viaApiKey: "Via API Key"
   status:
