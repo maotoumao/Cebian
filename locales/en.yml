@@ -83,6 +83,12 @@ settings:
   prompts:
     # $1 = trigger character ("/")
     hint: "Reusable prompt templates. Trigger them with $1 in the chat input."
+    placeholders:
+      selectedText: "Selected text on page"
+      pageUrl: "Current page URL"
+      pageTitle: "Current page title"
+      date: "Current date"
+      clipboard: "Clipboard content"
   skills:
     create: "Create skill"
     hint: "Multi-file skill packs that follow the agentskills.io spec; the agent loads them on demand."
@@ -170,6 +176,10 @@ provider:
     authFailed: "Authorization failed"
     enterCode: "Enter the code in the browser:"
     completeInBrowser: "Complete authorization in the popup browser window\u2026"
+    descriptions:
+      githubCopilot: "Use your Copilot subscription to access GPT/Claude"
+      openaiCodex: "Use your ChatGPT Plus/Pro subscription"
+      googleGemini: "Sign in with Google Cloud OAuth"
   apiKey:
     placeholder: "Enter API Key"
     disconnect: "Disconnect"
@@ -260,3 +270,44 @@ tools:
     listFrames: "Listing page frames"
     # $1 = action name
     unknown: "tab: $1"
+
+# ─── Dialogs ───
+dialogs:
+  imagePreview:
+    title: "Image preview"
+    alt: "Preview"
+
+# ─── VFS browser entrypoint ───
+vfs:
+  backToRoot: "Back to root"
+  # $1 = line count
+  lines: "$1 ln"
+  # $1 = formatted file size
+  binaryFile: "[Binary file — $1]"
+  # $1 = path
+  pathNotFound: "Path not found: $1"
+  unknownError: "Unknown error"
+
+# ─── Errors (toasts, thrown messages) ───
+errors:
+  oauth:
+    cancelled: "Cancelled"
+    timeout: "Authorization timed out"
+    noCode: "No authorization code received"
+    stateMismatch: "State mismatch"
+    # $1 = HTTP status
+    tokenExchangeFailed: "Token exchange failed: $1"
+    missingTokenFields: "Token response is missing required fields"
+    missingRefreshToken: "No refresh token received"
+    missingRefreshTokenLocal: "Missing refresh token"
+    # $1 = HTTP status
+    gcpProjectFailed: "Google Cloud project setup failed: $1"
+    gcpProjectPollFailed: "Project setup polling failed"
+    gcpProjectIdMissing: "Could not obtain Google Cloud project ID"
+    # $1 = provider id
+    unknownProvider: "Unknown OAuth provider: $1"
+  network:
+    invalidUrl: "Invalid URL format"
+    unsupportedScheme: "Only http/https schemes are supported"
+    # $1 = HTTP status
+    requestFailed: "Request failed: $1"

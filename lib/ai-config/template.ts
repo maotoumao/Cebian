@@ -5,14 +5,17 @@
  * Unknown variables are left as-is.
  */
 
-/** Built-in template variable names. */
+import { t } from '@/lib/i18n';
+
+/** Built-in template variable names. `getLabel` is called at use time so the
+ * label tracks the active locale. */
 export const TEMPLATE_VARIABLES = [
-  { name: 'selected_text', label: '页面选中文本' },
-  { name: 'page_url', label: '当前页面 URL' },
-  { name: 'page_title', label: '当前页面标题' },
-  { name: 'date', label: '当前日期' },
-  { name: 'clipboard', label: '剪贴板内容' },
-] as const;
+  { name: 'selected_text', getLabel: () => t('settings.prompts.placeholders.selectedText') },
+  { name: 'page_url', getLabel: () => t('settings.prompts.placeholders.pageUrl') },
+  { name: 'page_title', getLabel: () => t('settings.prompts.placeholders.pageTitle') },
+  { name: 'date', getLabel: () => t('settings.prompts.placeholders.date') },
+  { name: 'clipboard', getLabel: () => t('settings.prompts.placeholders.clipboard') },
+] as const satisfies readonly { name: string; getLabel: () => string }[];
 
 export type TemplateVarName = (typeof TEMPLATE_VARIABLES)[number]['name'];
 

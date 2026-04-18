@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/context-menu';
 import { vfs } from '@/lib/vfs';
 import { cn } from '@/lib/utils';
+import { t } from '@/lib/i18n';
 
 // ─── Types ───
 
@@ -186,19 +187,19 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
     menuItems = (
       <>
         <ContextMenuItem onClick={() => (tree.props as any).onCreateFile?.(node.id)}>
-          <FilePlus className="size-3.5 mr-2" /> 新建文件
+          <FilePlus className="size-3.5 mr-2" /> {t('common.newFile')}
         </ContextMenuItem>
         {allowNewFolder && (
           <ContextMenuItem onClick={() => (tree.props as any).onCreateFolder?.(node.id)}>
-            <FolderPlus className="size-3.5 mr-2" /> 新建文件夹
+            <FolderPlus className="size-3.5 mr-2" /> {t('common.newFolder')}
           </ContextMenuItem>
         )}
         <ContextMenuSeparator />
         <ContextMenuItem onClick={() => node.edit()}>
-          <Pencil className="size-3.5 mr-2" /> 重命名
+          <Pencil className="size-3.5 mr-2" /> {t('common.rename')}
         </ContextMenuItem>
         <ContextMenuItem onClick={() => tree.delete(node.id)} className="text-destructive focus:text-destructive">
-          <Trash2 className="size-3.5 mr-2" /> 删除
+          <Trash2 className="size-3.5 mr-2" /> {t('common.delete')}
         </ContextMenuItem>
       </>
     );
@@ -206,10 +207,10 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
     menuItems = (
       <>
         <ContextMenuItem onClick={() => node.edit()}>
-          <Pencil className="size-3.5 mr-2" /> 重命名
+          <Pencil className="size-3.5 mr-2" /> {t('common.rename')}
         </ContextMenuItem>
         <ContextMenuItem onClick={() => tree.delete(node.id)} className="text-destructive focus:text-destructive">
-          <Trash2 className="size-3.5 mr-2" /> 删除
+          <Trash2 className="size-3.5 mr-2" /> {t('common.delete')}
         </ContextMenuItem>
       </>
     );
@@ -460,7 +461,7 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
       </Tree>
       {showEmptyOverlay && (
         <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground pointer-events-none">
-          空文件夹
+          {t('common.empty.folder')}
         </div>
       )}
     </div>

@@ -1,5 +1,6 @@
 import type { Api, Model } from '@mariozechner/pi-ai';
 import type { CustomProviderConfig, CustomModelDef } from './storage';
+import { t } from '@/lib/i18n';
 
 /** Prefix used to distinguish custom providers from built-in ones */
 export const CUSTOM_PREFIX = 'custom:';
@@ -86,11 +87,11 @@ export async function fetchRemoteModels(
   try {
     parsed = new URL(baseUrl);
   } catch {
-    throw new Error('URL 格式无效');
+    throw new Error(t('errors.network.invalidUrl'));
   }
 
   if (!['http:', 'https:'].includes(parsed.protocol)) {
-    throw new Error('仅支持 http/https 协议');
+    throw new Error(t('errors.network.unsupportedScheme'));
   }
 
   const url = `${parsed.toString().replace(/\/+$/, '')}/models`;
@@ -104,7 +105,7 @@ export async function fetchRemoteModels(
     });
 
     if (!res.ok) {
-      throw new Error(`请求失败: ${res.status}`);
+      throw new Error(t('errors.network.requestFailed', [res.status]));
     }
 
     const data = await res.json();

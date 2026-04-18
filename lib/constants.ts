@@ -1,12 +1,18 @@
 // ─── Provider registry ───
 
 import type { CustomProviderConfig } from './storage';
+import { t } from '@/lib/i18n';
 
 export const OAUTH_PROVIDERS = [
-  { provider: 'github-copilot', label: 'GitHub Copilot', description: '使用 Copilot 订阅访问 GPT/Claude', flow: 'device-code' as const },
-  { provider: 'openai-codex', label: 'OpenAI Codex', description: '使用 ChatGPT Plus/Pro 订阅', flow: 'auth-code' as const },
-  { provider: 'google-gemini-cli', label: 'Google Gemini', description: 'Google Cloud OAuth 登录', flow: 'auth-code' as const },
-] as const;
+  { provider: 'github-copilot', label: 'GitHub Copilot', getDescription: () => t('provider.oauth.descriptions.githubCopilot'), flow: 'device-code' as const },
+  { provider: 'openai-codex', label: 'OpenAI Codex', getDescription: () => t('provider.oauth.descriptions.openaiCodex'), flow: 'auth-code' as const },
+  { provider: 'google-gemini-cli', label: 'Google Gemini', getDescription: () => t('provider.oauth.descriptions.googleGemini'), flow: 'auth-code' as const },
+] as const satisfies readonly {
+  provider: string;
+  label: string;
+  getDescription: () => string;
+  flow: 'device-code' | 'auth-code';
+}[];
 
 export const APIKEY_PROVIDERS = [
   { provider: 'anthropic', label: 'Anthropic' },

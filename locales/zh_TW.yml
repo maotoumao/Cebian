@@ -79,6 +79,12 @@ settings:
   prompts:
     # $1 = 觸發字元（「/」）
     hint: "可重複使用的提示詞模板，透過 $1 命令在聊天輸入中觸發。"
+    placeholders:
+      selectedText: "頁面選取文字"
+      pageUrl: "當前頁面 URL"
+      pageTitle: "當前頁面標題"
+      date: "當前日期"
+      clipboard: "剪貼簿內容"
   skills:
     create: "建立技能"
     hint: "遵循 agentskills.io 規範的多檔案技能包，agent 會按需載入。"
@@ -166,6 +172,10 @@ provider:
     authFailed: "授權失敗"
     enterCode: "請在瀏覽器中輸入代碼："
     completeInBrowser: "請在彈出的瀏覽器視窗中完成授權\u2026"
+    descriptions:
+      githubCopilot: "使用 Copilot 訂閱存取 GPT/Claude"
+      openaiCodex: "使用 ChatGPT Plus/Pro 訂閱"
+      googleGemini: "以 Google Cloud OAuth 登入"
   apiKey:
     placeholder: "輸入 API Key"
     disconnect: "中斷連線"
@@ -256,3 +266,44 @@ tools:
     listFrames: "正在列出頁面 frames"
     # $1 = action 名稱
     unknown: "tab: $1"
+
+# ─── 對話框 ───
+dialogs:
+  imagePreview:
+    title: "圖片預覽"
+    alt: "預覽"
+
+# ─── VFS 瀏覽入口 ───
+vfs:
+  backToRoot: "回到根目錄"
+  # $1 = 行數
+  lines: "$1 行"
+  # $1 = 格式化後的檔案大小
+  binaryFile: "[二進位檔案 — $1]"
+  # $1 = 路徑
+  pathNotFound: "路徑不存在：$1"
+  unknownError: "未知錯誤"
+
+# ─── 錯誤（toast、抛出的錯誤訊息）───
+errors:
+  oauth:
+    cancelled: "已取消"
+    timeout: "授權逾時"
+    noCode: "未收到授權碼"
+    stateMismatch: "State 不符"
+    # $1 = HTTP 狀態碼
+    tokenExchangeFailed: "Token 交換失敗：$1"
+    missingTokenFields: "Token 回應缺少必要欄位"
+    missingRefreshToken: "未收到 refresh token"
+    missingRefreshTokenLocal: "缺少 refresh token"
+    # $1 = HTTP 狀態碼
+    gcpProjectFailed: "Google Cloud 專案設定失敗：$1"
+    gcpProjectPollFailed: "專案設定輪詢失敗"
+    gcpProjectIdMissing: "無法取得 Google Cloud 專案 ID"
+    # $1 = provider id
+    unknownProvider: "未知的 OAuth 供應商：$1"
+  network:
+    invalidUrl: "URL 格式無效"
+    unsupportedScheme: "僅支援 http/https 協定"
+    # $1 = HTTP 狀態碼
+    requestFailed: "請求失敗：$1"

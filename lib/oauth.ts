@@ -15,6 +15,7 @@ import {
   normalizeDomain,
 } from '@mariozechner/pi-ai/oauth';
 import { providerCredentials, type OAuthCredential } from './storage';
+import { t } from '@/lib/i18n';
 
 // ─── PKCE (Web Crypto) ───
 
@@ -52,7 +53,7 @@ function waitForRedirectUrl(
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     if (signal?.aborted) {
-      reject(new Error('已取消'));
+      reject(new Error(t('errors.oauth.cancelled')));
       return;
     }
 
@@ -71,14 +72,14 @@ function waitForRedirectUrl(
 
     const timer = setTimeout(() => {
       cleanup();
-      reject(new Error('授权超时'));
+      reject(new Error(t('errors.oauth.timeout')));
     }, timeoutMs);
 
     chrome.tabs.onUpdated.addListener(listener);
 
     signal?.addEventListener('abort', () => {
       cleanup();
-      reject(new Error('已取消'));
+      reject(new Error(t('errors.oauth.cancelled')));
     }, { once: true });
   });
 }
@@ -143,8 +144,8 @@ export async function loginOpenAICodex(
   const code = params.get('code');
   const returnedState = params.get('state');
 
-  if (!code) throw new Error('未收到授权码');
-  if (returnedState !== state) throw new Error('State 不匹配');
+  if (!code) throw new Error(t('errors.oauth.noCode'));
+  if (returnedState !== state) throw new Error(t('errors.oauth.stateMismatch'));
 
   // Exchange code for tokens
   const tokenRes = await fetch(OPENAI_TOKEN_URL, {
@@ -160,12 +161,12 @@ export async function loginOpenAICodex(
   });
 
   if (!tokenRes.ok) {
-    throw new Error(`Token 交换失败: ${tokenRes.status}`);
+    throw new Error(t('errors.oauth.tokenExchangeFailed', [tokenRes.status]));
   }
 
   const tokenData = await tokenRes.json();
   if (!tokenData.access_token || !tokenData.refresh_token) {
-    throw new Error('Token 响应缺少必要字段');
+    throw new Error(t('errors.oauth.missingTokenFields'));
   }
 
   return {
@@ -233,7 +234,7 @@ async function discoverGoogleProject(accessToken: string): Promise<string> {
   });
 
   if (!onboardRes.ok) {
-    throw new Error(`Google Cloud 项目配置失败: ${onboardRes.status}`);
+    throw new Error(t('errors.oauth.gcpProjectFailed', [onboardRes.status]));
   }
 
   let lroData = await onboardRes.json();
@@ -246,7 +247,7 @@ async function discoverGoogleProject(accessToken: string): Promise<string> {
         method: 'GET',
         headers,
       });
-      if (!pollRes.ok) throw new Error('项目配置轮询失败');
+      if (!pollRes.ok) throw new Error(t('errors.oauth.gcpProjectPollFailed'));
       lroData = await pollRes.json();
       if (lroData.done) break;
     }
@@ -255,7 +256,7 @@ async function discoverGoogleProject(accessToken: string): Promise<string> {
   const projectId = lroData.response?.cloudaicompanionProject?.id;
   if (projectId) return projectId;
 
-  throw new Error('无法获取 Google Cloud 项目 ID');
+  throw new Error(t('errors.oauth.gcpProjectIdMissing'));
 }
 
 export async function loginGeminiCli(
@@ -282,8 +283,8 @@ export async function loginGeminiCli(
   const code = params.get('code');
   const returnedState = params.get('state');
 
-  if (!code) throw new Error('未收到授权码');
-  if (returnedState !== state) throw new Error('State 不匹配');
+  if (!code) throw new Error(t('errors.oauth.noCode'));
+  if (returnedState !== state) throw new Error(t('errors.oauth.stateMismatch'));
 
   // Exchange code for tokens
   const tokenRes = await fetch(GOOGLE_TOKEN_URL, {
@@ -300,12 +301,12 @@ export async function loginGeminiCli(
   });
 
   if (!tokenRes.ok) {
-    throw new Error(`Token 交换失败: ${tokenRes.status}`);
+    throw new Error(t('errors.oauth.tokenExchangeFailed', [tokenRes.status]));
   }
 
   const tokenData = await tokenRes.json();
   if (!tokenData.refresh_token) {
-    throw new Error('未收到 refresh token');
+    throw new Error(t('errors.oauth.missingRefreshToken'));
   }
 
   // Discover / provision Google Cloud project
@@ -337,7 +338,7 @@ export async function refreshOAuthCredential(
   provider: string,
   cred: OAuthCredential,
 ): Promise<OAuthCredential> {
-  if (!cred.refreshToken) throw new Error('缺少 refresh token');
+  if (!cred.refreshToken) throw new Error(t('errors.oauth.missingRefreshTokenLocal'));
 
   let newAccess: string;
   let newRefresh: string;
@@ -375,7 +376,7 @@ export async function refreshOAuthCredential(
       break;
     }
     default:
-      throw new Error(`未知的 OAuth provider: ${provider}`);
+      throw new Error(t('errors.oauth.unknownProvider', [provider]));
   }
 
   return {

@@ -79,6 +79,12 @@ settings:
   prompts:
     # $1 = 触发字符（“/”）
     hint: "可复用的提示模板，通过 $1 命令在聊天输入中触发。"
+    placeholders:
+      selectedText: "页面选中文本"
+      pageUrl: "当前页面 URL"
+      pageTitle: "当前页面标题"
+      date: "当前日期"
+      clipboard: "剪贴板内容"
   skills:
     create: "创建技能"
     hint: "遵循 agentskills.io 规范的多文件技能包，agent 会按需加载。"
@@ -166,6 +172,10 @@ provider:
     authFailed: "授权失败"
     enterCode: "请在浏览器中输入代码："
     completeInBrowser: "请在弹出的浏览器窗口中完成授权\u2026"
+    descriptions:
+      githubCopilot: "使用 Copilot 订阅访问 GPT/Claude"
+      openaiCodex: "使用 ChatGPT Plus/Pro 订阅"
+      googleGemini: "Google Cloud OAuth 登录"
   apiKey:
     placeholder: "输入 API Key"
     disconnect: "断开连接"
@@ -256,3 +266,45 @@ tools:
     listFrames: "正在列出页面 frames"
     # $1 = action 名称
     unknown: "tab: $1"
+
+# ─── 对话框 ───
+dialogs:
+  imagePreview:
+    title: "图片预览"
+    alt: "预览"
+
+# ─── VFS 浏览入口 ───
+vfs:
+
+  backToRoot: "返回根目录"
+  # $1 = 行数
+  lines: "$1 行"
+  # $1 = 格式化后的文件大小
+  binaryFile: "[二进制文件 — $1]"
+  # $1 = 路径
+  pathNotFound: "路径不存在：$1"
+  unknownError: "未知错误"
+
+# ─── 错误（toast、抛出的错误信息）───
+errors:
+  oauth:
+    cancelled: "已取消"
+    timeout: "授权超时"
+    noCode: "未收到授权码"
+    stateMismatch: "State 不匹配"
+    # $1 = HTTP 状态码
+    tokenExchangeFailed: "Token 交换失败：$1"
+    missingTokenFields: "Token 响应缺少必要字段"
+    missingRefreshToken: "未收到 refresh token"
+    missingRefreshTokenLocal: "缺少 refresh token"
+    # $1 = HTTP 状态码
+    gcpProjectFailed: "Google Cloud 项目配置失败：$1"
+    gcpProjectPollFailed: "项目配置轮询失败"
+    gcpProjectIdMissing: "无法获取 Google Cloud 项目 ID"
+    # $1 = provider id
+    unknownProvider: "未知的 OAuth provider：$1"
+  network:
+    invalidUrl: "URL 格式无效"
+    unsupportedScheme: "仅支持 http/https 协议"
+    # $1 = HTTP 状态码
+    requestFailed: "请求失败：$1"

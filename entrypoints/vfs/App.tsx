@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { vfs, normalizePath } from '@/lib/vfs';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { themePreference } from '@/lib/storage';
+import { t } from '@/lib/i18n';
 
 // ─── Theme (same as ai-config) ───
 
@@ -152,7 +153,7 @@ function DirView({ path, entries }: { path: string; entries: DirEntry[] }) {
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="opacity-30">
           <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
         </svg>
-        <span className="text-sm">空目录</span>
+        <span className="text-sm">{t('common.empty.folder')}</span>
       </div>
     );
   }
@@ -216,7 +217,7 @@ function FileView({ path, content, size }: { path: string; content: string; size
           <span className="text-sm font-medium truncate">{name}</span>
         </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
-          <span className="tabular-nums">{lineCount} 行</span>
+          <span className="tabular-nums">{t('vfs.lines', [lineCount])}</span>
           <span className="text-border">·</span>
           <span className="tabular-nums">{formatSize(size)}</span>
         </div>
@@ -289,7 +290,7 @@ export default function App() {
         } else {
           const ext = fileExtension(p.split('/').pop() ?? '');
           if (BINARY_EXTS.has(ext)) {
-            if (!stale) setView({ kind: 'file', path: p, content: `[二进制文件 — ${formatSize(st.size)}]`, size: st.size });
+            if (!stale) setView({ kind: 'file', path: p, content: t('vfs.binaryFile', [formatSize(st.size)]), size: st.size });
           } else {
             const raw = (await vfs.readFile(p, 'utf8')) as unknown as string;
             if (!stale) setView({ kind: 'file', path: p, content: raw, size: st.size });
@@ -299,8 +300,8 @@ export default function App() {
         if (stale) return;
         const message =
           err?.code === 'ENOENT'
-            ? `路径不存在: ${p}`
-            : err?.message ?? '未知错误';
+            ? t('vfs.pathNotFound', [p])
+            : err?.message ?? t('vfs.unknownError');
         setView({ kind: 'error', path: p, message });
       }
     }
@@ -354,7 +355,7 @@ export default function App() {
                 onClick={() => navigateTo('/')}
                 className="mt-2 text-xs text-primary hover:underline"
               >
-                返回根目录
+                {t('vfs.backToRoot')}
               </button>
             </div>
           )}

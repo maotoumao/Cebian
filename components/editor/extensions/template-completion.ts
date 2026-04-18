@@ -15,7 +15,7 @@ function templateCompletionSource(context: CompletionContext): CompletionResult 
     from: match.from + 2,
     options: TEMPLATE_VARIABLES.map((v) => ({
       label: v.name,
-      detail: v.label,
+      detail: v.getLabel(),
       apply: `${v.name}}}`,
       type: 'variable' as const,
     })),

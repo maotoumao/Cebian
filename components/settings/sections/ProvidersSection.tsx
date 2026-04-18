@@ -165,7 +165,7 @@ export function ProvidersSection() {
             <ProviderOAuthItem
               provider={p.provider}
               label={p.label}
-              description={p.description}
+              description={p.getDescription()}
               flow={p.flow}
               credential={providers[p.provider] as OAuthCredential | undefined}
               oauthState={getOAuthState(p.provider)}
