@@ -193,3 +193,70 @@ provider:
     manualModelPlaceholder: "Manual Model ID"
     addCustom: "Add custom provider"
     fetchFailed: "Failed to fetch models, please add manually"
+
+# ─── Tool runtime labels (shown in ToolCard) ───
+tools:
+  # $1 = mode (and optional selector suffix)
+  readPage: "Reading page content ($1)"
+  executeJs: "Running script"
+  screenshot: "Taking page screenshot"
+  askUser: "Waiting for user reply"
+  # $1 = skill name
+  runSkill: "Running skill script $1"
+  fs:
+    # $1 = file path
+    createFile: "Creating file $1"
+    # $1 = file path
+    editFile: "Editing file $1"
+    # $1 = directory path
+    mkdir: "Creating directory $1"
+    # $1 = old path
+    rename: "Renaming $1"
+    # $1 = path
+    delete: "Deleting $1"
+    # $1 = file path
+    readFile: "Reading file $1"
+    # $1 = directory path
+    list: "Listing directory $1"
+    # $1 = search pattern
+    searchFiles: "Searching files \"$1\""
+    # $1 = search pattern
+    searchContent: "Searching file content \"$1\""
+  chromeApi:
+    help: "Looking up Chrome API docs"
+    # $1 = namespace, $2 = method
+    call: "Calling chrome.$1.$2"
+  interact:
+    # $1 = target suffix (with leading space) or empty
+    click: "Clicking$1"
+    dblclick: "Double-clicking$1"
+    rightclick: "Right-clicking$1"
+    hover: "Hovering$1"
+    type: "Typing text$1"
+    clear: "Clearing input$1"
+    select: "Selecting option$1"
+    scroll: "Scrolling page"
+    # $1 = key name
+    keypress: "Pressing key $1"
+    # $1 = target suffix (with leading space) or empty
+    wait: "Waiting for element to appear$1"
+    waitHidden: "Waiting for element to disappear$1"
+    waitNavigation: "Waiting for page to load"
+    # $1 = search text
+    find: "Searching \"$1\""
+    # $1 = target suffix (with leading space) or empty
+    query: "Querying element$1"
+    # $1 = step count
+    sequence: "Running action sequence ($1 steps)"
+    # $1 = action name
+    unknown: "interact: $1"
+  tab:
+    open: "Opening new tab"
+    # $1 = tab id
+    close: "Closing tab $1"
+    # $1 = tab id
+    switch: "Switching to tab $1"
+    reload: "Reloading page"
+    listFrames: "Listing page frames"
+    # $1 = action name
+    unknown: "tab: $1"

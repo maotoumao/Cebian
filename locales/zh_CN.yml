@@ -189,3 +189,70 @@ provider:
     manualModelPlaceholder: "手动输入 Model ID"
     addCustom: "添加自定义提供商"
     fetchFailed: "无法获取模型列表，请手动添加"
+
+# ─── 工具运行时标签（在 ToolCard 中显示）───
+tools:
+  # $1 = mode（及可选 selector 后缀）
+  readPage: "正在阅读页面内容 ($1)"
+  executeJs: "正在执行脚本"
+  screenshot: "正在截取页面截图"
+  askUser: "等待用户回答"
+  # $1 = 技能名称
+  runSkill: "正在执行技能脚本 $1"
+  fs:
+    # $1 = 文件路径
+    createFile: "正在创建文件 $1"
+    # $1 = 文件路径
+    editFile: "正在编辑文件 $1"
+    # $1 = 目录路径
+    mkdir: "正在创建目录 $1"
+    # $1 = 原路径
+    rename: "正在重命名 $1"
+    # $1 = 路径
+    delete: "正在删除 $1"
+    # $1 = 文件路径
+    readFile: "正在读取文件 $1"
+    # $1 = 目录路径
+    list: "正在列出目录 $1"
+    # $1 = 搜索模式
+    searchFiles: "正在搜索文件 \"$1\""
+    # $1 = 搜索模式
+    searchContent: "正在搜索文件内容 \"$1\""
+  chromeApi:
+    help: "正在查询 Chrome API 文档"
+    # $1 = namespace，$2 = method
+    call: "正在调用 chrome.$1.$2"
+  interact:
+    # $1 = 目标后缀（含前导空格）或为空
+    click: "正在点击$1"
+    dblclick: "正在双击$1"
+    rightclick: "正在右键点击$1"
+    hover: "正在悬浮$1"
+    type: "正在输入文本$1"
+    clear: "正在清除输入框$1"
+    select: "正在选择选项$1"
+    scroll: "正在滚动页面"
+    # $1 = 按键名
+    keypress: "正在按键 $1"
+    # $1 = 目标后缀（含前导空格）或为空
+    wait: "正在等待元素出现$1"
+    waitHidden: "正在等待元素消失$1"
+    waitNavigation: "正在等待页面加载"
+    # $1 = 搜索文本
+    find: "正在搜索 \"$1\""
+    # $1 = 目标后缀（含前导空格）或为空
+    query: "正在查询元素$1"
+    # $1 = 步骤数
+    sequence: "正在执行操作序列 ($1 步)"
+    # $1 = action 名称
+    unknown: "interact: $1"
+  tab:
+    open: "正在打开新标签页"
+    # $1 = 标签页 id
+    close: "正在关闭标签页 $1"
+    # $1 = 标签页 id
+    switch: "正在切换标签页 $1"
+    reload: "正在刷新页面"
+    listFrames: "正在列出页面 frames"
+    # $1 = action 名称
+    unknown: "tab: $1"

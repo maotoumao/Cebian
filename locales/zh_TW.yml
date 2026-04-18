@@ -189,3 +189,70 @@ provider:
     manualModelPlaceholder: "手動輸入 Model ID"
     addCustom: "新增自訂供應商"
     fetchFailed: "無法擷取模型清單，請手動新增"
+
+# ─── 工具執行時標籤（在 ToolCard 中顯示）───
+tools:
+  # $1 = mode（及選填 selector 後綴）
+  readPage: "正在閱讀頁面內容 ($1)"
+  executeJs: "正在執行腳本"
+  screenshot: "正在擷取頁面螢幕截圖"
+  askUser: "等待使用者回覆"
+  # $1 = 技能名稱
+  runSkill: "正在執行技能腳本 $1"
+  fs:
+    # $1 = 檔案路徑
+    createFile: "正在建立檔案 $1"
+    # $1 = 檔案路徑
+    editFile: "正在編輯檔案 $1"
+    # $1 = 資料夾路徑
+    mkdir: "正在建立資料夾 $1"
+    # $1 = 原路徑
+    rename: "正在重新命名 $1"
+    # $1 = 路徑
+    delete: "正在刪除 $1"
+    # $1 = 檔案路徑
+    readFile: "正在讀取檔案 $1"
+    # $1 = 資料夾路徑
+    list: "正在列出資料夾 $1"
+    # $1 = 搜尋樣式
+    searchFiles: "正在搜尋檔案 \"$1\""
+    # $1 = 搜尋樣式
+    searchContent: "正在搜尋檔案內容 \"$1\""
+  chromeApi:
+    help: "正在查詢 Chrome API 文件"
+    # $1 = namespace，$2 = method
+    call: "正在呼叫 chrome.$1.$2"
+  interact:
+    # $1 = 目標後綴（含前導空格）或為空
+    click: "正在點擊$1"
+    dblclick: "正在雙擊$1"
+    rightclick: "正在右鍵點擊$1"
+    hover: "正在懸停$1"
+    type: "正在輸入文字$1"
+    clear: "正在清除輸入欄位$1"
+    select: "正在選擇選項$1"
+    scroll: "正在捲動頁面"
+    # $1 = 按鍵名稱
+    keypress: "正在按下按鍵 $1"
+    # $1 = 目標後綴（含前導空格）或為空
+    wait: "正在等待元素出現$1"
+    waitHidden: "正在等待元素消失$1"
+    waitNavigation: "正在等待頁面載入"
+    # $1 = 搜尋文字
+    find: "正在搜尋 \"$1\""
+    # $1 = 目標後綴（含前導空格）或為空
+    query: "正在查詢元素$1"
+    # $1 = 步驟數
+    sequence: "正在執行操作序列 ($1 步)"
+    # $1 = action 名稱
+    unknown: "interact: $1"
+  tab:
+    open: "正在開啟新分頁"
+    # $1 = 分頁 id
+    close: "正在關閉分頁 $1"
+    # $1 = 分頁 id
+    switch: "正在切換分頁 $1"
+    reload: "正在重新整理頁面"
+    listFrames: "正在列出頁面 frames"
+    # $1 = action 名稱
+    unknown: "tab: $1"

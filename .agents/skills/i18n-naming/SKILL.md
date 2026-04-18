@@ -57,6 +57,7 @@ common      # generic verbs/labels reused across UI (send, cancel, save, ...)
 chat        # /chat/* page (input, message, tools)
 settings    # /settings/* page (layout, providers, instructions, prompts, skills, advanced, about)
 provider    # provider sub-components (oauth, apiKey, custom)
+tools       # agent tool runtime labels (shown in ToolCard while a tool runs)
 dialogs     # modal dialogs
 errors      # toast / inline error messages
 agent       # agent-runtime user-facing strings

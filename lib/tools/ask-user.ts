@@ -62,7 +62,10 @@ export function createSessionAskUserTool(): {
 
       if (result === INTERACTIVE_CANCELLED) {
         return {
-          content: [{ type: 'text', text: '用户跳过了此问题。' }],
+          // English by design: this text is LLM-facing tool result context, not
+          // user-visible UI. The structured `details.cancelled` flag is the
+          // canonical signal; the text is purely for the model's reasoning.
+          content: [{ type: 'text', text: 'User skipped this question.' }],
           details: { cancelled: true },
         };
       }
