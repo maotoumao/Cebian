@@ -76,9 +76,10 @@ export const runSkillTool: AgentTool<typeof RunSkillParameters> = {
     'Arguments are accessible via the `args` variable. Returns JSON-serialized result.\n\n' +
     'PERMISSION FLOW: On first call, if the skill has not been granted permission, ' +
     'the tool returns a permission prompt with a confirmation_nonce. You must then use ask_user to show the prompt ' +
-    'to the user with options: "Deny", "Allow once", "Always allow this skill". ' +
+    'to the user with three options matching the user\'s language ' +
+    '(equivalents of: Deny / Allow once / Always allow this skill). ' +
     'If the user approves, call this tool again with the same parameters plus the confirmation_nonce. ' +
-    'If "always allow", also set always_allow=true. If the user denies, do not call this tool again.',
+    'If they chose the "always allow" option, also set always_allow=true. If the user denies, do not call this tool again.',
   parameters: RunSkillParameters,
 
   async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
@@ -194,7 +195,8 @@ export const runSkillTool: AgentTool<typeof RunSkillParameters> = {
                 `Script: ${script}\n` +
                 `Requested permissions:\n${permList}\n\n` +
                 `confirmation_nonce: ${nonce}\n\n` +
-                `Use ask_user to ask the user for confirmation with options: "Deny", "Allow once", "Always allow this skill". ` +
+                `Use ask_user to ask the user for confirmation with three options in the user's language ` +
+                `(equivalents of: Deny / Allow once / Always allow this skill). ` +
                 `If approved, call run_skill again with the same skill/script/args plus confirmation_nonce="${nonce}". ` +
                 `If "always allow", also set always_allow=true. If denied, do not call again.`,
             }],
