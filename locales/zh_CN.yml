@@ -77,6 +77,8 @@ settings:
     hint: "追加到默认规则之后，用于调整回复语言、风格或角色。无法覆盖工具协议和安全规则。"
     placeholder: "例如：\n- 用中文回复\n- 回答尽量简洁\n- 讨论代码时默认使用 TypeScript"
   prompts:
+    title: "提示词"
+    newBody: "（在此处编写你的提示词）"
     # $1 = 触发字符（“/”）
     hint: "可复用的提示模板，通过 $1 命令在聊天输入中触发。"
     placeholders:
@@ -86,6 +88,8 @@ settings:
       date: "当前日期"
       clipboard: "剪贴板内容"
   skills:
+    title: "技能"
+    newBody: "（在此处编写技能指令）"
     create: "创建技能"
     hint: "遵循 agentskills.io 规范的多文件技能包，agent 会按需加载。"
   editor:

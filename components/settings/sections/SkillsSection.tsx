@@ -62,7 +62,7 @@ export function SkillsSection() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="px-6 pt-6 pb-4 shrink-0 border-b border-border">
-        <h2 className="text-base font-semibold">Skills</h2>
+        <h2 className="text-base font-semibold">{t('settings.skills.title')}</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
           {t('settings.skills.hint')}
         </p>

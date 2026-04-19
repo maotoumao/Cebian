@@ -6,7 +6,13 @@ import { settingsFilePanelWidth } from '@/lib/storage';
 import type { SettingsOutletContext } from '@/components/settings/SettingsLayout';
 import { t } from '@/lib/i18n';
 
-const PROMPT_TEMPLATE = `---\nname: new-prompt\ndescription: ""\n---\n\n(Write your prompt here)\n`;
+const PROMPT_TEMPLATE = () => `---
+name: new-prompt
+description: ""
+---
+
+${t('settings.prompts.newBody')}
+`;
 
 /**
  * PromptsSection — reusable prompt template manager under /settings/prompts[/*].
@@ -34,12 +40,15 @@ export function PromptsSection() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="px-6 pt-6 pb-4 shrink-0 border-b border-border">
-        <h2 className="text-base font-semibold">Prompts</h2>
+        <h2 className="text-base font-semibold">{t('settings.prompts.title')}</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
           {(() => {
             // settings.prompts.hint embeds $1 where the trigger char appears,
             // so we can render <code>/</code> in the middle of translated text.
-            const parts = t('settings.prompts.hint', ['\u0000']).split('\u0000');
+            // Use a multi-char ASCII sentinel — single control chars (\u0000)
+            // are stripped by chrome.i18n.getMessage substitution.
+            const SENTINEL = '__CEBIAN_TRIGGER__';
+            const parts = t('settings.prompts.hint', [SENTINEL]).split(SENTINEL);
             return <>{parts[0]}<code className="text-[11px]">/</code>{parts[1] ?? ''}</>;
           })()}
         </p>
@@ -48,7 +57,7 @@ export function PromptsSection() {
         root={CEBIAN_PROMPTS_DIR}
         relativePath={relativePath}
         onSelectRelative={handleSelect}
-        newFileTemplate={PROMPT_TEMPLATE}
+        newFileTemplate={PROMPT_TEMPLATE()}
         enableTemplateVars
         panelWidthStorage={settingsFilePanelWidth}
         compactMode={breakpoint === 'compact'}

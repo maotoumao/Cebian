@@ -5,6 +5,7 @@
  * and `references/` subdirs. Naming collides are resolved by appending `-N`.
  */
 import { vfs } from '@/lib/vfs';
+import { t } from '@/lib/i18n';
 
 async function uniqueName(dir: string, base: string): Promise<string> {
   if (!(await vfs.exists(`${dir}/${base}`))) return base;
@@ -45,7 +46,7 @@ metadata:
 
 ## Instructions
 
-(Write your skill instructions here)
+${t('settings.skills.newBody')}
 `;
 
   await vfs.mkdir(dirPath, { recursive: true });

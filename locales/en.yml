@@ -81,6 +81,8 @@ settings:
     hint: "Appended after the default rules. Use it to adjust language, tone, or persona. Cannot override tool protocols or safety rules."
     placeholder: "e.g.\n- Reply in English\n- Keep answers concise\n- Default to TypeScript when discussing code"
   prompts:
+    title: "Prompts"
+    newBody: "(Write your prompt here)"
     # $1 = trigger character ("/")
     hint: "Reusable prompt templates. Trigger them with $1 in the chat input."
     placeholders:
@@ -90,6 +92,8 @@ settings:
       date: "Current date"
       clipboard: "Clipboard content"
   skills:
+    title: "Skills"
+    newBody: "(Write your skill instructions here)"
     create: "Create skill"
     hint: "Multi-file skill packs that follow the agentskills.io spec; the agent loads them on demand."
   editor:
