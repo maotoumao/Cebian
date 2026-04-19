@@ -205,6 +205,10 @@ chat:
   message:
     # $1 = 輸入 token 數（已格式化，如「1.2k」），$2 = 輸出 token 數（已格式化）
     tokensInOut: "↑$1 ↓$2"
+    # 快取明細（無寫入）。$1 = 未快取、$2 = 命中（均已格式化）
+    tokensInBreakdownHit: "未快取 $1 · 命中 $2"
+    # 快取明細（含寫入）。$1 = 未快取、$2 = 命中、$3 = 寫入（均已格式化）
+    tokensInBreakdownHitWrite: "未快取 $1 · 命中 $2 · 寫入 $3"
   session:
     loading: "載入工作階段…"
     modelError: "模型回傳錯誤"

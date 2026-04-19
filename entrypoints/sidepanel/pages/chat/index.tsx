@@ -159,7 +159,8 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
               if (isTurnClosing) {
                 let inputTokens = 0;
                 let outputTokens = 0;
-                let costUsd = 0;
+                let cacheReadTokens = 0;
+                let cacheWriteTokens = 0;
                 for (let i = idx; i >= 0; i--) {
                   const m = messages[i];
                   if (!('role' in m)) continue;
@@ -168,14 +169,16 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                     const am = m as AssistantMessage;
                     inputTokens += am.usage?.input ?? 0;
                     outputTokens += am.usage?.output ?? 0;
-                    costUsd += am.usage?.cost?.total ?? 0;
+                    cacheReadTokens += am.usage?.cacheRead ?? 0;
+                    cacheWriteTokens += am.usage?.cacheWrite ?? 0;
                   }
                 }
                 meta = {
                   modelLabel: assistantMsg.model,
                   inputTokens: inputTokens || undefined,
                   outputTokens: outputTokens || undefined,
-                  costUsd: costUsd || undefined,
+                  cacheReadTokens: cacheReadTokens || undefined,
+                  cacheWriteTokens: cacheWriteTokens || undefined,
                 };
               }
 

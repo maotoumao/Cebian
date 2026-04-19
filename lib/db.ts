@@ -1,6 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
-import type { AssistantMessage } from '@mariozechner/pi-ai';
 
 // ─── Schema ───
 
@@ -12,9 +11,6 @@ export interface SessionRecord {
   userInstructions: string;
   thinkingLevel: string;
   messageCount: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  totalCost: number;
   createdAt: number;
   updatedAt: number;
   messages: AgentMessage[];
@@ -48,28 +44,12 @@ export async function updateSessionMessages(
   id: string,
   messages: AgentMessage[],
 ): Promise<void> {
-  // Aggregate usage from assistant messages
-  let totalInputTokens = 0;
-  let totalOutputTokens = 0;
-  let totalCost = 0;
-
-  for (const msg of messages) {
-    if ('role' in msg && msg.role === 'assistant') {
-      const am = msg as AssistantMessage;
-      if (am.usage) {
-        totalInputTokens += am.usage.input ?? 0;
-        totalOutputTokens += am.usage.output ?? 0;
-        totalCost += am.usage.cost?.total ?? 0;
-      }
-    }
-  }
-
+  // Token / cost totals are derived on-demand from each AssistantMessage.usage
+  // in the UI; we deliberately do not persist aggregates to keep a single
+  // source of truth (see entrypoints/sidepanel/pages/chat/index.tsx).
   await db.sessions.update(id, {
     messages,
     messageCount: messages.length,
-    totalInputTokens,
-    totalOutputTokens,
-    totalCost,
     updatedAt: Date.now(),
   });
 }
