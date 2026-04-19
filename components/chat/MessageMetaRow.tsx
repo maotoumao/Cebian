@@ -61,8 +61,8 @@ export function MessageMetaRow({
 
   return (
     <div className="mt-2 flex items-center justify-between gap-2 text-[0.7rem] text-muted-foreground/70">
-      <span className="font-mono">{parts.join(' · ')}</span>
       {text && <CopyButton text={text} />}
+      <span className="font-mono">{parts.join(' · ')}</span>
     </div>
   );
 }
