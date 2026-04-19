@@ -48,6 +48,6 @@ export function SettingsRoutes({ basePath, showBackButton = false, showOpenInTab
 
 /** Redirects /settings to the last-visited section (fallback handled by storage item). */
 function SettingsIndexRedirect(): ReactNode {
-  const [target] = useStorageItem(lastSettingsSection, 'prompts');
+  const [target] = useStorageItem(lastSettingsSection, 'providers');
   return <Navigate to={target} replace />;
 }

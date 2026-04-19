@@ -149,5 +149,5 @@ export const settingsFilePanelWidth = storage.defineItem<number>(
  */
 export const lastSettingsSection = storage.defineItem<string>(
   'local:lastSettingsSection',
-  { fallback: 'prompts' },
+  { fallback: 'providers' },
 );
