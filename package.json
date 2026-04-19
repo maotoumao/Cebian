@@ -13,7 +13,11 @@
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
     "lint:i18n": "node scripts/lint-i18n.mjs",
-    "postinstall": "wxt prepare"
+    "check": "wxt prepare && tsc --noEmit && node scripts/lint-i18n.mjs",
+    "postinstall": "wxt prepare && simple-git-hooks"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm check"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.1",
@@ -64,6 +68,7 @@
     "@types/turndown": "^5.0.6",
     "@wxt-dev/module-react": "^1.1.5",
     "shadcn": "^4.2.0",
+    "simple-git-hooks": "^2.13.1",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",
     "wxt": "^0.20.20"
