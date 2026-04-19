@@ -31,14 +31,23 @@ interface ChatInputProps {
   onOpenSettings?: () => void;
   isAgentRunning?: boolean;
   onCancel?: () => void;
+  /** User-message texts already sent in this session, oldest first. */
+  userHistory?: string[];
+  /** Conversation id; changing it resets history navigation state. */
+  sessionId?: string | null;
 }
 
-export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: ChatInputProps) {
+export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [showSlash, setShowSlash] = useState(false);
   const [prompts, setPrompts] = useState<PromptMeta[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isPicking, setIsPicking] = useState(false);
+  // History navigation: null = editing the current draft; otherwise points
+  // into `userHistory`. `draft` stashes whatever the user had typed before
+  // entering history mode so we can restore it on ↓-past-end.
+  const [historyIndex, setHistoryIndex] = useState<number | null>(null);
+  const [draft, setDraft] = useState('');
   const { isActiveTabMobile, toggle: toggleMobile } = useMobileEmulation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -115,9 +124,82 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
     setValue('');
     setAttachments([]);
     setShowSlash(false);
+    setHistoryIndex(null);
+    setDraft('');
   };
 
+  // Reset history navigation when switching sessions.
+  useEffect(() => {
+    setHistoryIndex(null);
+    setDraft('');
+  }, [sessionId]);
+
   const handleKeyDown = (e: KeyboardEvent) => {
+    // Don't intercept anything while the IME is composing (e.g. Chinese pinyin).
+    if (e.nativeEvent.isComposing) return;
+
+    // ↑ / ↓ navigate previously sent user messages, but only when the caret
+    // is at the absolute start (↑) or end (↓) of the textarea, so multi-line
+    // editing is never disturbed. The slash command menu (when open) reserves
+    // these keys for its own use.
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !showSlash && userHistory && userHistory.length > 0) {
+      const ta = textareaRef.current;
+      if (ta) {
+        // After history navigation, place the caret to keep further presses
+        // ergonomic: ↑ leaves caret at start so the next ↑ keeps walking back;
+        // ↓ leaves caret at end so the next ↓ keeps walking forward (and
+        // typing continues from where the user is most likely to edit).
+        const moveCursor = (where: 'start' | 'end') => {
+          requestAnimationFrame(() => {
+            const el = textareaRef.current;
+            if (!el) return;
+            const pos = where === 'end' ? el.value.length : 0;
+            el.setSelectionRange(pos, pos);
+          });
+        };
+
+        if (e.key === 'ArrowUp' && ta.selectionStart === 0 && ta.selectionEnd === 0) {
+          if (historyIndex === null) {
+            e.preventDefault();
+            setDraft(ta.value);
+            const last = userHistory.length - 1;
+            setHistoryIndex(last);
+            setValue(userHistory[last]);
+            moveCursor('start');
+            return;
+          }
+          if (historyIndex > 0) {
+            e.preventDefault();
+            const next = historyIndex - 1;
+            setHistoryIndex(next);
+            setValue(userHistory[next]);
+            moveCursor('start');
+            return;
+          }
+          // Already at oldest entry — fall through.
+        }
+
+        if (
+          e.key === 'ArrowDown'
+          && historyIndex !== null
+          && ta.selectionStart === ta.value.length
+          && ta.selectionEnd === ta.value.length
+        ) {
+          e.preventDefault();
+          if (historyIndex < userHistory.length - 1) {
+            const next = historyIndex + 1;
+            setHistoryIndex(next);
+            setValue(userHistory[next]);
+          } else {
+            setHistoryIndex(null);
+            setValue(draft);
+          }
+          moveCursor('end');
+          return;
+        }
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (!isAgentRunning) handleSend();
@@ -127,6 +209,8 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel }: 
   const handleInput = (val: string) => {
     setValue(val);
     setShowSlash(val.startsWith('/'));
+    // Manual edits exit history mode — the new content becomes the draft.
+    if (historyIndex !== null) setHistoryIndex(null);
   };
 
   // Scan prompts when slash menu opens

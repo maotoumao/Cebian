@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { SquarePen } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -10,12 +10,13 @@ import {
   ThinkingBlock,
 } from '@/components/chat/Message';
 import { ToolCard } from '@/components/chat/ToolCard';
-import type { AssistantMessage, ToolResultMessage } from '@mariozechner/pi-ai';
+import type { AssistantMessage, ToolResultMessage, UserMessage } from '@mariozechner/pi-ai';
 import {
   getAssistantText,
   getThinkingBlocks,
   getToolCalls,
   findToolResult,
+  extractUserText,
 } from '@/lib/message-helpers';
 import { getToolLabel } from '@/lib/tools/tool-labels';
 import { uiToolRegistry } from '@/lib/tools/ui-registry';
@@ -94,6 +95,17 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
 
   const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
   const showWaitingPlaceholder = effectiveRunning && lastMsg && 'role' in lastMsg && lastMsg.role === 'user';
+
+  // History of user-typed prompts in this session, oldest first; consumed by
+  // ChatInput's ↑/↓ navigation. Strips the <user-request> wrapper added by
+  // buildStructuredMessage so what comes back is exactly what the user typed.
+  const userHistory = useMemo(
+    () => messages
+      .filter((m): m is UserMessage => 'role' in m && m.role === 'user')
+      .map(extractUserText)
+      .filter((s) => s.length > 0),
+    [messages],
+  );
 
   // Session loading state: we're loading if a session route is targeted but no messages or state yet
   const sessionLoading = !isNewChat && routeSessionId !== activeSessionId && messages.length === 0;
@@ -302,7 +314,14 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
         </div>
       </ScrollArea>
 
-      <ChatInput onSend={send} onCancel={cancel} isAgentRunning={effectiveRunning} onOpenSettings={onOpenSettings} />
+      <ChatInput
+        onSend={send}
+        onCancel={cancel}
+        isAgentRunning={effectiveRunning}
+        onOpenSettings={onOpenSettings}
+        userHistory={userHistory}
+        sessionId={activeSessionId ?? routeSessionId ?? null}
+      />
     </>
   );
 }
