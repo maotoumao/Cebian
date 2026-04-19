@@ -210,9 +210,9 @@ chat:
     # $1 = input tokens (formatted, e.g. "1.2k"), $2 = output tokens (formatted)
     tokensInOut: "↑$1 ↓$2"
     # Cache breakdown without write. $1 = uncached, $2 = cache hit (both formatted)
-    tokensInBreakdownHit: "uncached $1 · hit $2"
+    tokensInBreakdownHit: "uncached $1 · cached $2"
     # Cache breakdown with write. $1 = uncached, $2 = cache hit, $3 = cache write (all formatted)
-    tokensInBreakdownHitWrite: "uncached $1 · hit $2 · write $3"
+    tokensInBreakdownHitWrite: "uncached $1 · cached $2 · write $3"
   session:
     loading: "Loading session…"
     modelError: "Model returned an error"
