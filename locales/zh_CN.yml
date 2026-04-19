@@ -205,10 +205,10 @@ chat:
   message:
     # $1 = 输入 token 数（已格式化，如 "1.2k"），$2 = 输出 token 数（已格式化）
     tokensInOut: "↑$1 ↓$2"
-    # 缓存明细（无写入）。$1 = 未缓存、$2 = 命中（均已格式化）
+    # 缓存明细（无写入）。$1 = 未缓存、$2 = 缓存命中（均已格式化）
     tokensInBreakdownHit: "未缓存 $1 · 缓存 $2"
-    # 缓存明细（含写入）。$1 = 未缓存、$2 = 命中、$3 = 写入（均已格式化）
-    tokensInBreakdownHitWrite: "未缓存 $1 · 缓存 $2 · 写入 $3"
+    # 缓存明细（含写入）。$1 = 未缓存、$2 = 缓存命中、$3 = 写入缓存（均已格式化）
+    tokensInBreakdownHitWrite: "未缓存 $1 · 缓存 $2 · 写缓存 $3"
   session:
     loading: "加载会话中…"
     modelError: "模型返回错误"
