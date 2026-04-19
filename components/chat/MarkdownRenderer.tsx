@@ -55,12 +55,12 @@ function CodeBlock({ node, children }: { node?: HastElement; children?: ReactNod
   const text = hastToText(codeNode?.children);
 
   return (
-    <div className="my-2 overflow-hidden rounded-md border border-border/50 bg-accent/50">
-      <div className="flex items-center justify-between border-b border-border/50 pl-3 pr-1 py-0.5 text-xs text-muted-foreground">
+    <div className="my-2 overflow-hidden rounded-md bg-accent/50">
+      <div className="flex items-center justify-between pl-3 pr-1 py-0.5 text-xs text-muted-foreground">
         <span className="font-mono">{lang || t('common.code')}</span>
         <CopyButton text={text} />
       </div>
-      <pre className="overflow-x-auto p-3 text-[0.8rem]">
+      <pre className="overflow-x-auto px-3 pb-3 text-[0.8rem]">
         {children}
       </pre>
     </div>
@@ -132,9 +132,13 @@ const components: Components = {
   // Code blocks with header (language + copy button).
   pre: ({ node, children }) => <CodeBlock node={node as unknown as HastElement | undefined}>{children}</CodeBlock>,
 
-  // Inline code
+  // Inline code (block code is rendered inside `pre`/`CodeBlock` above).
+  // NOTE: rehype-highlight rewrites block code's className to `"hljs language-xxx ..."`,
+  // so we test for the `language-` token anywhere in the class list — checking only
+  // `startsWith('language-')` would misclassify highlighted blocks as inline and apply
+  // inline-code styling per text fragment (causing per-character "shadows").
   code: ({ className, children, ...props }) => {
-    const isBlock = className?.startsWith('language-');
+    const isBlock = !!className && /(?:^|\s)(?:hljs|language-)/.test(className);
     if (isBlock) {
       return (
         <code className={className} {...props}>
