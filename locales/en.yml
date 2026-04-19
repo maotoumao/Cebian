@@ -1,4 +1,4 @@
-# Cebian extension i18n — English (default).
+﻿# Cebian extension i18n — English (default).
 # Edit this file along with locales/zh_CN.yml and locales/zh_TW.yml.
 # See .agents/skills/i18n-naming/SKILL.md.
 
@@ -130,7 +130,7 @@ chat:
     readFileFailed: "Failed to read: $1"
     # $1 = file name
     unsupportedFileType: "Unsupported file type: $1"
-    noPrompts: "No prompts yet \u2014 create one from AI config"
+    noPrompts: "No prompts yet — create one from AI config"
     noMatch: "No matches"
     iframeEnterHint: "⏎ enter"
   attachments:
@@ -138,10 +138,10 @@ chat:
     screenshot: "Screenshot"
     imageAlt: "Attachment image"
   askUser:
-    placeholder: "Type a reply\u2026"
+    placeholder: "Type a reply…"
   model:
     select: "Select model"
-    searchPlaceholder: "Search models\u2026"
+    searchPlaceholder: "Search models…"
     notFound: "No models found"
     addMore: "Open settings to add more providers"
   thinking:
@@ -157,7 +157,7 @@ chat:
     args: "Arguments"
     result: "Result"
   session:
-    loading: "Loading session\u2026"
+    loading: "Loading session…"
     modelError: "Model returned an error"
     welcomeReady: "What can I help you with?"
 
@@ -180,7 +180,7 @@ provider:
     authorizing: "Authorizing"
     authFailed: "Authorization failed"
     enterCode: "Enter the code in the browser:"
-    completeInBrowser: "Complete authorization in the popup browser window\u2026"
+    completeInBrowser: "Complete authorization in the popup browser window…"
     descriptions:
       githubCopilot: "Use your Copilot subscription to access GPT/Claude"
       openaiCodex: "Use your ChatGPT Plus/Pro subscription"

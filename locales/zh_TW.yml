@@ -1,4 +1,4 @@
-# Cebian 擴充功能 i18n —— 繁體中文（zh_TW，台灣/港澳使用者）。
+﻿# Cebian 擴充功能 i18n —— 繁體中文（zh_TW，台灣/港澳使用者）。
 # 修改時請同步 locales/en.yml 與 locales/zh_CN.yml。規範見 .agents/skills/i18n-naming/SKILL.md。
 
 # ─── Manifest（扁平頂層 key，見規範「Manifest localization」）───
@@ -134,10 +134,10 @@ chat:
     screenshot: "螢幕截圖"
     imageAlt: "附件圖片"
   askUser:
-    placeholder: "輸入回覆\u2026"
+    placeholder: "輸入回覆…"
   model:
     select: "選擇模型"
-    searchPlaceholder: "搜尋模型\u2026"
+    searchPlaceholder: "搜尋模型…"
     notFound: "找不到模型"
     addMore: "前往設定新增更多供應商"
   thinking:
@@ -153,7 +153,7 @@ chat:
     args: "參數"
     result: "結果"
   session:
-    loading: "載入工作階段\u2026"
+    loading: "載入工作階段…"
     modelError: "模型回傳錯誤"
     welcomeReady: "有什麼我可以幫忙的？"
 
@@ -176,7 +176,7 @@ provider:
     authorizing: "授權中"
     authFailed: "授權失敗"
     enterCode: "請在瀏覽器中輸入代碼："
-    completeInBrowser: "請在彈出的瀏覽器視窗中完成授權\u2026"
+    completeInBrowser: "請在彈出的瀏覽器視窗中完成授權…"
     descriptions:
       githubCopilot: "使用 Copilot 訂閱存取 GPT/Claude"
       openaiCodex: "使用 ChatGPT Plus/Pro 訂閱"
