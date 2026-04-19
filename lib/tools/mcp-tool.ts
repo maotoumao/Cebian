@@ -7,23 +7,26 @@ import { getMCPManager, ThrottleError } from '@/lib/mcp/manager';
 /**
  * Build an `AgentTool` that proxies to one MCP tool on one server.
  *
- * The agent invokes by name `mcp__<shortServerId>__<toolName>` (server prefix
- * keeps tool names unique across multiple MCP servers and limits collisions
- * with built-in tools that never start with `mcp__`).
+ * The agent invokes by name `mcp__<slug>__<toolName>` where `<slug>` is a
+ * sanitized form of the server's user-given name (which is enforced unique
+ * by the store). Encoding the slug rather than an opaque short id keeps tool
+ * calls readable in logs and lets the chat UI render a human label without a
+ * runtime registry lookup. See `getToolLabel` in `lib/tools/tool-labels.ts`.
  */
 export function createMCPAgentTool(
   server: MCPServerConfig,
   mcpTool: MCPTool,
 ): AgentTool<TSchema> {
-  const shortId = server.id.replace(/-/g, '').slice(0, 8);
+  const slug = slugifyServerName(server.name);
   // Sanitize remote tool name: providers (OpenAI/Anthropic/Gemini) require
-  // ^[a-zA-Z0-9_-]+$ and limit total length. Cap at 48 to leave headroom
-  // under OpenAI's 64-char limit (`mcp__` + 8 + `__` = 15 prefix chars).
-  const safeName = mcpTool.name.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 48);
+  // ^[a-zA-Z0-9_-]+$. Keep the combined name within OpenAI's 64-char limit:
+  // `mcp__` (5) + slug (≤20) + `__` (2) = 27 prefix chars, leaving 37 for
+  // the tool name.
+  const safeName = mcpTool.name.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 37);
   if (safeName !== mcpTool.name) {
     console.warn(`[mcp] sanitized tool name "${mcpTool.name}" → "${safeName}" for server "${server.name}"`);
   }
-  const name = `mcp__${shortId}__${safeName}`;
+  const name = `mcp__${slug}__${safeName}`;
   const label = `${server.name} / ${mcpTool.name}`;
   const description = `[MCP: ${server.name}] ${mcpTool.description ?? mcpTool.name}`;
   // MCP tool inputSchema is JSON Schema; TypeBox TSchema is structurally
@@ -90,4 +93,25 @@ function extractText(blocks: RawContentBlock[]): string {
     .filter((b) => b.type === 'text' && typeof b.text === 'string')
     .map((b) => b.text as string)
     .join('\n');
+}
+
+/**
+ * Convert a server's user-facing name into a tool-name-safe slug.
+ *
+ * Lowercase, ASCII-only ([a-z0-9_-]), capped at 20 chars. The store enforces
+ * case-insensitive uniqueness on display names, but two distinct display
+ * names CAN slugify to the same value (e.g. "GitHub Personal" and
+ * "github_personal"). That collision would surface as a tool-name conflict
+ * inside the agent runtime — acceptable for v1; the user can rename to
+ * resolve. Keep this in sync with `parseMCPToolName` in tool-labels.ts.
+ */
+export function slugifyServerName(name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '_') // collapse runs of disallowed chars to one '_'
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 20);
+  // Always return at least something — empty slug would produce `mcp____tool`.
+  return slug || 'server';
 }

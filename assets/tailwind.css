@@ -2,7 +2,12 @@
 @import "tw-animate-css";
 @import "./code-highlight.css";
 
-@custom-variant dark (&:is(.dark *));
+/*
+ * Dark is the default theme (`:root`); light is opt-in via `data-theme="light"`
+ * on the document element (see entrypoints/*/App.tsx). The `dark:` Tailwind
+ * variant therefore matches when the document is NOT in light mode.
+ */
+@custom-variant dark (&:where(:root:not([data-theme='light']) *, :root:not([data-theme='light'])));
 
 @theme inline {
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -52,43 +57,55 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Dark theme (default) — design-first dark mode */
+/* Dark theme (default) — design-first dark mode (cool-neutral, layered) */
 :root {
   --radius: 0.625rem;
-  --background: #09090b;
-  --foreground: #fafafa;
-  --card: #18181b;
-  --card-foreground: #fafafa;
-  --popover: #18181b;
-  --popover-foreground: #fafafa;
+
+  /* Cool-neutral surfaces (HSL ~220°, low saturation, layered elevation) */
+  --background: #0b0d10;
+  --foreground: #e8e8ec;
+  --card: #14171c;
+  --card-foreground: #e8e8ec;
+  --popover: #1d2129;
+  --popover-foreground: #e8e8ec;
+  --muted: #101218;
+  --muted-foreground: #8a92a0;
+  --secondary: #232831;
+  --secondary-foreground: #e8e8ec;
+  --accent: #2c333e;
+  --accent-foreground: #e8e8ec;
+
+  /* Brand */
   --primary: #f97316;
-  --primary-foreground: #000000;
-  --secondary: #27272a;
-  --secondary-foreground: #fafafa;
-  --muted: #18181b;
-  --muted-foreground: #a1a1aa;
-  --accent: #27272a;
-  --accent-foreground: #fafafa;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --border: #27272a;
-  --input: #27272a;
-  --ring: #f97316;
-  --success: #10b981;
-  --info: #3b82f6;
-  --chart-1: #f97316;
-  --chart-2: #3b82f6;
-  --chart-3: #10b981;
-  --chart-4: #a855f7;
-  --chart-5: #eab308;
-  --sidebar: #09090b;
-  --sidebar-foreground: #fafafa;
+  --primary-foreground: #1a0a00;
+  --ring: #fdba74;
+
+  /* Borders / inputs */
+  --border: #363c4a;
+  --input: #363c4a;
+
+  /* Status colors — softened for dark backgrounds */
+  --destructive: #f87171;
+  --destructive-foreground: #1a0000;
+  --success: #34d399;
+  --info: #60a5fa;
+
+  /* Chart palette — -400 tier for dark backgrounds (hue-shifted off brand) */
+  --chart-1: #22d3ee;
+  --chart-2: #60a5fa;
+  --chart-3: #34d399;
+  --chart-4: #c084fc;
+  --chart-5: #facc15;
+
+  /* Sidebar — slightly recessed vs background for "sunken" feel */
+  --sidebar: #08090c;
+  --sidebar-foreground: #e8e8ec;
   --sidebar-primary: #f97316;
-  --sidebar-primary-foreground: #000000;
-  --sidebar-accent: #27272a;
-  --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: #27272a;
-  --sidebar-ring: #f97316;
+  --sidebar-primary-foreground: #1a0a00;
+  --sidebar-accent: #2c333e;
+  --sidebar-accent-foreground: #e8e8ec;
+  --sidebar-border: #1a1d23;
+  --sidebar-ring: #fdba74;
 }
 
 /* Light theme */
@@ -151,7 +168,7 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: #3a414e;
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {

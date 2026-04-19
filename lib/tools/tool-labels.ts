@@ -6,6 +6,19 @@
 import { t } from '@/lib/i18n';
 
 export function getToolLabel(name: string, args: Record<string, any> = {}): string {
+  // MCP tools: name is `mcp__<slug>__<remoteToolName>`. Parse and prettify;
+  // we don't have the original server name (slug is lossy: lowercase + `_`),
+  // so we surface the slug with underscores → spaces, which is good enough
+  // for users who recognize their own server names.
+  if (name.startsWith('mcp__')) {
+    const rest = name.slice(5); // strip "mcp__"
+    const sep = rest.indexOf('__');
+    if (sep > 0) {
+      const slug = rest.slice(0, sep).replace(/_/g, ' ');
+      const tool = rest.slice(sep + 2);
+      return t('tools.mcpCall', [slug, tool]);
+    }
+  }
   switch (name) {
     case 'read_page': {
       const mode = args.mode ?? 'markdown';

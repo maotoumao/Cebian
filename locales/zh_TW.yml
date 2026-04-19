@@ -272,6 +272,8 @@ tools:
   askUser: "等待使用者回覆"
   # $1 = 技能名稱
   runSkill: "正在執行技能腳本 $1"
+  # $1 = MCP 伺服器 slug（展示形式），$2 = 遠端工具名
+  mcpCall: "$1 · $2"
   fs:
     # $1 = 檔案路徑
     createFile: "正在建立檔案 $1"

@@ -276,6 +276,8 @@ tools:
   askUser: "Waiting for user reply"
   # $1 = skill name
   runSkill: "Running skill script $1"
+  # $1 = MCP server slug (display form), $2 = remote tool name
+  mcpCall: "$1 · $2"
   fs:
     # $1 = file path
     createFile: "Creating file $1"
