@@ -1,9 +1,71 @@
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import type { Components } from 'react-markdown';
 import { showDialog } from '@/lib/dialog';
+import { CopyButton } from './CopyButton';
+import { t } from '@/lib/i18n';
+
+/**
+ * Minimal structural types for the hast (HTML AST) nodes react-markdown passes
+ * via the `node` prop. We avoid importing `hast` directly because it isn't a
+ * direct dependency under pnpm's strict resolution.
+ */
+type HastText = { type: 'text'; value: string };
+type HastElement = {
+  type: 'element';
+  tagName: string;
+  properties?: { className?: string | string[] | unknown };
+  children: HastChild[];
+};
+type HastChild = HastElement | HastText | { type: string; [k: string]: unknown };
+
+/** Recursively concatenate all text nodes under a hast element. */
+function hastToText(nodes: HastChild[] | undefined): string {
+  if (!nodes) return '';
+  let out = '';
+  for (const n of nodes) {
+    if (n.type === 'text') out += (n as HastText).value;
+    else if (n.type === 'element') out += hastToText((n as HastElement).children);
+  }
+  return out;
+}
+
+/** Read the first `language-xxx` token from a hast element's className list. */
+function languageOf(props: HastElement['properties']): string {
+  const cls = props?.className;
+  const list = Array.isArray(cls) ? cls : typeof cls === 'string' ? cls.split(/\s+/) : [];
+  for (const c of list) {
+    if (typeof c === 'string' && c.startsWith('language-')) return c.slice('language-'.length);
+  }
+  return '';
+}
+
+/**
+ * Code-block container with header (language label + copy button).
+ * Sources language and copy text from the hast `node` (independent of the
+ * `components` map's `code` renderer, which would obscure the AST).
+ */
+function CodeBlock({ node, children }: { node?: HastElement; children?: ReactNode }) {
+  const codeNode = node?.children.find(
+    (c): c is HastElement => c.type === 'element' && (c as HastElement).tagName === 'code',
+  );
+  const lang = languageOf(codeNode?.properties);
+  const text = hastToText(codeNode?.children);
+
+  return (
+    <div className="my-2 overflow-hidden rounded-md border border-border/50 bg-accent/50">
+      <div className="flex items-center justify-between border-b border-border/50 pl-3 pr-1 py-0.5 text-xs text-muted-foreground">
+        <span className="font-mono">{lang || t('common.code')}</span>
+        <CopyButton text={text} />
+      </div>
+      <pre className="overflow-x-auto p-3 text-[0.8rem]">
+        {children}
+      </pre>
+    </div>
+  );
+}
 
 const components: Components = {
   // Images — click to preview
@@ -67,12 +129,8 @@ const components: Components = {
     <blockquote className="border-l-2 border-border pl-3 my-2 text-muted-foreground italic" {...props}>{children}</blockquote>
   ),
 
-  // Code blocks with language label
-  pre: ({ children, ...props }) => (
-    <pre className="overflow-x-auto rounded-md bg-accent/50 p-3 text-[0.8rem]" {...props}>
-      {children}
-    </pre>
-  ),
+  // Code blocks with header (language + copy button).
+  pre: ({ node, children }) => <CodeBlock node={node as unknown as HastElement | undefined}>{children}</CodeBlock>,
 
   // Inline code
   code: ({ className, children, ...props }) => {

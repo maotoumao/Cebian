@@ -22,6 +22,7 @@ common:
   rename: "重命名"
   edit: "编辑"
   add: "添加"
+  code: "代码"
   copy: "复制"
   copied: "已复制"
   copyFailed: "复制失败"

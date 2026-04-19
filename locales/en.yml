@@ -23,6 +23,7 @@ common:
   rename: "Rename"
   edit: "Edit"
   add: "Add"
+  code: "Code"
   copy: "Copy"
   copied: "Copied"
   copyFailed: "Copy failed"
