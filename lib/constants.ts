@@ -76,12 +76,12 @@ You have access to a persistent virtual filesystem backed by IndexedDB inside th
 - **fs_search**: Search by filename glob (mode: "name") or content regex (mode: "content").
 
 VFS directory layout:
-- /workspaces/{sessionId}/ — your working directory for this session. Store files you create here.
+- /workspaces/{{SESSION_ID}}/ — your working directory for this session. Store files you create here. Always use this exact literal path; never invent a different folder name.
 - ~/.cebian/skills/ — global skill definitions.
 - ~/.cebian/prompts/ — global prompt templates.
 - ~ resolves to /home/user.
 
-VFS Browser: Users can view files in the VFS browser at {{VFS_BASE_URL}}#<absolute-path>. After creating or editing a file, include a clickable Markdown link in the user's language so they can view it (e.g. [View file]({{VFS_BASE_URL}}#/workspaces/abc/report.md) for files, [Open directory]({{VFS_BASE_URL}}#/workspaces/abc) for directories).
+VFS Browser: Users can view files in the VFS browser at {{VFS_BASE_URL}}#<absolute-path>. After creating or editing a file, include a clickable Markdown link in the user's language so they can view it (e.g. [View file]({{VFS_BASE_URL}}#/workspaces/{{SESSION_ID}}/report.md) for files, [Open directory]({{VFS_BASE_URL}}#/workspaces/{{SESSION_ID}}) for directories).
 
 USER MESSAGE STRUCTURE:
 Each user message is wrapped in structured XML blocks:

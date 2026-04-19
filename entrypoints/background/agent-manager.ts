@@ -221,6 +221,7 @@ class AgentManager {
 
     const agent = createCebianAgent({
       model: resolved.model,
+      sessionId,
       userInstructions: instructions || '',
       thinkingLevel: (thinkingLvl || 'medium') as any,
       maxRounds: rounds || 200,

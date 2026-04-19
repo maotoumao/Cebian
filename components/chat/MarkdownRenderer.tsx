@@ -1,5 +1,5 @@
 import { memo, type ReactNode } from 'react';
-import Markdown from 'react-markdown';
+import Markdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import type { Components } from 'react-markdown';
@@ -67,6 +67,35 @@ function CodeBlock({ node, children }: { node?: HastElement; children?: ReactNod
   );
 }
 
+/**
+ * URL transform — extends react-markdown's default safelist to allow
+ * `chrome-extension:` URLs (used for VFS browser links rendered in chat).
+ * The default transform strips them entirely, leaving a bare `#fragment`
+ * that would resolve relative to the current page (sidepanel.html).
+ */
+function urlTransform(url: string): string | null | undefined {
+  if (/^chrome-extension:/i.test(url)) return url;
+  return defaultUrlTransform(url);
+}
+
+/**
+ * Rewrite a hash-only VFS path (e.g. `#/workspaces/abc/file.md`) to a full
+ * `chrome-extension://<id>/vfs.html#...` URL. The agent occasionally drops
+ * the `chrome-extension://...vfs.html` prefix and writes only the hash;
+ * without this, the browser resolves the link relative to sidepanel.html.
+ * Returns the original href unchanged if it doesn't match the pattern.
+ */
+function resolveVfsHref(href: string | undefined): string | undefined {
+  if (!href || !href.startsWith('#/')) return href;
+  // Only rewrite hashes that look like VFS absolute paths.
+  if (!/^#\/(workspaces|home)\b/.test(href)) return href;
+  try {
+    return chrome.runtime.getURL('vfs.html') + href;
+  } catch {
+    return href;
+  }
+}
+
 const components: Components = {
   // Images — click to preview
   img: ({ src, alt, ...props }) => (
@@ -84,7 +113,7 @@ const components: Components = {
 
   // External links open in new tab
   a: ({ href, children, ...props }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="text-info underline underline-offset-2 hover:text-info/80" {...props}>
+    <a href={resolveVfsHref(href)} target="_blank" rel="noopener noreferrer" className="text-info underline underline-offset-2 hover:text-info/80" {...props}>
       {children}
     </a>
   ),
@@ -215,6 +244,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
         components={components}
+        urlTransform={urlTransform}
       >
         {content}
       </Markdown>

@@ -8,6 +8,8 @@ import { DEFAULT_SYSTEM_PROMPT } from './constants';
 
 export interface CreateAgentOptions {
   model: Model<Api>;
+  /** Session id — substituted into the system prompt as the agent's working directory. */
+  sessionId: string;
   /**
    * Optional user-provided instructions appended to the built-in system prompt.
    * Intended for style/language/role tweaks; cannot override tool protocol or safety rules.
@@ -23,6 +25,7 @@ export interface CreateAgentOptions {
 export function createCebianAgent(options: CreateAgentOptions): Agent {
   const {
     model,
+    sessionId,
     userInstructions,
     thinkingLevel,
     maxRounds,
@@ -31,7 +34,9 @@ export function createCebianAgent(options: CreateAgentOptions): Agent {
   } = options;
 
   const vfsBaseUrl = chrome.runtime.getURL('vfs.html');
-  const basePrompt = DEFAULT_SYSTEM_PROMPT.replaceAll('{{VFS_BASE_URL}}', vfsBaseUrl);
+  const basePrompt = DEFAULT_SYSTEM_PROMPT
+    .replaceAll('{{VFS_BASE_URL}}', vfsBaseUrl)
+    .replaceAll('{{SESSION_ID}}', sessionId);
   const trimmedInstructions = userInstructions.trim();
   const effectivePrompt = trimmedInstructions
     ? `${basePrompt}\n\n<user-instructions>\n${trimmedInstructions}\n</user-instructions>`
