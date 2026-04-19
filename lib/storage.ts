@@ -58,11 +58,14 @@ export type MCPAuthConfig =
   | { type: 'bearer'; token: string };
 
 /**
- * Transport descriptor. v1 supports HTTP (Streamable HTTP) and SSE only —
+ * Transport descriptor. v1 supports Streamable HTTP and SSE only —
  * stdio is intentionally excluded (Chrome extension cannot spawn processes).
+ *
+ * Names match the MCP spec / SDK class names (`StreamableHTTPClientTransport`,
+ * `SSEClientTransport`) so users / docs / code share one vocabulary.
  */
 export interface MCPTransportConfig {
-  type: 'http' | 'sse';
+  type: 'streamable-http' | 'sse';
   url: string;
   /** Static request headers. Dynamic auth tokens belong in `auth`, not here. */
   headers?: Record<string, string>;

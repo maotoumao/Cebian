@@ -43,7 +43,7 @@ function validateAndNormalize(input: MCPServerInput): MCPServerInput {
     throw new Error(`Unsupported MCP server URL scheme: ${parsed.protocol}`);
   }
 
-  if (input.transport.type !== 'http' && input.transport.type !== 'sse') {
+  if (input.transport.type !== 'streamable-http' && input.transport.type !== 'sse') {
     throw new Error(`Unsupported MCP transport: ${String(input.transport.type)}`);
   }
 

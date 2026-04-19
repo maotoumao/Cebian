@@ -24,10 +24,31 @@ const CLIENT_VERSION = '0.0.0';
 /**
  * No-op JSON Schema validator for the MCP Client.
  *
- * The SDK's default `AjvJsonSchemaValidator` compiles schemas via Ajv, which
- * uses `new Function(...)` — blocked by the MV3 service worker CSP
- * (no `unsafe-eval`). We accept all structured tool output without validation;
- * downstream consumers (the LLM) are tolerant of extra/missing fields.
+ * ## Why
+ *
+ * The SDK's default `AjvJsonSchemaValidator` compiles JSON Schemas via Ajv,
+ * which uses `new Function(...)`. That is blocked by the MV3 service worker
+ * CSP (no `unsafe-eval`), causing every `listTools()` call to log a noisy
+ * compile error and fail to populate the SDK's output-schema validator cache.
+ *
+ * ## What we lose
+ *
+ * The SDK uses this validator only to verify a tool result's `structuredContent`
+ * field against the tool's declared `outputSchema` (see
+ * `Client.getToolOutputValidator` / `Client.callTool`). With this no-op:
+ *   - `structuredContent` is passed through unchanged.
+ *   - Tool output type-mismatches are NOT caught at the SDK boundary.
+ *
+ * ## What we keep
+ *
+ * Tool *input* validation is unaffected — we build our own AgentTool wrappers
+ * (see `lib/tools/mcp-tool.ts`) whose `parameters` are typebox schemas the
+ * agent runtime validates before execution. The SDK does not validate inputs.
+ *
+ * Downstream consumers of `structuredContent` (the LLM) are tolerant of
+ * extra/missing fields, so the trade-off is acceptable for v1. If we ever
+ * need real output validation in the SW, swap this for an eval-free validator
+ * (e.g. typebox compile, `@cfworker/json-schema`, or AJV's standalone codegen).
  */
 const noopSchemaValidator = {
   getValidator: <T>() => (input: unknown) => ({
