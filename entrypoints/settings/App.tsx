@@ -11,11 +11,7 @@ function resolveTheme(pref: 'dark' | 'light' | 'system'): 'dark' | 'light' {
 }
 
 function applyTheme(resolved: 'dark' | 'light') {
-  if (resolved === 'light') {
-    document.documentElement.setAttribute('data-theme', 'light');
-  } else {
-    document.documentElement.removeAttribute('data-theme');
-  }
+  document.documentElement.setAttribute('data-theme', resolved);
 }
 
 /**

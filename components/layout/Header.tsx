@@ -51,7 +51,7 @@ export function Header({ title, theme, onToggleTheme, onOpenSettings, onNewChat,
               size="icon-xs"
               onClick={onToggleTheme}
             >
-              {theme === 'system' ? <Monitor className="size-4.5" /> : theme === 'dark' ? <Sun className="size-4.5" /> : <Moon className="size-4.5" />}
+              {theme === 'system' ? <Monitor className="size-4.5" /> : theme === 'dark' ? <Moon className="size-4.5" /> : <Sun className="size-4.5" />}
             </Button>
           </TooltipTrigger>
           <TooltipContent>{t('common.toggleTheme')}</TooltipContent>

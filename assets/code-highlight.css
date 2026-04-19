@@ -1,13 +1,13 @@
-﻿/*
+/*
  * Syntax highlighting theme for `rehype-highlight` output.
  *
- * Base: GitHub Dark (highlight.js/styles/github-dark.css) — matches default dark theme.
- * Light: GitHub Light, scoped under `[data-theme="light"]` to match how the app
- * toggles themes (see entrypoints/*/App.tsx and assets/tailwind.css).
+ * Base: GitHub Light (highlight.js/styles/github.css) — matches `:root` light theme.
+ * Dark: GitHub Dark, scoped under `[data-theme="dark"]` to match how the app
+ * toggles themes (see entrypoints App.tsx and assets/tailwind.css).
  *
  * Inlined here (rather than `@import "highlight.js/styles/..."`) because:
  *   1. `highlight.js` is a transitive dep — pnpm strict resolution would block direct CSS imports.
- *   2. CSS `@import` cannot be selector-scoped, so light rules need to be authored under the attribute selector.
+ *   2. CSS `@import` cannot be selector-scoped, so dark rules need to be authored under the attribute selector.
  *
  * Background declarations are intentionally omitted from `.hljs` — the container `<pre>`
  * provides its own background so the highlighter integrates with our design tokens.
@@ -17,9 +17,9 @@
  * Copyright (c) 2006, Ivan Sagalaev <maniac@softwaremaniacs.org> and contributors.
  */
 
-/* ─── Base (dark — GitHub Dark) ─── */
+/* ─── Base (light — GitHub Light) ─── */
 .hljs {
-  color: #c9d1d9;
+  color: #24292e;
 }
 .hljs-doctag,
 .hljs-keyword,
@@ -28,13 +28,13 @@
 .hljs-template-variable,
 .hljs-type,
 .hljs-variable.language_ {
-  color: #ff7b72;
+  color: #d73a49;
 }
 .hljs-title,
 .hljs-title.class_,
 .hljs-title.class_.inherited__,
 .hljs-title.function_ {
-  color: #d2a8ff;
+  color: #6f42c1;
 }
 .hljs-attr,
 .hljs-attribute,
@@ -46,129 +46,129 @@
 .hljs-selector-attr,
 .hljs-selector-class,
 .hljs-selector-id {
-  color: #79c0ff;
+  color: #005cc5;
 }
 .hljs-regexp,
 .hljs-string,
 .hljs-meta .hljs-string {
-  color: #a5d6ff;
+  color: #032f62;
 }
 .hljs-built_in,
 .hljs-symbol {
-  color: #ffa657;
+  color: #e36209;
 }
 .hljs-comment,
 .hljs-code,
 .hljs-formula {
-  color: #8b949e;
+  color: #6a737d;
 }
 .hljs-name,
 .hljs-quote,
 .hljs-selector-tag,
 .hljs-selector-pseudo {
-  color: #7ee787;
+  color: #22863a;
 }
 .hljs-subst {
-  color: #c9d1d9;
+  color: #24292e;
 }
 .hljs-section {
-  color: #1f6feb;
+  color: #005cc5;
   font-weight: bold;
 }
 .hljs-bullet {
-  color: #f2cc60;
+  color: #735c0f;
 }
 .hljs-emphasis {
-  color: #c9d1d9;
+  color: #24292e;
   font-style: italic;
 }
 .hljs-strong {
-  color: #c9d1d9;
+  color: #24292e;
   font-weight: bold;
 }
 .hljs-addition {
-  color: #aff5b4;
-  background-color: #033a16;
-}
-.hljs-deletion {
-  color: #ffdcd7;
-  background-color: #67060c;
-}
-
-/* ─── Light overrides (GitHub Light) ─── */
-[data-theme='light'] .hljs {
-  color: #24292e;
-}
-[data-theme='light'] .hljs-doctag,
-[data-theme='light'] .hljs-keyword,
-[data-theme='light'] .hljs-meta .hljs-keyword,
-[data-theme='light'] .hljs-template-tag,
-[data-theme='light'] .hljs-template-variable,
-[data-theme='light'] .hljs-type,
-[data-theme='light'] .hljs-variable.language_ {
-  color: #d73a49;
-}
-[data-theme='light'] .hljs-title,
-[data-theme='light'] .hljs-title.class_,
-[data-theme='light'] .hljs-title.class_.inherited__,
-[data-theme='light'] .hljs-title.function_ {
-  color: #6f42c1;
-}
-[data-theme='light'] .hljs-attr,
-[data-theme='light'] .hljs-attribute,
-[data-theme='light'] .hljs-literal,
-[data-theme='light'] .hljs-meta,
-[data-theme='light'] .hljs-number,
-[data-theme='light'] .hljs-operator,
-[data-theme='light'] .hljs-variable,
-[data-theme='light'] .hljs-selector-attr,
-[data-theme='light'] .hljs-selector-class,
-[data-theme='light'] .hljs-selector-id {
-  color: #005cc5;
-}
-[data-theme='light'] .hljs-regexp,
-[data-theme='light'] .hljs-string,
-[data-theme='light'] .hljs-meta .hljs-string {
-  color: #032f62;
-}
-[data-theme='light'] .hljs-built_in,
-[data-theme='light'] .hljs-symbol {
-  color: #e36209;
-}
-[data-theme='light'] .hljs-comment,
-[data-theme='light'] .hljs-code,
-[data-theme='light'] .hljs-formula {
-  color: #6a737d;
-}
-[data-theme='light'] .hljs-name,
-[data-theme='light'] .hljs-quote,
-[data-theme='light'] .hljs-selector-tag,
-[data-theme='light'] .hljs-selector-pseudo {
-  color: #22863a;
-}
-[data-theme='light'] .hljs-subst {
-  color: #24292e;
-}
-[data-theme='light'] .hljs-section {
-  color: #005cc5;
-  font-weight: bold;
-}
-[data-theme='light'] .hljs-bullet {
-  color: #735c0f;
-}
-[data-theme='light'] .hljs-emphasis {
-  color: #24292e;
-  font-style: italic;
-}
-[data-theme='light'] .hljs-strong {
-  color: #24292e;
-  font-weight: bold;
-}
-[data-theme='light'] .hljs-addition {
   color: #22863a;
   background-color: #f0fff4;
 }
-[data-theme='light'] .hljs-deletion {
+.hljs-deletion {
   color: #b31d28;
   background-color: #ffeef0;
+}
+
+/* ─── Dark overrides (GitHub Dark, brightened to match --foreground) ─── */
+[data-theme='dark'] .hljs {
+  color: #e6edf3;
+}
+[data-theme='dark'] .hljs-doctag,
+[data-theme='dark'] .hljs-keyword,
+[data-theme='dark'] .hljs-meta .hljs-keyword,
+[data-theme='dark'] .hljs-template-tag,
+[data-theme='dark'] .hljs-template-variable,
+[data-theme='dark'] .hljs-type,
+[data-theme='dark'] .hljs-variable.language_ {
+  color: #ff7b72;
+}
+[data-theme='dark'] .hljs-title,
+[data-theme='dark'] .hljs-title.class_,
+[data-theme='dark'] .hljs-title.class_.inherited__,
+[data-theme='dark'] .hljs-title.function_ {
+  color: #d2a8ff;
+}
+[data-theme='dark'] .hljs-attr,
+[data-theme='dark'] .hljs-attribute,
+[data-theme='dark'] .hljs-literal,
+[data-theme='dark'] .hljs-meta,
+[data-theme='dark'] .hljs-number,
+[data-theme='dark'] .hljs-operator,
+[data-theme='dark'] .hljs-variable,
+[data-theme='dark'] .hljs-selector-attr,
+[data-theme='dark'] .hljs-selector-class,
+[data-theme='dark'] .hljs-selector-id {
+  color: #79c0ff;
+}
+[data-theme='dark'] .hljs-regexp,
+[data-theme='dark'] .hljs-string,
+[data-theme='dark'] .hljs-meta .hljs-string {
+  color: #a5d6ff;
+}
+[data-theme='dark'] .hljs-built_in,
+[data-theme='dark'] .hljs-symbol {
+  color: #ffa657;
+}
+[data-theme='dark'] .hljs-comment,
+[data-theme='dark'] .hljs-code,
+[data-theme='dark'] .hljs-formula {
+  color: #9ba6b3;
+}
+[data-theme='dark'] .hljs-name,
+[data-theme='dark'] .hljs-quote,
+[data-theme='dark'] .hljs-selector-tag,
+[data-theme='dark'] .hljs-selector-pseudo {
+  color: #7ee787;
+}
+[data-theme='dark'] .hljs-subst {
+  color: #e6edf3;
+}
+[data-theme='dark'] .hljs-section {
+  color: #1f6feb;
+  font-weight: bold;
+}
+[data-theme='dark'] .hljs-bullet {
+  color: #f2cc60;
+}
+[data-theme='dark'] .hljs-emphasis {
+  color: #e6edf3;
+  font-style: italic;
+}
+[data-theme='dark'] .hljs-strong {
+  color: #e6edf3;
+  font-weight: bold;
+}
+[data-theme='dark'] .hljs-addition {
+  color: #aff5b4;
+  background-color: #033a16;
+}
+[data-theme='dark'] .hljs-deletion {
+  color: #ffdcd7;
+  background-color: #67060c;
 }

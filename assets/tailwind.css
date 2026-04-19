@@ -3,11 +3,12 @@
 @import "./code-highlight.css";
 
 /*
- * Dark is the default theme (`:root`); light is opt-in via `data-theme="light"`
- * on the document element (see entrypoints/*/App.tsx). The `dark:` Tailwind
- * variant therefore matches when the document is NOT in light mode.
+ * Theme is set explicitly via `data-theme="light"` or `data-theme="dark"` on
+ * the document element (see entrypoints App.tsx files). Light is the `:root`
+ * default; dark overrides via `[data-theme='dark']`.
  */
-@custom-variant dark (&:where(:root:not([data-theme='light']) *, :root:not([data-theme='light'])));
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 
 @theme inline {
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -57,10 +58,47 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Dark theme (default) — design-first dark mode (cool-neutral, layered) */
+/* Light theme — `:root` default */
 :root {
   --radius: 0.625rem;
+  --background: #fafaf9;
+  --foreground: #1c1917;
+  --card: #ffffff;
+  --card-foreground: #1c1917;
+  --popover: #ffffff;
+  --popover-foreground: #1c1917;
+  --primary: #ea580c;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f5f4;
+  --secondary-foreground: #1c1917;
+  --muted: #f5f5f4;
+  --muted-foreground: #78716c;
+  --accent: #e7e5e4;
+  --accent-foreground: #1c1917;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #d6d3d1;
+  --input: #d6d3d1;
+  --ring: #ea580c;
+  --success: #059669;
+  --info: #2563eb;
+  --chart-1: #ea580c;
+  --chart-2: #2563eb;
+  --chart-3: #059669;
+  --chart-4: #9333ea;
+  --chart-5: #ca8a04;
+  --sidebar: #f5f5f4;
+  --sidebar-foreground: #1c1917;
+  --sidebar-primary: #ea580c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e7e5e4;
+  --sidebar-accent-foreground: #1c1917;
+  --sidebar-border: #d6d3d1;
+  --sidebar-ring: #ea580c;
+}
 
+/* Dark theme — design-first dark mode (cool-neutral, layered) */
+[data-theme='dark'] {
   /* Cool-neutral surfaces (HSL ~220°, low saturation, layered elevation) */
   --background: #0b0d10;
   --foreground: #e8e8ec;
@@ -106,44 +144,6 @@
   --sidebar-accent-foreground: #e8e8ec;
   --sidebar-border: #1a1d23;
   --sidebar-ring: #fdba74;
-}
-
-/* Light theme */
-[data-theme='light'] {
-  --background: #fafaf9;
-  --foreground: #1c1917;
-  --card: #ffffff;
-  --card-foreground: #1c1917;
-  --popover: #ffffff;
-  --popover-foreground: #1c1917;
-  --primary: #ea580c;
-  --primary-foreground: #ffffff;
-  --secondary: #f5f5f4;
-  --secondary-foreground: #1c1917;
-  --muted: #f5f5f4;
-  --muted-foreground: #78716c;
-  --accent: #e7e5e4;
-  --accent-foreground: #1c1917;
-  --destructive: #dc2626;
-  --destructive-foreground: #ffffff;
-  --border: #d6d3d1;
-  --input: #d6d3d1;
-  --ring: #ea580c;
-  --success: #059669;
-  --info: #2563eb;
-  --chart-1: #ea580c;
-  --chart-2: #2563eb;
-  --chart-3: #059669;
-  --chart-4: #9333ea;
-  --chart-5: #ca8a04;
-  --sidebar: #f5f5f4;
-  --sidebar-foreground: #1c1917;
-  --sidebar-primary: #ea580c;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e7e5e4;
-  --sidebar-accent-foreground: #1c1917;
-  --sidebar-border: #d6d3d1;
-  --sidebar-ring: #ea580c;
 }
 
 @layer base {
