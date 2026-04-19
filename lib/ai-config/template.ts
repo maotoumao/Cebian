@@ -6,6 +6,7 @@
  */
 
 import { t } from '@/lib/i18n';
+import { readText } from '@/lib/clipboard';
 
 /** Built-in template variable names. `getLabel` is called at use time so the
  * label tracks the active locale. */
@@ -31,7 +32,7 @@ export function replaceTemplateVars(content: string, vars: Record<string, string
 
 /**
  * Gather all built-in template variable values from the current context.
- * Runs in the sidepanel (has access to chrome.tabs and navigator.clipboard).
+ * Runs in the sidepanel (has access to chrome.tabs and the clipboard).
  */
 export async function gatherTemplateVars(): Promise<Record<string, string>> {
   const vars: Record<string, string> = {};
@@ -65,11 +66,7 @@ export async function gatherTemplateVars(): Promise<Record<string, string>> {
   }
 
   // Clipboard
-  try {
-    vars.clipboard = await navigator.clipboard.readText();
-  } catch {
-    vars.clipboard = '';
-  }
+  vars.clipboard = await readText();
 
   return vars;
 }

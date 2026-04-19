@@ -23,6 +23,8 @@ common:
   edit: "编辑"
   add: "添加"
   copy: "复制"
+  copied: "已复制"
+  copyFailed: "复制失败"
   newFile: "新建文件"
   newFolder: "新建文件夹"
   search: "搜索"

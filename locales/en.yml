@@ -24,6 +24,8 @@ common:
   edit: "Edit"
   add: "Add"
   copy: "Copy"
+  copied: "Copied"
+  copyFailed: "Copy failed"
   newFile: "New file"
   newFolder: "New folder"
   search: "Search"

@@ -2,7 +2,7 @@
 
 > **Status:** PROPOSAL — design accepted in principle, scope and details to be re-discussed before planning. Do **not** start implementing without explicit re-approval.
 >
-> **Why deferred:** Larger, cross-cutting refactor. Should land **after** the message-end UI (4), context compaction (3), and MCP client (1) plans so we can leverage learnings and avoid blocking smaller wins.
+> **Why deferred:** Larger, cross-cutting refactor. Should land **before** context compaction (see [`2026-04-19-context-compaction-PROPOSAL.md`](./2026-04-19-context-compaction-PROPOSAL.md)) — that work is blocked on the `SessionContext` introduced here. Sequencing question to revisit: do the SessionContext skeleton (Plan 2a) first, then compaction (Plan 3), then memory itself (Plan 2b)?
 
 ---
 
@@ -10,7 +10,8 @@
 
 1. **Memory tool** — give the agent a persistent, scoped memory backed by VFS (`/.cebian/memory/user/**`, `/.cebian/memory/host/<hostname>/**`, `/workspaces/<sessionId>/memory/**`).
 2. **Workspace visibility in chat** — let the user see what files the agent touched, both per-turn (FilesChangedCard) and cumulatively (Header file-count button → opens vfs.html at the session's workspace).
-3. **Tool architecture refactor** — replace the current ad-hoc `SessionToolContext` with a clean **Context + Middleware** pair, so cross-cutting concerns (file-change tracking, metrics, logging, future per-session resources) stop bleeding into individual tools.
+3. **Tool architecture refactor** — replace the current ad-hoc `SessionToolContext` with a clean **Context + Middleware** pair, so cross-cutting concerns (file-change tracking, metrics, logging, future per-session resources, **conversation/compaction state**) stop bleeding into individual tools.
+4. **Conversation state hub** — `SessionContext` must own the dual-track `displayMessages` / `modelMessages` / `compactionMarkers` introduced by the compaction PROPOSAL, plus future regenerate/truncate operations. Without this, both compaction and regenerate either bloat `agent-manager.ts` or get implemented twice.
 
 ---
 
@@ -46,6 +47,16 @@
 4. Whether host-memory injection should be re-evaluated on tab switch (deferred to v2 in the original discussion).
 5. Memory tool surface — match Anthropic's 6-op API (`view/create/str_replace/insert/delete/rename`) or trim?
 6. Settings UI for memory browser — reuse `FileWorkspace` component rooted at `/.cebian/memory/`?
+7. **Should we split this PROPOSAL into 2a (SessionContext skeleton — pure refactor, prerequisite for compaction) and 2b (memory feature)?** 2a would be small and mechanical; 2b stays a proposal until UX questions land.
+8. **`SessionContext` conversation API surface** — what exactly does it expose to tools / agent-manager?
+   - `displayMessages` / `modelMessages` (read-only views)
+   - `compactionMarkers`
+   - `appendDisplayMessage(msg)` (called from `message_end` handler)
+   - `truncateAt(displayIdx)` — for regenerate / edit-and-resend
+   - `compactIfNeeded()` — turn-boundary trigger
+   - `onCompactionStart` / `onCompactionEnd` event emitters (for UI broadcast)
+   - `tokenUsage` snapshot
+9. **Persistence boundary** — does `SessionContext` own the throttled writer, or does `agent-manager` keep it? Current lean: `SessionContext` owns it, agent-manager just calls `ctx.flush()` on `agent_end`.
 
 ---
 

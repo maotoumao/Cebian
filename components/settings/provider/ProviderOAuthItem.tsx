@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
+import { copyText } from '@/lib/clipboard';
 import { t } from '@/lib/i18n';
 import type { OAuthCredential } from '@/lib/storage';
 
@@ -40,7 +41,7 @@ export function ProviderOAuthItem({
   const [copied, setCopied] = useState(false);
 
   const handleCopyCode = (code: string) => {
-    navigator.clipboard.writeText(code);
+    void copyText(code, { silent: true });
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

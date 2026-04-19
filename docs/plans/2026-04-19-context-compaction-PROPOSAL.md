@@ -1,6 +1,52 @@
-# Context Compaction & Token Budget Implementation Plan
+# Context Compaction & Token Budget (PROPOSAL — DO NOT EXECUTE YET)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status:** PROPOSAL — design ideas captured below, but the original "in-place rewrite of `agent.state.messages`" approach has a **P0 design flaw** (see "Open issues" below) and the implementation is **blocked on the SessionContext refactor** (see [`2026-04-19-memory-and-tool-context-refactor-PROPOSAL.md`](./2026-04-19-memory-and-tool-context-refactor-PROPOSAL.md)). Do **not** start implementing without explicit re-approval and a revised plan.
+>
+> **Why deferred:** Naive compaction would silently destroy the user's visible chat history and make the future "regenerate last message" feature impossible to implement cleanly. Both problems are best solved by introducing a `displayMessages` vs `modelMessages` split, which in turn belongs in the SessionContext refactor rather than bolted onto `agent-manager.ts`.
+
+---
+
+## Open issues that must be resolved before this becomes a real plan
+
+### 1. UI history loss (P0)
+
+Today `agent.state.messages` is the **single source of truth** — it feeds the model, drives the UI broadcast, and is what `ThrottledSessionWriter` persists to Dexie. The original Tier-A/Tier-B sketch below mutates that array in place. Net effect after a compaction:
+
+- Side panel re-renders showing only the summary stub + tail messages.
+- Dexie row gets overwritten with the same shortened array.
+- Original conversation is **unrecoverable**.
+
+**Required mitigation: dual-track messages.**
+
+- `displayMessages: AgentMessage[]` — append + truncate-from-tail only. Always shown in the UI, always persisted whole.
+- `modelMessages: AgentMessage[]` — what the agent actually sends to the LLM. Compaction rewrites this; UI never reads it.
+- `compactionMarkers: CompactionMarker[]` — `{ id, startDisplayIdx, endDisplayIdx, summary, tier, tokensBefore, tokensAfter, at }`. UI inserts an inline "📦 Compacted N messages" divider between display messages at each marker's range; "expand" reads `displayMessages.slice(start, end)` (zero data duplication).
+- New `ServerMessage` types: `compaction_start` / `compaction_end` so the UI can show a "Compacting context…" banner.
+- `SessionRecord` schema bump to v2 with migration `modelMessages = messages` for existing rows.
+
+### 2. Regenerate / edit-and-resend (forward compatibility)
+
+Future feature: regenerate the last assistant message, or edit the last user message and resubmit. With single-track in-place compaction this is **impossible** for any turn that's been folded into a summary — the originals are gone.
+
+With dual-track it's straightforward:
+
+1. `displayMessages` is ground truth → find the truncation index N.
+2. `displayMessages = displayMessages.slice(0, N)`.
+3. Drop any `compactionMarkers` whose `endDisplayIdx > N`.
+4. Reset `modelMessages = displayMessages` (let the next prompt's natural compaction trigger handle it again — simplest correct behaviour).
+5. Tear down the old `Agent` instance and recreate it from the truncated `modelMessages` (the existing model-switch path in `agent-manager.ts` already does this).
+
+So `displayMessages` semantics is **append + truncate-tail**, not strictly append-only.
+
+### 3. Coupling to SessionContext refactor
+
+Adding `displayMessages`, `modelMessages`, `compactionMarkers`, `compactionInProgress`, `tokenUsage`, `pendingCompactionPromise`, `truncateAt()`, `regenerateLast()` directly onto `ManagedSession` in `agent-manager.ts` will balloon that file past 1000 lines and leave tools (which only see `SessionToolContext`) unable to read or trigger compaction. These belong on the new `SessionContext` proposed in the memory/refactor PROPOSAL.
+
+**Therefore the SessionContext refactor is a hard prerequisite for this work.**
+
+---
+
+## Original design sketch (kept for reference; needs rewrite under dual-track)
 
 **Goal:** Replace the current naive sliding window with a two-tier compaction strategy (tool-result clearing + summary compaction), an error-driven fallback that auto-recovers from `context_length_exceeded` responses, a runtime-discovered context-window estimate, and a token-budget indicator on `ChatInput`.
 

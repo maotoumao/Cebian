@@ -23,6 +23,8 @@ common:
   edit: "編輯"
   add: "新增"
   copy: "複製"
+  copied: "已複製"
+  copyFailed: "複製失敗"
   newFile: "新增檔案"
   newFolder: "新增資料夾"
   search: "搜尋"
