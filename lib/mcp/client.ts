@@ -22,6 +22,22 @@ const CLIENT_NAME = 'cebian';
 const CLIENT_VERSION = '0.0.0';
 
 /**
+ * No-op JSON Schema validator for the MCP Client.
+ *
+ * The SDK's default `AjvJsonSchemaValidator` compiles schemas via Ajv, which
+ * uses `new Function(...)` — blocked by the MV3 service worker CSP
+ * (no `unsafe-eval`). We accept all structured tool output without validation;
+ * downstream consumers (the LLM) are tolerant of extra/missing fields.
+ */
+const noopSchemaValidator = {
+  getValidator: <T>() => (input: unknown) => ({
+    valid: true as const,
+    data: input as T,
+    errorMessage: undefined,
+  }),
+};
+
+/**
  * Thin wrapper around `@modelcontextprotocol/sdk` Client + transport.
  *
  * Single responsibility: speak MCP. Does NOT implement caching, throttling,
@@ -52,7 +68,7 @@ export class MCPClient {
       : new StreamableHTTPClientTransport(url, { requestInit });
     this.client = new Client(
       { name: CLIENT_NAME, version: CLIENT_VERSION },
-      { capabilities: {} },
+      { capabilities: {}, jsonSchemaValidator: noopSchemaValidator as any },
     );
     try {
       await this.client.connect(this.transport);

@@ -9,7 +9,7 @@ import { scanSkillIndex, buildSkillsBlock } from '@/lib/ai-config/scanner';
 import { sessionStore } from './session-store';
 import { gatherPageContext } from '@/lib/page-context';
 import { buildTextPrefix, extractImages, type Attachment } from '@/lib/attachments';
-import { createSessionTools } from '@/lib/tools';
+import { createSessionTools, buildSessionToolArray } from '@/lib/tools';
 import type { SessionToolContext } from '@/lib/tools/session-context';
 import type { ServerMessage } from '@/lib/protocol';
 import type { SessionRecord } from '@/lib/db';
@@ -21,6 +21,7 @@ import {
   userInstructions as userInstructionsStorage,
   maxRounds as maxRoundsStorage,
 } from '@/lib/storage';
+import { getMCPManager } from '@/lib/mcp/manager';
 import { getCopilotBaseUrl } from '@/lib/oauth';
 import { mergeCustomProviders, isCustomProvider, findCustomModel } from '@/lib/custom-models';
 import { PRESET_PROVIDERS } from '@/lib/constants';
@@ -90,9 +91,40 @@ class AgentManager {
   private broadcast: BroadcastFn = () => {};
   /** Periodic timer that calls a trivial Chrome API to prevent SW termination while agents run. */
   private keepAliveTimer: number | null = null;
+  /** Subscription to MCPManager change notifications; pushes refreshed tools into every live session. */
+  private mcpUnsubscribe?: () => void;
 
   setBroadcast(fn: BroadcastFn): void {
     this.broadcast = fn;
+    // Subscribe to MCPManager so we react AFTER its internal entries map is
+    // reconciled — avoids racing two independent storage watchers.
+    if (!this.mcpUnsubscribe) {
+      this.mcpUnsubscribe = getMCPManager().subscribe(() => {
+        void this.refreshAllSessionTools();
+      });
+    }
+  }
+
+  /**
+   * Rebuild every live session's tool array from current MCP config.
+   * Called when the user adds, removes, enables, disables, or edits an MCP
+   * server. The agent's `state.tools` setter accepts a fresh array, so a
+   * mid-run update is safe — the next assistant turn picks up the new tools.
+   *
+   * Sessions refresh in parallel; manager-level dedup prevents fan-out reconnects.
+   */
+  private async refreshAllSessionTools(): Promise<void> {
+    if (this.sessions.size === 0) return;
+    await Promise.allSettled(
+      Array.from(this.sessions.values()).map(async (managed) => {
+        try {
+          const tools = await buildSessionToolArray(managed.toolCtx);
+          managed.agent.state.tools = tools;
+        } catch (err) {
+          console.warn(`[mcp] failed to refresh tools for session ${managed.sessionId}:`, err);
+        }
+      }),
+    );
   }
 
   /**
@@ -185,7 +217,7 @@ class AgentManager {
     }
 
     // Create per-session tools with isolated bridges
-    const { tools: sessionTools, ctx: toolCtx } = createSessionTools();
+    const { tools: sessionTools, ctx: toolCtx } = await createSessionTools();
 
     const agent = createCebianAgent({
       model: resolved.model,

@@ -3,6 +3,7 @@
 // interactive tools exist. Adding a new interactive tool requires zero changes
 // to agent-manager — only register it here via ctx.register().
 
+import type { AgentTool } from '@mariozechner/pi-agent-core';
 import type { InteractiveBridge, PendingRequest } from './interactive-bridge';
 
 export type ToolStateCallback = (
@@ -12,13 +13,25 @@ export type ToolStateCallback = (
 
 export class SessionToolContext {
   private bridges = new Map<string, InteractiveBridge<any, any>>();
+  /** Per-session interactive AgentTool instances, in registration order. */
+  private interactiveTools: AgentTool<any>[] = [];
   private bridgeUnsubs: (() => void)[] = [];
   private pendingState = new Map<string, boolean>();
   private listeners = new Set<ToolStateCallback>();
 
-  /** Register a bridge for an interactive tool. Call during session setup. */
-  register(toolName: string, bridge: InteractiveBridge<any, any>): void {
+  /**
+   * Register an interactive tool's bridge AND its AgentTool instance.
+   * The tool is included in `getInteractiveTools()` so callers (e.g. the
+   * session tool array builder) can compose it without naming individual
+   * tools — keeping agent-manager unaware of which interactive tools exist.
+   */
+  register(
+    toolName: string,
+    bridge: InteractiveBridge<any, any>,
+    tool: AgentTool<any>,
+  ): void {
     this.bridges.set(toolName, bridge);
+    this.interactiveTools.push(tool);
     this.pendingState.set(toolName, false);
 
     // Subscribe to this bridge's state and detect transitions
@@ -40,6 +53,14 @@ export class SessionToolContext {
   /** Get the pending request for a specific tool. */
   getPending(toolName: string): PendingRequest<any> | null {
     return this.bridges.get(toolName)?.getPending() ?? null;
+  }
+
+  /**
+   * Snapshot of all registered interactive AgentTool instances, in registration
+   * order. Returns a fresh array; safe to spread into a tools list.
+   */
+  getInteractiveTools(): AgentTool<any>[] {
+    return [...this.interactiveTools];
   }
 
   /** Check if any registered tool has a pending request. */
@@ -82,6 +103,7 @@ export class SessionToolContext {
     this.bridgeUnsubs = [];
     this.listeners.clear();
     this.bridges.clear();
+    this.interactiveTools = [];
     this.pendingState.clear();
   }
 }

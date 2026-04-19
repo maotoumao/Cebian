@@ -101,24 +101,24 @@ export function createSessionConfirmTool(): {
 import { createSessionConfirmTool } from './confirm-action';
 import { TOOL_CONFIRM_ACTION } from '@/lib/types';
 
-export function createSessionTools() {
+export async function createSessionTools() {
   const ctx = new SessionToolContext();
 
   const { tool: askUserTool, bridge: askUserBridge } = createSessionAskUserTool();
-  ctx.register(TOOL_ASK_USER, askUserBridge);
+  ctx.register(TOOL_ASK_USER, askUserBridge, askUserTool);
 
   // ▼ 新增两行 ▼
   const { tool: confirmTool, bridge: confirmBridge } = createSessionConfirmTool();
-  ctx.register(TOOL_CONFIRM_ACTION, confirmBridge);
+  ctx.register(TOOL_CONFIRM_ACTION, confirmBridge, confirmTool);
 
-  return {
-    tools: [askUserTool, confirmTool, ...sharedTools],  // ← 加入 tools 数组
-    ctx,
-  };
+  const tools = await buildSessionToolArray(ctx);
+  return { tools, ctx };
 }
 ```
 
-**完成后 `agent-manager.ts` 零改动** — `toolCtx.subscribe()` 自动覆盖新注册的 bridge。
+**关键点**：
+- `ctx.register(name, bridge, tool)` 的第三个参数是该 tool 实例。`SessionToolContext` 会把所有注册的 interactive tools 收集起来，`buildSessionToolArray(ctx)` 自动取出，无需手动拼接 tools 数组。
+- **完成后 `agent-manager.ts` 零改动** —— 它只通过 `ctx` 间接接触工具，永远不知道 `confirm_action` 的存在。MCP 配置变化时的 `refreshAllSessionTools` 也会自动包含这个新工具。
 
 ### 4. 创建 UI 组件
 
@@ -185,7 +185,7 @@ import './confirm-action-registry';  // ← 新增
 |------|------|------|
 | 1. 定义常量 | `lib/types.ts` | 加 `TOOL_*` 常量 |
 | 2. 创建工具 | `lib/tools/{name}.ts` | 工厂函数 + bridge |
-| 3. 注册 bridge | `lib/tools/index.ts` | `ctx.register()` + 加入 tools 数组 |
+| 3. 注册 bridge | `lib/tools/index.ts` | `ctx.register(name, bridge, tool)` |
 | 4. 创建 UI | `lib/tools/{name}-registry.tsx` | React 组件 + `uiToolRegistry.register()` |
 | 5. 注册 UI | `lib/tools/ui-registrations.ts` | `import './{name}-registry'` |
 | 6. 系统提示词 | `lib/constants.ts` | 可选 |

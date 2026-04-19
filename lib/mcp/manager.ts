@@ -44,6 +44,8 @@ class MCPManager {
   private entries = new Map<string, ServerEntry>();
   private unwatch?: () => void;
   private initPromise?: Promise<void>;
+  /** Fired AFTER reconcile mutates `entries`, so subscribers see fresh state. */
+  private listeners = new Set<() => void>();
 
   init(): Promise<void> {
     if (!this.initPromise) {
@@ -51,11 +53,40 @@ class MCPManager {
         const configs = await mcpServers.getValue();
         for (const c of configs) this.upsert(c);
         this.unwatch = mcpServers.watch((next) => {
-          void this.reconcile(next ?? []);
+          void (async () => {
+            await this.reconcile(next ?? []);
+            this.notify();
+          })();
         });
-      })();
+      })().catch((err) => {
+        // Don't cache a rejected init — next caller should be able to retry,
+        // otherwise a transient storage failure bricks all session creation
+        // until the service worker restarts.
+        this.initPromise = undefined;
+        throw err;
+      });
     }
     return this.initPromise;
+  }
+
+  /**
+   * Subscribe to MCP config changes. Callbacks fire AFTER `entries` has been
+   * reconciled, so calls into `getEnabledServers()` / `getAllTools()` from the
+   * callback will see the new state. Returns an unsubscribe function.
+   */
+  subscribe(cb: () => void): () => void {
+    this.listeners.add(cb);
+    return () => this.listeners.delete(cb);
+  }
+
+  private notify(): void {
+    for (const cb of this.listeners) {
+      try {
+        cb();
+      } catch (err) {
+        console.warn('[mcp] subscriber threw:', err);
+      }
+    }
   }
 
   async getEnabledServers(): Promise<MCPServerConfig[]> {
@@ -158,9 +189,12 @@ class MCPManager {
       });
       return;
     }
-    const enabledFalling = existing.config.enabled && !config.enabled;
+    const enabledChanged = existing.config.enabled !== config.enabled;
     const material = this.materialChange(existing.config, config);
-    if (material || enabledFalling) {
+    if (material || enabledChanged) {
+      // Material change OR any enabled flip: drop the connection + cache so
+      // the next discover/use reconnects with current config and fetches
+      // fresh tools. Critical for "enable a server" → tools appear instantly.
       void this.closeEntry(existing);
       existing.client = new MCPClient(config);
       existing.throttle = new ServerThrottle();
