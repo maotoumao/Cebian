@@ -32,6 +32,7 @@
     "@lezer/highlight": "^1.2.3",
     "@mariozechner/pi-agent-core": "^0.67.6",
     "@mariozechner/pi-ai": "^0.67.6",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@mozilla/readability": "^0.6.0",
     "@sinclair/typebox": "0.34.49",
     "@wxt-dev/i18n": "^0.2.5",

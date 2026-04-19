@@ -54,6 +54,16 @@ function validateAndNormalize(input: MCPServerInput): MCPServerInput {
     auth = { type: 'bearer', token };
   }
 
+  // Reject Authorization in transport.headers when bearer auth is set —
+  // the client wrapper would silently overwrite it, which is confusing.
+  if (auth.type === 'bearer' && input.transport.headers) {
+    for (const key of Object.keys(input.transport.headers)) {
+      if (key.toLowerCase() === 'authorization') {
+        throw new Error('Do not set the Authorization header manually when using bearer auth — set the token in the auth field instead.');
+      }
+    }
+  }
+
   return {
     name,
     enabled: input.enabled,
