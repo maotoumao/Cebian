@@ -1,21 +1,15 @@
 #!/usr/bin/env node
 /**
- * lint-i18n.mjs — temporary helper for the i18n migration.
+ * lint-i18n.mjs — i18n regression guard.
  *
- * Two checks:
- *  1. Scans Cebian source for hard-coded Chinese characters in user-facing
- *     positions (JSX text, string literals in components/entrypoints) and
- *     prints a report.
- *  2. Asserts the top-level keys in `locales/en.yml`, `locales/zh_CN.yml`,
+ * Three checks (any failure exits non-zero so the pre-commit hook blocks):
+ *  1. Asserts the top-level keys in `locales/en.yml`, `locales/zh_CN.yml`,
  *     and `locales/zh_TW.yml` match the approved allow-list (the manifest
  *     exception + namespace namespaces). Catches accidental flat keys
  *     like top-level `cancel: ...`.
- *  3. Asserts top-level key parity across all three locale files.
- *
- * Intended to track migration progress; does NOT fail the build.
- *
- * DELETE this script (and the `lint:i18n` package.json entry) once the
- * extraction migration is complete.
+ *  2. Asserts full key parity (flat paths) across all three locale files.
+ *  3. Scans Cebian source for hard-coded Chinese characters in user-facing
+ *     positions (JSX text, string literals in components/entrypoints).
  */
 import { promises as fs } from 'node:fs';
 import path from 'node:path';

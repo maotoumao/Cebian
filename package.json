@@ -12,7 +12,6 @@
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
-    "lint:i18n": "node scripts/lint-i18n.mjs",
     "check": "wxt prepare && tsc --noEmit && node scripts/lint-i18n.mjs",
     "postinstall": "wxt prepare && simple-git-hooks"
   },

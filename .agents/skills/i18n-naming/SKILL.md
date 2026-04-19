@@ -274,7 +274,7 @@ usage frequently picks a different word entirely.
 4. Update the call site to `t('your.key')` (or `t('your.key', [arg1, ...])`).
 5. If using positional placeholders, document the meaning of each `$N`
    with an inline YAML comment on the preceding line, in all three locales.
-6. Run `pnpm compile` (and `pnpm lint:i18n` during the migration phase).
+6. Run `pnpm check` (compiles types and runs the i18n lint).
 
 ## Review checklist
 
