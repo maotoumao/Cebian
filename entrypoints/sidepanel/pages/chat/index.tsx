@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { SquarePen } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -92,28 +92,6 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
   }, []);
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
 
-  // Track the duration of the most recent agent run, attached to the last
-  // assistant message in `messages`. We start the timer when isAgentRunning
-  // flips true (and no timer is already running) and freeze the duration
-  // when it flips false. Reset whenever the active session changes.
-  const turnStartedAtRef = useRef<number | null>(null);
-  const [lastTurnDurationMs, setLastTurnDurationMs] = useState<number | null>(null);
-  useEffect(() => {
-    turnStartedAtRef.current = null;
-    setLastTurnDurationMs(null);
-  }, [activeSessionId]);
-  useEffect(() => {
-    if (isAgentRunning) {
-      if (turnStartedAtRef.current == null) {
-        turnStartedAtRef.current = Date.now();
-        setLastTurnDurationMs(null);
-      }
-    } else if (turnStartedAtRef.current != null) {
-      setLastTurnDurationMs(Date.now() - turnStartedAtRef.current);
-      turnStartedAtRef.current = null;
-    }
-  }, [isAgentRunning]);
-
   const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
   const showWaitingPlaceholder = effectiveRunning && lastMsg && 'role' in lastMsg && lastMsg.role === 'user';
 
@@ -163,21 +141,43 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                 break;
               }
 
-              // Meta row: only attach `copyText` when the turn has truly
-              // ended (the agent has fully stopped, not just paused on an
-              // interactive tool). For non-last messages the turn is by
-              // definition over. We also skip pure-tool-call turns with no
-              // text content.
+              // Meta row: show only on the assistant message that *closes*
+              // the turn (stopReason !== 'toolUse'), so multi-tool-round
+              // turns get one consolidated meta at the very end instead of
+              // one per intermediate model call. The closing message is
+              // also the only one whose timing represents the whole turn.
               const turnEnded = !isLast || !isAgentRunning;
+              const isTurnClosing =
+                turnEnded && assistantMsg.stopReason !== 'toolUse';
               const plainText = getAssistantText(assistantMsg).trim();
-              const copyText = turnEnded && plainText.length > 0 ? plainText : undefined;
-              const meta = {
-                modelLabel: assistantMsg.model,
-                inputTokens: assistantMsg.usage?.input,
-                outputTokens: assistantMsg.usage?.output,
-                costUsd: assistantMsg.usage?.cost?.total,
-                durationMs: isLast ? lastTurnDurationMs ?? undefined : undefined,
-              };
+              const copyText = isTurnClosing && plainText.length > 0 ? plainText : undefined;
+
+              // Aggregate usage across all assistant messages of this turn
+              // (walk back to the most recent user message). Each tool round
+              // is its own LLM call with its own usage; users want the sum.
+              let meta: Parameters<typeof AgentMessage>[0]['meta'];
+              if (isTurnClosing) {
+                let inputTokens = 0;
+                let outputTokens = 0;
+                let costUsd = 0;
+                for (let i = idx; i >= 0; i--) {
+                  const m = messages[i];
+                  if (!('role' in m)) continue;
+                  if (m.role === 'user') break;
+                  if (m.role === 'assistant') {
+                    const am = m as AssistantMessage;
+                    inputTokens += am.usage?.input ?? 0;
+                    outputTokens += am.usage?.output ?? 0;
+                    costUsd += am.usage?.cost?.total ?? 0;
+                  }
+                }
+                meta = {
+                  modelLabel: assistantMsg.model,
+                  inputTokens: inputTokens || undefined,
+                  outputTokens: outputTokens || undefined,
+                  costUsd: costUsd || undefined,
+                };
+              }
 
               return (
                 <AgentMessage

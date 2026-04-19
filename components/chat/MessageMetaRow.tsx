@@ -6,9 +6,8 @@ export interface MessageMetaProps {
   inputTokens?: number;
   outputTokens?: number;
   costUsd?: number;
-  durationMs?: number;
-  /** Plain text to copy when the user clicks the copy button. */
-  text: string;
+  /** When provided, a copy button is rendered at the end of the row. */
+  text?: string;
 }
 
 function formatTokens(n?: number): string {
@@ -18,13 +17,13 @@ function formatTokens(n?: number): string {
 }
 
 /**
- * End-of-turn meta row: model · `↑in ↓out` · cost · duration · copy button.
+ * End-of-turn meta row: model · `↑in ↓out` · cost · (copy).
  *
- * Hidden by default; fades in on parent `group` hover so reading the message
- * stays uncluttered. Parts that have no data are silently omitted.
+ * Always visible once the turn ends — the meta is the primary signal that
+ * the message is complete. Parts that have no data are silently omitted.
  */
 export function MessageMetaRow({
-  modelLabel, inputTokens, outputTokens, costUsd, durationMs, text,
+  modelLabel, inputTokens, outputTokens, costUsd, text,
 }: MessageMetaProps) {
   const parts: string[] = [];
   if (modelLabel) parts.push(modelLabel);
@@ -39,14 +38,13 @@ export function MessageMetaRow({
     // single-substitution i18n key that would only echo its argument.
     parts.push(`$${costUsd.toFixed(4)}`);
   }
-  if (durationMs != null) {
-    parts.push(t('chat.message.durationSeconds', [(durationMs / 1000).toFixed(1)]));
-  }
+
+  if (parts.length === 0 && !text) return null;
 
   return (
-    <div className="mt-2 flex items-center justify-between gap-2 text-[0.7rem] text-muted-foreground/80 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+    <div className="mt-2 flex items-center justify-between gap-2 text-[0.7rem] text-muted-foreground/70">
       <span className="font-mono">{parts.join(' · ')}</span>
-      <CopyButton text={text} />
+      {text && <CopyButton text={text} />}
     </div>
   );
 }

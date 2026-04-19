@@ -161,8 +161,6 @@ chat:
   message:
     # $1 = input tokens (formatted, e.g. "1.2k"), $2 = output tokens (formatted)
     tokensInOut: "↑$1 ↓$2"
-    # $1 = duration in seconds, already formatted (e.g. "3.4")
-    durationSeconds: "$1s"
   session:
     loading: "Loading session…"
     modelError: "Model returned an error"

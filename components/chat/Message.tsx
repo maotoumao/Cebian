@@ -77,12 +77,13 @@ export function AgentMessage({
   children?: ReactNode;
   isStreaming?: boolean;
   showHeader?: boolean;
+  /** Meta is rendered as soon as `!isStreaming`; the copy button inside the
+   * row is gated on `copyText` (skipped for pure tool-call turns). */
   meta?: Omit<MessageMetaProps, 'text'>;
-  /** When provided and not streaming, renders the end-of-turn meta row with a copy button. */
   copyText?: string;
 }) {
   return (
-    <div className={`group self-start w-full ${showHeader ? '' : '-mt-1'}`}>
+    <div className={`self-start w-full ${showHeader ? '' : '-mt-1'}`}>
       {showHeader && (
         <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground font-medium">
           <Bot className="size-3.5 text-primary" />
@@ -98,7 +99,7 @@ export function AgentMessage({
           />
         )}
       </div>
-      {!isStreaming && copyText && (
+      {!isStreaming && (meta || copyText) && (
         <MessageMetaRow {...(meta ?? {})} text={copyText} />
       )}
     </div>
