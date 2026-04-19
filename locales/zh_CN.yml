@@ -108,9 +108,12 @@ settings:
       delete: "删除服务器"
       # $1 = 服务器名称
       deleteConfirm: "确定删除 MCP 服务器“$1”吗？此操作不可撤销。"
+    errors:
+      # $1 = 服务器名称
+      nameTaken: "已存在名为“$1”的 MCP 服务器。"
     status:
       disabled: "已禁用"
-      idle: "空闲"
+      idle: "等待首次调用"
       connected: "已连接"
       disconnected: "未连接"
       probing: "重连中"
@@ -126,6 +129,11 @@ settings:
       authBearer: "Bearer Token"
       bearerToken: "Token"
       bearerTokenPlaceholder: "粘贴 bearer token"
+      headers: "自定义 Headers"
+      headerKeyPlaceholder: "Header 名（如 X-MCP-Toolsets）"
+      headerValuePlaceholder: "Header 值"
+      addHeader: "添加 Header"
+      removeHeader: "移除 Header"
   editor:
     selectFile: "选择一个文件开始编辑"
     saving: "保存中…"

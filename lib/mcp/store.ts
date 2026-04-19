@@ -4,6 +4,7 @@ import {
   type MCPTransportConfig,
   type MCPAuthConfig,
 } from '@/lib/storage';
+import { t } from '@/lib/i18n';
 
 /**
  * CRUD helpers around the `mcpServers` storage item.
@@ -81,8 +82,25 @@ export async function getMCPServer(id: string): Promise<MCPServerConfig | undefi
   return all.find((s) => s.id === id);
 }
 
+/**
+ * Throws if `name` clashes with another server's name (case-insensitive).
+ * `excludeId` lets `updateMCPServer` ignore the record being edited.
+ *
+ * Names are the user-visible identifier (cards, error toasts, future tool
+ * namespacing); allowing duplicates would make the UI ambiguous and could
+ * cause MCP tool name collisions when we prefix tools with their server name.
+ */
+function assertNameUnique(name: string, all: MCPServerConfig[], excludeId?: string): void {
+  const lc = name.toLowerCase();
+  if (all.some((s) => s.id !== excludeId && s.name.toLowerCase() === lc)) {
+    throw new Error(t('settings.mcp.errors.nameTaken', [name]));
+  }
+}
+
 export async function addMCPServer(input: MCPServerInput): Promise<MCPServerConfig> {
   const norm = validateAndNormalize(input);
+  const all = await mcpServers.getValue();
+  assertNameUnique(norm.name, all);
   const now = Date.now();
   const config: MCPServerConfig = {
     id: crypto.randomUUID(),
@@ -94,7 +112,6 @@ export async function addMCPServer(input: MCPServerInput): Promise<MCPServerConf
     createdAt: now,
     updatedAt: now,
   };
-  const all = await mcpServers.getValue();
   await mcpServers.setValue([...all, config]);
   return config;
 }
@@ -127,6 +144,9 @@ export async function updateMCPServer(
     transport: mergedTransport,
     auth: mergedAuth,
   });
+  if (norm.name.toLowerCase() !== current.name.toLowerCase()) {
+    assertNameUnique(norm.name, all, id);
+  }
   const next: MCPServerConfig = {
     ...current,
     name: norm.name,

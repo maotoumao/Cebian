@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,15 +20,23 @@ export interface MCPFormValues {
   url: string;
   authType: AuthType;
   bearerToken: string;
+  /**
+   * Headers as an editable array; rows may temporarily have empty keys/values
+   * while the user is typing. `formToInput` aggregates them into the storage
+   * `Record<string, string>` shape (case-insensitive, last-write-wins) and
+   * silently drops rows with empty keys.
+   */
+  headers: Array<{ key: string; value: string }>;
 }
 
-const EMPTY: MCPFormValues = {
+const makeEmpty = (): MCPFormValues => ({
   name: '',
   transportType: 'streamable-http',
   url: '',
   authType: 'none',
   bearerToken: '',
-};
+  headers: [],
+});
 
 /**
  * Build a store-shaped input from form values. Throws on missing required
@@ -42,11 +50,29 @@ export function formToInput(values: MCPFormValues): {
   const auth: MCPAuthConfig = values.authType === 'bearer'
     ? { type: 'bearer', token: values.bearerToken.trim() }
     : { type: 'none' };
-  return {
-    name: values.name.trim(),
-    transport: { type: values.transportType, url: values.url.trim() },
-    auth,
+
+  // Aggregate header rows: skip empty keys, normalize via Headers (case-
+  // insensitive, last write wins). Only attach `headers` when non-empty so
+  // the stored record stays minimal.
+  let headers: Record<string, string> | undefined;
+  if (values.headers.length > 0) {
+    const h = new Headers();
+    for (const row of values.headers) {
+      const k = row.key.trim();
+      if (!k) continue;
+      h.set(k, row.value);
+    }
+    const out: Record<string, string> = {};
+    h.forEach((v, k) => { out[k] = v; });
+    if (Object.keys(out).length > 0) headers = out;
+  }
+
+  const transport: MCPTransportConfig = {
+    type: values.transportType,
+    url: values.url.trim(),
+    ...(headers ? { headers } : {}),
   };
+  return { name: values.name.trim(), transport, auth };
 }
 
 // ─── Shared form body ───
@@ -73,6 +99,10 @@ export function MCPFormBody({
       e.preventDefault();
       onSubmit();
     }
+  };
+  // Header rows: Enter must NOT submit (user is mid-edit, multi-row).
+  const onHeaderKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') e.preventDefault();
   };
   return (
     <div className="space-y-3 border border-border rounded-lg p-3">
@@ -159,6 +189,60 @@ export function MCPFormBody({
         </div>
       )}
 
+      <Separator />
+
+      <div className="space-y-2">
+        <Label className="text-xs">{t('settings.mcp.form.headers')}</Label>
+        {values.headers.length > 0 && (
+          <div className="space-y-1">
+            {values.headers.map((row, idx) => (
+              <div key={idx} className="flex items-center gap-1">
+                <Input
+                  value={row.key}
+                  onChange={(e) => {
+                    const next = values.headers.map((r, i) => (i === idx ? { ...r, key: e.target.value } : r));
+                    onChange({ headers: next });
+                  }}
+                  onKeyDown={onHeaderKeyDown}
+                  placeholder={t('settings.mcp.form.headerKeyPlaceholder')}
+                  className="h-8 text-sm font-mono flex-1"
+                />
+                <Input
+                  value={row.value}
+                  onChange={(e) => {
+                    const next = values.headers.map((r, i) => (i === idx ? { ...r, value: e.target.value } : r));
+                    onChange({ headers: next });
+                  }}
+                  onKeyDown={onHeaderKeyDown}
+                  placeholder={t('settings.mcp.form.headerValuePlaceholder')}
+                  className="h-8 text-sm font-mono flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => onChange({ headers: values.headers.filter((_, i) => i !== idx) })}
+                  aria-label={t('settings.mcp.form.removeHeader')}
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          size="xs"
+          className="w-full"
+          onClick={() => onChange({ headers: [...values.headers, { key: '', value: '' }] })}
+        >
+          <Plus className="size-3.5" />
+          {t('settings.mcp.form.addHeader')}
+        </Button>
+      </div>
+
       <div className="flex justify-end gap-2 pt-1">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel}>{t('common.cancel')}</Button>
         <Button type="button" size="sm" onClick={onSubmit} disabled={submitDisabled}>{submitLabel}</Button>
@@ -171,11 +255,11 @@ export function MCPFormBody({
 
 export function MCPServerAddForm() {
   const [expanded, setExpanded] = useState(false);
-  const [values, setValues] = useState<MCPFormValues>(EMPTY);
+  const [values, setValues] = useState<MCPFormValues>(makeEmpty);
   const [busy, setBusy] = useState(false);
 
   const reset = () => {
-    setValues(EMPTY);
+    setValues(makeEmpty());
     setExpanded(false);
   };
 
@@ -221,12 +305,16 @@ export function MCPServerAddForm() {
 // ─── Edit existing server ───
 
 function configToValues(server: MCPServerConfig): MCPFormValues {
+  const headerRows = server.transport.headers
+    ? Object.entries(server.transport.headers).map(([key, value]) => ({ key, value }))
+    : [];
   return {
     name: server.name,
     transportType: server.transport.type,
     url: server.transport.url,
     authType: server.auth.type,
     bearerToken: server.auth.type === 'bearer' ? server.auth.token : '',
+    headers: headerRows,
   };
 }
 

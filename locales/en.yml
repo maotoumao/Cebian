@@ -112,9 +112,12 @@ settings:
       delete: "Delete server"
       # $1 = server name
       deleteConfirm: "Delete MCP server \"$1\"? This cannot be undone."
+    errors:
+      # $1 = server name
+      nameTaken: "An MCP server named \"$1\" already exists."
     status:
       disabled: "Disabled"
-      idle: "Idle"
+      idle: "Awaiting first call"
       connected: "Connected"
       disconnected: "Disconnected"
       probing: "Reconnecting"
@@ -130,6 +133,11 @@ settings:
       authBearer: "Bearer token"
       bearerToken: "Token"
       bearerTokenPlaceholder: "Paste bearer token"
+      headers: "Custom headers"
+      headerKeyPlaceholder: "Header name (e.g. X-MCP-Toolsets)"
+      headerValuePlaceholder: "Header value"
+      addHeader: "Add header"
+      removeHeader: "Remove header"
   editor:
     selectFile: "Select a file to start editing"
     saving: "Saving…"

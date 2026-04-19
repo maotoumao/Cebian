@@ -25,7 +25,7 @@ function getStatusDot(server: MCPServerConfig, info: MCPStatusInfo | undefined):
     return { className: 'bg-muted-foreground/30', label: t('settings.mcp.status.disabled') };
   }
   if (!info) {
-    return { className: 'bg-muted-foreground/40', label: t('settings.mcp.status.idle') };
+    return { className: 'bg-sky-500', label: t('settings.mcp.status.idle') };
   }
   if (info.breaker === 'OPEN') {
     return { className: 'bg-red-500', label: t('settings.mcp.status.circuitOpen') };
@@ -36,7 +36,7 @@ function getStatusDot(server: MCPServerConfig, info: MCPStatusInfo | undefined):
   if (info.connected) {
     return { className: 'bg-emerald-500', label: t('settings.mcp.status.connected') };
   }
-  return { className: 'bg-muted-foreground/40', label: t('settings.mcp.status.disconnected') };
+  return { className: 'bg-sky-500/60', label: t('settings.mcp.status.disconnected') };
 }
 
 /**
