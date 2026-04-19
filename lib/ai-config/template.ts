@@ -65,7 +65,7 @@ export async function gatherTemplateVars(): Promise<Record<string, string>> {
     vars.selected_text = '';
   }
 
-  // Clipboard
+  // Clipboard — readText() swallows permission/focus errors and returns ''.
   vars.clipboard = await readText();
 
   return vars;

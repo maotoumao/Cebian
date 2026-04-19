@@ -154,6 +154,11 @@ chat:
   tool:
     args: "參數"
     result: "結果"
+  message:
+    # $1 = 輸入 token 數（已格式化，如「1.2k」），$2 = 輸出 token 數（已格式化）
+    tokensInOut: "↑$1 ↓$2"
+    # $1 = 耗時（秒），已格式化（如「3.4」）
+    durationSeconds: "$1s"
   session:
     loading: "載入工作階段…"
     modelError: "模型回傳錯誤"

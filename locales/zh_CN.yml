@@ -154,6 +154,11 @@ chat:
   tool:
     args: "参数"
     result: "结果"
+  message:
+    # $1 = 输入 token 数（已格式化，如 "1.2k"），$2 = 输出 token 数（已格式化）
+    tokensInOut: "↑$1 ↓$2"
+    # $1 = 耗时（秒），已格式化（如 "3.4"）
+    durationSeconds: "$1s"
   session:
     loading: "加载会话中…"
     modelError: "模型返回错误"

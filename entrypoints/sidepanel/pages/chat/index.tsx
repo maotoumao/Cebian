@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { SquarePen } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -11,7 +11,12 @@ import {
 } from '@/components/chat/Message';
 import { ToolCard } from '@/components/chat/ToolCard';
 import type { AssistantMessage, ToolResultMessage } from '@mariozechner/pi-ai';
-import { getAssistantText, getThinkingBlocks, getToolCalls, findToolResult } from '@/lib/message-helpers';
+import {
+  getAssistantText,
+  getThinkingBlocks,
+  getToolCalls,
+  findToolResult,
+} from '@/lib/message-helpers';
 import { getToolLabel } from '@/lib/tools/tool-labels';
 import { uiToolRegistry } from '@/lib/tools/ui-registry';
 import { useBackgroundAgent } from '@/hooks/useBackgroundAgent';
@@ -87,6 +92,28 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
   }, []);
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
 
+  // Track the duration of the most recent agent run, attached to the last
+  // assistant message in `messages`. We start the timer when isAgentRunning
+  // flips true (and no timer is already running) and freeze the duration
+  // when it flips false. Reset whenever the active session changes.
+  const turnStartedAtRef = useRef<number | null>(null);
+  const [lastTurnDurationMs, setLastTurnDurationMs] = useState<number | null>(null);
+  useEffect(() => {
+    turnStartedAtRef.current = null;
+    setLastTurnDurationMs(null);
+  }, [activeSessionId]);
+  useEffect(() => {
+    if (isAgentRunning) {
+      if (turnStartedAtRef.current == null) {
+        turnStartedAtRef.current = Date.now();
+        setLastTurnDurationMs(null);
+      }
+    } else if (turnStartedAtRef.current != null) {
+      setLastTurnDurationMs(Date.now() - turnStartedAtRef.current);
+      turnStartedAtRef.current = null;
+    }
+  }, [isAgentRunning]);
+
   const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
   const showWaitingPlaceholder = effectiveRunning && lastMsg && 'role' in lastMsg && lastMsg.role === 'user';
 
@@ -136,8 +163,30 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                 break;
               }
 
+              // Meta row: only attach `copyText` when the turn has truly
+              // ended (the agent has fully stopped, not just paused on an
+              // interactive tool). For non-last messages the turn is by
+              // definition over. We also skip pure-tool-call turns with no
+              // text content.
+              const turnEnded = !isLast || !isAgentRunning;
+              const plainText = getAssistantText(assistantMsg).trim();
+              const copyText = turnEnded && plainText.length > 0 ? plainText : undefined;
+              const meta = {
+                modelLabel: assistantMsg.model,
+                inputTokens: assistantMsg.usage?.input,
+                outputTokens: assistantMsg.usage?.output,
+                costUsd: assistantMsg.usage?.cost?.total,
+                durationMs: isLast ? lastTurnDurationMs ?? undefined : undefined,
+              };
+
               return (
-                <AgentMessage key={`asst-${idx}`} isStreaming={isStreaming} showHeader={showHeader}>
+                <AgentMessage
+                  key={`asst-${idx}`}
+                  isStreaming={isStreaming}
+                  showHeader={showHeader}
+                  meta={meta}
+                  copyText={copyText}
+                >
                   {thinkingBlocks.map((block, i) => (
                     <ThinkingBlock key={`t-${idx}-${i}`} content={block.thinking} isLive={isStreaming} />
                   ))}

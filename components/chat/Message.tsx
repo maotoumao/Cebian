@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useMemo, type ReactNode, type KeyboardEven
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
+import { MessageMetaRow, type MessageMetaProps } from '@/components/chat/MessageMetaRow';
 import { extractUserText, extractUserAttachments } from '@/lib/message-helpers';
 import { showDialog } from '@/lib/dialog';
 import { t } from '@/lib/i18n';
@@ -66,9 +67,22 @@ export function UserMessageBubble({ msg, children }: { msg?: Message; children?:
 }
 
 /* ─── Agent Message ─── */
-export function AgentMessage({ children, isStreaming, showHeader = true }: { children?: ReactNode; isStreaming?: boolean; showHeader?: boolean }) {
+export function AgentMessage({
+  children,
+  isStreaming,
+  showHeader = true,
+  meta,
+  copyText,
+}: {
+  children?: ReactNode;
+  isStreaming?: boolean;
+  showHeader?: boolean;
+  meta?: Omit<MessageMetaProps, 'text'>;
+  /** When provided and not streaming, renders the end-of-turn meta row with a copy button. */
+  copyText?: string;
+}) {
   return (
-    <div className={`self-start w-full ${showHeader ? '' : '-mt-1'}`}>
+    <div className={`group self-start w-full ${showHeader ? '' : '-mt-1'}`}>
       {showHeader && (
         <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground font-medium">
           <Bot className="size-3.5 text-primary" />
@@ -77,10 +91,16 @@ export function AgentMessage({ children, isStreaming, showHeader = true }: { chi
       )}
       <div className="text-[0.9rem] leading-relaxed space-y-3">
         {children}
-        {isStreaming && !children && (
-          <span className="inline-block w-1.5 h-4 bg-primary animate-pulse rounded-sm align-text-bottom" />
+        {isStreaming && (
+          <span
+            aria-hidden
+            className="inline-block w-1.5 h-4 bg-primary animate-pulse rounded-sm align-text-bottom ml-0.5"
+          />
         )}
       </div>
+      {!isStreaming && copyText && (
+        <MessageMetaRow {...(meta ?? {})} text={copyText} />
+      )}
     </div>
   );
 }
