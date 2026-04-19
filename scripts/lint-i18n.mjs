@@ -160,9 +160,12 @@ async function checkKeyParity() {
 }
 
 async function main() {
+  let hasFailure = false;
+
   // ─── 1. Top-level YAML key allow-list check ───
   const localeViolations = await checkLocaleAllowList();
   if (localeViolations.length > 0) {
+    hasFailure = true;
     console.log(`✗ i18n lint: ${localeViolations.length} disallowed top-level locale key(s):`);
     for (const { file, key } of localeViolations) {
       console.log(`  ${file}: \`${key}\` — not in allow-list (see .agents/skills/i18n-naming/SKILL.md)`);
@@ -175,9 +178,11 @@ async function main() {
   // ─── 1b. Full key parity (flat paths) across en/zh_CN/zh_TW ───
   const { missing: parityMissing, readErrors } = await checkKeyParity();
   for (const { file, message } of readErrors) {
+    hasFailure = true;
     console.log(`✗ i18n lint: failed to read ${file}: ${message}`);
   }
   if (parityMissing.length > 0) {
+    hasFailure = true;
     console.log(`✗ i18n lint: ${parityMissing.length} key parity gap(s) (flat paths):`);
     for (const { file, key } of parityMissing) {
       console.log(`  ${file}: missing \`${key}\``);
@@ -204,8 +209,11 @@ async function main() {
 
   if (fileHits.length === 0) {
     console.log('✓ i18n lint: no Chinese characters found in scanned source.');
+    if (hasFailure) process.exit(1);
     return;
   }
+
+  hasFailure = true;
 
   console.log(`i18n lint: ${totalLines} line(s) with Chinese across ${fileHits.length} file(s)`);
   console.log('---');
@@ -216,6 +224,8 @@ async function main() {
       console.log(`  L${String(lineNo).padStart(4, ' ')}  ${display}`);
     }
   }
+
+  if (hasFailure) process.exit(1);
 }
 
 main().catch((err) => {
