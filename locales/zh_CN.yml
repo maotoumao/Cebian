@@ -60,6 +60,7 @@ settings:
     instructions: "指引"
     prompts: "提示词"
     skills: "技能"
+    mcp: "MCP 服务器"
     advanced: "高级"
     about: "关于"
   providers:
@@ -94,6 +95,37 @@ settings:
     newBody: "（在此处编写技能指令）"
     create: "创建技能"
     hint: "遵循 agentskills.io 规范的多文件技能包，agent 会按需加载。"
+  mcp:
+    title: "MCP 服务器"
+    description: "接入 Model Context Protocol 服务器，把它们的工具暴露给 agent 使用。"
+    empty:
+      title: "尚未配置 MCP 服务器"
+      hint: "添加一个服务器，用外部工具扩展 agent 的能力。"
+    actions:
+      add: "添加 MCP 服务器"
+      toggle: "启用服务器"
+      edit: "编辑服务器"
+      delete: "删除服务器"
+      # $1 = 服务器名称
+      deleteConfirm: "确定删除 MCP 服务器“$1”吗？此操作不可撤销。"
+    status:
+      disabled: "已禁用"
+      idle: "空闲"
+      connected: "已连接"
+      disconnected: "未连接"
+      probing: "重连中"
+      circuitOpen: "暂时不可用"
+    form:
+      name: "名称"
+      namePlaceholder: "例如：weather、github、my-tools"
+      transport: "传输协议"
+      url: "URL"
+      urlPlaceholder: "https://example.com/mcp"
+      authType: "认证方式"
+      authNone: "无"
+      authBearer: "Bearer Token"
+      bearerToken: "Token"
+      bearerTokenPlaceholder: "粘贴 bearer token"
   editor:
     selectFile: "选择一个文件开始编辑"
     saving: "保存中…"

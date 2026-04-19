@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Key, MessageSquare, FileText, Blocks, Sliders, Info } from 'lucide-react';
+import { Key, MessageSquare, FileText, Blocks, Plug, Sliders, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 
@@ -20,6 +20,7 @@ export const SETTINGS_SECTIONS: SectionNavItem[] = [
   { path: 'instructions', getLabel: () => t('settings.nav.instructions'), icon: MessageSquare },
   { path: 'prompts', getLabel: () => t('settings.nav.prompts'), icon: FileText },
   { path: 'skills', getLabel: () => t('settings.nav.skills'), icon: Blocks },
+  { path: 'mcp', getLabel: () => t('settings.nav.mcp'), icon: Plug },
   { path: 'advanced', getLabel: () => t('settings.nav.advanced'), icon: Sliders },
   { path: 'about', getLabel: () => t('settings.nav.about'), icon: Info },
 ];
