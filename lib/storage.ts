@@ -45,6 +45,54 @@ export interface CustomProviderConfig {
   models: CustomModelDef[];
 }
 
+// ─── MCP servers ───
+
+/**
+ * Authentication strategy for an MCP server.
+ * v1 only ships `none` and `bearer`. The discriminated union leaves room for
+ * `oauth2` (using lib/oauth.ts + entrypoints/background/oauth-refresh.ts) and
+ * `custom` without breaking existing records.
+ */
+export type MCPAuthConfig =
+  | { type: 'none' }
+  | { type: 'bearer'; token: string };
+
+/**
+ * Transport descriptor. v1 supports HTTP (Streamable HTTP) and SSE only —
+ * stdio is intentionally excluded (Chrome extension cannot spawn processes).
+ */
+export interface MCPTransportConfig {
+  type: 'http' | 'sse';
+  url: string;
+  /** Static request headers. Dynamic auth tokens belong in `auth`, not here. */
+  headers?: Record<string, string>;
+}
+
+/**
+ * Persistent user-facing configuration for one MCP server.
+ *
+ * Runtime state (active connection, tool-list cache, rate-limiter counters,
+ * circuit-breaker state) lives in background SW memory, NOT in this record.
+ * Sensitive runtime tokens (e.g. OAuth refresh) will live in a separate
+ * `mcpServerRuntime` storage item when we add OAuth.
+ */
+export interface MCPServerConfig {
+  id: string;
+  name: string;
+  enabled: boolean;
+  transport: MCPTransportConfig;
+  auth: MCPAuthConfig;
+  /** Schema version for forward-compatible migrations. */
+  schemaVersion: 1;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export const mcpServers = storage.defineItem<MCPServerConfig[]>(
+  'local:mcpServers',
+  { fallback: [] },
+);
+
 // ─── Thinking level ───
 
 export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high';
