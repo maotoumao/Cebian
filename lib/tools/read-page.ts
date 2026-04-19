@@ -107,6 +107,316 @@ function getDocumentHtml(selector: string | null): { html: string; url: string }
 
 /** Extract a structural outline of the page's visual regions. */
 function extractOutline(selector: string | null): string {
+  // ─── Nested: blocking overlay detector ───
+  // Nested so it shares scope with extractOutline when serialized by
+  // chrome.scripting.executeScript (which only injects a single function).
+  // Pure read-only: never mutates DOM, triggers focus, scroll, or events.
+  function detectOverlays(): {
+    blocking: {
+      selector: string;
+      rect: { x: number; y: number; w: number; h: number };
+      coverage: number;
+      zIndex: number;
+      label: string;
+      signals: string[];
+      score: number;
+      confidence: 'normal' | 'high';
+    } | null;
+    notice: {
+      selector: string;
+      rect: { x: number; y: number; w: number; h: number };
+      coverage: number;
+      zIndex: number;
+      label: string;
+      signals: string[];
+      score: number;
+      confidence: 'normal' | 'high';
+    } | null;
+  } {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const vArea = Math.max(1, vw * vh);
+
+    function buildOverlaySelector(el: Element): string {
+      if ((el as HTMLElement).id) return '#' + CSS.escape((el as HTMLElement).id);
+      const path: string[] = [];
+      let node: Element | null = el;
+      while (node && node !== document.body && node !== document.documentElement) {
+        let seg = node.tagName.toLowerCase();
+        if ((node as HTMLElement).id) {
+          path.unshift('#' + CSS.escape((node as HTMLElement).id));
+          break;
+        }
+        const parent: Element | null = node.parentElement;
+        if (parent) {
+          const sameTag = Array.from(parent.children).filter(c => c.tagName === node!.tagName);
+          if (sameTag.length > 1) seg += ':nth-of-type(' + (sameTag.indexOf(node) + 1) + ')';
+        }
+        path.unshift(seg);
+        node = parent;
+      }
+      return path.join(' > ');
+    }
+
+    function describeLabel(el: Element): string {
+      const aria = el.getAttribute('aria-label');
+      if (aria) return aria.trim().slice(0, 60);
+      const heading = el.querySelector('h1, h2, h3, [role="heading"]');
+      const t = heading?.textContent?.trim() ?? '';
+      if (t) return t.slice(0, 60);
+      const own = Array.from(el.childNodes)
+        .filter(n => n.nodeType === Node.TEXT_NODE)
+        .map(n => (n.textContent ?? '').trim())
+        .find(s => s.length > 0) ?? '';
+      return own.slice(0, 60);
+    }
+
+    function topAtPoint(x: number, y: number): Element | null {
+      let el = document.elementFromPoint(x, y);
+      // Hard cap on shadow piercing to defend against pathological host-A → host-B → host-A cycles.
+      for (let i = 0; i < 16 && el && (el as any).shadowRoot; i++) {
+        let inner: Element | null = null;
+        try {
+          inner = ((el as any).shadowRoot as ShadowRoot).elementFromPoint?.(x, y) ?? null;
+        } catch {
+          inner = null;
+        }
+        if (!inner || inner === el) break;
+        el = inner;
+      }
+      return el;
+    }
+
+    function bgAlpha(cs: CSSStyleDeclaration): number {
+      const bg = cs.backgroundColor;
+      if (!bg || bg === 'transparent') return 0;
+      const m = bg.match(/rgba?\(([^)]+)\)/i);
+      if (!m) return 0;
+      const parts = m[1].split(',').map(s => s.trim());
+      if (parts.length === 4) return parseFloat(parts[3]) || 0;
+      if (parts.length === 3) return 1;
+      return 0;
+    }
+
+    const samples: Array<[number, number]> = [
+      [vw / 2, vh / 2],
+      [vw / 3, vh / 3],
+      [(2 * vw) / 3, vh / 3],
+      [vw / 3, (2 * vh) / 3],
+      [(2 * vw) / 3, (2 * vh) / 3],
+    ];
+
+    const hitMap = new Map<Element, number>();
+    for (const [x, y] of samples) {
+      const top = topAtPoint(x, y);
+      if (!top) continue;
+      let cur: Element | null = top;
+      while (cur && cur !== document.body && cur !== document.documentElement) {
+        hitMap.set(cur, (hitMap.get(cur) ?? 0) + 1);
+        cur = cur.parentElement;
+      }
+    }
+
+    const NAME_RE = /(?:^|[-_ ])(modal|dialog|overlay|popup|mask|backdrop|login|signin|sign-?up|register|consent|gdpr|cookie|paywall|lightbox)(?:[-_ ]|$)/i;
+    const NOTICE_RE = /(?:cookie|consent|gdpr|notice|banner)/i;
+
+    const bodyCs = getComputedStyle(document.body);
+    const htmlCs = getComputedStyle(document.documentElement);
+    const bodyScrollLocked = bodyCs.overflow === 'hidden' || htmlCs.overflow === 'hidden';
+
+    const ae = document.activeElement;
+    const activeIsMeaningful = !!ae && ae !== document.body && ae !== document.documentElement;
+
+    type Candidate = {
+      el: Element;
+      rect: DOMRect;
+      coverage: number;
+      cs: CSSStyleDeclaration;
+      hits: number;
+    };
+
+    // Map keys are unique by definition, so no dedup Set needed. With 9 sample points and
+    // the 15% coverage gate, hits>=1 is sufficient and lets small centered modals through.
+    const candidates: Candidate[] = [];
+    for (const [el, hits] of hitMap) {
+      if (hits < 1) continue;
+
+      let cs: CSSStyleDeclaration;
+      try { cs = getComputedStyle(el); } catch { continue; }
+      const pos = cs.position;
+      if (pos !== 'fixed' && pos !== 'absolute' && pos !== 'sticky') continue;
+      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+      // Use Number.isFinite, not `|| 1` \u2014 opacity '0' parses to 0 which is falsy; we want to skip
+      // transparent elements, not fall back to 1 and keep them.
+      const op = parseFloat(cs.opacity);
+      if (Number.isFinite(op) && op <= 0.1) continue;
+      if (cs.pointerEvents === 'none') continue;
+
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) continue;
+      const coverage = (rect.width * rect.height) / vArea;
+      if (coverage < 0.15) continue;
+
+      candidates.push({ el, rect, coverage, cs, hits });
+    }
+
+    type Scored = {
+      el: Element;
+      rect: DOMRect;
+      coverage: number;
+      cs: CSSStyleDeclaration;
+      score: number;
+      signals: string[];
+      zIndex: number;
+    };
+
+    function scoreCandidate(c: Candidate): Scored {
+      const { el, cs, coverage } = c;
+      const signals: string[] = [];
+      let score = 0;
+
+      const role = el.getAttribute('role');
+      const ariaModal = el.getAttribute('aria-modal');
+      const isNativeDialog = el.tagName === 'DIALOG' && (el as HTMLDialogElement).open;
+      if (role === 'dialog' || role === 'alertdialog' || ariaModal === 'true' || isNativeDialog) {
+        score += 3;
+        if (role) signals.push(`role=${role}`);
+        else if (isNativeDialog) signals.push('dialog[open]');
+        if (ariaModal === 'true') signals.push('aria-modal=true');
+      }
+
+      const idStr = (el as HTMLElement).id || '';
+      const clsStr = typeof (el as HTMLElement).className === 'string'
+        ? (el as HTMLElement).className
+        : '';
+      const nameMatch = NAME_RE.exec(`${idStr} ${clsStr}`);
+      if (nameMatch) {
+        score += 2;
+        signals.push(`name~=${nameMatch[1].toLowerCase()}`);
+      }
+
+      if (activeIsMeaningful && el.contains(ae)) {
+        score += 2;
+        signals.push('focus-trapped');
+      }
+
+      if (bodyScrollLocked) {
+        score += 1;
+        signals.push('body-scroll-locked');
+      }
+
+      const selfAlpha = bgAlpha(cs);
+      if (selfAlpha > 0.3 && coverage >= 0.8) {
+        score += 2;
+        signals.push(`backdrop-alpha=${selfAlpha.toFixed(2)}`);
+      } else if (el.parentElement) {
+        for (const sib of el.parentElement.children) {
+          if (sib === el) continue;
+          let sCs: CSSStyleDeclaration;
+          try { sCs = getComputedStyle(sib); } catch { continue; }
+          if (sCs.position !== 'fixed') continue;
+          const sr = (sib as HTMLElement).getBoundingClientRect();
+          const sCov = (sr.width * sr.height) / vArea;
+          if (sCov < 0.8) continue;
+          const sa = bgAlpha(sCs);
+          if (sa > 0.3) {
+            score += 2;
+            signals.push(`sibling-backdrop-alpha=${sa.toFixed(2)}`);
+            break;
+          }
+        }
+      }
+
+      const zRaw = cs.zIndex;
+      const zNum = zRaw === 'auto' ? 0 : (parseInt(zRaw, 10) || 0);
+      if (zNum >= 1000) {
+        score += 1;
+        signals.push(`z=${zNum}`);
+      }
+
+      if (coverage >= 0.6) {
+        score += 2;
+        signals.push(`coverage=${Math.round(coverage * 100)}%`);
+      }
+
+      return { el, rect: c.rect, coverage, cs, score, signals, zIndex: zNum };
+    }
+
+    const scored = candidates.map(scoreCandidate);
+
+    let blocking: Scored | null = null;
+    for (const s of scored) {
+      if (s.score < 3) continue;
+      if (!blocking
+        || s.score > blocking.score
+        || (s.score === blocking.score && s.coverage > blocking.coverage)) {
+        blocking = s;
+      }
+    }
+
+    // \u2500\u2500 Notice bypass: fixed top/bottom bars matching cookie/consent naming \u2500\u2500
+    // Filter by name attribute first via attribute selector \u2014 cheap text match in C++,
+    // bounded result set \u2014 before paying for getComputedStyle / getBoundingClientRect.
+    // Worst case the page has no matching nodes \u2192 empty NodeList, near-zero cost.
+    let notice: Scored | null = null;
+    const NOTICE_NAME_SELECTOR = [
+      '[id*="cookie" i]', '[class*="cookie" i]',
+      '[id*="consent" i]', '[class*="consent" i]',
+      '[id*="gdpr" i]', '[class*="gdpr" i]',
+      '[id*="banner" i]', '[class*="banner" i]',
+      '[id*="notice" i]', '[class*="notice" i]',
+    ].join(',');
+    let noticeCandidates: HTMLElement[];
+    try {
+      noticeCandidates = Array.from(document.querySelectorAll<HTMLElement>(NOTICE_NAME_SELECTOR)).slice(0, 50);
+    } catch {
+      noticeCandidates = [];
+    }
+    for (const el of noticeCandidates) {
+      if (blocking && blocking.el === el) continue;
+      // Re-verify against the stricter regex (attribute selectors are broader than NOTICE_RE).
+      const idStr = el.id || '';
+      const clsStr = typeof el.className === 'string' ? el.className : '';
+      if (!NOTICE_RE.test(`${idStr} ${clsStr}`)) continue;
+      let cs: CSSStyleDeclaration;
+      try { cs = getComputedStyle(el); } catch { continue; }
+      if (cs.position !== 'fixed') continue;
+      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+      const op = parseFloat(cs.opacity);
+      if (Number.isFinite(op) && op <= 0.1) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height < 60) continue;
+      const stuckBottom = rect.bottom >= vh - 10 && rect.bottom <= vh + 50;
+      const stuckTop = rect.top >= -10 && rect.top <= 10;
+      if (!stuckBottom && !stuckTop) continue;
+      const coverage = (rect.width * rect.height) / vArea;
+      const zRaw = cs.zIndex;
+      const zNum = zRaw === 'auto' ? 0 : (parseInt(zRaw, 10) || 0);
+      const signals = [stuckBottom ? 'stuck-bottom' : 'stuck-top'];
+      notice = {
+        el, rect, coverage, cs,
+        score: 0, signals, zIndex: zNum,
+      };
+      break;
+    }
+
+    const toResult = (s: Scored) => ({
+      selector: buildOverlaySelector(s.el),
+      rect: { x: Math.round(s.rect.x), y: Math.round(s.rect.y), w: Math.round(s.rect.width), h: Math.round(s.rect.height) },
+      coverage: Math.round(s.coverage * 100),
+      zIndex: s.zIndex,
+      label: describeLabel(s.el),
+      signals: s.signals,
+      score: s.score,
+      confidence: (s.score >= 5 ? 'high' : 'normal') as 'normal' | 'high',
+    });
+
+    return {
+      blocking: blocking ? toResult(blocking) : null,
+      notice: notice ? toResult(notice) : null,
+    };
+  }
+
   const MIN_WIDTH = 50;
   const MIN_HEIGHT = 30;
   const MAX_DEPTH = 6;
@@ -480,9 +790,44 @@ function extractOutline(selector: string | null): string {
     footer.push(`(outline truncated at ${MAX_NODES} nodes — use selector to drill into a specific region)`);
   }
 
+  // Overlay detection: only for full-page outline (selector === null).
+  // When the agent drills into a specific region, occlusion is not relevant.
+  const overlayLines: string[] = [];
+  if (selector === null) {
+    let result: ReturnType<typeof detectOverlays> | null = null;
+    try {
+      result = detectOverlays();
+    } catch (e) {
+      // Visible only in the inspected page's console; harmless on hostile pages,
+      // useful during development to catch regressions.
+      console.warn('[cebian] detectOverlays failed:', e);
+      result = null;
+    }
+    if (result?.blocking) {
+      const o = result.blocking;
+      const conf = o.confidence === 'high' ? ' (high confidence)' : '';
+      overlayLines.push(`[!] Blocking overlay detected${conf}:`);
+      overlayLines.push(`    selector: ${o.selector}`);
+      overlayLines.push(`    rect: [${o.rect.x},${o.rect.y} ${o.rect.w}×${o.rect.h}]  coverage: ${o.coverage}%  z-index: ${o.zIndex}`);
+      if (o.label) overlayLines.push(`    label: "${o.label}"`);
+      overlayLines.push(`    signals: ${o.signals.join(', ')}`);
+      overlayLines.push(`    suggestion: this overlay likely intercepts clicks. Dismiss it (close button / ESC) or ask the user before interacting with the underlying page.`);
+      overlayLines.push('');
+    }
+    if (result?.notice) {
+      const o = result.notice;
+      overlayLines.push(`[i] Notice bar detected (non-blocking):`);
+      overlayLines.push(`    selector: ${o.selector}`);
+      overlayLines.push(`    rect: [${o.rect.x},${o.rect.y} ${o.rect.w}×${o.rect.h}]`);
+      if (o.label) overlayLines.push(`    label: "${o.label}"`);
+      overlayLines.push('');
+    }
+  }
+
   return [
     ...header,
     '',
+    ...overlayLines,
     ...tree.flatMap(n => formatNode(n, 0)),
     '',
     ...footer,
@@ -524,7 +869,7 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
     'Extract content from a browser tab (defaults to the active tab). ' +
     'Modes: "markdown" (default, full-page as markdown — works for any page), ' +
     '"article" (reader-mode extraction as markdown — for news/blogs/docs), ' +
-    '"outline" (page structure overview — visual regions with selectors, positions, interactive elements; use to understand layout before acting), ' +
+    '"outline" (page structure overview — visual regions with selectors, positions, interactive elements; also reports any blocking overlay / modal that may intercept clicks; use to understand layout before acting), ' +
     '"text" (plain text), "html" (cleaned HTML). ' +
     'Optionally scope to a CSS selector. ' +
     'Use this before answering questions about page content.',
