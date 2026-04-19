@@ -111,6 +111,14 @@ settings:
     errors:
       # $1 = 服务器名称
       nameTaken: "已存在名为“$1”的 MCP 服务器。"
+      nameRequired: "服务器名称不能为空。"
+      urlRequired: "服务器 URL 不能为空。"
+      # $1 = URL
+      urlInvalid: "服务器 URL 无效：$1"
+      # $1 = scheme（例如 "ftp:"）
+      urlScheme: "不支持的 URL 协议：$1"
+      bearerTokenRequired: "Bearer Token 不能为空。"
+      authHeaderConflict: "使用 Bearer 认证时请勿手动设置 Authorization header，请在认证字段中填写 token。"
     status:
       disabled: "已禁用"
       idle: "等待首次调用"

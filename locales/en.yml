@@ -115,6 +115,14 @@ settings:
     errors:
       # $1 = server name
       nameTaken: "An MCP server named \"$1\" already exists."
+      nameRequired: "Server name is required."
+      urlRequired: "Server URL is required."
+      # $1 = URL
+      urlInvalid: "Invalid server URL: $1"
+      # $1 = scheme (e.g. "ftp:")
+      urlScheme: "Unsupported URL scheme: $1"
+      bearerTokenRequired: "Bearer token is required."
+      authHeaderConflict: "Do not set the Authorization header manually when using bearer auth — set the token in the auth field instead."
     status:
       disabled: "Disabled"
       idle: "Awaiting first call"

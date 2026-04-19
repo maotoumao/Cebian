@@ -127,7 +127,7 @@ export function MCPFormBody({
                 key={tt}
                 type="button"
                 variant={active ? 'default' : 'outline'}
-                size="xs"
+                size="sm"
                 className={active ? 'border border-transparent' : undefined}
                 onClick={() => onChange({ transportType: tt })}
               >
@@ -157,7 +157,7 @@ export function MCPFormBody({
           <Button
             type="button"
             variant={values.authType === 'none' ? 'default' : 'outline'}
-            size="xs"
+            size="sm"
             className={values.authType === 'none' ? 'border border-transparent' : undefined}
             onClick={() => onChange({ authType: 'none' })}
           >
@@ -166,7 +166,7 @@ export function MCPFormBody({
           <Button
             type="button"
             variant={values.authType === 'bearer' ? 'default' : 'outline'}
-            size="xs"
+            size="sm"
             className={values.authType === 'bearer' ? 'border border-transparent' : undefined}
             onClick={() => onChange({ authType: 'bearer' })}
           >
@@ -234,7 +234,7 @@ export function MCPFormBody({
         <Button
           type="button"
           variant="outline"
-          size="xs"
+          size="sm"
           className="w-full"
           onClick={() => onChange({ headers: [...values.headers, { key: '', value: '' }] })}
         >

@@ -29,19 +29,19 @@ export interface MCPServerInput {
  */
 function validateAndNormalize(input: MCPServerInput): MCPServerInput {
   const name = input.name?.trim();
-  if (!name) throw new Error('MCP server name is required');
+  if (!name) throw new Error(t('settings.mcp.errors.nameRequired'));
 
   const url = input.transport?.url?.trim();
-  if (!url) throw new Error('MCP server URL is required');
+  if (!url) throw new Error(t('settings.mcp.errors.urlRequired'));
 
   let parsed: URL;
   try {
     parsed = new URL(url);
   } catch {
-    throw new Error(`Invalid MCP server URL: ${url}`);
+    throw new Error(t('settings.mcp.errors.urlInvalid', [url]));
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error(`Unsupported MCP server URL scheme: ${parsed.protocol}`);
+    throw new Error(t('settings.mcp.errors.urlScheme', [parsed.protocol]));
   }
 
   if (input.transport.type !== 'streamable-http' && input.transport.type !== 'sse') {
@@ -51,7 +51,7 @@ function validateAndNormalize(input: MCPServerInput): MCPServerInput {
   let auth: MCPAuthConfig = input.auth ?? { type: 'none' };
   if (auth.type === 'bearer') {
     const token = auth.token?.trim();
-    if (!token) throw new Error('Bearer token is required when auth.type is "bearer"');
+    if (!token) throw new Error(t('settings.mcp.errors.bearerTokenRequired'));
     auth = { type: 'bearer', token };
   }
 
@@ -60,7 +60,7 @@ function validateAndNormalize(input: MCPServerInput): MCPServerInput {
   if (auth.type === 'bearer' && input.transport.headers) {
     for (const key of Object.keys(input.transport.headers)) {
       if (key.toLowerCase() === 'authorization') {
-        throw new Error('Do not set the Authorization header manually when using bearer auth — set the token in the auth field instead.');
+        throw new Error(t('settings.mcp.errors.authHeaderConflict'));
       }
     }
   }

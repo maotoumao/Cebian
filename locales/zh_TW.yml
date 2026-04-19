@@ -111,6 +111,14 @@ settings:
     errors:
       # $1 = 伺服器名稱
       nameTaken: "已存在名為「$1」的 MCP 伺服器。"
+      nameRequired: "伺服器名稱不能為空。"
+      urlRequired: "伺服器 URL 不能為空。"
+      # $1 = URL
+      urlInvalid: "伺服器 URL 無效：$1"
+      # $1 = scheme（例如 "ftp:"）
+      urlScheme: "不支持的 URL 協定：$1"
+      bearerTokenRequired: "Bearer Token 不能為空。"
+      authHeaderConflict: "使用 Bearer 認證時請勿手動設定 Authorization header，請在認證欄位填寫 token。"
     status:
       disabled: "已停用"
       idle: "等待首次呼叫"
