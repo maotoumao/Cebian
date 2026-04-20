@@ -17,7 +17,7 @@ export function UserMessageBubble({ msg, children }: { msg?: Message; children?:
 
   return (
     <div className="self-end max-w-[95%]">
-      <div className="bg-card border border-border px-4 py-3 rounded-2xl text-[0.9rem] leading-relaxed w-fit ml-auto">
+      <div className="bg-card border border-border px-4 py-3 rounded-2xl text-[0.9rem] leading-relaxed w-fit ml-auto whitespace-pre-wrap">
         {text ?? children}
       </div>
 
