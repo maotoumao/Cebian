@@ -24,9 +24,11 @@ export function getAssistantText(msg: AssistantMessage): string {
     .join('');
 }
 
-/** Extract thinking blocks from an AssistantMessage */
+/** Extract thinking blocks from an AssistantMessage (skips empty summaries) */
 export function getThinkingBlocks(msg: AssistantMessage): ThinkingContent[] {
-  return msg.content.filter((b): b is ThinkingContent => b.type === 'thinking');
+  return msg.content.filter(
+    (b): b is ThinkingContent => b.type === 'thinking' && !!b.thinking?.trim(),
+  );
 }
 
 /** Extract tool calls from an AssistantMessage */
