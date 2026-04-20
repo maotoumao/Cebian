@@ -2,7 +2,7 @@
 
 <img src="./public/icon/128.png" alt="Cebian" width="96" height="96" />
 
-# 🐾 Cebian
+# Cebian
 
 **AI 驱动的浏览器侧边栏助手**
 

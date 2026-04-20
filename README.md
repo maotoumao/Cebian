@@ -2,7 +2,7 @@
 
 <img src="./public/icon/128.png" alt="Cebian" width="96" height="96" />
 
-# 🐾 Cebian
+# Cebian
 
 **An AI assistant that lives in your browser side panel**
 
