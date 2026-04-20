@@ -218,6 +218,7 @@ chat:
     loading: "Loading session…"
     modelError: "Model returned an error"
     welcomeReady: "What can I help you with?"
+    scrollToBottom: "Jump to latest"
 
 # ─── Provider sub-components (OAuth / API Key / custom) ───
 provider:

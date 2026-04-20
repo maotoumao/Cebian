@@ -1,7 +1,13 @@
-import { useRef, useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { SquarePen } from 'lucide-react';
+import { SquarePen, ArrowDown } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { ChatInput } from '@/components/chat/ChatInput';
 import {
   UserMessageBubble,
@@ -21,8 +27,10 @@ import {
 import { getToolLabel } from '@/lib/tools/tool-labels';
 import { uiToolRegistry } from '@/lib/tools/ui-registry';
 import { useBackgroundAgent } from '@/hooks/useBackgroundAgent';
+import { useStickToBottom } from '@/hooks/useStickToBottom';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { activeModel } from '@/lib/storage';
+import type { Attachment } from '@/lib/attachments';
 import type { SessionRecord } from '@/lib/db';
 import { t } from '@/lib/i18n';
 
@@ -81,17 +89,26 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     onTitleChange?.(sessionTitle);
   }, [sessionTitle, onTitleChange]);
 
-  // Auto-scroll
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const scrollToBottom = useCallback(() => {
-    requestAnimationFrame(() => {
-      const el = scrollRef.current;
-      if (!el) return;
-      const viewport = el.querySelector('[data-slot="scroll-area-viewport"]') as HTMLElement | null;
-      if (viewport) viewport.scrollTop = viewport.scrollHeight;
-    });
-  }, []);
-  useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
+  // Auto-scroll: stick to bottom while content streams, but stop following
+  // as soon as the user scrolls up. Resumes when the user scrolls back near
+  // the bottom. Driven internally by ResizeObserver, so no `messages`-dep
+  // effect needed here.
+  const { scrollRef, isAtBottom, scrollToBottom } = useStickToBottom();
+
+  // Force-pin to bottom when switching sessions or opening a fresh chat.
+  useEffect(() => {
+    scrollToBottom({ force: true });
+  }, [activeSessionId, isNewChat, scrollToBottom]);
+
+  // Force-pin when the user sends a new message — sending is an explicit
+  // intent to see the latest output.
+  const handleSend = useCallback(
+    (text: string, attachments?: Attachment[]) => {
+      scrollToBottom({ force: true });
+      send(text, attachments);
+    },
+    [scrollToBottom, send],
+  );
 
   const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
   const showWaitingPlaceholder = effectiveRunning && lastMsg && 'role' in lastMsg && lastMsg.role === 'user';
@@ -112,11 +129,12 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
 
   return (
     <>
-      <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
-        <div className="flex flex-col gap-4 p-5">
-          {sessionLoading && (
-            <div className="text-center text-sm text-muted-foreground py-12">
-              {t('chat.session.loading')}
+      <div className="flex-1 min-h-0 relative flex flex-col">
+        <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
+          <div className="flex flex-col gap-4 p-5">
+            {sessionLoading && (
+              <div className="text-center text-sm text-muted-foreground py-12">
+                {t('chat.session.loading')}
             </div>
           )}
 
@@ -314,8 +332,26 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
         </div>
       </ScrollArea>
 
+        {!isAtBottom && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="secondary"
+                size="icon"
+                aria-label={t('chat.session.scrollToBottom')}
+                onClick={() => scrollToBottom({ force: true })}
+                className="absolute bottom-3 right-3 size-8 rounded-full shadow-md border border-border/60 bg-background/90 backdrop-blur hover:bg-background"
+              >
+                <ArrowDown className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t('chat.session.scrollToBottom')}</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+
       <ChatInput
-        onSend={send}
+        onSend={handleSend}
         onCancel={cancel}
         isAgentRunning={effectiveRunning}
         onOpenSettings={onOpenSettings}
