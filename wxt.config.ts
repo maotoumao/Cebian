@@ -14,6 +14,7 @@ export default defineConfig({
       'offscreen', 'debugger', 'webNavigation',
       'bookmarks', 'history', 'cookies', 'topSites', 'sessions',
       'downloads', 'notifications',
+      'clipboardRead',
     ],
     host_permissions: ['<all_urls>'],
     action: {

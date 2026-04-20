@@ -31,12 +31,30 @@ export async function copyText(text: string, opts: CopyOptions = {}): Promise<bo
 }
 
 export async function readText(): Promise<string> {
+  // Modern API — requires `clipboardRead` permission and a focused document.
   try {
     if (navigator.clipboard?.readText) return await navigator.clipboard.readText();
-  } catch {
-    /* fall through */
+  } catch (err) {
+    console.warn('[clipboard] readText (async API) failed, falling back to execCommand:', err);
   }
-  return '';
+  // Legacy fallback: hidden textarea + execCommand('paste'). Works in some
+  // Chromium builds even when the async API rejects. Must NOT be readonly —
+  // execCommand('paste') is a no-op on readonly fields.
+  const el = document.createElement('textarea');
+  el.style.position = 'fixed';
+  el.style.top = '-9999px';
+  el.style.opacity = '0';
+  document.body.appendChild(el);
+  try {
+    el.focus();
+    const ok = document.execCommand('paste');
+    return ok ? el.value : '';
+  } catch (err) {
+    console.warn('[clipboard] readText (execCommand) failed:', err);
+    return '';
+  } finally {
+    el.remove();
+  }
 }
 
 async function tryCopy(text: string): Promise<boolean> {

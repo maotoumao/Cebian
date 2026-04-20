@@ -41,6 +41,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
   const [value, setValue] = useState('');
   const [showSlash, setShowSlash] = useState(false);
   const [prompts, setPrompts] = useState<PromptMeta[]>([]);
+  const [selectedPromptIndex, setSelectedPromptIndex] = useState(0);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isPicking, setIsPicking] = useState(false);
   // History navigation: null = editing the current draft; otherwise points
@@ -51,6 +52,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
   const { isActiveTabMobile, toggle: toggleMobile } = useMobileEmulation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const slashMenuRef = useRef<HTMLDivElement>(null);
 
   const [currentModel, setCurrentModel] = useStorageItem(activeModel, null);
   const [currentThinkingLevel, setCurrentThinkingLevel] = useStorageItem(thinkingLevel, 'medium');
@@ -138,11 +140,40 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
     // Don't intercept anything while the IME is composing (e.g. Chinese pinyin).
     if (e.nativeEvent.isComposing) return;
 
+    // Slash menu keyboard navigation. Only active while the menu is actually
+    // rendered with at least one selectable item — when it's hidden (no
+    // match) all keys fall through to the default textarea behaviour
+    // (history nav, send, etc.).
+    if (isSlashMenuVisible && filteredPrompts.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedPromptIndex((i) => (i + 1) % filteredPrompts.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedPromptIndex((i) => (i - 1 + filteredPrompts.length) % filteredPrompts.length);
+        return;
+      }
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const target = filteredPrompts[selectedPromptIndex] ?? filteredPrompts[0];
+        if (target) handlePromptSelect(target);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowSlash(false);
+        return;
+      }
+    }
+
     // ↑ / ↓ navigate previously sent user messages, but only when the caret
     // is at the absolute start (↑) or end (↓) of the textarea, so multi-line
-    // editing is never disturbed. The slash command menu (when open) reserves
-    // these keys for its own use.
-    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !showSlash && userHistory && userHistory.length > 0) {
+    // editing is never disturbed. The slash command menu (when visible)
+    // reserves these keys for its own use; once it's hidden — including the
+    // "no match" case — history navigation resumes.
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !isSlashMenuVisible && userHistory && userHistory.length > 0) {
       const ta = textareaRef.current;
       if (ta) {
         // After history navigation, place the caret to keep further presses
@@ -224,6 +255,33 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
   const filteredPrompts = slashFilter
     ? prompts.filter((p) => p.name.toLowerCase().includes(slashFilter) || p.description.toLowerCase().includes(slashFilter))
     : prompts;
+
+  // Menu hides when the user has typed a search term that matches nothing —
+  // in that case Enter falls through to send the literal `/xxx` text.
+  // When the search is empty we keep the menu open even if there are no
+  // prompts at all, so the user sees the "no prompts yet" empty state.
+  const isSlashMenuVisible = showSlash && (slashFilter === '' || filteredPrompts.length > 0);
+
+  // Clamp the highlighted index whenever the visible list changes.
+  useEffect(() => {
+    if (filteredPrompts.length === 0) {
+      setSelectedPromptIndex(0);
+      return;
+    }
+    setSelectedPromptIndex((i) => Math.min(Math.max(i, 0), filteredPrompts.length - 1));
+  }, [filteredPrompts.length]);
+
+  // Reset highlight to the top whenever the menu (re)opens.
+  useEffect(() => {
+    if (isSlashMenuVisible) setSelectedPromptIndex(0);
+  }, [isSlashMenuVisible]);
+
+  // Keep the highlighted item in view when navigating with the keyboard.
+  useEffect(() => {
+    if (!isSlashMenuVisible) return;
+    const el = slashMenuRef.current?.querySelector<HTMLElement>(`[data-prompt-index="${selectedPromptIndex}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [selectedPromptIndex, isSlashMenuVisible]);
 
   // Handle prompt selection from slash menu
   const handlePromptSelect = async (prompt: PromptMeta) => {
@@ -351,29 +409,37 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
   return (
     <footer className="px-4 py-4 border-t border-border bg-background relative">
       {/* Slash menu — dynamic VFS prompts */}
-      {showSlash && (
-        <div className="absolute bottom-full left-4 right-4 mb-3 bg-popover border border-border rounded-lg shadow-xl z-50 animate-in slide-in-from-bottom-1 fade-in duration-150 max-h-60 overflow-y-auto">
+      {isSlashMenuVisible && (
+        <div
+          ref={slashMenuRef}
+          className="absolute bottom-full left-4 right-4 mb-3 bg-popover border border-border rounded-lg shadow-xl z-50 animate-in slide-in-from-bottom-1 fade-in duration-150 max-h-60 overflow-y-auto"
+        >
           {filteredPrompts.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-3 px-2.5">
-              {prompts.length === 0 ? t('chat.composer.noPrompts') : t('chat.composer.noMatch')}
+              {t('chat.composer.noPrompts')}
             </p>
           ) : (
             <div className="py-1">
-              {filteredPrompts.map((p) => (
-                <button
-                  key={p.fileName}
-                  onClick={() => handlePromptSelect(p)}
-                  className="w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-accent/50 transition-colors"
-                >
-                  <FileType className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">/{p.name}</p>
-                    {p.description && (
-                      <p className="text-xs text-muted-foreground truncate">{p.description}</p>
-                    )}
-                  </div>
-                </button>
-              ))}
+              {filteredPrompts.map((p, idx) => {
+                const selected = idx === selectedPromptIndex;
+                return (
+                  <button
+                    key={p.fileName}
+                    data-prompt-index={idx}
+                    onClick={() => handlePromptSelect(p)}
+                    onMouseMove={() => setSelectedPromptIndex(idx)}
+                    className={`w-full flex items-start gap-2.5 px-3 py-2 text-left transition-colors ${selected ? 'bg-accent' : 'hover:bg-accent/50'}`}
+                  >
+                    <FileType className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">/{p.name}</p>
+                      {p.description && (
+                        <p className="text-xs text-muted-foreground truncate">{p.description}</p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
