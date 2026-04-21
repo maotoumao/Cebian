@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" width="640" height="420">
+  <defs>
+    <linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e1e2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f0f1a;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accent2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="640" height="420" fill="url(#bg2)" rx="12"/>
+
+  <!-- Settings sidebar nav -->
+  <rect x="0" y="0" width="160" height="420" fill="#16213e" rx="12"/>
+  <rect x="148" y="0" width="12" height="420" fill="#16213e"/>
+
+  <!-- Nav header -->
+  <text x="16" y="36" fill="white" font-size="14" font-family="sans-serif" font-weight="bold">Settings</text>
+
+  <!-- Nav items -->
+  <rect x="8" y="52" width="144" height="34" rx="6" fill="url(#accent2)" opacity="0.2"/>
+  <rect x="8" y="52" width="3" height="34" rx="1.5" fill="url(#accent2)"/>
+  <text x="24" y="73" fill="#93c5fd" font-size="12" font-family="sans-serif">🤖  Providers</text>
+
+  <text x="24" y="110" fill="#6b7280" font-size="12" font-family="sans-serif">📝  Instructions</text>
+  <text x="24" y="140" fill="#6b7280" font-size="12" font-family="sans-serif">⚡  Prompts</text>
+  <text x="24" y="170" fill="#6b7280" font-size="12" font-family="sans-serif">🧩  Skills</text>
+  <text x="24" y="200" fill="#6b7280" font-size="12" font-family="sans-serif">🔌  MCP Servers</text>
+  <text x="24" y="230" fill="#6b7280" font-size="12" font-family="sans-serif">⚙  Advanced</text>
+  <text x="24" y="260" fill="#6b7280" font-size="12" font-family="sans-serif">ℹ  About</text>
+
+  <!-- Main content area -->
+  <rect x="160" y="0" width="480" height="420" fill="#1a1a2e"/>
+
+  <!-- Providers content -->
+  <text x="180" y="36" fill="white" font-size="14" font-family="sans-serif" font-weight="bold">AI Providers</text>
+
+  <!-- OAuth section label -->
+  <text x="180" y="68" fill="#6b7280" font-size="10" font-family="sans-serif" font-weight="bold" letter-spacing="1">OAUTH</text>
+  <rect x="180" y="76" width="420" height="1" fill="#2a2a4e"/>
+
+  <!-- GitHub Copilot card -->
+  <rect x="180" y="86" width="420" height="56" rx="8" fill="#252538"/>
+  <circle cx="204" cy="114" r="14" fill="#24292e"/>
+  <text x="204" y="119" fill="white" font-size="12" font-family="sans-serif" text-anchor="middle">⊛</text>
+  <text x="226" y="108" fill="white" font-size="12" font-family="sans-serif" font-weight="600">GitHub Copilot</text>
+  <text x="226" y="124" fill="#6b7280" font-size="11" font-family="sans-serif">Use your Copilot subscription</text>
+  <rect x="540" y="100" width="52" height="28" rx="6" fill="url(#accent2)"/>
+  <text x="566" y="118" fill="white" font-size="11" font-family="sans-serif" text-anchor="middle">Sign in</text>
+
+  <!-- OpenAI Codex card -->
+  <rect x="180" y="150" width="420" height="56" rx="8" fill="#252538"/>
+  <circle cx="204" cy="178" r="14" fill="#10a37f"/>
+  <text x="204" y="183" fill="white" font-size="14" font-family="sans-serif" text-anchor="middle">✦</text>
+  <text x="226" y="172" fill="white" font-size="12" font-family="sans-serif" font-weight="600">OpenAI Codex</text>
+  <text x="226" y="188" fill="#6b7280" font-size="11" font-family="sans-serif">ChatGPT Plus/Pro subscription</text>
+  <rect x="540" y="164" width="52" height="28" rx="6" fill="#2a2a4e"/>
+  <text x="566" y="182" fill="#6b7280" font-size="11" font-family="sans-serif" text-anchor="middle">Sign in</text>
+
+  <!-- API Key section -->
+  <text x="180" y="228" fill="#6b7280" font-size="10" font-family="sans-serif" font-weight="bold" letter-spacing="1">VIA API KEY</text>
+  <rect x="180" y="236" width="420" height="1" fill="#2a2a4e"/>
+
+  <!-- API Key input example -->
+  <rect x="180" y="246" width="420" height="56" rx="8" fill="#252538"/>
+  <text x="200" y="266" fill="white" font-size="12" font-family="sans-serif" font-weight="600">OpenAI</text>
+  <rect x="200" y="275" width="280" height="18" rx="4" fill="#1e1e3e"/>
+  <text x="210" y="288" fill="#6b7280" font-size="10" font-family="sans-serif">sk-••••••••••••••••••••••••</text>
+  <rect x="488" y="275" width="100" height="18" rx="4" fill="url(#accent2)" opacity="0.8"/>
+  <text x="538" y="288" fill="white" font-size="10" font-family="sans-serif" text-anchor="middle">Connected ✓</text>
+
+  <!-- Placeholder label -->
+  <text x="400" y="400" fill="#4b5563" font-size="12" font-family="sans-serif" text-anchor="middle">[Settings screenshot placeholder]</text>
+</svg>

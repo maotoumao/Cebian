@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Features & Settings — Cebian</title>
+  <meta name="description" content="Complete guide to Cebian's features and settings. Learn how to use AI providers, prompts, skills, MCP servers, and more." />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/images/icon-32.png" />
+  <link rel="stylesheet" href="assets/css/tailwind.css" />
+  <link rel="stylesheet" href="assets/css/site.css" />
+</head>
+<body class="bg-white text-gray-900 antialiased">
+
+  <!-- ── Navbar ─────────────────────────────────────────────────────── -->
+  <header id="navbar" class="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md transition-shadow duration-200">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <a href="index.html" class="flex items-center gap-2.5 no-underline">
+          <img src="assets/images/icon-32.png" alt="Cebian" class="w-8 h-8 rounded-lg" />
+          <span class="font-bold text-lg text-gray-900">Cebian</span>
+        </a>
+        <nav class="hidden sm:flex items-center gap-6">
+          <a href="features.html" class="nav-link active" data-i18n="nav.features">Features</a>
+          <a href="install.html" class="nav-link" data-i18n="nav.install">Install</a>
+          <a href="https://github.com/maotoumao/Cebian" target="_blank" rel="noopener noreferrer" class="nav-link">GitHub</a>
+        </nav>
+        <div class="flex items-center gap-3">
+          <button id="lang-toggle" class="btn-lang">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            <span id="lang-text">中文</span>
+          </button>
+          <a href="install.html" class="btn-primary text-sm py-2 px-4" data-i18n="home.hero.cta_install">Install Now</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Page header ────────────────────────────────────────────────── -->
+  <div class="pt-24 pb-12 px-4 sm:px-6 lg:px-8 bg-gray-50 border-b border-gray-100">
+    <div class="max-w-6xl mx-auto">
+      <h1 class="text-4xl font-extrabold text-gray-900 mb-3" data-i18n="features.page_title">Features &amp; Settings</h1>
+      <p class="text-gray-500 text-lg max-w-2xl" data-i18n="features.page_subtitle">
+        A complete guide to every feature in Cebian, including detailed explanations of all settings.
+      </p>
+    </div>
+  </div>
+
+  <!-- ── Two-column layout ──────────────────────────────────────────── -->
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="flex gap-10">
+
+      <!-- ── TOC Sidebar ─────────────────────────────────────────────── -->
+      <aside class="hidden lg:block w-52 flex-shrink-0">
+        <nav class="sticky top-24 space-y-1">
+          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-3">On this page</p>
+          <a href="#chat" class="toc-link" id="toc-chat">Chat Interface</a>
+          <a href="#settings" class="toc-link" id="toc-settings">Settings</a>
+          <a href="#providers" class="toc-link pl-6 text-xs" id="toc-providers">Providers</a>
+          <a href="#instructions" class="toc-link pl-6 text-xs" id="toc-instructions">Instructions</a>
+          <a href="#prompts" class="toc-link pl-6 text-xs" id="toc-prompts">Prompts</a>
+          <a href="#skills" class="toc-link pl-6 text-xs" id="toc-skills">Skills</a>
+          <a href="#mcp" class="toc-link pl-6 text-xs" id="toc-mcp">MCP Servers</a>
+          <a href="#advanced" class="toc-link pl-6 text-xs" id="toc-advanced">Advanced</a>
+          <a href="#about" class="toc-link pl-6 text-xs" id="toc-about">About</a>
+        </nav>
+      </aside>
+
+      <!-- ── Main content ────────────────────────────────────────────── -->
+      <article class="flex-1 min-w-0 prose-section">
+
+        <!-- ── Chat Interface ────────────────────────────────────────── -->
+        <section id="chat" class="scroll-mt-24">
+          <h2 data-i18n="features.chat_section">Chat Interface</h2>
+          <p data-i18n="features.chat_desc">
+            The main chat area is where you interact with the AI. Select a model from the model picker at the top, type your message, and press Enter or click Send.
+          </p>
+
+          <!-- Screenshot placeholder -->
+          <div class="my-6 rounded-xl overflow-hidden shadow-md border border-gray-100">
+            <img src="assets/images/placeholder-hero.svg" alt="Chat interface screenshot" class="w-full block" loading="lazy" />
+          </div>
+
+          <h3 data-i18n="features.chat_attach_title">Attachments</h3>
+          <p data-i18n="features.chat_attach_desc">
+            Click the paperclip icon to attach images or files. You can also paste images directly from the clipboard. Attachments are sent to the AI as context.
+          </p>
+
+          <h3 data-i18n="features.chat_screenshot_title">Page Screenshot</h3>
+          <p data-i18n="features.chat_screenshot_desc">
+            Capture a screenshot of the current tab and attach it to your message so the AI can see exactly what you see.
+          </p>
+
+          <h3 data-i18n="features.chat_pick_title">Element Picker</h3>
+          <p data-i18n="features.chat_pick_desc">
+            Click the cursor icon to enter pick mode. Then click any element on the page to capture its HTML and text as context. Useful for debugging or explaining specific UI elements.
+          </p>
+
+          <h3 data-i18n="features.chat_mobile_title">Mobile Emulation</h3>
+          <p data-i18n="features.chat_mobile_desc">
+            Toggle mobile-device emulation on the active tab. The page reloads in a mobile viewport so you can test responsive layouts side-by-side with the AI.
+          </p>
+
+          <h3 data-i18n="features.chat_prompt_title">Slash Prompts</h3>
+          <p data-i18n="features.chat_prompt_desc">
+            Type <code>/</code> in the chat input to open the prompt picker. Select a saved prompt to insert it into the input with all template variables filled in.
+          </p>
+        </section>
+
+        <hr class="my-10 border-gray-100" />
+
+        <!-- ── Settings ─────────────────────────────────────────────── -->
+        <section id="settings" class="scroll-mt-24">
+          <h2 data-i18n="features.settings_section">Settings</h2>
+          <p data-i18n="features.settings_desc">
+            Open settings by clicking the gear icon at the bottom of the side panel. Settings are organized into the following sections.
+          </p>
+
+          <!-- Settings screenshot -->
+          <div class="my-6 rounded-xl overflow-hidden shadow-md border border-gray-100">
+            <img src="assets/images/placeholder-settings.svg" alt="Settings screenshot" class="w-full block" loading="lazy" />
+          </div>
+        </section>
+
+        <!-- ── Providers ──────────────────────────────────────────────── -->
+        <section id="providers" class="scroll-mt-24 mt-8">
+          <h3 data-i18n="features.providers_title">Providers</h3>
+          <p data-i18n="features.providers_desc">
+            Configure which AI providers and models are available to you. Cebian supports three categories of providers:
+          </p>
+          <ul>
+            <li data-i18n="features.providers_oauth">OAuth providers (GitHub Copilot, OpenAI Codex via ChatGPT, Google Gemini CLI) — sign in once with your existing subscription.</li>
+            <li data-i18n="features.providers_apikey">API Key providers (OpenAI, Anthropic, Google Gemini) — paste your API key to unlock all models from that provider.</li>
+            <li data-i18n="features.providers_custom">Custom OpenAI-compatible providers — configure any endpoint that speaks the OpenAI API (e.g. Ollama, LM Studio, or a self-hosted proxy).</li>
+          </ul>
+          <div class="callout mt-4">
+            💡 <strong>Tip:</strong> You can add multiple providers and switch between them with the model picker in the chat.
+          </div>
+        </section>
+
+        <!-- ── Instructions ───────────────────────────────────────────── -->
+        <section id="instructions" class="scroll-mt-24 mt-10">
+          <h3 data-i18n="features.instructions_title">Instructions</h3>
+          <p data-i18n="features.instructions_desc">
+            Write custom instructions that are appended to the default system prompt. Use this to adjust the AI's language, tone, or persona. For example:
+          </p>
+          <pre class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm font-mono text-gray-700 overflow-x-auto whitespace-pre-wrap" id="instructions-example">- Reply in English
+- Keep answers concise
+- Default to TypeScript when discussing code</pre>
+          <p class="text-sm text-gray-500 mt-3" data-i18n="features.instructions_note">
+            Instructions cannot override tool protocols or built-in safety rules. Maximum 2,000 characters.
+          </p>
+        </section>
+
+        <!-- ── Prompts ─────────────────────────────────────────────────── -->
+        <section id="prompts" class="scroll-mt-24 mt-10">
+          <h3 data-i18n="features.prompts_title">Prompts</h3>
+          <p data-i18n="features.prompts_desc">
+            Build a library of reusable prompt templates. Trigger any prompt by typing <code>/</code> in the chat input. Templates support these dynamic variables:
+          </p>
+          <ul data-i18n-list="features.prompts_vars">
+            <li><code>{{selected_text}}</code> — currently selected text on the active page</li>
+            <li><code>{{page_url}}</code> — full URL of the active page</li>
+            <li><code>{{page_title}}</code> — title of the active page</li>
+            <li><code>{{date}}</code> — today's date</li>
+            <li><code>{{clipboard}}</code> — current clipboard content</li>
+          </ul>
+
+          <div class="callout mt-4">
+            💡 <strong>Example:</strong> Create a prompt called "Explain selection" with the body:
+            <br /><code>Explain the following text in simple terms: {{selected_text}}</code>
+          </div>
+        </section>
+
+        <!-- ── Skills ─────────────────────────────────────────────────── -->
+        <section id="skills" class="scroll-mt-24 mt-10">
+          <h3 data-i18n="features.skills_title">Skills</h3>
+          <p data-i18n="features.skills_desc">
+            Skills are multi-file instruction packs following the agentskills.io specification. The AI can load and run them on demand to handle complex, domain-specific workflows.
+          </p>
+          <div class="callout tip mt-4">
+            🧩 Skills extend what the AI can do beyond the default — for example, a skill can teach the AI to follow your project's coding conventions, draft emails in a specific format, or run a custom debugging workflow.
+          </div>
+        </section>
+
+        <!-- ── MCP Servers ─────────────────────────────────────────────── -->
+        <section id="mcp" class="scroll-mt-24 mt-10">
+          <h3 data-i18n="features.mcp_title">MCP Servers</h3>
+          <p data-i18n="features.mcp_desc">
+            Connect external Model Context Protocol (MCP) servers to expose their tools to the agent. Click "Add MCP server" and fill in:
+          </p>
+          <ul data-i18n-list="features.mcp_fields">
+            <li>Name — a short identifier for this server</li>
+            <li>Transport — Streamable HTTP (recommended) or SSE</li>
+            <li>URL — the server's endpoint URL</li>
+            <li>Authentication — None, or Bearer token</li>
+            <li>Custom headers — optional HTTP headers</li>
+          </ul>
+
+          <h4 class="font-semibold text-gray-800 mt-6 mb-2" data-i18n="features.mcp_status_title">Server status indicators:</h4>
+          <ul data-i18n-list="features.mcp_statuses">
+            <li>Idle — server is configured but not yet called</li>
+            <li>Connected — last tool call succeeded</li>
+            <li>Disconnected — server could not be reached</li>
+            <li>Reconnecting — automatic retry in progress</li>
+            <li>Unavailable — circuit breaker open after repeated failures</li>
+            <li>Disabled — server is toggled off</li>
+          </ul>
+        </section>
+
+        <!-- ── Advanced ────────────────────────────────────────────────── -->
+        <section id="advanced" class="scroll-mt-24 mt-10">
+          <h3 data-i18n="features.advanced_title">Advanced</h3>
+          <p data-i18n="features.advanced_desc">Fine-tune agent behaviour with low-level knobs.</p>
+
+          <h4 class="font-semibold text-gray-800 mt-4 mb-1" data-i18n="features.advanced_maxrounds_title">Max conversation rounds</h4>
+          <p data-i18n="features.advanced_maxrounds_desc">
+            Sets the maximum number of message pairs kept in the context window before older messages are truncated. Default is 200, range 1–1,000. Lower values save tokens; higher values preserve more history.
+          </p>
+        </section>
+
+        <!-- ── About ──────────────────────────────────────────────────── -->
+        <section id="about" class="scroll-mt-24 mt-10">
+          <h3 data-i18n="features.about_title">About</h3>
+          <p data-i18n="features.about_desc">
+            Shows the current extension version and links to the GitHub repository, license, and feedback.
+          </p>
+        </section>
+
+        <!-- ── Bottom CTA ──────────────────────────────────────────────── -->
+        <div class="mt-14 p-8 bg-gray-50 rounded-2xl border border-gray-100 text-center">
+          <p class="text-gray-700 font-medium mb-4" data-i18n="home.cta.title">Ready to try Cebian?</p>
+          <a href="install.html" class="btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span data-i18n="home.hero.cta_install">Install Now</span>
+          </a>
+        </div>
+
+      </article>
+    </div>
+  </div>
+
+  <!-- ── Footer ─────────────────────────────────────────────────────── -->
+  <footer class="bg-white border-t border-gray-100 py-10 px-4 sm:px-6 lg:px-8 mt-8">
+    <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-400">
+      <div class="flex items-center gap-2">
+        <img src="assets/images/icon-32.png" alt="Cebian" class="w-5 h-5 rounded" />
+        <span class="font-medium text-gray-600">Cebian</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="index.html" class="hover:text-blue-600 transition-colors">Home</a>
+        <a href="install.html" class="hover:text-blue-600 transition-colors" data-i18n="nav.install">Install</a>
+        <a href="https://github.com/maotoumao/Cebian" target="_blank" rel="noopener noreferrer" class="hover:text-blue-600 transition-colors">GitHub</a>
+        <a href="https://github.com/maotoumao/Cebian/blob/HEAD/LICENSE" target="_blank" rel="noopener noreferrer" class="hover:text-blue-600 transition-colors" data-i18n="home.footer.license">License</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/i18n.js"></script>
+  <script>
+    // Navbar scroll effect
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('navbar-scrolled', window.scrollY > 8);
+    });
+
+    // Update instructions example text on language change
+    function updateInstructionsExample() {
+      const el = document.getElementById('instructions-example');
+      if (!el) return;
+      el.textContent = typeof currentLang !== 'undefined' && currentLang === 'zh'
+        ? '- 用中文回复\n- 回答尽量简洁\n- 讨论代码时默认使用 TypeScript'
+        : '- Reply in English\n- Keep answers concise\n- Default to TypeScript when discussing code';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      updateInstructionsExample();
+      initTOC();
+    });
+
+    const origApply = window.applyTranslations;
+    window.applyTranslations = function() {
+      if (origApply) origApply();
+      updateInstructionsExample();
+    };
+
+    // Active TOC highlighting
+    function initTOC() {
+      const sections = ['chat','settings','providers','instructions','prompts','skills','mcp','advanced','about'];
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          const tocLink = document.getElementById('toc-' + entry.target.id);
+          if (tocLink) {
+            tocLink.classList.toggle('active', entry.isIntersecting);
+          }
+        });
+      }, { rootMargin: '-20% 0px -70% 0px' });
+
+      sections.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) observer.observe(el);
+      });
+    }
+  </script>
+</body>
+</html>

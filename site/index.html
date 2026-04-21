@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cebian — AI assistant in your browser side panel</title>
+  <meta name="description" content="Cebian puts a powerful AI agent right in your browser side panel. Multi-model, privacy-first, open source." />
+  <meta property="og:title" content="Cebian — AI assistant in your browser side panel" />
+  <meta property="og:description" content="No account required. Your data stays local. Open source." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/images/icon-32.png" />
+  <link rel="stylesheet" href="assets/css/tailwind.css" />
+  <link rel="stylesheet" href="assets/css/site.css" />
+</head>
+<body class="bg-white text-gray-900 antialiased">
+
+  <!-- ── Navbar ─────────────────────────────────────────────────────── -->
+  <header id="navbar" class="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md transition-shadow duration-200">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- Logo -->
+        <a href="index.html" class="flex items-center gap-2.5 no-underline">
+          <img src="assets/images/icon-32.png" alt="Cebian" class="w-8 h-8 rounded-lg" />
+          <span class="font-bold text-lg text-gray-900">Cebian</span>
+        </a>
+
+        <!-- Nav links -->
+        <nav class="hidden sm:flex items-center gap-6">
+          <a href="features.html" class="nav-link" data-i18n="nav.features">Features</a>
+          <a href="install.html" class="nav-link" data-i18n="nav.install">Install</a>
+          <a href="https://github.com/maotoumao/Cebian" target="_blank" rel="noopener noreferrer" class="nav-link">
+            <span data-i18n="nav.github">GitHub</span>
+          </a>
+        </nav>
+
+        <!-- Right actions -->
+        <div class="flex items-center gap-3">
+          <button id="lang-toggle" class="btn-lang">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="2" y1="12" x2="22" y2="12"/>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            </svg>
+            <span id="lang-text">中文</span>
+          </button>
+          <a href="install.html" class="btn-primary text-sm py-2 px-4">
+            <span data-i18n="home.hero.cta_install">Install Now</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ── Hero ───────────────────────────────────────────────────────── -->
+    <section class="hero-bg pt-32 pb-20 px-4 sm:px-6 lg:px-8">
+      <div class="max-w-6xl mx-auto">
+        <div class="text-center max-w-3xl mx-auto mb-12">
+          <div class="badge mb-6">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+            <span data-i18n="home.hero.badge">Open Source · Privacy First</span>
+          </div>
+          <h1 class="text-5xl sm:text-6xl font-extrabold tracking-tight text-gray-900 leading-tight mb-6">
+            <span data-i18n-hero-title></span>
+          </h1>
+          <p class="text-xl text-gray-500 leading-relaxed mb-8" data-i18n="home.hero.subtitle">
+            Cebian puts a powerful AI agent right in your browser side panel. Read any page, pick elements, run tools — without ever leaving the tab you're on.
+          </p>
+          <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="install.html" class="btn-primary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span data-i18n="home.hero.cta_install">Install Now</span>
+            </a>
+            <a href="features.html" class="btn-secondary">
+              <span data-i18n="home.hero.cta_features">Explore Features</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- Hero screenshot placeholder -->
+        <div class="max-w-4xl mx-auto">
+          <div class="rounded-2xl overflow-hidden shadow-2xl border border-gray-200">
+            <img
+              src="assets/images/placeholder-hero.svg"
+              alt="Cebian in action — chat screenshot"
+              class="w-full block"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Why Cebian ────────────────────────────────────────────────── -->
+    <section class="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
+      <div class="max-w-6xl mx-auto">
+        <h2 class="text-3xl font-bold text-center text-gray-900 mb-12" data-i18n="home.why.title">Why Cebian?</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- No account -->
+          <div class="why-card">
+            <div class="why-icon">🔓</div>
+            <h3 class="text-lg font-semibold text-gray-900" data-i18n="home.why.no_account_title">No account required</h3>
+            <p class="text-gray-500 text-sm leading-relaxed" data-i18n="home.why.no_account_desc">
+              Install and start chatting immediately. No sign-up, no email, no subscription needed.
+            </p>
+          </div>
+          <!-- Private -->
+          <div class="why-card">
+            <div class="why-icon">🔒</div>
+            <h3 class="text-lg font-semibold text-gray-900" data-i18n="home.why.private_title">Your data stays local</h3>
+            <p class="text-gray-500 text-sm leading-relaxed" data-i18n="home.why.private_desc">
+              Every conversation, prompt, and file is stored in your browser only. Nothing is ever uploaded.
+            </p>
+          </div>
+          <!-- Open source -->
+          <div class="why-card">
+            <div class="why-icon">📖</div>
+            <h3 class="text-lg font-semibold text-gray-900" data-i18n="home.why.open_source_title">Fully open source</h3>
+            <p class="text-gray-500 text-sm leading-relaxed" data-i18n="home.why.open_source_desc">
+              All code is on GitHub under AGPL-3.0. Read it, modify it, run it yourself.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Features ──────────────────────────────────────────────────── -->
+    <section class="py-20 px-4 sm:px-6 lg:px-8 bg-white">
+      <div class="max-w-6xl mx-auto">
+        <div class="text-center mb-14">
+          <h2 class="text-3xl font-bold text-gray-900 mb-4" data-i18n="home.features.title">
+            Everything you need to be productive
+          </h2>
+          <p class="text-gray-500 text-lg" data-i18n="home.features.subtitle">
+            Powerful AI tooling that fits neatly inside your browser.
+          </p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <!-- Multi-model -->
+          <div class="feature-card">
+            <div class="feature-icon bg-blue-50">🤖</div>
+            <h3 class="font-semibold text-gray-900 mb-1.5" data-i18n="home.features.multi_model_title">Multi-model</h3>
+            <p class="text-sm text-gray-500 leading-relaxed" data-i18n="home.features.multi_model_desc">OpenAI, Anthropic, Google, and any OpenAI-compatible endpoint.</p>
+          </div>
+          <!-- Page-aware -->
+          <div class="feature-card">
+            <div class="feature-icon bg-emerald-50">📄</div>
+            <h3 class="font-semibold text-gray-900 mb-1.5" data-i18n="home.features.page_aware_title">Page-aware</h3>
+            <p class="text-sm text-gray-500 leading-relaxed" data-i18n="home.features.page_aware_desc">Grab URL, title, selected text, or pick any element as context.</p>
+          </div>
+          <!-- Slash Prompts -->
+          <div class="feature-card">
+            <div class="feature-icon bg-yellow-50">⚡</div>
+            <h3 class="font-semibold text-gray-900 mb-1.5" data-i18n="home.features.prompts_title">Slash Prompts</h3>
+            <p class="text-sm text-gray-500 leading-relaxed" data-i18n="home.features.prompts_desc">Reusable prompt library with dynamic variables like <code class="text-xs bg-gray-100 px-1 rounded">{{selected_text}}</code>.</p>
+          </div>
+          <!-- Skills -->
+          <div class="feature-card">
+            <div class="feature-icon bg-purple-50">🧩</div>
+            <h3 class="font-semibold text-gray-900 mb-1.5" data-i18n="home.features.skills_title">Skills</h3>
+            <p class="text-sm text-gray-500 leading-relaxed" data-i18n="home.features.skills_desc">Package multi-step workflows the AI loads on demand.</p>
+          </div>
+          <!-- MCP -->
+          <div class="feature-card">
+            <div class="feature-icon bg-orange-50">🔌</div>
+            <h3 class="font-semibold text-gray-900 mb-1.5" data-i18n="home.features.mcp_title">MCP Tools</h3>
+            <p class="text-sm text-gray-500 leading-relaxed" data-i18n="home.features.mcp_desc">Built-in Model Context Protocol client. External tools just work.</p>
+          </div>
+          <!-- Mobile -->
+          <div class="feature-card">
+            <div class="feature-icon bg-pink-50">📱</div>
+            <h3 class="font-semibold text-gray-900 mb-1.5" data-i18n="home.features.mobile_title">Mobile Emulation</h3>
+            <p class="text-sm text-gray-500 leading-relaxed" data-i18n="home.features.mobile_desc">Toggle mobile viewport to debug responsive pages in one click.</p>
+          </div>
+          <!-- Privacy -->
+          <div class="feature-card">
+            <div class="feature-icon bg-green-50">🔒</div>
+            <h3 class="font-semibold text-gray-900 mb-1.5" data-i18n="home.features.privacy_title">Privacy First</h3>
+            <p class="text-sm text-gray-500 leading-relaxed" data-i18n="home.features.privacy_desc">Zero telemetry, zero cloud sync — everything stays local.</p>
+          </div>
+          <!-- Screenshots -->
+          <div class="feature-card">
+            <div class="feature-icon bg-sky-50">🖼</div>
+            <h3 class="font-semibold text-gray-900 mb-1.5" data-i18n="home.features.screenshot_title">Screenshots & Files</h3>
+            <p class="text-sm text-gray-500 leading-relaxed" data-i18n="home.features.screenshot_desc">Attach screenshots, images, or files to give AI full context.</p>
+          </div>
+        </div>
+
+        <div class="text-center mt-10">
+          <a href="features.html" class="btn-secondary">
+            <span data-i18n="home.hero.cta_features">Explore Features</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── CTA ────────────────────────────────────────────────────────── -->
+    <section class="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
+      <div class="max-w-4xl mx-auto">
+        <div class="cta-section">
+          <h2 class="text-3xl font-bold mb-3" data-i18n="home.cta.title">Ready to try Cebian?</h2>
+          <p class="text-white/80 text-lg mb-8" data-i18n="home.cta.subtitle">
+            Install in under a minute. No account, no subscription, no data collection.
+          </p>
+          <a href="install.html" class="inline-flex items-center gap-2 bg-white text-blue-600 font-bold py-3 px-8 rounded-xl hover:bg-blue-50 transition-colors no-underline">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span data-i18n="home.cta.button">Get Cebian</span>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ── Footer ─────────────────────────────────────────────────────── -->
+  <footer class="bg-white border-t border-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-6xl mx-auto">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <!-- Brand -->
+        <div>
+          <div class="flex items-center gap-2 mb-3">
+            <img src="assets/images/icon-32.png" alt="Cebian" class="w-7 h-7 rounded-md" />
+            <span class="font-bold text-gray-900">Cebian</span>
+          </div>
+          <p class="text-sm text-gray-500" data-i18n="home.footer.tagline">
+            AI assistant in your browser side panel.
+          </p>
+        </div>
+        <!-- Links -->
+        <div>
+          <h4 class="text-sm font-semibold text-gray-900 mb-3" data-i18n="home.footer.links_title">Links</h4>
+          <ul class="space-y-2 text-sm text-gray-500">
+            <li><a href="features.html" class="hover:text-blue-600 transition-colors" data-i18n="nav.features">Features</a></li>
+            <li><a href="install.html" class="hover:text-blue-600 transition-colors" data-i18n="nav.install">Install</a></li>
+            <li><a href="https://github.com/maotoumao/Cebian" target="_blank" rel="noopener noreferrer" class="hover:text-blue-600 transition-colors">GitHub</a></li>
+            <li><a href="https://github.com/maotoumao/Cebian/releases" target="_blank" rel="noopener noreferrer" class="hover:text-blue-600 transition-colors">Releases</a></li>
+          </ul>
+        </div>
+        <!-- Legal -->
+        <div>
+          <h4 class="text-sm font-semibold text-gray-900 mb-3" data-i18n="home.footer.legal_title">Legal</h4>
+          <ul class="space-y-2 text-sm text-gray-500">
+            <li><a href="https://github.com/maotoumao/Cebian/blob/HEAD/LICENSE" target="_blank" rel="noopener noreferrer" class="hover:text-blue-600 transition-colors" data-i18n="home.footer.license">License (AGPL-3.0)</a></li>
+            <li><a href="https://github.com/maotoumao/Cebian/blob/HEAD/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer" class="hover:text-blue-600 transition-colors" data-i18n="home.footer.contributing">Contributing</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="mt-8 pt-6 border-t border-gray-100 text-center text-sm text-gray-400">
+        <span data-i18n="home.footer.made_with">Made with ❤️</span>
+        &nbsp;·&nbsp;
+        <a href="https://github.com/maotoumao/Cebian" target="_blank" rel="noopener noreferrer" class="hover:text-blue-600 transition-colors">maotoumao/Cebian</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/js/i18n.js"></script>
+  <script>
+    // Navbar scroll effect
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 8) {
+        navbar.classList.add('navbar-scrolled');
+      } else {
+        navbar.classList.remove('navbar-scrolled');
+      }
+    });
+
+    // Hero title with gradient
+    function renderHeroTitle() {
+      const el = document.querySelector('[data-i18n-hero-title]');
+      if (!el) return;
+      const raw = typeof currentLang !== 'undefined'
+        ? (currentLang === 'zh'
+          ? 'AI 助手，\n就在侧边栏。'
+          : 'Your AI assistant,\nliving in the sidebar.')
+        : 'Your AI assistant,\nliving in the sidebar.';
+      const lines = raw.split('\n');
+      el.innerHTML = lines.map((line, i) =>
+        i === 0
+          ? `<span>${line}</span>`
+          : `<br/><span class="gradient-text">${line}</span>`
+      ).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderHeroTitle();
+    });
+
+    // Re-render on language change
+    const origApply = window.applyTranslations;
+    window.applyTranslations = function() {
+      if (origApply) origApply();
+      renderHeroTitle();
+    };
+  </script>
+</body>
+</html>

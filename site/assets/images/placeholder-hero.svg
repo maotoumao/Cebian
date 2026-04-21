@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="800" height="500">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e1e2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f0f1a;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="500" fill="url(#bg)" rx="12"/>
+
+  <!-- Browser chrome bar -->
+  <rect x="0" y="0" width="800" height="40" fill="#16213e" rx="12"/>
+  <rect x="0" y="28" width="800" height="12" fill="#16213e"/>
+  <circle cx="20" cy="20" r="6" fill="#ff5f57"/>
+  <circle cx="40" cy="20" r="6" fill="#febc2e"/>
+  <circle cx="60" cy="20" r="6" fill="#28c840"/>
+  <rect x="120" y="10" width="460" height="20" rx="4" fill="#2a2a3e"/>
+  <text x="350" y="24" fill="#6b7280" font-size="12" font-family="sans-serif" text-anchor="middle">https://example.com</text>
+
+  <!-- Main page area -->
+  <rect x="0" y="40" width="580" height="460" fill="#1a1a2e"/>
+
+  <!-- Sidebar panel -->
+  <rect x="580" y="40" width="220" height="460" fill="#16213e"/>
+  <rect x="580" y="40" width="1" height="460" fill="#2a2a4e"/>
+
+  <!-- Sidebar header -->
+  <rect x="580" y="40" width="220" height="48" fill="#1e1e3e"/>
+  <circle cx="600" cy="64" r="12" fill="url(#accent)"/>
+  <text x="620" y="68" fill="white" font-size="13" font-family="sans-serif" font-weight="bold">Cebian</text>
+  <rect x="768" y="52" width="20" height="20" rx="4" fill="#2a2a4e"/>
+
+  <!-- Chat messages in sidebar -->
+  <!-- User message -->
+  <rect x="600" y="110" width="170" height="38" rx="8" fill="#2a2a4e"/>
+  <text x="615" y="128" fill="#d1d5db" font-size="10" font-family="sans-serif">What is this page about?</text>
+  <text x="615" y="142" fill="#6b7280" font-size="9" font-family="sans-serif">Just now</text>
+
+  <!-- AI response bubble -->
+  <rect x="590" y="162" width="190" height="70" rx="8" fill="url(#accent)" opacity="0.15"/>
+  <rect x="590" y="162" width="190" height="70" rx="8" fill="none" stroke="#3b82f6" stroke-width="1" opacity="0.4"/>
+  <text x="600" y="178" fill="#93c5fd" font-size="10" font-family="sans-serif">This page covers modern web</text>
+  <text x="600" y="192" fill="#93c5fd" font-size="10" font-family="sans-serif">development practices. It</text>
+  <text x="600" y="206" fill="#93c5fd" font-size="10" font-family="sans-serif">explains React hooks...</text>
+  <text x="600" y="224" fill="#6b7280" font-size="9" font-family="sans-serif">● ↑1.2k ↓0.8k</text>
+
+  <!-- Thinking indicator -->
+  <rect x="590" y="248" width="120" height="24" rx="6" fill="#2a2a4e"/>
+  <circle cx="604" cy="260" r="3" fill="#8b5cf6"/>
+  <circle cx="616" cy="260" r="3" fill="#8b5cf6" opacity="0.7"/>
+  <circle cx="628" cy="260" r="3" fill="#8b5cf6" opacity="0.4"/>
+  <text x="640" y="264" fill="#6b7280" font-size="9" font-family="sans-serif">Thinking…</text>
+
+  <!-- Input area -->
+  <rect x="586" y="440" width="208" height="48" rx="8" fill="#1e1e3e"/>
+  <rect x="590" y="444" width="180" height="28" rx="6" fill="#2a2a4e"/>
+  <text x="602" y="462" fill="#6b7280" font-size="10" font-family="sans-serif">Ask anything…</text>
+  <!-- Icon buttons -->
+  <circle cx="748" cy="458" r="10" fill="url(#accent)"/>
+  <text x="748" y="462" fill="white" font-size="10" font-family="sans-serif" text-anchor="middle">↑</text>
+
+  <!-- Sidebar nav icons at bottom -->
+  <rect x="586" y="400" width="32" height="32" rx="6" fill="#2a2a4e"/>
+  <text x="602" y="420" fill="#6b7280" font-size="14" font-family="sans-serif" text-anchor="middle">⊕</text>
+  <rect x="624" y="400" width="32" height="32" rx="6" fill="#2a2a4e"/>
+  <text x="640" y="420" fill="#6b7280" font-size="14" font-family="sans-serif" text-anchor="middle">⊞</text>
+  <rect x="662" y="400" width="32" height="32" rx="6" fill="#2a2a4e"/>
+  <text x="678" y="420" fill="#6b7280" font-size="14" font-family="sans-serif" text-anchor="middle">☰</text>
+  <rect x="700" y="400" width="32" height="32" rx="6" fill="#2a2a4e"/>
+  <text x="716" y="420" fill="#6b7280" font-size="14" font-family="sans-serif" text-anchor="middle">⚙</text>
+
+  <!-- Main page content (blurred/stylized) -->
+  <rect x="40" y="80" width="280" height="18" rx="3" fill="#2a2a4e"/>
+  <rect x="40" y="110" width="200" height="12" rx="3" fill="#252538" opacity="0.7"/>
+  <rect x="40" y="130" width="240" height="12" rx="3" fill="#252538" opacity="0.7"/>
+  <rect x="40" y="150" width="180" height="12" rx="3" fill="#252538" opacity="0.7"/>
+  <rect x="40" y="190" width="260" height="140" rx="6" fill="#252538"/>
+  <rect x="60" y="210" width="140" height="10" rx="2" fill="#2a2a4e"/>
+  <rect x="60" y="228" width="200" height="10" rx="2" fill="#2a2a4e" opacity="0.7"/>
+  <rect x="60" y="246" width="160" height="10" rx="2" fill="#2a2a4e" opacity="0.7"/>
+  <rect x="60" y="264" width="220" height="10" rx="2" fill="#2a2a4e" opacity="0.7"/>
+  <rect x="60" y="282" width="180" height="10" rx="2" fill="#2a2a4e" opacity="0.7"/>
+  <rect x="60" y="300" width="140" height="10" rx="2" fill="#2a2a4e" opacity="0.5"/>
+
+  <!-- Placeholder label -->
+  <text x="290" y="430" fill="#4b5563" font-size="13" font-family="sans-serif" text-anchor="middle">[Chat screenshot placeholder]</text>
+</svg>

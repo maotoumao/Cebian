@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 380" width="640" height="380">
+  <defs>
+    <linearGradient id="bgI" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f8fafc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f1f5f9;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accentI" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="640" height="380" fill="url(#bgI)" rx="12"/>
+
+  <!-- Browser window chrome -->
+  <rect x="40" y="20" width="560" height="340" rx="10" fill="white" stroke="#e5e7eb" stroke-width="1.5"/>
+  <rect x="40" y="20" width="560" height="40" fill="#f9fafb" rx="10"/>
+  <rect x="40" y="48" width="560" height="12" fill="#f9fafb"/>
+  <circle cx="64" cy="40" r="6" fill="#fee2e2"/>
+  <circle cx="82" cy="40" r="6" fill="#fef3c7"/>
+  <circle cx="100" cy="40" r="6" fill="#dcfce7"/>
+  <rect x="120" y="28" width="380" height="24" rx="4" fill="white" stroke="#e5e7eb" stroke-width="1"/>
+  <text x="310" y="44" fill="#9ca3af" font-size="11" font-family="sans-serif" text-anchor="middle">chrome://extensions</text>
+
+  <!-- Extensions page content -->
+  <rect x="56" y="72" width="528" height="36" fill="white"/>
+  <text x="72" y="96" fill="#1f2937" font-size="15" font-family="sans-serif" font-weight="bold">Extensions</text>
+  <rect x="500" y="76" width="72" height="28" rx="6" fill="#f3f4f6"/>
+  <text x="536" y="94" fill="#374151" font-size="11" font-family="sans-serif" text-anchor="middle">Dev mode</text>
+  <!-- Toggle ON -->
+  <rect x="555" y="82" width="32" height="16" rx="8" fill="url(#accentI)"/>
+  <circle cx="579" cy="90" r="7" fill="white"/>
+
+  <rect x="56" y="108" width="528" height="1" fill="#e5e7eb"/>
+
+  <!-- Load unpacked button (highlighted) -->
+  <rect x="72" y="120" width="128" height="32" rx="6" fill="url(#accentI)"/>
+  <text x="136" y="140" fill="white" font-size="11" font-family="sans-serif" text-anchor="middle" font-weight="600">Load unpacked</text>
+
+  <!-- Cebian extension card -->
+  <rect x="72" y="168" width="232" height="150" rx="8" fill="white" stroke="#e5e7eb" stroke-width="1.5"/>
+  <!-- Glow effect -->
+  <rect x="72" y="168" width="232" height="150" rx="8" fill="none" stroke="url(#accentI)" stroke-width="2" opacity="0.6"/>
+
+  <circle cx="116" cy="208" r="24" fill="url(#accentI)"/>
+  <text x="116" y="215" fill="white" font-size="18" font-family="sans-serif" text-anchor="middle" font-weight="bold">C</text>
+
+  <text x="152" y="200" fill="#1f2937" font-size="13" font-family="sans-serif" font-weight="bold">Cebian</text>
+  <text x="152" y="216" fill="#6b7280" font-size="10" font-family="sans-serif">v0.1.0</text>
+  <text x="96" y="246" fill="#6b7280" font-size="10" font-family="sans-serif">AI-powered browser sidebar</text>
+  <text x="96" y="260" fill="#6b7280" font-size="10" font-family="sans-serif">assistant</text>
+
+  <!-- Toggle enabled -->
+  <rect x="238" y="300" width="44" height="22" rx="11" fill="url(#accentI)"/>
+  <circle cx="273" cy="311" r="10" fill="white"/>
+
+  <rect x="90" y="300" width="72" height="8" rx="2" fill="#e5e7eb"/>
+
+  <!-- Arrow pointing to Load unpacked -->
+  <line x1="136" y1="165" x2="136" y2="155" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
+  <polygon points="136,148 130,158 142,158" fill="#f59e0b"/>
+
+  <!-- Step label -->
+  <text x="320" y="350" fill="#9ca3af" font-size="12" font-family="sans-serif" text-anchor="middle">[Install screenshot placeholder]</text>
+</svg>

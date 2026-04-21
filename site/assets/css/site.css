@@ -1,0 +1,359 @@
+/* Cebian Site — shared styles */
+
+/* ── Custom properties ─────────────────────────────────────────── */
+:root {
+  --cebian-blue: #3b82f6;
+  --cebian-blue-dark: #2563eb;
+  --cebian-purple: #8b5cf6;
+  --cebian-gradient: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.1);
+}
+
+/* ── Base ──────────────────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans CJK SC", "Source Han Sans SC",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Navigation ────────────────────────────────────────────────── */
+.nav-link {
+  position: relative;
+  color: #374151;
+  text-decoration: none;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  color: var(--cebian-blue);
+}
+
+.nav-link.active::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--cebian-blue);
+  border-radius: 1px;
+}
+
+/* ── Gradient text ─────────────────────────────────────────────── */
+.gradient-text {
+  background: var(--cebian-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Hero ──────────────────────────────────────────────────────── */
+.hero-bg {
+  background: radial-gradient(
+      ellipse 80% 60% at 50% 0%,
+      rgba(59, 130, 246, 0.08) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 60% 40% at 80% 20%,
+      rgba(139, 92, 246, 0.06) 0%,
+      transparent 60%
+    ),
+    #ffffff;
+}
+
+/* ── Feature cards ─────────────────────────────────────────────── */
+.feature-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.feature-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: #d1d5db;
+}
+
+.feature-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  margin-bottom: 0.75rem;
+}
+
+/* ── Placeholder images ────────────────────────────────────────── */
+.img-placeholder {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e9ecef 100%);
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  font-size: 0.875rem;
+  gap: 0.5rem;
+  min-height: 240px;
+}
+
+.img-placeholder svg {
+  opacity: 0.4;
+}
+
+/* ── Steps ─────────────────────────────────────────────────────── */
+.step-number {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--cebian-gradient);
+  color: white;
+  font-weight: 700;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.step-connector {
+  width: 2px;
+  flex: 1;
+  min-height: 2rem;
+  background: linear-gradient(to bottom, #ddd6fe, #bfdbfe);
+  margin: 0 auto;
+}
+
+/* ── Prose (features page) ─────────────────────────────────────── */
+.prose-section h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin-top: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.prose-section h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.prose-section p {
+  color: #374151;
+  line-height: 1.75;
+  margin-bottom: 1rem;
+}
+
+.prose-section ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.prose-section ul li {
+  padding-left: 1.25rem;
+  position: relative;
+  color: #374151;
+  line-height: 1.6;
+}
+
+.prose-section ul li::before {
+  content: "›";
+  position: absolute;
+  left: 0;
+  color: var(--cebian-blue);
+  font-weight: 700;
+}
+
+.prose-section code {
+  background: #f3f4f6;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  font-size: 0.875em;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  color: #1d4ed8;
+}
+
+.callout {
+  background: #eff6ff;
+  border-left: 4px solid var(--cebian-blue);
+  border-radius: 0 8px 8px 0;
+  padding: 1rem 1.25rem;
+  color: #1e40af;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.callout.tip {
+  background: #f0fdf4;
+  border-left-color: #22c55e;
+  color: #166534;
+}
+
+.callout.warning {
+  background: #fffbeb;
+  border-left-color: #f59e0b;
+  color: #92400e;
+}
+
+/* ── Table of contents sidebar ─────────────────────────────────── */
+.toc-link {
+  display: block;
+  padding: 0.3rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: #6b7280;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+  border-left: 2px solid transparent;
+}
+
+.toc-link:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.toc-link.active {
+  background: #eff6ff;
+  color: var(--cebian-blue);
+  border-left-color: var(--cebian-blue);
+}
+
+/* ── Buttons ───────────────────────────────────────────────────── */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--cebian-gradient);
+  color: white;
+  font-weight: 600;
+  padding: 0.75rem 1.75rem;
+  border-radius: 10px;
+  text-decoration: none;
+  transition: opacity 0.2s, transform 0.2s;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: white;
+  color: #1f2937;
+  font-weight: 600;
+  padding: 0.75rem 1.75rem;
+  border-radius: 10px;
+  text-decoration: none;
+  transition: background 0.2s, transform 0.2s;
+  border: 1.5px solid #e5e7eb;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.btn-secondary:hover {
+  background: #f9fafb;
+  transform: translateY(-1px);
+}
+
+.btn-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 6px;
+  border: 1.5px solid #e5e7eb;
+  background: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-lang:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+/* ── Why section cards ─────────────────────────────────────────── */
+.why-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.75rem;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  box-shadow: var(--shadow-sm);
+}
+
+.why-icon {
+  font-size: 2rem;
+  margin-bottom: 0.25rem;
+}
+
+/* ── CTA section ───────────────────────────────────────────────── */
+.cta-section {
+  background: var(--cebian-gradient);
+  border-radius: 20px;
+  padding: 3.5rem 2rem;
+  text-align: center;
+  color: white;
+}
+
+/* ── Badge ─────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--cebian-blue-dark);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  padding: 0.3rem 0.8rem;
+  border-radius: 99px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* ── Responsive utilities ──────────────────────────────────────── */
+@media (max-width: 640px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+/* ── Navbar scroll shadow ──────────────────────────────────────── */
+.navbar-scrolled {
+  box-shadow: 0 1px 0 #e5e7eb, 0 4px 12px rgba(0, 0, 0, 0.06);
+}
