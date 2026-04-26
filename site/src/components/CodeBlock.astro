@@ -1,0 +1,21 @@
+---
+interface Props {
+  code: string;
+  lang?: string;
+}
+const { code, lang } = Astro.props;
+---
+<div
+  class="relative rounded-lg overflow-hidden"
+  style="border: 1px solid var(--border); background: color-mix(in oklab, var(--bg-elev) 96%, var(--fg) 4%);"
+>
+  {lang && (
+    <div
+      class="flex items-center justify-between px-3 py-1.5 text-[11.5px] font-mono uppercase tracking-wider border-b"
+      style="color: var(--fg-subtle); border-color: var(--border);"
+    >
+      <span>{lang}</span>
+    </div>
+  )}
+  <pre class="p-4 overflow-x-auto text-[12.5px] leading-relaxed"><code set:html={code}></code></pre>
+</div>

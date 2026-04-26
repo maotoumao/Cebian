@@ -1,0 +1,37 @@
+---
+/**
+ * Top-of-page numbered anchor navigation, shared by reference long pages.
+ * Renders as a single horizontal row that wraps; collapses gracefully on
+ * narrow viewports.
+ */
+interface Item {
+  id: string;
+  tag: string;
+}
+interface Props {
+  items: Item[];
+}
+const { items } = Astro.props;
+---
+<nav
+  aria-label="On this page"
+  class="container-wide"
+  style="--anchor-line: var(--border);"
+>
+  <ul
+    class="flex flex-wrap gap-x-5 gap-y-2 py-3 text-[11.5px] font-mono uppercase tracking-[0.18em] border-y"
+    style="border-color: var(--anchor-line); color: var(--fg-subtle);"
+  >
+    {items.map((s, i) => (
+      <li>
+        <a
+          href={`#${s.id}`}
+          class="inline-flex items-center gap-2 transition-colors hover:text-[color:var(--fg)]"
+        >
+          <span style="color: var(--accent); opacity: 0.85;">{String(i + 1).padStart(2, '0')}</span>
+          <span>{s.tag}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</nav>

@@ -1,0 +1,100 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import ArticleSection from '../../components/ArticleSection.astro';
+import { getDict, type Lang } from '../../i18n';
+
+export function getStaticPaths() {
+  return [{ params: { lang: 'zh' } }, { params: { lang: 'en' } }];
+}
+
+const lang = Astro.params.lang as Lang;
+const t = getDict(lang);
+---
+<BaseLayout lang={lang} title={t.about.title} description={t.about.title} path="/about">
+  <PageHeader eyebrow={t.about.eyebrow} title={t.about.title} />
+
+  <article class="container-wide pb-24">
+    <ArticleSection number="01" tag={t.about.tags.name} title={t.about.name_heading}>
+      <p>{t.about.name_body}</p>
+    </ArticleSection>
+
+    <ArticleSection number="02" tag={t.about.tags.license} title={t.about.license_heading}>
+      <p>{t.about.license_body}</p>
+    </ArticleSection>
+
+    <ArticleSection number="03" tag={t.about.tags.feedback} title={t.about.feedback_heading}>
+      <p>{t.about.feedback_body}</p>
+      <ul class="mt-5 space-y-2.5 text-[14px]">
+        <li class="flex items-center gap-3">
+          <span class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--fg-subtle);">Repo</span>
+          <a href="https://github.com/maotoumao/Cebian" target="_blank" rel="noopener" style="color: var(--accent);">github.com/maotoumao/Cebian</a>
+        </li>
+        <li class="flex items-center gap-3">
+          <span class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--fg-subtle);">Issues</span>
+          <a href="https://github.com/maotoumao/Cebian/issues" target="_blank" rel="noopener" style="color: var(--accent);">github.com/maotoumao/Cebian/issues</a>
+        </li>
+      </ul>
+    </ArticleSection>
+
+    <ArticleSection number="04" tag={t.about.tags.sponsor} title={t.about.sponsor_heading}>
+      <p>{t.about.sponsor_body}</p>
+      <div class="mt-6 grid gap-4 sm:grid-cols-2">
+        <a
+          href="/sponsor/wechat-qr.jpeg"
+          target="_blank" rel="noopener"
+          class="group rounded-xl p-5 flex flex-col items-start gap-3 transition-transform hover:-translate-y-0.5"
+          style="border: 1px solid var(--border); background: var(--bg-elev);"
+        >
+          <div class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--accent);">{t.about.sponsor_wechat_label}</div>
+          <h3 class="text-[15.5px] font-medium" style="color: var(--fg);">{t.about.sponsor_wechat_title}</h3>
+          <p class="text-[13.5px] leading-relaxed" style="color: var(--fg-muted);">{t.about.sponsor_wechat_body}</p>
+          <span class="mt-1 inline-flex items-center gap-1.5 text-[13px] font-medium" style="color: var(--accent);">
+            {t.about.sponsor_wechat_cta}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M7 7h10v10" /></svg>
+          </span>
+        </a>
+        <a
+          href="https://ko-fi.com/maotoumao"
+          target="_blank" rel="noopener"
+          class="group rounded-xl p-5 flex flex-col items-start gap-3 transition-transform hover:-translate-y-0.5"
+          style="border: 1px solid var(--border); background: var(--bg-elev);"
+        >
+          <div class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--accent);">Ko-fi</div>
+          <h3 class="text-[15.5px] font-medium" style="color: var(--fg);">{t.about.sponsor_kofi_title}</h3>
+          <p class="text-[13.5px] leading-relaxed" style="color: var(--fg-muted);">{t.about.sponsor_kofi_body}</p>
+          <span class="mt-1 inline-flex items-center gap-1.5 text-[13px] font-medium" style="color: var(--accent);">
+            ko-fi.com/maotoumao
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M7 7h10v10" /></svg>
+          </span>
+        </a>
+      </div>
+    </ArticleSection>
+
+    <ArticleSection number="05" tag={t.about.tags.contact} title={t.about.contact_heading}>
+      <p>{t.about.contact_body}</p>
+      <ul class="mt-5 space-y-2.5 text-[14px]">
+        <li class="flex items-center gap-3">
+          <span class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--fg-subtle);">Author</span>
+          <a href="https://github.com/maotoumao" target="_blank" rel="noopener" style="color: var(--accent);">github.com/maotoumao</a>
+        </li>
+        <li class="flex items-center gap-3">
+          <span class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--fg-subtle);">X</span>
+          <a href="https://x.com/maotoumao0_0" target="_blank" rel="noopener" style="color: var(--accent);">@maotoumao0_0</a>
+        </li>
+        <li class="flex items-center gap-3">
+          <span class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--fg-subtle);">Bilibili</span>
+          <a href="https://space.bilibili.com/12866223" target="_blank" rel="noopener" style="color: var(--accent);">{t.about.socials.bilibili_name}</a>
+        </li>
+        <li class="flex items-center gap-3">
+          <span class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--fg-subtle);">{t.about.socials.xhs_label}</span>
+          <a href="https://www.xiaohongshu.com/user/profile/5ce6085200000000050213a6" target="_blank" rel="noopener" style="color: var(--accent);">{t.about.socials.xhs_name}</a>
+        </li>
+        <li class="flex items-center gap-3">
+          <span class="font-mono text-[12px] uppercase tracking-[0.18em]" style="color: var(--fg-subtle);">{t.about.socials.wechat_label}</span>
+          <a href="/sponsor/wechat_channel.jpg" target="_blank" rel="noopener" style="color: var(--accent);">{t.about.socials.wechat_name}</a>
+        </li>
+      </ul>
+    </ArticleSection>
+  </article>
+</BaseLayout>

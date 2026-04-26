@@ -1,0 +1,277 @@
+@import "tailwindcss";
+
+@theme {
+  /* Fonts */
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Brand warm orange — pulled from the extension UI */
+  --color-amber-50: #fdf6e9;
+  --color-amber-100: #f8e4bd;
+  --color-amber-200: #f2cf87;
+  --color-amber-300: #ecb854;
+  --color-amber-400: #e8a43a;
+  --color-amber-500: #d68e23;
+  --color-amber-600: #b0721a;
+  --color-amber-700: #825416;
+  --color-amber-800: #563811;
+  --color-amber-900: #2f1f08;
+
+  /* Ink — warm blacks */
+  --color-ink-50: #f5efe4;
+  --color-ink-100: #e8dfd0;
+  --color-ink-200: #c8bda9;
+  --color-ink-300: #8a7f6d;
+  --color-ink-400: #574f43;
+  --color-ink-500: #332d26;
+  --color-ink-600: #23201c;
+  --color-ink-700: #1a1815;
+  --color-ink-800: #141210;
+  --color-ink-900: #0c0b09;
+
+  /* Cream — warm offwhite */
+  --color-cream-50: #fbf7ef;
+  --color-cream-100: #f5efe4;
+  --color-cream-200: #ece3d1;
+}
+
+/* ------------------------------------------------------------------ */
+/* Theme tokens — semantic variables bound per light / dark mode      */
+/* ------------------------------------------------------------------ */
+:root,
+html[data-theme="light"] {
+  --bg: var(--color-cream-100);
+  --bg-elev: #ffffff;
+  --bg-grid: rgba(20, 18, 16, 0.04);
+  --fg: var(--color-ink-800);
+  --fg-muted: var(--color-ink-400);
+  --fg-subtle: var(--color-ink-300);
+  --border: rgba(20, 18, 16, 0.1);
+  --border-strong: rgba(20, 18, 16, 0.2);
+  --accent: var(--color-amber-500);
+  --accent-fg: #1a1612;
+  --accent-soft: var(--color-amber-100);
+  --noise-opacity: 0.045;
+}
+
+html[data-theme="dark"] {
+  --bg: var(--color-ink-800);
+  --bg-elev: var(--color-ink-700);
+  --bg-grid: rgba(245, 239, 228, 0.035);
+  --fg: var(--color-cream-100);
+  --fg-muted: var(--color-ink-300);
+  --fg-subtle: var(--color-ink-400);
+  --border: rgba(245, 239, 228, 0.09);
+  --border-strong: rgba(245, 239, 228, 0.2);
+  --accent: var(--color-amber-400);
+  --accent-fg: #1a1612;
+  --accent-soft: rgba(232, 164, 58, 0.16);
+  --noise-opacity: 0.06;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elev: var(--bg-elev);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+}
+
+/* ------------------------------------------------------------------ */
+/* Base                                                               */
+/* ------------------------------------------------------------------ */
+* {
+  border-color: var(--border);
+}
+
+html {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* Prevent theme flash */
+  color-scheme: light dark;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  min-height: 100dvh;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.02em;
+  font-weight: 540;
+}
+
+code, pre, .font-mono {
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+/* ------------------------------------------------------------------ */
+/* Decorative surfaces                                                */
+/* ------------------------------------------------------------------ */
+.bg-grid {
+  background-image:
+    linear-gradient(var(--bg-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+.bg-noise::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: var(--noise-opacity);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 0.08  0 0 0 0 0.07  0 0 0 0 0.06  0 0 0 1 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  mix-blend-mode: multiply;
+}
+
+html[data-theme="dark"] .bg-noise::before {
+  mix-blend-mode: screen;
+}
+
+.decor-line {
+  background-image: linear-gradient(
+    90deg,
+    transparent 0,
+    var(--border-strong) 20%,
+    var(--accent) 50%,
+    var(--border-strong) 80%,
+    transparent 100%
+  );
+  height: 1px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Animations                                                         */
+/* ------------------------------------------------------------------ */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.rise {
+  animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0,
+    var(--accent-soft) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2.4s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.85); }
+}
+
+.pulse-dot {
+  animation: pulse-dot 1.8s ease-in-out infinite;
+}
+
+/* ------------------------------------------------------------------ */
+/* Layout primitives — container widths & section padding             */
+/* ------------------------------------------------------------------ */
+/*
+ * Two container widths across the site:
+ *   .container-hero — 1180px, used for landing hero & footer
+ *   .container-wide — 1080px, used for every inner page (docs, sponsor, install-guide, about, privacy)
+ *
+ * Side padding scales with viewport: 20px on mobile, 32px from md up.
+ */
+.container-hero,
+.container-wide {
+  width: 100%;
+  margin-inline: auto;
+  padding-inline: 20px;
+}
+@media (min-width: 768px) {
+  .container-hero,
+  .container-wide {
+    padding-inline: 32px;
+  }
+}
+.container-hero { max-width: calc(1180px + 64px); }
+.container-wide { max-width: calc(1080px + 64px); }
+
+/*
+ * Heading scale — keep page typography from drifting.
+ *   .h-page  — page hero h1, fluid 38–60px
+ *   .h-major — section h2 in reference layouts (28–34px)
+ *   .h-minor — sub-heading h3 (19–22px)
+ *   .h-prose — h2 inside article column (24–28px)
+ */
+.h-page {
+  font-family: var(--font-display);
+  font-weight: 540;
+  letter-spacing: -0.025em;
+  line-height: 1.04;
+  font-size: clamp(38px, 4.4vw + 8px, 60px);
+}
+.h-major {
+  font-family: var(--font-display);
+  font-weight: 540;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  font-size: clamp(26px, 1.4vw + 18px, 32px);
+}
+.h-prose {
+  font-family: var(--font-display);
+  font-weight: 540;
+  letter-spacing: -0.018em;
+  line-height: 1.18;
+  font-size: clamp(22px, 0.8vw + 17px, 26px);
+}
+.h-minor {
+  font-family: var(--font-display);
+  font-weight: 540;
+  letter-spacing: -0.012em;
+  line-height: 1.25;
+  font-size: clamp(18px, 0.4vw + 15px, 21px);
+}
+
+/* ------------------------------------------------------------------ */
+/* Focus                                                              */
+/* ------------------------------------------------------------------ */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* Scroll */
+html {
+  scroll-behavior: smooth;
+  scrollbar-color: var(--border-strong) transparent;
+}

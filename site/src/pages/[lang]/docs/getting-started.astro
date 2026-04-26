@@ -1,0 +1,48 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import PageHeader from '../../../components/PageHeader.astro';
+import ArticleSection from '../../../components/ArticleSection.astro';
+import DocsFooter from '../../../components/DocsFooter.astro';
+import { getDict, type Lang } from '../../../i18n';
+
+export function getStaticPaths() {
+  return [{ params: { lang: 'zh' } }, { params: { lang: 'en' } }];
+}
+
+const lang = Astro.params.lang as Lang;
+const t = getDict(lang);
+const d = t.docs.getting_started;
+---
+<BaseLayout lang={lang} title={d.title} description={d.lead} path="/docs/getting-started">
+  <PageHeader eyebrow={d.eyebrow} title={d.title} lead={d.lead} />
+
+  <article class="container-wide pb-24">
+    <p class="text-[15.5px] leading-[1.75]" style="color: var(--fg);">{d.body}</p>
+
+    <ol class="mt-10 space-y-5">
+      {d.steps.map((s, i) => (
+        <li class="relative pl-14">
+          <div
+            class="absolute left-0 top-0 flex h-10 w-10 items-center justify-center rounded-full font-display text-[15px]"
+            style="border: 1px solid var(--border-strong); color: var(--accent);"
+          >
+            {String(i + 1).padStart(2, '0')}
+          </div>
+          <h3 class="h-minor">{s.title}</h3>
+          <p class="mt-1.5 text-[14.5px] leading-relaxed" style="color: var(--fg-muted);">{s.body}</p>
+        </li>
+      ))}
+    </ol>
+
+    <ArticleSection tag={d.tip_tag} title={d.tip_heading}>
+      <div
+        class="rounded-xl p-5 sm:p-6"
+        style="border: 1px solid var(--border); background: color-mix(in oklab, var(--bg-elev) 80%, var(--accent-soft) 20%);"
+      >
+        <p class="text-[14.5px] leading-relaxed">{d.tip_body}</p>
+      </div>
+    </ArticleSection>
+
+    <DocsFooter lang={lang} slug="getting-started" />
+  </article>
+</BaseLayout>

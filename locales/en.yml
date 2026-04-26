@@ -1,0 +1,474 @@
+﻿# Cebian extension i18n — English (default).
+# Edit this file along with locales/zh_CN.yml and locales/zh_TW.yml.
+# See .agents/skills/i18n-naming/SKILL.md.
+
+# ─── Manifest (flat top-level keys, see skill "Manifest localization") ───
+extName: "Cebian"
+extDescription: "AI-powered browser sidebar assistant"
+actionTitle: "Open Cebian sidebar"
+
+# ─── Common (reused across the UI) ───
+common:
+  newChat: "New chat"
+  send: "Send"
+  history: "History"
+  toggleTheme: "Toggle theme"
+  settings: "Settings"
+  back: "Back"
+  openInNewTab: "Open in new tab"
+  loading: "Loading…"
+  cancel: "Cancel"
+  confirm: "Confirm"
+  save: "Save"
+  delete: "Delete"
+  rename: "Rename"
+  edit: "Edit"
+  add: "Add"
+  code: "Code"
+  copy: "Copy"
+  copied: "Copied"
+  copyFailed: "Copy failed"
+  newFile: "New file"
+  newFolder: "New folder"
+  search: "Search"
+  searchPlaceholder: "Search…"
+  moreActions: "More actions"
+  empty:
+    history: "No history yet"
+    folder: "Empty folder"
+  time:
+    justNow: "Just now"
+    # Time labels intentionally use abbreviations (min/h/d/mo/y) to avoid
+    # English plural-vs-singular branching at the call site ("1 min ago"
+    # reads naturally without a separate 0/1/n map).
+    # $1 = number of minutes
+    minutesAgo: "$1 min ago"
+    # $1 = number of hours
+    hoursAgo: "$1 h ago"
+    # $1 = number of days
+    daysAgo: "$1 d ago"
+    # $1 = number of months
+    monthsAgo: "$1 mo ago"
+    # $1 = number of years
+    yearsAgo: "$1 y ago"
+  session:
+    deleteConfirmTitle: "Delete chat?"
+    # $1 = session title
+    deleteConfirmDescription: "\"$1\" and its workspace files will be permanently removed. This cannot be undone."
+    running: "Agent is running"
+    # $1 = message count
+    messageCount:
+      0: "No messages"
+      1: "1 message"
+      n: "$1 messages"
+
+# ─── Settings hub ───
+settings:
+  nav:
+    aria: "Settings navigation"
+    providers: "Providers"
+    instructions: "Instructions"
+    prompts: "Prompts"
+    skills: "Skills"
+    mcp: "MCP Servers"
+    advanced: "Advanced"
+    about: "About"
+  providers:
+    title: "AI providers"
+  about:
+    title: "About"
+    tagline: "AI browser sidebar assistant"
+    feedback: "Feedback"
+    checkUpdate: "Check for updates"
+    checking: "Checking…"
+    upToDate: "You are on the latest version"
+    # $1 = new version string (e.g. "1.2.3")
+    updateAvailable: "New version v$1 available"
+    viewInstallGuide: "View install guide"
+    checkFailed: "Update check failed"
+    followAuthor: "Follow the author"
+    socials:
+      wechat: "WeChat Official Account"
+      wechatHandle: "一只猫头猫"
+      bilibili: "Bilibili"
+      bilibiliHandle: "不想睡觉猫头猫"
+      xiaohongshu: "Xiaohongshu"
+      xiaohongshuHandle: "一只猫头猫"
+      x: "X"
+      xHandle: "@maotoumao0_0"
+  advanced:
+    title: "Advanced"
+    maxRounds:
+      label: "Max conversation rounds"
+      hint: "Older messages are truncated when exceeded"
+  instructions:
+    title: "Instructions"
+    label: "Custom instructions"
+    hint: "Appended after the default rules. Use it to adjust language, tone, or persona. Cannot override tool protocols or safety rules."
+    placeholder: "e.g.\n- Reply in English\n- Keep answers concise\n- Default to TypeScript when discussing code"
+  prompts:
+    title: "Prompts"
+    newBody: "(Write your prompt here)"
+    # $1 = trigger character ("/")
+    hint: "Reusable prompt templates. Trigger them with $1 in the chat input."
+    placeholders:
+      selectedText: "Selected text on page"
+      pageUrl: "Current page URL"
+      pageTitle: "Current page title"
+      date: "Current date"
+      clipboard: "Clipboard content"
+  skills:
+    title: "Skills"
+    newBody: "(Write your skill instructions here)"
+    create: "Create skill"
+    hint: "Multi-file skill packs that follow the agentskills.io spec; the agent loads them on demand."
+    import: "Import…"
+    exportCurrent: "Export"
+    exportAll: "Export all"
+    exportEmpty: "No skills available to export"
+    # $1 = skill name
+    exportSuccess: "Exported \"$1\""
+    # $1 = number of skills exported
+    exportAllSuccess:
+      1: "Exported 1 skill"
+      n: "Exported $1 skills"
+    # $1 = imported skill name
+    importSuccess: "Imported \"$1\""
+    # $1 = number of skills imported
+    importSuccessBackup:
+      1: "Imported 1 skill"
+      n: "Imported $1 skills"
+    importDialog:
+      titleSingle: "Import skill"
+      titleBackup: "Import skill backup"
+      permissionsHeading: "Requested permissions"
+      permissionsNone: "No special permissions requested."
+      hasScriptsWarning: "Contains executable scripts under scripts/."
+      # $1 = file count
+      fileCount:
+        1: "1 file"
+        n: "$1 files"
+      # $1 = skill count
+      skillCount:
+        1: "1 skill"
+        n: "$1 skills"
+      # $1 = source name (already exists in VFS), $2 = renamed target name
+      conflictNotice: "A skill named \"$1\" already exists. It will be imported as \"$2\" unless you overwrite."
+      overwrite: "Overwrite existing"
+      keepBoth: "Import as new"
+      confirmOverwriteTitle: "Overwrite existing skill?"
+      # $1 = skill name(s), comma-separated
+      confirmOverwriteDescription: "\"$1\" will be replaced and its saved permissions will be cleared. Continue?"
+  mcp:
+    title: "MCP Servers"
+    description: "Connect Model Context Protocol servers to expose their tools to the agent."
+    empty:
+      title: "No MCP servers configured"
+      hint: "Add a server to extend the agent with external tools."
+    actions:
+      add: "Add MCP server"
+      toggle: "Enable server"
+      edit: "Edit server"
+      delete: "Delete server"
+      deleteConfirmTitle: "Delete MCP server?"
+      # $1 = server name
+      deleteConfirmDescription: "\"$1\" will be removed. This cannot be undone."
+    errors:
+      # $1 = server name
+      nameTaken: "An MCP server named \"$1\" already exists."
+      nameRequired: "Server name is required."
+      urlRequired: "Server URL is required."
+      # $1 = URL
+      urlInvalid: "Invalid server URL: $1"
+      # $1 = scheme (e.g. "ftp:")
+      urlScheme: "Unsupported URL scheme: $1"
+      bearerTokenRequired: "Bearer token is required."
+      authHeaderConflict: "Do not set the Authorization header manually when using bearer auth — set the token in the auth field instead."
+    status:
+      disabled: "Disabled"
+      idle: "Awaiting first call"
+      connected: "Connected"
+      disconnected: "Disconnected"
+      probing: "Reconnecting"
+      circuitOpen: "Unavailable"
+    form:
+      name: "Name"
+      namePlaceholder: "e.g. weather, github, my-tools"
+      transport: "Transport"
+      url: "URL"
+      urlPlaceholder: "https://example.com/mcp"
+      authType: "Authentication"
+      authNone: "None"
+      authBearer: "Bearer token"
+      bearerToken: "Token"
+      bearerTokenPlaceholder: "Paste bearer token"
+      headers: "Custom headers"
+      headerKeyPlaceholder: "Header name (e.g. X-MCP-Toolsets)"
+      headerValuePlaceholder: "Header value"
+      addHeader: "Add header"
+      removeHeader: "Remove header"
+  editor:
+    selectFile: "Select a file to start editing"
+    saving: "Saving…"
+    saveFailed: "Save failed"
+    unsaved: "Unsaved"
+    saved: "Saved"
+  files:
+    backToList: "Back to file list"
+    selectOrCreate: "Select or create a file from the left"
+
+# ─── Chat surface ───
+chat:
+  composer:
+    placeholder: "Type '/' for commands…"
+    pickElement: "Pick element"
+    cancelPick: "Cancel pick"
+    screenshot: "Screenshot"
+    uploadFile: "Upload file"
+    mobileMode: "Mobile mode"
+    needModel: "Please select an AI model first"
+    goToSettings: "Go to settings"
+    readPromptFailed: "Failed to read prompt"
+    elementAdded: "Element already added"
+    elementPickFailed: "Failed to pick element"
+    elementPickUnsupported: "Element picker isn't supported on this page"
+    elementPickNavigated: "Element picker cancelled — the page navigated"
+    imageAlreadyAdded: "Image already added"
+    screenshotFailed: "Screenshot failed"
+    # $1 = max attachment count
+    maxAttachments: "Up to $1 attachments"
+    # $1 = number of files actually added
+    truncatedFiles: "Only added the first $1 file(s); limit reached"
+    # $1 = file name, $2 = size limit (formatted, e.g. "5 MB")
+    fileTooLarge: "$1 exceeds $2"
+    # $1 = file name
+    readFileFailed: "Failed to read: $1"
+    # $1 = file name
+    unsupportedFileType: "Unsupported file type: $1"
+    noPrompts: "No prompts yet — create one from AI config"
+    noMatch: "No matches"
+    iframeEnterHint: "⏎ enter"
+  attachments:
+    image: "Image"
+    screenshot: "Screenshot"
+    imageAlt: "Attachment image"
+    # $1 = event count, $2 = formatted duration (M:SS)
+    recordingMeta: "$1 events · $2"
+    recordingTruncated: "truncated"
+    recordingDownload: "Download recording JSON"
+    # $1 = event count, $2 = compact char count (e.g. 1.2K, 3M)
+    recordingHover: "$1 events · ~$2 chars"
+  recorder:
+    start: "Start recording user actions"
+    stop: "Stop recording (will attach to next message)"
+    startRejectedBusy: "Another sidepanel is already recording. Stop it first to start a new recording."
+    autoStoppedEvents: "Recording auto-stopped: event limit reached"
+    autoStoppedTime: "Recording auto-stopped: time limit reached"
+  askUser:
+    placeholder: "Type a reply…"
+  model:
+    select: "Select model"
+    searchPlaceholder: "Search models…"
+    notFound: "No models found"
+    addMore: "Open settings to add more providers"
+  thinking:
+    # $1 = current level label
+    label: "Thinking: $1"
+    levels:
+      "off": "Off"
+      minimal: "Minimal"
+      low: "Low"
+      medium: "Medium"
+      high: "High"
+  tool:
+    args: "Arguments"
+    result: "Result"
+  message:
+    # $1 = input tokens (formatted, e.g. "1.2k"), $2 = output tokens (formatted)
+    tokensInOut: "↑$1 ↓$2"
+    # Cache breakdown without write. $1 = uncached, $2 = cache hit (both formatted)
+    tokensInBreakdownHit: "uncached $1 · cached $2"
+    # Cache breakdown with write. $1 = uncached, $2 = cache hit, $3 = cache write (all formatted)
+    tokensInBreakdownHitWrite: "uncached $1 · cached $2 · write $3"
+  session:
+    loading: "Loading session…"
+    modelError: "Model returned an error"
+    welcomeReady: "What can I help you with?"
+    scrollToBottom: "Jump to latest"
+
+# ─── Provider sub-components (OAuth / API Key / custom) ───
+provider:
+  section:
+    viaApiKey: "Via API Key"
+  status:
+    connected: "Connected"
+    notConfigured: "Not configured"
+    unverified: "Unverified"
+    verifying: "Verifying"
+    connectFailed: "Connection failed"
+    failed: "Failed"
+  oauth:
+    signIn: "Sign in"
+    signOut: "Sign out"
+    loggedIn: "Signed in"
+    notLoggedIn: "Not signed in"
+    authorizing: "Authorizing"
+    authFailed: "Authorization failed"
+    enterCode: "Enter the code in the browser:"
+    completeInBrowser: "Complete authorization in the popup browser window…"
+    descriptions:
+      githubCopilot: "Use your Copilot subscription to access GPT/Claude"
+      openaiCodex: "Use your ChatGPT Plus/Pro subscription"
+      googleGemini: "Sign in with Google Cloud OAuth"
+  apiKey:
+    placeholder: "Enter API Key"
+    disconnect: "Disconnect"
+    noModels: "No available models"
+    verifyNoResponse: "Verification failed: unexpected response"
+    # $1 = model count
+    connectedWithCount: "Connected · $1 models"
+  summary:
+    # $1 = auth label (OAuth / API Key), $2 = model count
+    modelsAvailable: "$1 · $2 models available"
+  form:
+    name: "Name"
+    namePlaceholder: "e.g. My Ollama"
+    baseUrl: "Base URL"
+    baseUrlPlaceholder: "e.g. http://localhost:11434/v1"
+    apiKeyOptional: "API Key (optional)"
+    apiKeyPlaceholder: "Leave empty to skip auth"
+    models: "Models"
+    autoFetch: "Auto-fetch"
+    reasoning: "Reasoning"
+    manualModelPlaceholder: "Manual Model ID"
+    addCustom: "Add custom provider"
+    fetchFailed: "Failed to fetch models, please add manually"
+
+# ─── Tool runtime labels (shown in ToolCard) ───
+tools:
+  # $1 = mode (and optional selector suffix)
+  readPage: "Reading page content ($1)"
+  executeJs: "Running script"
+  screenshot: "Taking page screenshot"
+  askUser: "Waiting for user reply"
+  # $1 = skill name
+  runSkill: "Running skill script $1"
+  # $1 = MCP server slug (display form), $2 = remote tool name
+  mcpCall: "$1 · $2"
+  fs:
+    # $1 = file path
+    createFile: "Creating file $1"
+    # $1 = file path
+    editFile: "Editing file $1"
+    # $1 = directory path
+    mkdir: "Creating directory $1"
+    # $1 = old path
+    rename: "Renaming $1"
+    # $1 = path
+    delete: "Deleting $1"
+    # $1 = file path
+    readFile: "Reading file $1"
+    # $1 = directory path
+    list: "Listing directory $1"
+    # $1 = search pattern
+    searchFiles: "Searching files \"$1\""
+    # $1 = search pattern
+    searchContent: "Searching file content \"$1\""
+  chromeApi:
+    help: "Looking up Chrome API docs"
+    # $1 = namespace, $2 = method
+    call: "Calling chrome.$1.$2"
+  interact:
+    # $1 = target suffix (with leading space) or empty
+    click: "Clicking$1"
+    dblclick: "Double-clicking$1"
+    rightclick: "Right-clicking$1"
+    hover: "Hovering$1"
+    focus: "Focusing$1"
+    type: "Typing text$1"
+    clear: "Clearing input$1"
+    select: "Selecting option$1"
+    scroll: "Scrolling page"
+    # $1 = key name
+    keypress: "Pressing key $1"
+    # $1 = target suffix (with leading space) or empty
+    wait: "Waiting for element to appear$1"
+    waitHidden: "Waiting for element to disappear$1"
+    waitNavigation: "Waiting for page to load"
+    # $1 = step count
+    sequence: "Running action sequence ($1 steps)"
+    # $1 = action name
+    unknown: "interact: $1"
+  inspect:
+    # $1 = selector
+    selector: "Inspecting $1"
+    # $1 = text query
+    text: "Inspecting text \"$1\""
+    page: "Inspecting page"
+  tab:
+    open: "Opening new tab"
+    # $1 = tab id
+    close: "Closing tab $1"
+    # $1 = tab id
+    switch: "Switching to tab $1"
+    reload: "Reloading page"
+    listFrames: "Listing page frames"
+    # $1 = action name
+    unknown: "tab: $1"
+
+# ─── Dialogs ───
+dialogs:
+  imagePreview:
+    title: "Image preview"
+    alt: "Preview"
+
+# ─── VFS browser entrypoint ───
+vfs:
+  backToRoot: "Back to root"
+  # $1 = line count
+  lines: "$1 ln"
+  # $1 = formatted file size
+  binaryFile: "[Binary file — $1]"
+  # $1 = path
+  pathNotFound: "Path not found: $1"
+  unknownError: "Unknown error"
+
+# ─── Errors (toasts, thrown messages) ───
+errors:
+  oauth:
+    cancelled: "Cancelled"
+    timeout: "Authorization timed out"
+    noCode: "No authorization code received"
+    stateMismatch: "State mismatch"
+    # $1 = HTTP status
+    tokenExchangeFailed: "Token exchange failed: $1"
+    missingTokenFields: "Token response is missing required fields"
+    missingRefreshToken: "No refresh token received"
+    missingRefreshTokenLocal: "Missing refresh token"
+    # $1 = HTTP status
+    gcpProjectFailed: "Google Cloud project setup failed: $1"
+    gcpProjectPollFailed: "Project setup polling failed"
+    gcpProjectIdMissing: "Could not obtain Google Cloud project ID"
+    # $1 = provider id
+    unknownProvider: "Unknown OAuth provider: $1"
+  network:
+    invalidUrl: "Invalid URL format"
+    unsupportedScheme: "Only http/https schemes are supported"
+    # $1 = HTTP status
+    requestFailed: "Request failed: $1"
+  mobile:
+    toggleFailed: "Failed to toggle mobile mode"
+  skillPackage:
+    invalid: "Invalid skill package."
+    tooLarge: "Skill package is too large."
+    tooManyFiles: "Skill package contains too many files."
+    missingEntry: "Skill package is missing SKILL.md."
+    # $1 = path
+    unsafePath: "Unsafe path in skill package: $1"
+    # $1 = permission name
+    unsupportedPermission: "Unsupported permission requested: $1"
+    # $1 = skill name
+    invalidName: "Invalid skill name: $1"
+    # $1 = skill name
+    reservedName: "Skill name is reserved: $1"
+    parseFrontmatter: "Failed to parse SKILL.md frontmatter."

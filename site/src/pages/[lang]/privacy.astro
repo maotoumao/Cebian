@@ -1,0 +1,28 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import ArticleSection from '../../components/ArticleSection.astro';
+import { getDict, type Lang } from '../../i18n';
+
+export function getStaticPaths() {
+  return [{ params: { lang: 'zh' } }, { params: { lang: 'en' } }];
+}
+
+const lang = Astro.params.lang as Lang;
+const t = getDict(lang);
+---
+<BaseLayout lang={lang} title={t.privacy.title} description={t.privacy.lead} path="/privacy">
+  <PageHeader eyebrow={t.privacy.eyebrow} title={t.privacy.title} lead={t.privacy.lead} />
+
+  <article class="container-wide pb-24">
+    {t.privacy.sections.map((s, i) => (
+      <ArticleSection
+        number={String(i + 1).padStart(2, '0')}
+        tag={t.privacy.clause_tag}
+        title={s.heading}
+      >
+        <p>{s.body}</p>
+      </ArticleSection>
+    ))}
+  </article>
+</BaseLayout>

@@ -1,0 +1,35 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import PageHeader from '../../../components/PageHeader.astro';
+import ArticleSection from '../../../components/ArticleSection.astro';
+import DocsFooter from '../../../components/DocsFooter.astro';
+import { getDict, type Lang } from '../../../i18n';
+
+export function getStaticPaths() {
+  return [{ params: { lang: 'zh' } }, { params: { lang: 'en' } }];
+}
+
+const lang = Astro.params.lang as Lang;
+const t = getDict(lang);
+const d = t.docs.instructions;
+---
+<BaseLayout lang={lang} title={d.title} description={d.lead} path="/docs/instructions">
+  <PageHeader eyebrow={d.eyebrow} title={d.title} lead={d.lead} />
+
+  <article class="container-wide pb-24">
+    <p class="text-[15.5px] leading-[1.75]" style="color: var(--fg);">{d.body}</p>
+
+    <ArticleSection tag={d.notes_tag} title={d.notes_heading}>
+      <ul class="space-y-2.5 text-[14px] leading-relaxed">
+        {d.notes.map((n) => (
+          <li class="relative pl-5">
+            <span class="absolute left-0 top-[0.7em] h-[5px] w-[5px] rounded-full" style="background: var(--accent);" aria-hidden></span>
+            {n}
+          </li>
+        ))}
+      </ul>
+    </ArticleSection>
+
+    <DocsFooter lang={lang} slug="instructions" />
+  </article>
+</BaseLayout>

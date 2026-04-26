@@ -1,0 +1,183 @@
+import {
+  mcpServers,
+  type MCPServerConfig,
+  type MCPTransportConfig,
+  type MCPAuthConfig,
+} from '@/lib/storage';
+import { t } from '@/lib/i18n';
+
+/**
+ * CRUD helpers around the `mcpServers` storage item.
+ *
+ * All mutations go through here so we can centralise validation, timestamp
+ * bookkeeping, and (later) emit change events for the manager to react to.
+ *
+ * UI components should prefer `useStorageItem(mcpServers)` for reactive reads
+ * and call these helpers for writes.
+ */
+
+export interface MCPServerInput {
+  name: string;
+  enabled?: boolean;
+  transport: MCPTransportConfig;
+  auth?: MCPAuthConfig;
+}
+
+/**
+ * Validates and returns a normalized copy of `input` (trimmed name/url/token).
+ * Throws on invalid input.
+ */
+function validateAndNormalize(input: MCPServerInput): MCPServerInput {
+  const name = input.name?.trim();
+  if (!name) throw new Error(t('settings.mcp.errors.nameRequired'));
+
+  const url = input.transport?.url?.trim();
+  if (!url) throw new Error(t('settings.mcp.errors.urlRequired'));
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(t('settings.mcp.errors.urlInvalid', [url]));
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(t('settings.mcp.errors.urlScheme', [parsed.protocol]));
+  }
+
+  if (input.transport.type !== 'streamable-http' && input.transport.type !== 'sse') {
+    throw new Error(`Unsupported MCP transport: ${String(input.transport.type)}`);
+  }
+
+  let auth: MCPAuthConfig = input.auth ?? { type: 'none' };
+  if (auth.type === 'bearer') {
+    const token = auth.token?.trim();
+    if (!token) throw new Error(t('settings.mcp.errors.bearerTokenRequired'));
+    auth = { type: 'bearer', token };
+  }
+
+  // Reject Authorization in transport.headers when bearer auth is set —
+  // the client wrapper would silently overwrite it, which is confusing.
+  if (auth.type === 'bearer' && input.transport.headers) {
+    for (const key of Object.keys(input.transport.headers)) {
+      if (key.toLowerCase() === 'authorization') {
+        throw new Error(t('settings.mcp.errors.authHeaderConflict'));
+      }
+    }
+  }
+
+  return {
+    name,
+    enabled: input.enabled,
+    transport: { ...input.transport, url },
+    auth,
+  };
+}
+
+export async function listMCPServers(): Promise<MCPServerConfig[]> {
+  return mcpServers.getValue();
+}
+
+export async function getMCPServer(id: string): Promise<MCPServerConfig | undefined> {
+  const all = await mcpServers.getValue();
+  return all.find((s) => s.id === id);
+}
+
+/**
+ * Throws if `name` clashes with another server's name (case-insensitive).
+ * `excludeId` lets `updateMCPServer` ignore the record being edited.
+ *
+ * Names are the user-visible identifier (cards, error toasts, future tool
+ * namespacing); allowing duplicates would make the UI ambiguous and could
+ * cause MCP tool name collisions when we prefix tools with their server name.
+ */
+function assertNameUnique(name: string, all: MCPServerConfig[], excludeId?: string): void {
+  const lc = name.toLowerCase();
+  if (all.some((s) => s.id !== excludeId && s.name.toLowerCase() === lc)) {
+    throw new Error(t('settings.mcp.errors.nameTaken', [name]));
+  }
+}
+
+export async function addMCPServer(input: MCPServerInput): Promise<MCPServerConfig> {
+  const norm = validateAndNormalize(input);
+  const all = await mcpServers.getValue();
+  assertNameUnique(norm.name, all);
+  const now = Date.now();
+  const config: MCPServerConfig = {
+    id: crypto.randomUUID(),
+    name: norm.name,
+    enabled: norm.enabled ?? true,
+    transport: norm.transport,
+    auth: norm.auth!,
+    schemaVersion: 1,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await mcpServers.setValue([...all, config]);
+  return config;
+}
+
+/**
+ * Patch an MCP server. `transport` and `auth` are SHALLOW-MERGED with the
+ * existing record so callers may pass `{ transport: { url: 'new' } }` without
+ * clobbering `headers`. To fully replace either object, spread it explicitly.
+ */
+export async function updateMCPServer(
+  id: string,
+  patch: {
+    name?: string;
+    enabled?: boolean;
+    transport?: Partial<MCPTransportConfig>;
+    auth?: MCPAuthConfig;
+  },
+): Promise<MCPServerConfig> {
+  const all = await mcpServers.getValue();
+  const idx = all.findIndex((s) => s.id === id);
+  if (idx === -1) throw new Error(`MCP server not found: ${id}`);
+  const current = all[idx];
+  const mergedTransport: MCPTransportConfig = patch.transport
+    ? { ...current.transport, ...patch.transport }
+    : current.transport;
+  const mergedAuth: MCPAuthConfig = patch.auth ?? current.auth;
+  const norm = validateAndNormalize({
+    name: patch.name ?? current.name,
+    enabled: patch.enabled ?? current.enabled,
+    transport: mergedTransport,
+    auth: mergedAuth,
+  });
+  if (norm.name.toLowerCase() !== current.name.toLowerCase()) {
+    assertNameUnique(norm.name, all, id);
+  }
+  const next: MCPServerConfig = {
+    ...current,
+    name: norm.name,
+    enabled: norm.enabled ?? current.enabled,
+    transport: norm.transport,
+    auth: norm.auth!,
+    updatedAt: Date.now(),
+  };
+  const copy = [...all];
+  copy[idx] = next;
+  await mcpServers.setValue(copy);
+  return next;
+}
+
+export async function removeMCPServer(id: string): Promise<void> {
+  const all = await mcpServers.getValue();
+  await mcpServers.setValue(all.filter((s) => s.id !== id));
+}
+
+/**
+ * Toggle the `enabled` flag without re-validating transport/auth, so users can
+ * disable a record that has become invalid (e.g. expired token, stricter
+ * validator shipped in a later version).
+ */
+export async function setMCPServerEnabled(id: string, enabled: boolean): Promise<MCPServerConfig> {
+  const all = await mcpServers.getValue();
+  const idx = all.findIndex((s) => s.id === id);
+  if (idx === -1) throw new Error(`MCP server not found: ${id}`);
+  const next: MCPServerConfig = { ...all[idx], enabled, updatedAt: Date.now() };
+  const copy = [...all];
+  copy[idx] = next;
+  await mcpServers.setValue(copy);
+  return next;
+}

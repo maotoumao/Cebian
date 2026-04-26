@@ -1,0 +1,36 @@
+---
+import Eyebrow from './Eyebrow.astro';
+/**
+ * Reference-section layout: left sticky eyebrow + heading column,
+ * right content column. Stacks on viewports below the lg breakpoint.
+ *
+ *   ┌─────────────┬───────────────────────────────┐
+ *   │ 01 ● TAG    │  <slot> — paragraphs, lists,  │
+ *   │ Title       │  screenshots, code, etc.      │
+ *   └─────────────┴───────────────────────────────┘
+ */
+interface Props {
+  id: string;
+  number?: string;
+  tag: string;
+  title: string;
+  /** Add bottom margin to leave space before next section. Default true. */
+  spaced?: boolean;
+}
+const { id, number, tag, title, spaced = true } = Astro.props;
+---
+<section
+  id={id}
+  class:list={[
+    'grid scroll-mt-20 gap-8 lg:grid-cols-[minmax(220px,260px)_minmax(0,1fr)] lg:gap-14',
+    spaced && 'mb-20 lg:mb-24 last:mb-0',
+  ]}
+>
+  <header class="lg:sticky lg:top-20 lg:self-start">
+    <Eyebrow number={number}>{tag}</Eyebrow>
+    <h2 class="h-major mt-3">{title}</h2>
+  </header>
+  <div class="min-w-0">
+    <slot />
+  </div>
+</section>

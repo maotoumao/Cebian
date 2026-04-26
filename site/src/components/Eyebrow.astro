@@ -1,0 +1,28 @@
+---
+interface Props {
+  label?: string;
+  tone?: 'accent' | 'muted';
+  number?: string;
+}
+const { label, tone = 'accent', number } = Astro.props;
+const accent = tone === 'accent';
+const hasTag = label != null || Astro.slots.has('default');
+---
+<span
+  class="inline-flex items-center gap-2 font-mono text-[12px] uppercase tracking-[0.16em] whitespace-nowrap"
+  style={accent ? 'color: var(--accent);' : 'color: var(--fg-subtle);'}
+>
+  {number && (
+    <span style={accent ? 'color: var(--accent); opacity: 0.65;' : 'color: var(--fg-subtle);'}>{number}</span>
+  )}
+  {hasTag && (
+    <>
+      <span
+        class="inline-block h-[6px] w-[6px] rounded-full"
+        style={accent ? 'background: var(--accent);' : 'background: var(--fg-subtle);'}
+        aria-hidden
+      ></span>
+      <slot>{label}</slot>
+    </>
+  )}
+</span>

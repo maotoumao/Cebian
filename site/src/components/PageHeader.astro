@@ -1,0 +1,25 @@
+---
+/**
+ * Reusable page-header block — consistent typography across inner pages.
+ * Sits in the wide container (1080) to match the dominant `RefSection` width.
+ */
+interface Props {
+  eyebrow?: string;
+  title: string;
+  lead?: string;
+  divider?: boolean;
+}
+const { eyebrow, title, lead, divider = true } = Astro.props;
+---
+<section class="container-wide relative pt-12 pb-10 sm:pt-16 sm:pb-12">
+  {eyebrow && (
+    <div class="font-mono text-[12px] uppercase tracking-[0.18em] mb-4 sm:mb-5" style="color: var(--accent);">{eyebrow}</div>
+  )}
+  <h1 class="h-page max-w-4xl">{title}</h1>
+  {lead && (
+    <p class="mt-5 sm:mt-6 max-w-2xl text-[15.5px] sm:text-[16px] leading-relaxed" style="color: var(--fg-muted);">
+      {lead}
+    </p>
+  )}
+  {divider && <div class="decor-line mt-8 sm:mt-10"></div>}
+</section>

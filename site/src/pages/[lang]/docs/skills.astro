@@ -1,0 +1,48 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import PageHeader from '../../../components/PageHeader.astro';
+import ArticleSection from '../../../components/ArticleSection.astro';
+import CodeBlock from '../../../components/CodeBlock.astro';
+import DocsFooter from '../../../components/DocsFooter.astro';
+import { getDict, type Lang } from '../../../i18n';
+
+export function getStaticPaths() {
+  return [{ params: { lang: 'zh' } }, { params: { lang: 'en' } }];
+}
+
+const lang = Astro.params.lang as Lang;
+const t = getDict(lang);
+const d = t.docs.skills;
+---
+<BaseLayout lang={lang} title={d.title} description={d.lead} path="/docs/skills">
+  <PageHeader eyebrow={d.eyebrow} title={d.title} lead={d.lead} />
+
+  <article class="container-wide pb-24">
+    <p class="text-[15.5px] leading-[1.75]" style="color: var(--fg);">{d.body}</p>
+
+    <ArticleSection tag={d.when_tag} title={d.when_heading}>
+      <p style="color: var(--fg-muted);">{d.when_body}</p>
+    </ArticleSection>
+
+    <ArticleSection tag={d.structure_tag} title={d.structure_heading}>
+      <p style="color: var(--fg-muted);">{d.structure_body}</p>
+      <div class="mt-5">
+        <CodeBlock lang="markdown" code={d.structure_code} />
+      </div>
+    </ArticleSection>
+
+    <ArticleSection tag={d.panel_tag} title={d.panel_heading}>
+      <p style="color: var(--fg-muted);">{d.panel_body}</p>
+      <ul class="mt-5 space-y-2.5 text-[14px] leading-relaxed">
+        {d.panel_bullets.map((b) => (
+          <li class="relative pl-5">
+            <span class="absolute left-0 top-[0.7em] h-[5px] w-[5px] rounded-full" style="background: var(--accent);" aria-hidden></span>
+            {b}
+          </li>
+        ))}
+      </ul>
+    </ArticleSection>
+
+    <DocsFooter lang={lang} slug="skills" />
+  </article>
+</BaseLayout>

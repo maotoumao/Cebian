@@ -1,0 +1,50 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getDict, localePath } from '../i18n';
+
+// Static 404 cannot know the visitor's lang at build time.
+// Render the zh copy by default, and swap to en client-side when the URL is under /en/.
+const zh = getDict('zh');
+const en = getDict('en');
+---
+<BaseLayout lang="zh" title="404" description={zh.not_found.body} path="/" bare>
+  <div class="min-h-dvh grid place-items-center px-5 text-center bg-noise relative">
+    <div class="absolute inset-0 bg-grid opacity-40" aria-hidden></div>
+    <div class="relative">
+      <div class="font-display text-[120px] leading-none tracking-[-0.04em]" style="color: var(--accent);">404</div>
+      <p
+        class="mt-2 text-[18px]"
+        style="color: var(--fg);"
+        data-nf-body
+        data-zh={zh.not_found.body}
+        data-en={en.not_found.body}
+      >{zh.not_found.body}</p>
+      <div class="mt-8 flex justify-center">
+        <a
+          href={localePath('zh', '/')}
+          class="rounded-md px-4 py-2 text-[13.5px] font-medium"
+          style="background: var(--accent); color: var(--accent-fg);"
+          data-nf-back
+          data-zh-href={localePath('zh', '/')}
+          data-en-href={localePath('en', '/')}
+          data-zh={zh.not_found.back}
+          data-en={en.not_found.back}
+        >{zh.not_found.back}</a>
+      </div>
+    </div>
+  </div>
+
+  <script is:inline>
+    (function () {
+      var isEn = location.pathname.indexOf('/en/') === 0 || location.pathname === '/en';
+      if (!isEn) return;
+      document.documentElement.lang = 'en';
+      document.querySelectorAll('[data-nf-body],[data-nf-back]').forEach(function (el) {
+        el.textContent = el.dataset.en;
+      });
+      document.querySelectorAll('[data-nf-back]').forEach(function (el) {
+        el.setAttribute('href', el.dataset.enHref);
+      });
+    })();
+  </script>
+</BaseLayout>

@@ -1,0 +1,62 @@
+---
+import { getDict, localePath, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+  slug: string;
+}
+const { lang, slug } = Astro.props;
+const t = getDict(lang);
+
+const items = t.docs.index_items;
+const idx = items.findIndex((it) => it.slug === slug);
+const prev = idx > 0 ? items[idx - 1] : null;
+const next = idx >= 0 && idx < items.length - 1 ? items[idx + 1] : null;
+
+const labels = t.docs.pager;
+---
+<nav
+  class="mt-16 grid gap-3 sm:grid-cols-2"
+  aria-label={labels.index}
+>
+  {prev ? (
+    <a
+      href={localePath(lang, `/docs/${prev.slug}`)}
+      class="group flex flex-col gap-1.5 rounded-xl p-5 transition-colors hover:border-[var(--border-strong)]"
+      style="border: 1px solid var(--border); background: var(--bg-elev);"
+    >
+      <span class="font-mono text-[11.5px] uppercase tracking-[0.16em] inline-flex items-center gap-1.5" style="color: var(--fg-subtle);">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden><path d="M15 18l-6-6 6-6" /></svg>
+        {labels.prev}
+      </span>
+      <span class="font-display text-[16px] tracking-tight" style="color: var(--fg);">{prev.title}</span>
+    </a>
+  ) : (
+    <div></div>
+  )}
+  {next ? (
+    <a
+      href={localePath(lang, `/docs/${next.slug}`)}
+      class="group flex flex-col gap-1.5 rounded-xl p-5 sm:items-end sm:text-right transition-colors hover:border-[var(--border-strong)]"
+      style="border: 1px solid var(--border); background: var(--bg-elev);"
+    >
+      <span class="font-mono text-[11.5px] uppercase tracking-[0.16em] inline-flex items-center gap-1.5" style="color: var(--fg-subtle);">
+        {labels.next}
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden><path d="M9 6l6 6-6 6" /></svg>
+      </span>
+      <span class="font-display text-[16px] tracking-tight" style="color: var(--fg);">{next.title}</span>
+    </a>
+  ) : (
+    <div></div>
+  )}
+</nav>
+<div class="mt-6 text-[13.5px]">
+  <a
+    href={localePath(lang, '/docs')}
+    class="inline-flex items-center gap-1.5"
+    style="color: var(--accent);"
+  >
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden><path d="M19 12H5M11 19l-7-7 7-7" /></svg>
+    {labels.index}
+  </a>
+</div>

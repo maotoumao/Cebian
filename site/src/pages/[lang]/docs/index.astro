@@ -1,0 +1,64 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import PageHeader from '../../../components/PageHeader.astro';
+import { getDict, localePath, type Lang } from '../../../i18n';
+
+export function getStaticPaths() {
+  return [{ params: { lang: 'zh' } }, { params: { lang: 'en' } }];
+}
+
+const lang = Astro.params.lang as Lang;
+const t = getDict(lang);
+---
+<BaseLayout lang={lang} title={t.docs.title} description={t.docs.lead} path="/docs">
+  <PageHeader eyebrow={t.docs.eyebrow} title={t.docs.title} />
+
+  <div class="container-wide pb-24">
+    {/* WIP placeholder — set SHOW_CARDS = true below to restore the original card grid. */}
+    <div
+      class="rounded-xl p-12 sm:p-16 text-center bg-noise relative overflow-hidden"
+      style="border: 1px dashed var(--border-strong); background: var(--bg-elev);"
+    >
+      <div class="absolute inset-0 bg-grid opacity-30" aria-hidden></div>
+      <div class="relative">
+        <div class="font-mono text-[12px] uppercase tracking-[0.2em]" style="color: var(--accent);">
+          {t.docs.wip_label}
+        </div>
+        <p class="mt-4 font-display text-[22px] sm:text-[26px]" style="color: var(--fg);">
+          {t.docs.wip_text}
+        </p>
+      </div>
+    </div>
+
+    {/*
+      Original card grid — kept here so it can be restored at any time.
+      To re-enable: delete the WIP block above and the `false &&` guard below.
+    */}
+    {false && (
+      <div class="mt-8 grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {t.docs.index_items.map((item, i) => (
+          <a
+            href={localePath(lang, `/docs/${item.slug}`)}
+            class="group relative overflow-hidden rounded-xl p-6 transition-transform hover:-translate-y-0.5 flex flex-col"
+            style="border: 1px solid var(--border); background: var(--bg-elev);"
+          >
+            <div
+              class="absolute -right-16 -top-16 h-40 w-40 rounded-full blur-3xl opacity-0 group-hover:opacity-70 transition-opacity"
+              style="background: var(--accent-soft);"
+              aria-hidden
+            ></div>
+            <div class="relative flex items-center gap-2 font-mono text-[12px] uppercase tracking-[0.16em]" style="color: var(--accent);">
+              <span style="opacity: 0.65;">{String(i + 1).padStart(2, '0')}</span>
+            </div>
+            <h2 class="relative mt-3 h-prose">{item.title}</h2>
+            <p class="relative mt-3 text-[13.5px] leading-relaxed flex-1" style="color: var(--fg-muted);">{item.body}</p>
+            <div class="relative mt-6 inline-flex items-center gap-1.5 text-[13px] font-medium self-start" style="color: var(--accent);">
+              {t.docs.read_cta}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
+            </div>
+          </a>
+        ))}
+      </div>
+    )}
+  </div>
+</BaseLayout>

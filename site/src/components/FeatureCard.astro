@@ -1,0 +1,26 @@
+---
+interface Props {
+  tag?: string;
+  title: string;
+  body: string;
+  index?: number;
+}
+const { tag, title, body, index = 0 } = Astro.props;
+---
+<div
+  class="group relative overflow-hidden rounded-xl p-5 transition-transform hover:-translate-y-0.5"
+  style={`border: 1px solid var(--border); background: var(--bg-elev); animation-delay: ${80 * index}ms;`}
+>
+  <div
+    class="absolute -right-10 -top-10 h-24 w-24 rounded-full blur-2xl opacity-0 group-hover:opacity-60 transition-opacity"
+    style="background: var(--accent-soft);"
+    aria-hidden
+  ></div>
+  {tag && (
+    <div class="font-mono text-[12px] uppercase tracking-[0.16em] mb-3" style="color: var(--accent);">
+      {tag}
+    </div>
+  )}
+  <h3 class="font-display text-[19px] leading-snug mb-2">{title}</h3>
+  <p class="text-[13.5px] leading-relaxed" style="color: var(--fg-muted);">{body}</p>
+</div>

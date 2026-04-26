@@ -1,0 +1,234 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ScreenshotFrame from '../../components/ScreenshotFrame.astro';
+import FeatureCard from '../../components/FeatureCard.astro';
+import Eyebrow from '../../components/Eyebrow.astro';
+import { getDict, localePath, type Lang } from '../../i18n';
+
+export function getStaticPaths() {
+  return [{ params: { lang: 'zh' } }, { params: { lang: 'en' } }];
+}
+
+const lang = Astro.params.lang as Lang;
+const t = getDict(lang);
+---
+<BaseLayout lang={lang} title="Cebian" path="/">
+  <!-- =============== HERO =============== -->
+  <section class="relative overflow-hidden bg-noise">
+    <!-- decorative grid -->
+    <div class="absolute inset-0 bg-grid opacity-[0.45]" aria-hidden></div>
+    <!-- decorative radial -->
+    <div
+      class="absolute -top-40 left-1/2 -translate-x-1/2 h-[640px] w-[1100px] -z-0 blur-3xl opacity-60"
+      style="background: radial-gradient(ellipse at center, var(--accent-soft) 0%, transparent 60%);"
+      aria-hidden
+    ></div>
+
+    <div class="relative container-hero pt-20 pb-24 grid gap-14 lg:grid-cols-[1.15fr_1fr] lg:items-center">
+      <div class="rise" style="animation-delay: 60ms;">
+        <h1
+          class="font-display text-[54px] sm:text-[72px] lg:text-[84px] leading-[0.98] tracking-[-0.03em]"
+          style="font-weight: 520;"
+        >
+          <span>{t.home.headline_lead}</span>
+          <span
+            class="relative inline-block"
+            style="color: var(--accent);"
+          >
+            {t.home.headline_accent}
+            <span
+              class="absolute inset-x-0 -bottom-1 h-[5px] rounded-sm"
+              style="background: var(--accent); opacity: 0.22;"
+              aria-hidden
+            ></span>
+          </span>
+          <span>{t.home.headline_tail}</span>
+        </h1>
+
+        <p
+          class="mt-7 max-w-xl text-[16.5px] leading-[1.65]"
+          style="color: var(--fg-muted);"
+        >
+          {t.home.subhead}
+        </p>
+
+        <div class="mt-9 flex flex-wrap items-center gap-3 text-[14px]">
+          <a
+            href={localePath(lang, '/install-guide')}
+            class="inline-flex items-center gap-2 rounded-md px-5 py-3 font-medium transition-transform hover:-translate-y-0.5"
+            style="background: var(--accent); color: var(--accent-fg); box-shadow: 0 10px 30px -10px var(--accent);"
+          >
+            {t.home.cta_install}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden>
+              <path d="M5 12h14M13 5l7 7-7 7" />
+            </svg>
+          </a>
+          <a
+            href={localePath(lang, '/docs')}
+            class="inline-flex items-center gap-2 rounded-md px-5 py-3 font-medium transition-colors"
+            style="border: 1px solid var(--border-strong); color: var(--fg);"
+          >
+            {t.home.cta_install_guide}
+          </a>
+        </div>
+
+        <div class="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] font-mono uppercase tracking-[0.14em]" style="color: var(--fg-subtle);">
+          <span class="flex items-center gap-2">
+            <span class="h-[6px] w-[6px] rounded-full" style="background: var(--accent);"></span>
+            {t.home.badges.multi_provider}
+          </span>
+          <span class="flex items-center gap-2">
+            <span class="h-[6px] w-[6px] rounded-full" style="background: var(--accent);"></span>
+            {t.home.badges.mcp}
+          </span>
+          <span class="flex items-center gap-2">
+            <span class="h-[6px] w-[6px] rounded-full" style="background: var(--accent);"></span>
+            {t.home.badges.skills}
+          </span>
+          <span class="flex items-center gap-2">
+            <span class="h-[6px] w-[6px] rounded-full" style="background: var(--accent);"></span>
+            {t.home.badges.local_first}
+          </span>
+          <span class="flex items-center gap-2">
+            <span class="h-[6px] w-[6px] rounded-full" style="background: var(--accent);"></span>
+            {t.home.badges.open_source}
+          </span>
+        </div>
+      </div>
+
+      <div class="rise" style="animation-delay: 220ms;">
+        <ScreenshotFrame
+          variant="sidebar"
+          ratio="9/16"
+          src="/screenshots/sidebar.png"
+          alt={t.home.sidebar_alt}
+          caption=""
+          placeholderLabel={t.home.sidebar_placeholder}
+        />
+      </div>
+    </div>
+
+    <div class="decor-line container-hero"></div>
+  </section>
+
+  <!-- =============== WHY =============== -->
+  <section class="relative container-hero py-20">
+    <div class="grid gap-12 lg:grid-cols-[1fr_1.6fr] lg:items-start">
+      <div>
+        <Eyebrow number="01" />
+        <h2 class="font-display text-[34px] sm:text-[42px] leading-[1.05] tracking-[-0.02em] mt-4">
+          {t.home.why_heading}
+        </h2>
+        <p class="mt-5 text-[15px] leading-relaxed" style="color: var(--fg-muted);">
+          {t.home.why_lead}
+        </p>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-3">
+        {t.home.why_cards.map((c, i) => (
+          <div
+            class="rise flex h-full flex-col rounded-xl p-5"
+            style={`border: 1px solid var(--border); background: var(--bg-elev); animation-delay: ${120 * i}ms;`}
+          >
+            <div class="font-mono text-[12px] uppercase tracking-[0.16em]" style="color: var(--accent);">
+              0{i + 1}
+            </div>
+            <h3 class="font-display text-[19px] mt-3 mb-2">{c.title}</h3>
+            <p class="text-[13.5px] leading-relaxed" style="color: var(--fg-muted);">{c.body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <div class="decor-line container-hero"></div>
+
+  <!-- =============== FEATURES =============== -->
+  <section class="relative container-hero py-20">
+    <div class="max-w-2xl">
+      <Eyebrow number="02" />
+      <h2 class="font-display text-[34px] sm:text-[42px] leading-[1.05] tracking-[-0.02em] mt-4">
+        {t.home.features_heading}
+      </h2>
+    </div>
+    <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {t.home.features_cards.map((c, i) => (
+        <FeatureCard tag={c.tag} title={c.title} body={c.body} index={i} />
+      ))}
+    </div>
+    <div class="mt-10 text-center">
+      <a href={localePath(lang, '/install-guide')} class="inline-flex items-center gap-1.5 text-[13.5px] font-medium" style="color: var(--accent);">
+        {t.common.learn_more}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden><path d="M5 12h14M13 5l7 7-7 7" /></svg>
+      </a>
+    </div>
+  </section>
+
+  <div class="decor-line container-hero"></div>
+
+  <!-- =============== SCENARIOS =============== -->
+  <section class="relative container-hero py-20">
+    <div class="max-w-2xl">
+      <Eyebrow number="03" />
+      <h2 class="font-display text-[34px] sm:text-[42px] leading-[1.05] tracking-[-0.02em] mt-4">
+        {t.home.scenarios_heading}
+      </h2>
+      <p class="mt-5 text-[15px] leading-relaxed" style="color: var(--fg-muted);">
+        {t.home.scenarios_lead}
+      </p>
+    </div>
+    <ul class="mt-12 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+      {t.home.scenarios.map((s, i) => (
+        <li class="flex gap-4">
+          <div
+            class="shrink-0 font-mono text-[12px] leading-[1.4] tracking-[0.16em] pt-1"
+            style="color: var(--accent); opacity: 0.7;"
+          >
+            {String(i + 1).padStart(2, '0')}
+          </div>
+          <div class="min-w-0">
+            <h3 class="font-display text-[17px] leading-snug tracking-tight">{s.title}</h3>
+            <p class="mt-1.5 text-[13.5px] leading-relaxed" style="color: var(--fg-muted);">{s.body}</p>
+          </div>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <!-- =============== FINAL CTA =============== -->
+  <section class="relative container-hero pt-8 pb-24">
+    <div
+      class="relative overflow-hidden rounded-2xl p-10 sm:p-14 bg-noise"
+      style="border: 1px solid var(--border); background: linear-gradient(135deg, var(--bg-elev) 0%, color-mix(in oklab, var(--accent-soft) 55%, var(--bg-elev)) 100%);"
+    >
+      <div class="absolute inset-0 bg-grid opacity-30" aria-hidden></div>
+      <div class="relative">
+        <h2 class="font-display text-[34px] sm:text-[42px] leading-tight tracking-[-0.02em] max-w-2xl">
+          {t.home.cta_heading}
+        </h2>
+        <p class="mt-4 max-w-xl text-[15px] leading-relaxed" style="color: var(--fg-muted);">
+          {t.home.cta_body}
+        </p>
+        <div class="mt-8 flex flex-wrap gap-3 text-[14px]">
+          <a
+            href={localePath(lang, '/install-guide')}
+            class="inline-flex items-center gap-2 rounded-md px-5 py-3 font-medium transition-transform hover:-translate-y-0.5"
+            style="background: var(--accent); color: var(--accent-fg);"
+          >
+            {t.home.cta_install}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden>
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </a>
+          <a
+            href="https://github.com/maotoumao/Cebian"
+            target="_blank" rel="noopener"
+            class="inline-flex items-center gap-2 rounded-md px-5 py-3 font-medium"
+            style="border: 1px solid var(--border-strong); color: var(--fg);"
+          >
+            {t.common.on_github}
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

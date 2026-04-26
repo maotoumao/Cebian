@@ -1,0 +1,459 @@
+/**
+ * OAuth login/refresh logic for browser extension context.
+ *
+ * GitHub Copilot: Device Code Flow (uses pi-ai directly)
+ * OpenAI Codex:   Authorization Code + PKCE (self-built, tab URL interception)
+ * Google Gemini:  Authorization Code + PKCE (self-built, tab URL interception)
+ */
+
+import {
+  loginGitHubCopilot as piLoginGitHubCopilot,
+  refreshGitHubCopilotToken,
+  refreshOpenAICodexToken,
+  refreshGoogleCloudToken,
+  getGitHubCopilotBaseUrl,
+  normalizeDomain,
+} from '@mariozechner/pi-ai/oauth';
+import { providerCredentials, type OAuthCredential } from './storage';
+import { t } from '@/lib/i18n';
+
+// ─── PKCE (Web Crypto) ───
+
+function base64urlEncode(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+async function generatePKCE(): Promise<{ verifier: string; challenge: string }> {
+  const verifierBytes = new Uint8Array(32);
+  crypto.getRandomValues(verifierBytes);
+  const verifier = base64urlEncode(verifierBytes);
+  const data = new TextEncoder().encode(verifier);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  const challenge = base64urlEncode(new Uint8Array(hash));
+  return { verifier, challenge };
+}
+
+// ─── Result type ───
+
+export interface OAuthResult {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+  extra?: Record<string, unknown>;
+}
+
+// ─── Tab URL interception ───
+
+function waitForRedirectUrl(
+  urlPrefix: string,
+  signal?: AbortSignal,
+  timeoutMs = 120000,
+): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error(t('errors.oauth.cancelled')));
+      return;
+    }
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      chrome.tabs.onUpdated.removeListener(listener);
+    };
+
+    const listener = (tabId: number, info: { url?: string }) => {
+      if (info.url?.startsWith(urlPrefix)) {
+        cleanup();
+        chrome.tabs.remove(tabId).catch(() => {});
+        resolve(info.url);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(t('errors.oauth.timeout')));
+    }, timeoutMs);
+
+    chrome.tabs.onUpdated.addListener(listener);
+
+    signal?.addEventListener('abort', () => {
+      cleanup();
+      reject(new Error(t('errors.oauth.cancelled')));
+    }, { once: true });
+  });
+}
+
+// ─── GitHub Copilot (Device Code Flow) ───
+
+export interface GitHubCopilotCallbacks {
+  onDeviceCode: (code: string, verificationUrl: string) => void;
+  onProgress?: (message: string) => void;
+  signal?: AbortSignal;
+}
+
+export async function loginGitHubCopilot(
+  callbacks: GitHubCopilotCallbacks,
+): Promise<OAuthResult> {
+  const creds = await piLoginGitHubCopilot({
+    onAuth: (url: string, instructions?: string) => {
+      chrome.tabs.create({ url });
+      callbacks.onDeviceCode(instructions ?? '', url);
+    },
+    onPrompt: async () => '',
+    onProgress: callbacks.onProgress,
+    signal: callbacks.signal,
+  });
+
+  return {
+    accessToken: creds.access,
+    refreshToken: creds.refresh,
+    expiresAt: creds.expires,
+    extra: creds.enterpriseUrl ? { enterpriseUrl: creds.enterpriseUrl } : undefined,
+  };
+}
+
+// ─── OpenAI Codex (Authorization Code + PKCE) ───
+
+const OPENAI_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
+const OPENAI_AUTHORIZE_URL = 'https://auth.openai.com/oauth/authorize';
+const OPENAI_TOKEN_URL = 'https://auth.openai.com/oauth/token';
+const OPENAI_REDIRECT_URI = 'http://localhost:1455/auth/callback';
+const OPENAI_SCOPE = 'openid profile email offline_access';
+
+export async function loginOpenAICodex(
+  signal?: AbortSignal,
+): Promise<OAuthResult> {
+  const { verifier, challenge } = await generatePKCE();
+  const state = crypto.randomUUID();
+
+  const url = new URL(OPENAI_AUTHORIZE_URL);
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('client_id', OPENAI_CLIENT_ID);
+  url.searchParams.set('redirect_uri', OPENAI_REDIRECT_URI);
+  url.searchParams.set('scope', OPENAI_SCOPE);
+  url.searchParams.set('code_challenge', challenge);
+  url.searchParams.set('code_challenge_method', 'S256');
+  url.searchParams.set('state', state);
+  url.searchParams.set('codex_cli_simplified_flow', 'true');
+
+  chrome.tabs.create({ url: url.toString() });
+
+  const redirectUrl = await waitForRedirectUrl(OPENAI_REDIRECT_URI, signal);
+  const params = new URL(redirectUrl).searchParams;
+  const code = params.get('code');
+  const returnedState = params.get('state');
+
+  if (!code) throw new Error(t('errors.oauth.noCode'));
+  if (returnedState !== state) throw new Error(t('errors.oauth.stateMismatch'));
+
+  // Exchange code for tokens
+  const tokenRes = await fetch(OPENAI_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: OPENAI_CLIENT_ID,
+      code,
+      code_verifier: verifier,
+      redirect_uri: OPENAI_REDIRECT_URI,
+    }),
+  });
+
+  if (!tokenRes.ok) {
+    throw new Error(t('errors.oauth.tokenExchangeFailed', [tokenRes.status]));
+  }
+
+  const tokenData = await tokenRes.json();
+  if (!tokenData.access_token || !tokenData.refresh_token) {
+    throw new Error(t('errors.oauth.missingTokenFields'));
+  }
+
+  return {
+    accessToken: tokenData.access_token,
+    refreshToken: tokenData.refresh_token,
+    expiresAt: Date.now() + tokenData.expires_in * 1000,
+  };
+}
+
+// ─── Google Gemini CLI (Authorization Code + PKCE) ───
+
+const GOOGLE_CLIENT_ID = atob('NjgxMjU1ODA5Mzk1LW9vOGZ0Mm9wcmRybnA5ZTNhcWY2YXYzaG1kaWIxMzVqLmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29t');
+const GOOGLE_CLIENT_SECRET = atob('R09DU1BYLTR1SGdNUG0tMW83U2stZ2VWNkN1NWNsWEZzeGw=');
+const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const GOOGLE_REDIRECT_URI = 'http://localhost:8085/oauth2callback';
+const GOOGLE_SCOPES = [
+  'https://www.googleapis.com/auth/cloud-platform',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
+];
+const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com';
+
+async function discoverGoogleProject(accessToken: string): Promise<string> {
+  const headers = {
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+    'User-Agent': 'cebian-extension/1.0',
+  };
+
+  const loadRes = await fetch(`${CODE_ASSIST_ENDPOINT}/v1internal:loadCodeAssist`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      metadata: {
+        ideType: 'IDE_UNSPECIFIED',
+        platform: 'PLATFORM_UNSPECIFIED',
+        pluginType: 'GEMINI',
+      },
+    }),
+  });
+
+  if (loadRes.ok) {
+    const data = await loadRes.json();
+    if (data.cloudaicompanionProject) {
+      return data.cloudaicompanionProject;
+    }
+    if (data.currentTier) {
+      // Has tier but no managed project — need onboarding
+    }
+  }
+
+  // Onboard to free tier
+  const onboardRes = await fetch(`${CODE_ASSIST_ENDPOINT}/v1internal:onboardUser`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      tierId: 'free-tier',
+      metadata: {
+        ideType: 'IDE_UNSPECIFIED',
+        platform: 'PLATFORM_UNSPECIFIED',
+        pluginType: 'GEMINI',
+      },
+    }),
+  });
+
+  if (!onboardRes.ok) {
+    throw new Error(t('errors.oauth.gcpProjectFailed', [onboardRes.status]));
+  }
+
+  let lroData = await onboardRes.json();
+
+  // Poll if operation is not done
+  if (!lroData.done && lroData.name) {
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      const pollRes = await fetch(`${CODE_ASSIST_ENDPOINT}/v1internal/${lroData.name}`, {
+        method: 'GET',
+        headers,
+      });
+      if (!pollRes.ok) throw new Error(t('errors.oauth.gcpProjectPollFailed'));
+      lroData = await pollRes.json();
+      if (lroData.done) break;
+    }
+  }
+
+  const projectId = lroData.response?.cloudaicompanionProject?.id;
+  if (projectId) return projectId;
+
+  throw new Error(t('errors.oauth.gcpProjectIdMissing'));
+}
+
+export async function loginGeminiCli(
+  signal?: AbortSignal,
+): Promise<OAuthResult> {
+  const { verifier, challenge } = await generatePKCE();
+  const state = crypto.randomUUID();
+
+  const url = new URL(GOOGLE_AUTH_URL);
+  url.searchParams.set('client_id', GOOGLE_CLIENT_ID);
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('redirect_uri', GOOGLE_REDIRECT_URI);
+  url.searchParams.set('scope', GOOGLE_SCOPES.join(' '));
+  url.searchParams.set('code_challenge', challenge);
+  url.searchParams.set('code_challenge_method', 'S256');
+  url.searchParams.set('state', state);
+  url.searchParams.set('access_type', 'offline');
+  url.searchParams.set('prompt', 'consent');
+
+  chrome.tabs.create({ url: url.toString() });
+
+  const redirectUrl = await waitForRedirectUrl(GOOGLE_REDIRECT_URI, signal);
+  const params = new URL(redirectUrl).searchParams;
+  const code = params.get('code');
+  const returnedState = params.get('state');
+
+  if (!code) throw new Error(t('errors.oauth.noCode'));
+  if (returnedState !== state) throw new Error(t('errors.oauth.stateMismatch'));
+
+  // Exchange code for tokens
+  const tokenRes = await fetch(GOOGLE_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
+      code,
+      grant_type: 'authorization_code',
+      redirect_uri: GOOGLE_REDIRECT_URI,
+      code_verifier: verifier,
+    }),
+  });
+
+  if (!tokenRes.ok) {
+    throw new Error(t('errors.oauth.tokenExchangeFailed', [tokenRes.status]));
+  }
+
+  const tokenData = await tokenRes.json();
+  if (!tokenData.refresh_token) {
+    throw new Error(t('errors.oauth.missingRefreshToken'));
+  }
+
+  // Discover / provision Google Cloud project
+  const projectId = await discoverGoogleProject(tokenData.access_token);
+
+  // Get user email (optional)
+  let email: string | undefined;
+  try {
+    const userRes = await fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json', {
+      headers: { 'Authorization': `Bearer ${tokenData.access_token}` },
+    });
+    if (userRes.ok) {
+      const userData = await userRes.json();
+      email = userData.email;
+    }
+  } catch { /* optional */ }
+
+  return {
+    accessToken: tokenData.access_token,
+    refreshToken: tokenData.refresh_token,
+    expiresAt: Date.now() + tokenData.expires_in * 1000 - 5 * 60 * 1000,
+    extra: { projectId, email },
+  };
+}
+
+// ─── Unified refresh ───
+
+export async function refreshOAuthCredential(
+  provider: string,
+  cred: OAuthCredential,
+): Promise<OAuthCredential> {
+  if (!cred.refreshToken) throw new Error(t('errors.oauth.missingRefreshTokenLocal'));
+
+  let newAccess: string;
+  let newRefresh: string;
+  let newExpires: number;
+  let newExtra = cred.extra;
+
+  switch (provider) {
+    case 'github-copilot': {
+      const domain = cred.extra?.enterpriseUrl
+        ? (normalizeDomain(cred.extra.enterpriseUrl as string) ?? undefined)
+        : undefined;
+      const result = await refreshGitHubCopilotToken(cred.refreshToken, domain);
+      newAccess = result.access;
+      newRefresh = result.refresh;
+      newExpires = result.expires;
+      if (result.enterpriseUrl) {
+        newExtra = { ...cred.extra, enterpriseUrl: result.enterpriseUrl };
+      }
+      break;
+    }
+    case 'openai-codex': {
+      const result = await refreshOpenAICodexToken(cred.refreshToken);
+      newAccess = result.access;
+      newRefresh = result.refresh;
+      newExpires = result.expires;
+      break;
+    }
+    case 'google-gemini-cli': {
+      const projectId = (cred.extra?.projectId as string) ?? '';
+      const result = await refreshGoogleCloudToken(cred.refreshToken, projectId);
+      newAccess = result.access;
+      newRefresh = result.refresh;
+      newExpires = result.expires;
+      newExtra = { ...cred.extra, projectId: result.projectId ?? projectId };
+      break;
+    }
+    default:
+      throw new Error(t('errors.oauth.unknownProvider', [provider]));
+  }
+
+  return {
+    authType: 'oauth',
+    accessToken: newAccess,
+    refreshToken: newRefresh,
+    expiresAt: newExpires,
+    verified: true,
+    extra: newExtra,
+  };
+}
+
+// ─── Get Copilot base URL ───
+
+export function getCopilotBaseUrl(cred: OAuthCredential): string {
+  const domain = cred.extra?.enterpriseUrl
+    ? (normalizeDomain(cred.extra.enterpriseUrl as string) ?? undefined)
+    : undefined;
+  return getGitHubCopilotBaseUrl(cred.accessToken, domain);
+}
+
+// ─── Get API key ───
+
+// Google Gemini requires projectId alongside the token; other providers use plain accessToken.
+function getApiKeyFromCredential(
+  _provider: string,
+  cred: OAuthCredential,
+): string {
+  if (cred.extra?.projectId) {
+    return JSON.stringify({
+      token: cred.accessToken,
+      projectId: cred.extra.projectId,
+    });
+  }
+  return cred.accessToken;
+}
+
+// ─── On-demand token refresh ───
+
+const ON_DEMAND_BUFFER_MS = 5 * 60 * 1000; // 5 minutes before expiry
+
+/** Per-provider in-flight refresh promise to deduplicate concurrent refreshes. */
+const inflightRefresh = new Map<string, Promise<OAuthCredential>>();
+
+/**
+ * Get a valid OAuth token, refreshing on-demand if it's about to expire.
+ * Deduplicates concurrent refresh requests per provider.
+ */
+export async function getValidOAuthToken(
+  provider: string,
+  _cred: OAuthCredential,
+): Promise<string> {
+  // Re-read from storage in case background alarm already refreshed
+  const freshCreds = await providerCredentials.getValue();
+  const cred = (freshCreds[provider] as OAuthCredential | undefined) ?? _cred;
+
+  if (cred.refreshToken && cred.expiresAt && Date.now() >= cred.expiresAt - ON_DEMAND_BUFFER_MS) {
+    let pending = inflightRefresh.get(provider);
+    if (!pending) {
+      pending = refreshOAuthCredential(provider, cred)
+        .then(async (refreshed) => {
+          const creds = await providerCredentials.getValue();
+          await providerCredentials.setValue({ ...creds, [provider]: refreshed });
+          console.log(`[OAuth] ${provider}: on-demand refresh succeeded`);
+          return refreshed;
+        })
+        .finally(() => inflightRefresh.delete(provider));
+      inflightRefresh.set(provider, pending);
+    }
+
+    try {
+      const refreshed = await pending;
+      return getApiKeyFromCredential(provider, refreshed);
+    } catch (err) {
+      console.error(`[OAuth] ${provider}: on-demand refresh failed, using existing token`, err);
+    }
+  }
+
+  return getApiKeyFromCredential(provider, cred);
+}

@@ -1,0 +1,67 @@
+---
+import type { Lang } from '../i18n';
+import { getDict, localePath } from '../i18n';
+
+interface Props { lang: Lang; }
+const { lang } = Astro.props;
+const t = getDict(lang);
+---
+<footer class="mt-24 border-t" style="border-color: var(--border);">
+  <div class="container-hero py-12 grid gap-10 md:grid-cols-[1.4fr_1fr_1fr]">
+    <div>
+      <div class="flex items-center gap-2.5">
+        <img src="/icon/48.png" alt="" width="22" height="22" class="rounded-[5px]" />
+        <span class="font-display text-[17px] font-semibold">Cebian</span>
+      </div>
+      <p class="mt-4 text-[13.5px] leading-relaxed max-w-sm" style="color: var(--fg-muted);">
+        {t.footer.tagline}
+      </p>
+      <p class="mt-2 text-[12.5px]" style="color: var(--fg-subtle);">
+        {t.footer.made_with}{' '}
+        <a
+          href={t.footer.author_url}
+          target="_blank"
+          rel="noopener"
+          class="link-muted underline underline-offset-2 decoration-dotted"
+          style="color: var(--fg-muted);"
+        >{t.footer.author}</a>
+        {' · '}{t.footer.license}
+      </p>
+    </div>
+
+    <div>
+      <div class="text-[12px] uppercase tracking-[0.14em] mb-3" style="color: var(--fg-subtle);">
+        {t.footer.links_heading}
+      </div>
+      <ul class="space-y-2 text-[13.5px]">
+        <li><a href={localePath(lang, '/install-guide')} class="link-muted">{t.nav.install_guide}</a></li>
+        <li><a href={localePath(lang, '/docs')} class="link-muted">{t.nav.docs}</a></li>
+        <li><a href={localePath(lang, '/about')} class="link-muted">{t.nav.about}</a></li>
+      </ul>
+    </div>
+
+    <div>
+      <div class="text-[12px] uppercase tracking-[0.14em] mb-3" style="color: var(--fg-subtle);">
+        {t.footer.resources_heading}
+      </div>
+      <ul class="space-y-2 text-[13.5px]">
+        <li><a href="https://github.com/maotoumao/Cebian" class="link-muted" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/maotoumao/Cebian/releases/latest" class="link-muted" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://github.com/maotoumao/Cebian/issues" class="link-muted" target="_blank" rel="noopener">Issues</a></li>
+        <li><a href={localePath(lang, '/privacy')} class="link-muted">{t.footer.privacy}</a></li>
+        <li><a href={localePath(lang, '/about')} class="link-muted">{t.footer.contact}</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="container-hero pb-8 text-[12px]" style="color: var(--fg-subtle);">
+    {t.footer.copyright}
+  </div>
+</footer>
+
+<style>
+  .link-muted {
+    color: var(--fg-muted);
+    transition: color .15s ease;
+  }
+  .link-muted:hover { color: var(--fg); }
+</style>

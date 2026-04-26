@@ -1,0 +1,54 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import PageHeader from '../../../components/PageHeader.astro';
+import ArticleSection from '../../../components/ArticleSection.astro';
+import DocsFooter from '../../../components/DocsFooter.astro';
+import { getDict, type Lang } from '../../../i18n';
+
+export function getStaticPaths() {
+  return [{ params: { lang: 'zh' } }, { params: { lang: 'en' } }];
+}
+
+const lang = Astro.params.lang as Lang;
+const t = getDict(lang);
+const d = t.docs.mcp;
+---
+<BaseLayout lang={lang} title={d.title} description={d.lead} path="/docs/mcp">
+  <PageHeader eyebrow={d.eyebrow} title={d.title} lead={d.lead} />
+
+  <article class="container-wide pb-24">
+    <p class="text-[15.5px] leading-[1.75]" style="color: var(--fg);">{d.body}</p>
+
+    <ArticleSection tag={d.transports_tag} title={d.transports_heading}>
+      <div class="grid gap-3">
+        {d.transports.map((tr) => (
+          <div
+            class="rounded-xl p-5"
+            style="border: 1px solid var(--border); background: var(--bg-elev);"
+          >
+            <div class="font-mono text-[12px]" style="color: var(--accent);">{tr.name}</div>
+            <p class="mt-2 text-[14px] leading-relaxed" style="color: var(--fg);">{tr.desc}</p>
+          </div>
+        ))}
+      </div>
+    </ArticleSection>
+
+    <ArticleSection tag={d.example_tag} title={d.example_heading}>
+      <p style="color: var(--fg-muted);">{d.example_body}</p>
+    </ArticleSection>
+
+    <ArticleSection tag={d.panel_tag} title={d.panel_heading}>
+      <p style="color: var(--fg-muted);">{d.panel_body}</p>
+      <ul class="mt-5 space-y-2.5 text-[14px] leading-relaxed">
+        {d.panel_bullets.map((b) => (
+          <li class="relative pl-5">
+            <span class="absolute left-0 top-[0.7em] h-[5px] w-[5px] rounded-full" style="background: var(--accent);" aria-hidden></span>
+            {b}
+          </li>
+        ))}
+      </ul>
+    </ArticleSection>
+
+    <DocsFooter lang={lang} slug="mcp" />
+  </article>
+</BaseLayout>

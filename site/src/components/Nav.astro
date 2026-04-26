@@ -1,0 +1,177 @@
+---
+import type { Lang } from '../i18n';
+import { getDict, localePath } from '../i18n';
+import LangSwitcher from './LangSwitcher.tsx';
+import ThemeToggle from './ThemeToggle.tsx';
+
+interface Props {
+  lang: Lang;
+  path: string;
+}
+const { lang, path } = Astro.props;
+const t = getDict(lang);
+
+const links = [
+  { href: localePath(lang, '/'), label: t.nav.home, match: '/' },
+  { href: localePath(lang, '/install-guide'), label: t.nav.install_guide, match: '/install-guide' },
+  { href: localePath(lang, '/docs'), label: t.nav.docs, match: '/docs' },
+  { href: localePath(lang, '/about'), label: t.nav.about, match: '/about' },
+];
+
+function isActive(match: string) {
+  if (match === '/') return path === '/';
+  return path === match || path.startsWith(match + '/');
+}
+---
+<header class="sticky top-0 z-40 backdrop-blur-md" style="background-color: color-mix(in oklab, var(--bg) 82%, transparent); border-bottom: 1px solid var(--border);">
+  <div class="container-hero flex h-14 items-center gap-6">
+    <a href={localePath(lang, '/')} class="group flex items-center gap-2.5">
+      <img src="/icon/48.png" alt="" width="22" height="22" class="rounded-[5px]" />
+      <span class="font-display text-[17px] font-semibold tracking-tight">Cebian</span>
+    </a>
+
+    <nav class="hidden md:flex items-center gap-1 text-[13px]" aria-label="Primary">
+      {links.map(({ href, label, match }) => {
+        const active = isActive(match);
+        return (
+          <a
+            href={href}
+            class="relative px-2.5 py-1.5 rounded-md transition-colors"
+            style={active
+              ? 'color: var(--fg); background-color: color-mix(in oklab, var(--accent-soft) 80%, transparent);'
+              : 'color: var(--fg-muted);'}
+            onmouseover={active ? undefined : "this.style.color='var(--fg)';"}
+            onmouseout={active ? undefined : "this.style.color='var(--fg-muted)';"}
+          >
+            {label}
+            {active && (
+              <span
+                class="absolute inset-x-2 -bottom-[9px] h-[2px]"
+                style="background: var(--accent);"
+                aria-hidden
+              />
+            )}
+          </a>
+        );
+      })}
+    </nav>
+
+    <div class="ml-auto flex items-center gap-2 text-[13px]">
+      <a
+        href="https://github.com/maotoumao/Cebian"
+        target="_blank"
+        rel="noopener"
+        class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-colors"
+        style="color: var(--fg-muted); border: 1px solid var(--border);"
+        aria-label="GitHub"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6a4.7 4.7 0 0 1 1.2-3.2c-.1-.3-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.7 1.6.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.7-2.8 5.7-5.5 6 .5.4.8 1.1.8 2.2v3.2c0 .3.2.7.8.6A12 12 0 0 0 12 .3Z"/></svg>
+        GitHub
+      </a>
+      <LangSwitcher client:load lang={lang} path={path} />
+      <ThemeToggle client:load />
+      <a
+        href={localePath(lang, '/install-guide')}
+        class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-transform hover:-translate-y-px"
+        style="background: var(--accent); color: var(--accent-fg);"
+      >
+        {t.nav.install_cta}
+      </a>
+
+      <!-- mobile menu trigger -->
+      <button
+        type="button"
+        id="nav-toggle"
+        class="md:hidden inline-flex items-center justify-center h-9 w-9 rounded-md"
+        style="border: 1px solid var(--border); color: var(--fg);"
+        aria-label="Menu"
+        aria-controls="nav-drawer"
+        aria-expanded="false"
+      >
+        <svg class="block" data-icon="open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        <svg class="hidden" data-icon="close" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- mobile drawer -->
+  <div
+    id="nav-drawer"
+    class="md:hidden hidden border-t"
+    style="border-color: var(--border); background: var(--bg);"
+  >
+    <nav class="container-hero py-4 grid gap-1 text-[15px]" aria-label="Primary mobile">
+      {links.map(({ href, label, match }) => {
+        const active = isActive(match);
+        return (
+          <a
+            href={href}
+            class="flex items-center justify-between rounded-md px-3 py-2.5"
+            style={active
+              ? 'color: var(--fg); background-color: color-mix(in oklab, var(--accent-soft) 80%, transparent);'
+              : 'color: var(--fg-muted);'}
+          >
+            <span>{label}</span>
+            {active && (
+              <span
+                class="h-[6px] w-[6px] rounded-full"
+                style="background: var(--accent);"
+                aria-hidden
+              />
+            )}
+          </a>
+        );
+      })}
+    </nav>
+    <div class="container-hero pb-5 pt-1 flex items-center gap-2">
+      <a
+        href="https://github.com/maotoumao/Cebian"
+        target="_blank"
+        rel="noopener"
+        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-[13.5px]"
+        style="color: var(--fg-muted); border: 1px solid var(--border);"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6a4.7 4.7 0 0 1 1.2-3.2c-.1-.3-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.7 1.6.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.7-2.8 5.7-5.5 6 .5.4.8 1.1.8 2.2v3.2c0 .3.2.7.8.6A12 12 0 0 0 12 .3Z"/></svg>
+        GitHub
+      </a>
+      <a
+        href={localePath(lang, '/install-guide')}
+        class="ml-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-md font-medium text-[13.5px]"
+        style="background: var(--accent); color: var(--accent-fg);"
+      >
+        {t.nav.install_cta}
+      </a>
+    </div>
+  </div>
+</header>
+
+<script is:inline>
+  (function () {
+    const btn = document.getElementById('nav-toggle');
+    const drawer = document.getElementById('nav-drawer');
+    if (!btn || !drawer) return;
+    const open = btn.querySelector('[data-icon="open"]');
+    const close = btn.querySelector('[data-icon="close"]');
+    function setOpen(o) {
+      drawer.classList.toggle('hidden', !o);
+      btn.setAttribute('aria-expanded', String(o));
+      if (open && close) {
+        open.classList.toggle('hidden', o);
+        close.classList.toggle('hidden', !o);
+        open.classList.toggle('block', !o);
+        close.classList.toggle('block', o);
+      }
+    }
+    btn.addEventListener('click', () => {
+      setOpen(drawer.classList.contains('hidden'));
+    });
+    // Close drawer when a link inside it is clicked
+    drawer.addEventListener('click', (e) => {
+      const t = e.target;
+      if (t && t.closest && t.closest('a')) setOpen(false);
+    });
+    // Close on resize to desktop
+    const mq = window.matchMedia('(min-width: 768px)');
+    mq.addEventListener('change', (e) => { if (e.matches) setOpen(false); });
+  })();
+</script>

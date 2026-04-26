@@ -1,0 +1,470 @@
+﻿# Cebian 擴充功能 i18n —— 繁體中文（zh_TW，台灣/港澳使用者）。
+# 修改時請同步 locales/en.yml 與 locales/zh_CN.yml。規範見 .agents/skills/i18n-naming/SKILL.md。
+
+# ─── Manifest（扁平頂層 key，見規範「Manifest localization」）───
+extName: "Cebian"
+extDescription: "AI 驅動的瀏覽器側邊欄助手"
+actionTitle: "開啟 Cebian 側邊欄"
+
+# ─── 通用（UI 中複用）───
+common:
+  newChat: "新對話"
+  send: "傳送"
+  history: "歷史記錄"
+  toggleTheme: "切換主題"
+  settings: "設定"
+  back: "返回"
+  openInNewTab: "在新分頁開啟"
+  loading: "載入中…"
+  cancel: "取消"
+  confirm: "確認"
+  save: "儲存"
+  delete: "刪除"
+  rename: "重新命名"
+  edit: "編輯"
+  add: "新增"
+  code: "代碼"
+  copy: "複製"
+  copied: "已複製"
+  copyFailed: "複製失敗"
+  newFile: "新增檔案"
+  newFolder: "新增資料夾"
+  search: "搜尋"
+  searchPlaceholder: "搜尋…"
+  moreActions: "更多操作"
+  empty:
+    history: "尚無歷史記錄"
+    folder: "空資料夾"
+  time:
+    justNow: "剛剛"
+    # $1 = 分鐘數
+    minutesAgo: "$1 分鐘前"
+    # $1 = 小時數
+    hoursAgo: "$1 小時前"
+    # $1 = 天數
+    daysAgo: "$1 天前"
+    # $1 = 月數
+    monthsAgo: "$1 個月前"
+    # $1 = 年數
+    yearsAgo: "$1 年前"
+  session:
+    deleteConfirmTitle: "刪除會話？"
+    # $1 = 會話標題
+    deleteConfirmDescription: "「$1」以及它的工作區檔案將被永久刪除，此操作無法復原。"
+    running: "工作中"
+    # $1 = 訊息數
+    messageCount:
+      0: "尚無訊息"
+      1: "1 則訊息"
+      n: "$1 則訊息"
+
+# ─── 設定 ───
+settings:
+  nav:
+    aria: "設定導覽"
+    providers: "供應商"
+    instructions: "指引"
+    prompts: "提示詞"
+    skills: "技能"
+    mcp: "MCP 伺服器"
+    advanced: "進階"
+    about: "關於"
+  providers:
+    title: "AI 供應商"
+  about:
+    title: "關於"
+    tagline: "AI 瀏覽器側邊欄助手"
+    feedback: "意見回饋"
+    checkUpdate: "檢查更新"
+    checking: "檢查中…"
+    upToDate: "已是最新版本"
+    # $1 = new version string (e.g. "1.2.3")
+    updateAvailable: "發現新版本 v$1"
+    viewInstallGuide: "檢視安裝指南"
+    checkFailed: "檢查更新失敗"
+    followAuthor: "關注作者"
+    socials:
+      wechat: "微信公眾號"
+      wechatHandle: "一只猫头猫"
+      bilibili: "嗶哩嗶哩"
+      bilibiliHandle: "不想睡觉猫头猫"
+      xiaohongshu: "小紅書"
+      xiaohongshuHandle: "一只猫头猫"
+      x: "X"
+      xHandle: "@maotoumao0_0"
+  advanced:
+    title: "進階"
+    maxRounds:
+      label: "最大對話輪數"
+      hint: "超出後自動截斷早期訊息"
+  instructions:
+    title: "指引"
+    label: "自訂指引"
+    hint: "追加在預設規則之後，用於調整回覆語言、風格或角色。無法覆蓋工具協定與安全規則。"
+    placeholder: "例如：\n- 用中文回覆\n- 回答盡量簡潔\n- 討論程式碼時預設使用 TypeScript"
+  prompts:
+    title: "提示詞"
+    newBody: "（在此處撰寫你的提示詞）"
+    # $1 = 觸發字元（「/」）
+    hint: "可重複使用的提示詞模板，透過 $1 命令在聊天輸入中觸發。"
+    placeholders:
+      selectedText: "頁面選取文字"
+      pageUrl: "當前頁面 URL"
+      pageTitle: "當前頁面標題"
+      date: "當前日期"
+      clipboard: "剪貼簿內容"
+  skills:
+    title: "技能"
+    newBody: "（在此處撰寫技能指令）"
+    create: "建立技能"
+    hint: "遵循 agentskills.io 規範的多檔案技能包，agent 會按需載入。"
+    import: "匯入…"
+    exportCurrent: "匯出"
+    exportAll: "匯出全部"
+    exportEmpty: "沒有可匯出的技能"
+    # $1 = 技能名稱
+    exportSuccess: "已匯出「$1」"
+    # $1 = 匯出技能數量
+    exportAllSuccess:
+      1: "已匯出 1 個技能"
+      n: "已匯出 $1 個技能"
+    # $1 = 匯入的技能名稱
+    importSuccess: "已匯入「$1」"
+    # $1 = 匯入技能數量
+    importSuccessBackup:
+      1: "已匯入 1 個技能"
+      n: "已匯入 $1 個技能"
+    importDialog:
+      titleSingle: "匯入技能"
+      titleBackup: "匯入技能備份"
+      permissionsHeading: "申請的權限"
+      permissionsNone: "未申請特殊權限。"
+      hasScriptsWarning: "包含 scripts/ 下的可執行指令稿。"
+      # $1 = 檔案數
+      fileCount:
+        1: "1 個檔案"
+        n: "$1 個檔案"
+      # $1 = 技能數
+      skillCount:
+        1: "1 個技能"
+        n: "$1 個技能"
+      # $1 = 已存在的來源名稱, $2 = 重新命名後的目標名稱
+      conflictNotice: "已存在名為「$1」的技能。除非選擇覆寫，否則將匯入為「$2」。"
+      overwrite: "覆寫現有"
+      keepBoth: "保留兩者"
+      confirmOverwriteTitle: "覆寫現有技能？"
+      # $1 = 技能名稱（多個時以逗號分隔）
+      confirmOverwriteDescription: "「$1」將被取代，且已授予的權限將被清除。是否繼續？"
+  mcp:
+    title: "MCP 伺服器"
+    description: "連接 Model Context Protocol 伺服器，把它們的工具開放給 agent 使用。"
+    empty:
+      title: "尚未設定 MCP 伺服器"
+      hint: "新增一個伺服器，用外部工具擴充 agent 的能力。"
+    actions:
+      add: "新增 MCP 伺服器"
+      toggle: "啟用伺服器"
+      edit: "編輯伺服器"
+      delete: "刪除伺服器"
+      deleteConfirmTitle: "刪除 MCP 伺服器？"
+      # $1 = 伺服器名稱
+      deleteConfirmDescription: "「$1」將被刪除，此操作無法復原。"
+    errors:
+      # $1 = 伺服器名稱
+      nameTaken: "已存在名為「$1」的 MCP 伺服器。"
+      nameRequired: "伺服器名稱不能為空。"
+      urlRequired: "伺服器 URL 不能為空。"
+      # $1 = URL
+      urlInvalid: "伺服器 URL 無效：$1"
+      # $1 = scheme（例如 "ftp:"）
+      urlScheme: "不支持的 URL 協定：$1"
+      bearerTokenRequired: "Bearer Token 不能為空。"
+      authHeaderConflict: "使用 Bearer 認證時請勿手動設定 Authorization header，請在認證欄位填寫 token。"
+    status:
+      disabled: "已停用"
+      idle: "等待首次呼叫"
+      connected: "已連線"
+      disconnected: "未連線"
+      probing: "重新連線中"
+      circuitOpen: "暫時無法使用"
+    form:
+      name: "名稱"
+      namePlaceholder: "例如：weather、github、my-tools"
+      transport: "傳輸協定"
+      url: "URL"
+      urlPlaceholder: "https://example.com/mcp"
+      authType: "認證方式"
+      authNone: "無"
+      authBearer: "Bearer Token"
+      bearerToken: "Token"
+      bearerTokenPlaceholder: "貼上 bearer token"
+      headers: "自訂 Headers"
+      headerKeyPlaceholder: "Header 名稱（如 X-MCP-Toolsets）"
+      headerValuePlaceholder: "Header 值"
+      addHeader: "新增 Header"
+      removeHeader: "移除 Header"
+  editor:
+    selectFile: "選擇一個檔案開始編輯"
+    saving: "儲存中…"
+    saveFailed: "儲存失敗"
+    unsaved: "未儲存"
+    saved: "已儲存"
+  files:
+    backToList: "返回檔案列表"
+    selectOrCreate: "從左側選擇或建立檔案"
+
+# ─── 聊天 ───
+chat:
+  composer:
+    placeholder: "輸入 / 查看命令…"
+    pickElement: "選擇元素"
+    cancelPick: "取消選擇"
+    screenshot: "螢幕截圖"
+    uploadFile: "上傳檔案"
+    mobileMode: "行動裝置模式"
+    needModel: "請先選擇一個 AI 模型"
+    goToSettings: "前往設定"
+    readPromptFailed: "讀取 Prompt 失敗"
+    elementAdded: "此元素已新增"
+    elementPickFailed: "元素選擇失敗"
+    elementPickUnsupported: "當前頁面不支援元素選取"
+    elementPickNavigated: "頁面已跳轉，元素選取已取消"
+    imageAlreadyAdded: "此圖片已新增"
+    screenshotFailed: "螢幕截圖失敗"
+    # $1 = 附件上限個數
+    maxAttachments: "最多新增 $1 個附件"
+    # $1 = 實際新增的檔案數
+    truncatedFiles: "僅新增前 $1 個檔案，已達上限"
+    # $1 = 檔案名稱，$2 = 容量上限（已格式化，如「5 MB」）
+    fileTooLarge: "$1 超過 $2 限制"
+    # $1 = 檔案名稱
+    readFileFailed: "讀取失敗：$1"
+    # $1 = 檔案名稱
+    unsupportedFileType: "不支援的檔案類型：$1"
+    noPrompts: "尚無 Prompt，前往 AI 設定建立"
+    noMatch: "無相符結果"
+    iframeEnterHint: "⏎ 點擊進入"
+  attachments:
+    image: "圖片"
+    screenshot: "螢幕截圖"
+    imageAlt: "附件圖片"
+    # $1 = 事件數量, $2 = 時長 (M:SS)
+    recordingMeta: "$1 個事件 · $2"
+    recordingTruncated: "已截斷"
+    recordingDownload: "下載錄製 JSON"
+    # $1 = 事件數量, $2 = 簡短字元數（如 1.2K、3M）
+    recordingHover: "$1 個事件 · 約 $2 字元"
+  recorder:
+    start: "開始錄製使用者操作"
+    stop: "停止錄製（會隨下一條訊息發送）"
+    startRejectedBusy: "另一個側邊欄正在錄製，請先停止後再開始新的錄製。"
+    autoStoppedEvents: "錄製已自動停止：達到事件上限"
+    autoStoppedTime: "錄製已自動停止：達到時長上限"
+  askUser:
+    placeholder: "輸入回覆…"
+  model:
+    select: "選擇模型"
+    searchPlaceholder: "搜尋模型…"
+    notFound: "找不到模型"
+    addMore: "前往設定新增更多供應商"
+  thinking:
+    # $1 = 當前等級 label
+    label: "思考：$1"
+    levels:
+      "off": "關閉"
+      minimal: "最小"
+      low: "低"
+      medium: "中"
+      high: "高"
+  tool:
+    args: "參數"
+    result: "結果"
+  message:
+    # $1 = 輸入 token 數（已格式化，如「1.2k」），$2 = 輸出 token 數（已格式化）
+    tokensInOut: "↑$1 ↓$2"
+    # 快取明細（無寫入）。$1 = 未快取、$2 = 快取命中（均已格式化）
+    tokensInBreakdownHit: "未快取 $1 · 快取 $2"
+    # 快取明細（含寫入）。$1 = 未快取、$2 = 快取命中、$3 = 寫入快取（均已格式化）
+    tokensInBreakdownHitWrite: "未快取 $1 · 快取 $2 · 寫快取 $3"
+  session:
+    loading: "載入工作階段…"
+    modelError: "模型回傳錯誤"
+    welcomeReady: "有什麼我可以幫忙的？"
+    scrollToBottom: "跳至最新訊息"
+
+# ─── 供應商子元件（OAuth / API Key / 自訂）───
+provider:
+  section:
+    viaApiKey: "透過 API Key"
+  status:
+    connected: "已連線"
+    notConfigured: "尚未設定"
+    unverified: "未驗證"
+    verifying: "驗證中"
+    connectFailed: "連線失敗"
+    failed: "失敗"
+  oauth:
+    signIn: "登入"
+    signOut: "登出"
+    loggedIn: "已登入"
+    notLoggedIn: "未登入"
+    authorizing: "授權中"
+    authFailed: "授權失敗"
+    enterCode: "請在瀏覽器中輸入代碼："
+    completeInBrowser: "請在彈出的瀏覽器視窗中完成授權…"
+    descriptions:
+      githubCopilot: "使用 Copilot 訂閱存取 GPT/Claude"
+      openaiCodex: "使用 ChatGPT Plus/Pro 訂閱"
+      googleGemini: "以 Google Cloud OAuth 登入"
+  apiKey:
+    placeholder: "輸入 API Key"
+    disconnect: "中斷連線"
+    noModels: "無可用模型"
+    verifyNoResponse: "驗證失敗：未收到預期回應"
+    # $1 = 模型數量
+    connectedWithCount: "已連線 · $1 個模型"
+  summary:
+    # $1 = 認證方式（OAuth / API Key），$2 = 模型數量
+    modelsAvailable: "$1 · $2 個模型可用"
+  form:
+    name: "名稱"
+    namePlaceholder: "例如：My Ollama"
+    baseUrl: "Base URL"
+    baseUrlPlaceholder: "例如：http://localhost:11434/v1"
+    apiKeyOptional: "API Key（選填）"
+    apiKeyPlaceholder: "留空則不傳送驗證"
+    models: "模型清單"
+    autoFetch: "自動擷取"
+    reasoning: "推理"
+    manualModelPlaceholder: "手動輸入 Model ID"
+    addCustom: "新增自訂供應商"
+    fetchFailed: "無法擷取模型清單，請手動新增"
+
+# ─── 工具執行時標籤（在 ToolCard 中顯示）───
+tools:
+  # $1 = mode（及選填 selector 後綴）
+  readPage: "正在閱讀頁面內容 ($1)"
+  executeJs: "正在執行腳本"
+  screenshot: "正在擷取頁面螢幕截圖"
+  askUser: "等待使用者回覆"
+  # $1 = 技能名稱
+  runSkill: "正在執行技能腳本 $1"
+  # $1 = MCP 伺服器 slug（展示形式），$2 = 遠端工具名
+  mcpCall: "$1 · $2"
+  fs:
+    # $1 = 檔案路徑
+    createFile: "正在建立檔案 $1"
+    # $1 = 檔案路徑
+    editFile: "正在編輯檔案 $1"
+    # $1 = 資料夾路徑
+    mkdir: "正在建立資料夾 $1"
+    # $1 = 原路徑
+    rename: "正在重新命名 $1"
+    # $1 = 路徑
+    delete: "正在刪除 $1"
+    # $1 = 檔案路徑
+    readFile: "正在讀取檔案 $1"
+    # $1 = 資料夾路徑
+    list: "正在列出資料夾 $1"
+    # $1 = 搜尋樣式
+    searchFiles: "正在搜尋檔案 \"$1\""
+    # $1 = 搜尋樣式
+    searchContent: "正在搜尋檔案內容 \"$1\""
+  chromeApi:
+    help: "正在查詢 Chrome API 文件"
+    # $1 = namespace，$2 = method
+    call: "正在呼叫 chrome.$1.$2"
+  interact:
+    # $1 = 目標後綴（含前導空格）或為空
+    click: "正在點擊$1"
+    dblclick: "正在雙擊$1"
+    rightclick: "正在右鍵點擊$1"
+    hover: "正在懸停$1"
+    focus: "正在聚焦$1"
+    type: "正在輸入文字$1"
+    clear: "正在清除輸入欄位$1"
+    select: "正在選擇選項$1"
+    scroll: "正在捲動頁面"
+    # $1 = 按鍵名稱
+    keypress: "正在按下按鍵 $1"
+    # $1 = 目標後綴（含前導空格）或為空
+    wait: "正在等待元素出現$1"
+    waitHidden: "正在等待元素消失$1"
+    waitNavigation: "正在等待頁面載入"
+    # $1 = 步驟數
+    sequence: "正在執行操作序列 ($1 步)"
+    # $1 = action 名稱
+    unknown: "interact: $1"
+  inspect:
+    # $1 = selector
+    selector: "正在檢查 $1"
+    # $1 = 搜尋文字
+    text: "正在依文字檢查 \"$1\""
+    page: "正在檢查頁面"
+  tab:
+    open: "正在開啟新分頁"
+    # $1 = 分頁 id
+    close: "正在關閉分頁 $1"
+    # $1 = 分頁 id
+    switch: "正在切換分頁 $1"
+    reload: "正在重新整理頁面"
+    listFrames: "正在列出頁面 frames"
+    # $1 = action 名稱
+    unknown: "tab: $1"
+
+# ─── 對話框 ───
+dialogs:
+  imagePreview:
+    title: "圖片預覽"
+    alt: "預覽"
+
+# ─── VFS 瀏覽入口 ───
+vfs:
+  backToRoot: "回到根目錄"
+  # $1 = 行數
+  lines: "$1 行"
+  # $1 = 格式化後的檔案大小
+  binaryFile: "[二進位檔案 — $1]"
+  # $1 = 路徑
+  pathNotFound: "路徑不存在：$1"
+  unknownError: "未知錯誤"
+
+# ─── 錯誤（toast、抛出的錯誤訊息）───
+errors:
+  oauth:
+    cancelled: "已取消"
+    timeout: "授權逾時"
+    noCode: "未收到授權碼"
+    stateMismatch: "State 不符"
+    # $1 = HTTP 狀態碼
+    tokenExchangeFailed: "Token 交換失敗：$1"
+    missingTokenFields: "Token 回應缺少必要欄位"
+    missingRefreshToken: "未收到 refresh token"
+    missingRefreshTokenLocal: "缺少 refresh token"
+    # $1 = HTTP 狀態碼
+    gcpProjectFailed: "Google Cloud 專案設定失敗：$1"
+    gcpProjectPollFailed: "專案設定輪詢失敗"
+    gcpProjectIdMissing: "無法取得 Google Cloud 專案 ID"
+    # $1 = provider id
+    unknownProvider: "未知的 OAuth 供應商：$1"
+  network:
+    invalidUrl: "URL 格式無效"
+    unsupportedScheme: "僅支援 http/https 協定"
+    # $1 = HTTP 狀態碼
+    requestFailed: "請求失敗：$1"
+  mobile:
+    toggleFailed: "行動裝置模式切換失敗"
+  skillPackage:
+    invalid: "無效的技能包。"
+    tooLarge: "技能包過大。"
+    tooManyFiles: "技能包包含過多檔案。"
+    missingEntry: "技能包缺少 SKILL.md。"
+    # $1 = 路徑
+    unsafePath: "技能包中存在不安全的路徑：$1"
+    # $1 = 權限名稱
+    unsupportedPermission: "申請了不支援的權限：$1"
+    # $1 = 技能名稱
+    invalidName: "無效的技能名稱：$1"
+    # $1 = 技能名稱
+    reservedName: "此技能名稱為系統保留：$1"
+    parseFrontmatter: "無法解析 SKILL.md 的 frontmatter。"

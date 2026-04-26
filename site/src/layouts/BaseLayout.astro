@@ -1,0 +1,78 @@
+---
+import '../styles/globals.css';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import type { Lang } from '../i18n';
+import { getDict, languages } from '../i18n';
+
+interface Props {
+  lang: Lang;
+  title: string;
+  description?: string;
+  /** Current pathname without locale prefix, e.g. "/features". Used for language switcher. */
+  path: string;
+  /** When true, hides top-level nav chrome (used on 404). */
+  bare?: boolean;
+}
+
+const { lang, title, description, path, bare = false } = Astro.props;
+const t = getDict(lang);
+const htmlLang = languages[lang].htmlLang;
+const siteName = 'Cebian';
+const fullTitle = title === siteName ? title : `${title} — ${siteName}`;
+const metaDesc = description ?? t.footer.tagline;
+const canonical = new URL(`/${lang}${path === '/' ? '' : path}`, Astro.site).toString();
+const altZh = new URL(`/zh${path === '/' ? '' : path}`, Astro.site).toString();
+const altEn = new URL(`/en${path === '/' ? '' : path}`, Astro.site).toString();
+---
+<!doctype html>
+<html lang={htmlLang} data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={metaDesc} />
+    <meta name="generator" content={Astro.generator} />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icon/32.png" />
+    <link rel="icon" type="image/png" sizes="128x128" href="/icon/128.png" />
+    <link rel="apple-touch-icon" href="/icon/128.png" />
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" hreflang="zh" href={altZh} />
+    <link rel="alternate" hreflang="en" href={altEn} />
+    <link rel="alternate" hreflang="x-default" href={altZh} />
+    <meta property="og:site_name" content={siteName} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={metaDesc} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={new URL('/icon/128.png', Astro.site).toString()} />
+    <meta name="twitter:card" content="summary" />
+
+    <!-- Distinctive fonts: Fraunces (display) + Geist (sans) + JetBrains Mono (mono). -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,0..100&family=Geist:wght@300..700&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
+
+    <!-- Apply saved theme before paint, avoiding flash. -->
+    <script is:inline>
+      (() => {
+        try {
+          const saved = localStorage.getItem('cebian-site-theme');
+          const prefers = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          const theme = saved === 'light' || saved === 'dark' ? saved : prefers;
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch {}
+      })();
+    </script>
+  </head>
+  <body class="relative min-h-dvh">
+    {!bare && <Nav lang={lang} path={path} />}
+    <main>
+      <slot />
+    </main>
+    {!bare && <Footer lang={lang} />}
+  </body>
+</html>
