@@ -1,0 +1,82 @@
+name: Publish Release
+
+# Take artifacts from a previous "Build and Upload Artifacts" run and publish
+# them to a GitHub Release. Decoupled from build so you can pick a known-good
+# build, smoke-test it locally, and only then promote it to a release.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Build workflow run ID to pull artifacts from (the numeric id at the end of the run URL)'
+        required: true
+        type: string
+      tag:
+        description: 'Release tag (e.g. v1.0.0). Created if it does not exist.'
+        required: true
+        type: string
+      name:
+        description: 'Release name (defaults to tag)'
+        required: false
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        default: false
+        type: boolean
+      draft:
+        description: 'Create as draft (do not publish yet)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download chrome zip
+        uses: actions/download-artifact@v4
+        with:
+          name: cebian-chrome-zip
+          path: dist/chrome
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download firefox zip
+        uses: actions/download-artifact@v4
+        with:
+          name: cebian-firefox-zip
+          path: dist/firefox
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download skills zip
+        uses: actions/download-artifact@v4
+        with:
+          name: cebian-skills-zip
+          path: dist/skills
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: List release assets
+        run: find dist -type f | sort
+
+      - name: Create / update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: ${{ inputs.name || inputs.tag }}
+          draft: ${{ inputs.draft }}
+          prerelease: ${{ inputs.prerelease }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/chrome/*.zip
+            dist/firefox/*.zip
+            dist/skills/*.zip
