@@ -40,19 +40,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download chrome zip
+      - name: Download chrome build
         uses: actions/download-artifact@v4
         with:
-          name: cebian-chrome-zip
-          path: dist/chrome
+          name: cebian-chrome-build
+          path: build/chrome
           run-id: ${{ inputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download firefox zip
+      - name: Download firefox build
         uses: actions/download-artifact@v4
         with:
-          name: cebian-firefox-zip
-          path: dist/firefox
+          name: cebian-firefox-build
+          path: build/firefox
           run-id: ${{ inputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -64,8 +64,15 @@ jobs:
           run-id: ${{ inputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: List release assets
-        run: find dist -type f | sort
+      - name: Package extension zips
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          tag="${{ inputs.tag }}"
+          version="${tag#v}"
+          (cd build/chrome  && zip -r "$GITHUB_WORKSPACE/dist/cebian-${version}-chrome.zip" .)
+          (cd build/firefox && zip -r "$GITHUB_WORKSPACE/dist/cebian-${version}-firefox.zip" .)
+          ls -la dist dist/skills
 
       - name: Create / update release
         uses: softprops/action-gh-release@v2
@@ -77,6 +84,6 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            dist/chrome/*.zip
-            dist/firefox/*.zip
+            dist/cebian-*-chrome.zip
+            dist/cebian-*-firefox.zip
             dist/skills/*.zip
