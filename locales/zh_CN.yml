@@ -315,7 +315,6 @@ provider:
     descriptions:
       githubCopilot: "使用 Copilot 订阅访问 GPT/Claude"
       openaiCodex: "使用 ChatGPT Plus/Pro 订阅"
-      googleGemini: "Google Cloud OAuth 登录"
   apiKey:
     placeholder: "输入 API Key"
     disconnect: "断开连接"
@@ -442,10 +441,6 @@ errors:
     missingTokenFields: "Token 响应缺少必要字段"
     missingRefreshToken: "未收到 refresh token"
     missingRefreshTokenLocal: "缺少 refresh token"
-    # $1 = HTTP 状态码
-    gcpProjectFailed: "Google Cloud 项目配置失败：$1"
-    gcpProjectPollFailed: "项目配置轮询失败"
-    gcpProjectIdMissing: "无法获取 Google Cloud 项目 ID"
     # $1 = provider id
     unknownProvider: "未知的 OAuth provider：$1"
   network:

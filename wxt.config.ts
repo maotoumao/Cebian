@@ -27,31 +27,25 @@ export default defineConfig({
       // Sandbox pages have origin: null — allow CORS from any origin in dev mode
       cors: true,
     },
-    // Inline a few Node-only `process.env.X` references that
+    // Inline the one Node-only `process.env.X` reference that
     // `@mariozechner/pi-ai`'s OAuth modules read at module load time
-    // (openai-codex, google-gemini-cli, google-antigravity, anthropic).
-    // Without this, importing the oauth subpath in the browser/SW throws
-    // `ReferenceError: process is not defined` at module evaluation,
-    // killing background and sidepanel boot.
+    // (openai-codex, anthropic). Without this, importing the oauth subpath
+    // in the browser/SW throws `ReferenceError: process is not defined` at
+    // module evaluation, killing background and sidepanel boot.
     // Other `process.*` access in those modules is guarded by
-    // `typeof process !== "undefined"` and is safe to leave alone.
+    // `typeof process !== "undefined"` or only runs inside Node-only code
+    // paths gated by `process.versions?.node`, and is safe to leave alone.
     //
-    // The replaced values are never actually read at runtime — they sit
-    // inside Node-only branches gated by `process.versions?.node`, which is
-    // always undefined in the browser/SW. Cebian's own OAuth flows live in
-    // `lib/oauth.ts` and don't depend on any of these env vars.
+    // The replaced value is never actually read at runtime — it sits inside
+    // a Node-only branch that is always skipped in the browser/SW. Cebian's
+    // own OAuth flows live in `lib/oauth.ts` and don't depend on it.
     //
-    //   - PI_OAUTH_CALLBACK_HOST  : pi-ai openai-codex / google-gemini-cli /
-    //                               google-antigravity / anthropic — host for
-    //                               the local Node http.createServer that
-    //                               receives the OAuth callback in CLI mode.
-    //   - GOOGLE_CLOUD_PROJECT,
-    //     GOOGLE_CLOUD_PROJECT_ID : pi-ai google-gemini-cli's discoverProject
-    //                               — user-provided GCP project id override.
+    //   - PI_OAUTH_CALLBACK_HOST  : pi-ai openai-codex / anthropic — host
+    //                               for the local Node http.createServer
+    //                               that receives the OAuth callback in
+    //                               CLI mode.
     define: {
       'process.env.PI_OAUTH_CALLBACK_HOST': JSON.stringify('127.0.0.1'),
-      'process.env.GOOGLE_CLOUD_PROJECT': 'undefined',
-      'process.env.GOOGLE_CLOUD_PROJECT_ID': 'undefined',
     },
     resolve: {
       alias: {

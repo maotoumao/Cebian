@@ -3,14 +3,12 @@
  *
  * GitHub Copilot: Device Code Flow (uses pi-ai directly)
  * OpenAI Codex:   Authorization Code + PKCE (self-built, tab URL interception)
- * Google Gemini:  Authorization Code + PKCE (self-built, tab URL interception)
  */
 
 import {
   loginGitHubCopilot as piLoginGitHubCopilot,
   refreshGitHubCopilotToken,
   refreshOpenAICodexToken,
-  refreshGoogleCloudToken,
   getGitHubCopilotBaseUrl,
   normalizeDomain,
 } from '@mariozechner/pi-ai/oauth';
@@ -176,162 +174,6 @@ export async function loginOpenAICodex(
   };
 }
 
-// ─── Google Gemini CLI (Authorization Code + PKCE) ───
-
-const GOOGLE_CLIENT_ID = atob('NjgxMjU1ODA5Mzk1LW9vOGZ0Mm9wcmRybnA5ZTNhcWY2YXYzaG1kaWIxMzVqLmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29t');
-const GOOGLE_CLIENT_SECRET = atob('R09DU1BYLTR1SGdNUG0tMW83U2stZ2VWNkN1NWNsWEZzeGw=');
-const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
-const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const GOOGLE_REDIRECT_URI = 'http://localhost:8085/oauth2callback';
-const GOOGLE_SCOPES = [
-  'https://www.googleapis.com/auth/cloud-platform',
-  'https://www.googleapis.com/auth/userinfo.email',
-  'https://www.googleapis.com/auth/userinfo.profile',
-];
-const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com';
-
-async function discoverGoogleProject(accessToken: string): Promise<string> {
-  const headers = {
-    'Authorization': `Bearer ${accessToken}`,
-    'Content-Type': 'application/json',
-    'User-Agent': 'cebian-extension/1.0',
-  };
-
-  const loadRes = await fetch(`${CODE_ASSIST_ENDPOINT}/v1internal:loadCodeAssist`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      metadata: {
-        ideType: 'IDE_UNSPECIFIED',
-        platform: 'PLATFORM_UNSPECIFIED',
-        pluginType: 'GEMINI',
-      },
-    }),
-  });
-
-  if (loadRes.ok) {
-    const data = await loadRes.json();
-    if (data.cloudaicompanionProject) {
-      return data.cloudaicompanionProject;
-    }
-    if (data.currentTier) {
-      // Has tier but no managed project — need onboarding
-    }
-  }
-
-  // Onboard to free tier
-  const onboardRes = await fetch(`${CODE_ASSIST_ENDPOINT}/v1internal:onboardUser`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      tierId: 'free-tier',
-      metadata: {
-        ideType: 'IDE_UNSPECIFIED',
-        platform: 'PLATFORM_UNSPECIFIED',
-        pluginType: 'GEMINI',
-      },
-    }),
-  });
-
-  if (!onboardRes.ok) {
-    throw new Error(t('errors.oauth.gcpProjectFailed', [onboardRes.status]));
-  }
-
-  let lroData = await onboardRes.json();
-
-  // Poll if operation is not done
-  if (!lroData.done && lroData.name) {
-    for (let i = 0; i < 30; i++) {
-      await new Promise(r => setTimeout(r, 3000));
-      const pollRes = await fetch(`${CODE_ASSIST_ENDPOINT}/v1internal/${lroData.name}`, {
-        method: 'GET',
-        headers,
-      });
-      if (!pollRes.ok) throw new Error(t('errors.oauth.gcpProjectPollFailed'));
-      lroData = await pollRes.json();
-      if (lroData.done) break;
-    }
-  }
-
-  const projectId = lroData.response?.cloudaicompanionProject?.id;
-  if (projectId) return projectId;
-
-  throw new Error(t('errors.oauth.gcpProjectIdMissing'));
-}
-
-export async function loginGeminiCli(
-  signal?: AbortSignal,
-): Promise<OAuthResult> {
-  const { verifier, challenge } = await generatePKCE();
-  const state = crypto.randomUUID();
-
-  const url = new URL(GOOGLE_AUTH_URL);
-  url.searchParams.set('client_id', GOOGLE_CLIENT_ID);
-  url.searchParams.set('response_type', 'code');
-  url.searchParams.set('redirect_uri', GOOGLE_REDIRECT_URI);
-  url.searchParams.set('scope', GOOGLE_SCOPES.join(' '));
-  url.searchParams.set('code_challenge', challenge);
-  url.searchParams.set('code_challenge_method', 'S256');
-  url.searchParams.set('state', state);
-  url.searchParams.set('access_type', 'offline');
-  url.searchParams.set('prompt', 'consent');
-
-  chrome.tabs.create({ url: url.toString() });
-
-  const redirectUrl = await waitForRedirectUrl(GOOGLE_REDIRECT_URI, signal);
-  const params = new URL(redirectUrl).searchParams;
-  const code = params.get('code');
-  const returnedState = params.get('state');
-
-  if (!code) throw new Error(t('errors.oauth.noCode'));
-  if (returnedState !== state) throw new Error(t('errors.oauth.stateMismatch'));
-
-  // Exchange code for tokens
-  const tokenRes = await fetch(GOOGLE_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: GOOGLE_CLIENT_ID,
-      client_secret: GOOGLE_CLIENT_SECRET,
-      code,
-      grant_type: 'authorization_code',
-      redirect_uri: GOOGLE_REDIRECT_URI,
-      code_verifier: verifier,
-    }),
-  });
-
-  if (!tokenRes.ok) {
-    throw new Error(t('errors.oauth.tokenExchangeFailed', [tokenRes.status]));
-  }
-
-  const tokenData = await tokenRes.json();
-  if (!tokenData.refresh_token) {
-    throw new Error(t('errors.oauth.missingRefreshToken'));
-  }
-
-  // Discover / provision Google Cloud project
-  const projectId = await discoverGoogleProject(tokenData.access_token);
-
-  // Get user email (optional)
-  let email: string | undefined;
-  try {
-    const userRes = await fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json', {
-      headers: { 'Authorization': `Bearer ${tokenData.access_token}` },
-    });
-    if (userRes.ok) {
-      const userData = await userRes.json();
-      email = userData.email;
-    }
-  } catch { /* optional */ }
-
-  return {
-    accessToken: tokenData.access_token,
-    refreshToken: tokenData.refresh_token,
-    expiresAt: Date.now() + tokenData.expires_in * 1000 - 5 * 60 * 1000,
-    extra: { projectId, email },
-  };
-}
-
 // ─── Unified refresh ───
 
 export async function refreshOAuthCredential(
@@ -366,15 +208,6 @@ export async function refreshOAuthCredential(
       newExpires = result.expires;
       break;
     }
-    case 'google-gemini-cli': {
-      const projectId = (cred.extra?.projectId as string) ?? '';
-      const result = await refreshGoogleCloudToken(cred.refreshToken, projectId);
-      newAccess = result.access;
-      newRefresh = result.refresh;
-      newExpires = result.expires;
-      newExtra = { ...cred.extra, projectId: result.projectId ?? projectId };
-      break;
-    }
     default:
       throw new Error(t('errors.oauth.unknownProvider', [provider]));
   }
@@ -396,22 +229,6 @@ export function getCopilotBaseUrl(cred: OAuthCredential): string {
     ? (normalizeDomain(cred.extra.enterpriseUrl as string) ?? undefined)
     : undefined;
   return getGitHubCopilotBaseUrl(cred.accessToken, domain);
-}
-
-// ─── Get API key ───
-
-// Google Gemini requires projectId alongside the token; other providers use plain accessToken.
-function getApiKeyFromCredential(
-  _provider: string,
-  cred: OAuthCredential,
-): string {
-  if (cred.extra?.projectId) {
-    return JSON.stringify({
-      token: cred.accessToken,
-      projectId: cred.extra.projectId,
-    });
-  }
-  return cred.accessToken;
 }
 
 // ─── On-demand token refresh ───
@@ -449,11 +266,11 @@ export async function getValidOAuthToken(
 
     try {
       const refreshed = await pending;
-      return getApiKeyFromCredential(provider, refreshed);
+      return refreshed.accessToken;
     } catch (err) {
       console.error(`[OAuth] ${provider}: on-demand refresh failed, using existing token`, err);
     }
   }
 
-  return getApiKeyFromCredential(provider, cred);
+  return cred.accessToken;
 }

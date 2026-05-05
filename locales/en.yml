@@ -319,7 +319,6 @@ provider:
     descriptions:
       githubCopilot: "Use your Copilot subscription to access GPT/Claude"
       openaiCodex: "Use your ChatGPT Plus/Pro subscription"
-      googleGemini: "Sign in with Google Cloud OAuth"
   apiKey:
     placeholder: "Enter API Key"
     disconnect: "Disconnect"
@@ -445,10 +444,6 @@ errors:
     missingTokenFields: "Token response is missing required fields"
     missingRefreshToken: "No refresh token received"
     missingRefreshTokenLocal: "Missing refresh token"
-    # $1 = HTTP status
-    gcpProjectFailed: "Google Cloud project setup failed: $1"
-    gcpProjectPollFailed: "Project setup polling failed"
-    gcpProjectIdMissing: "Could not obtain Google Cloud project ID"
     # $1 = provider id
     unknownProvider: "Unknown OAuth provider: $1"
   network:

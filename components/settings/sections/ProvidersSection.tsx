@@ -15,7 +15,7 @@ import {
 } from '@/lib/storage';
 import { OAUTH_PROVIDERS, APIKEY_PROVIDERS, PRESET_PROVIDERS } from '@/lib/constants';
 import { customProviderKey, getCustomModels } from '@/lib/custom-models';
-import { loginGitHubCopilot, loginOpenAICodex, loginGeminiCli } from '@/lib/oauth';
+import { loginGitHubCopilot, loginOpenAICodex } from '@/lib/oauth';
 import { t } from '@/lib/i18n';
 
 /**
@@ -76,9 +76,6 @@ export function ProvidersSection() {
           break;
         case 'openai-codex':
           result = await loginOpenAICodex(abort.signal);
-          break;
-        case 'google-gemini-cli':
-          result = await loginGeminiCli(abort.signal);
           break;
         default:
           return;

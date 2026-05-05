@@ -276,7 +276,7 @@ description: Chinese to English translation — preserves terms, natural tone.
       categories_tag: 'Categories',
       categories_heading: 'Three ways to plug in',
       categories: [
-        { name: 'OAuth', heading: 'One-click sign-in', body: 'Copilot uses Device Flow; Codex and Gemini CLI use PKCE. Once signed in, a background alarm refreshes tokens every 30 minutes.' },
+        { name: 'OAuth', heading: 'One-click sign-in', body: 'Copilot uses Device Flow; Codex uses PKCE. Once signed in, a background alarm refreshes tokens every 30 minutes.' },
         { name: 'API Key', heading: 'Bring your key', body: 'Anthropic, OpenAI, Gemini, xAI, Groq, OpenRouter, Mistral, MiniMax, Kimi. Each key is verified with a real call on save and only then becomes selectable.' },
         { name: 'Custom', heading: 'Any OpenAI-compatible endpoint', body: 'Provide a baseURL + key and Cebian auto-discovers models via /v1/models. Great for self-hosted, proxies, and aggregators.' },
       ],
