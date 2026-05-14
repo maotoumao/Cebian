@@ -98,13 +98,23 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
     setCurrentThinkingLevel(level);
   };
 
-  // Auto-resize textarea
+  // Auto-resize textarea. When the value is empty (initial mount, after
+  // send) we clear the inline height entirely and let CSS `min-h-11 /
+  // max-h-37.5` drive sizing. This avoids a first-paint race in the
+  // sidepanel where `scrollHeight` is read before fonts / Tailwind / the
+  // first layout pass have stabilized — in that window the textarea is
+  // measured against browser defaults and can report a height >= 150,
+  // which then gets clamped to 150px and frozen as inline style until the
+  // user types the first character.
   useEffect(() => {
     const el = textareaRef.current;
-    if (el) {
-      el.style.height = 'auto';
-      el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+    if (!el) return;
+    if (!value) {
+      el.style.height = '';
+      return;
     }
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 150) + 'px';
   }, [value]);
 
   // Cancel picker on unmount
