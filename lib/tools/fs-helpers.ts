@@ -66,8 +66,10 @@ export function isBinaryContent(data: Uint8Array): boolean {
 }
 
 /**
- * If the given path is under ~/.cebian/skills/, send an invalidation message
- * to the background to clear the cached skill index.
+ * If the given path is under ~/.cebian/skills/, clear the in-process skill
+ * index cache so the next read picks up the change. Synchronous and local
+ * to the current execution context — does not send any cross-context
+ * message.
  */
 export function invalidateSkillIndexIfNeeded(path: string): void {
   const normalized = normalizePath(path);
