@@ -5,6 +5,16 @@ import { vfs } from '@/lib/vfs';
 import { extensionForMime } from '@/lib/mime';
 import { formatSize, invalidateSkillIndexIfNeeded } from './fs-helpers';
 
+/** Default ceiling on response body bytes if the caller doesn't override
+ *  via `save.maxBytes`. Comfortably fits typical screenshots, short clips,
+ *  and JSON payloads while keeping a single tool call from spending hundreds
+ *  of MB of browser memory. */
+const DEFAULT_MAX_BYTES = 50 * 1024 * 1024;
+/** Hard upper bound regardless of caller-supplied `save.maxBytes`. Keeps
+ *  an over-eager agent from instructing the tool to buffer multi-GB
+ *  responses that would crash the service worker. */
+const HARD_MAX_BYTES = 1024 * 1024 * 1024;
+
 /** RequestInit subset we accept from the agent. Only fields that make sense
  *  for a from-the-LLM call are exposed. Notably, `body` is restricted to
  *  string — LLMs don't have a way to construct ArrayBuffer / FormData, and
@@ -52,8 +62,10 @@ const FsSaveUrlSave = Type.Object({
   })),
   maxBytes: Type.Optional(Type.Number({
     description:
-      '[NOT YET IMPLEMENTED] Abort and reject if the response body exceeds this many bytes. ' +
-      'Defaults to 50 MB. Capped at a hard ceiling of 1 GB regardless of value.',
+      'Abort and reject if the response body exceeds this many bytes. ' +
+      'Defaults to 50 MB. Capped at a hard ceiling of 1 GB regardless of value. ' +
+      'The check uses Content-Length as a pre-flight when present, and a running ' +
+      'tally during streaming so oversized responses abort early without buffering.',
   })),
   sample: Type.Optional(Type.Boolean({
     description:
@@ -112,78 +124,130 @@ export const fsSaveUrlTool: AgentTool<typeof FsSaveUrlParameters> = {
         return errorResult(`File already exists at ${params.dest}; pass save.overwrite=true to replace it.`);
       }
 
-      // ── Fetch ──
+      // ── Network I/O ──
       // Bridge the agent's abort signal into our request so a user-issued
-      // cancel reliably aborts an in-flight download. Forward `signal.reason`
-      // so the downstream AbortError keeps the original cancellation cause.
+      // cancel reliably aborts BOTH the fetch handshake AND the streaming
+      // body read. The listener stays registered until the very end of the
+      // network/write section so a cancellation mid-stream actually tears
+      // down the in-flight fetch at the network layer — not just on the
+      // next loop iteration's throwIfAborted check.
       const controller = new AbortController();
       const onAbort = () => controller.abort(signal?.reason);
       signal?.addEventListener('abort', onAbort, { once: true });
-      let response: Response;
       try {
-        response = await fetch(parsedUrl.href, buildRequestInit(params.init, controller.signal));
-      } catch (err) {
-        // Let AbortError bubble up to pi-agent-core's cancellation contract
-        // (every other fs-* tool does the same). Other errors are network
-        // failures we surface as a clean tool error.
-        if ((err as Error).name === 'AbortError' || signal?.aborted) throw err;
-        return errorResult(`Network error: ${(err as Error).message}`);
+        let response: Response;
+        try {
+          response = await fetch(parsedUrl.href, buildRequestInit(params.init, controller.signal));
+        } catch (err) {
+          // Let AbortError bubble up to pi-agent-core's cancellation contract
+          // (every other fs-* tool does the same). Other errors are network
+          // failures we surface as a clean tool error.
+          if ((err as Error).name === 'AbortError' || signal?.aborted) throw err;
+          return errorResult(`Network error: ${(err as Error).message}`);
+        }
+        signal?.throwIfAborted();
+
+        // `manual` redirect mode returns an opaque-redirect response (status 0,
+        // empty body, no headers exposed). Saving that to VFS would write a
+        // zero-byte file with no useful information — reject loud and steer
+        // the agent toward `redirect: 'follow'` if it actually wants content.
+        if (response.type === 'opaqueredirect') {
+          return errorResult(
+            'Got opaque-redirect response (init.redirect="manual") — nothing to save. ' +
+            'Use init.redirect="follow" to fetch the redirect target.',
+          );
+        }
+        if (!response.ok) {
+          return errorResult(`HTTP ${response.status} ${response.statusText}`.trim(), response.status);
+        }
+
+        // ── Read body (streaming, with size cap) ──
+        // Two-layer guard: a pre-flight check on Content-Length (when the
+        // server provides it) lets us reject obviously-oversized responses
+        // before reading a single byte, and a running tally during the read
+        // loop catches servers that lie about Content-Length or omit it.
+        const maxBytes = Math.min(params.save?.maxBytes ?? DEFAULT_MAX_BYTES, HARD_MAX_BYTES);
+
+        const declaredLength = parseInt(response.headers.get('content-length') ?? '', 10);
+        if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+          return errorResult(
+            `Response too large: Content-Length declares ${formatSize(declaredLength)} ` +
+            `> maxBytes ${formatSize(maxBytes)}. Pass save.maxBytes to raise the limit ` +
+            `(hard cap ${formatSize(HARD_MAX_BYTES)}).`,
+          );
+        }
+
+        const chunks: Uint8Array[] = [];
+        let total = 0;
+        const reader = response.body?.getReader();
+        if (reader) {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              total += value.byteLength;
+              if (total > maxBytes) {
+                // Tear down the fetch immediately so we don't burn bandwidth
+                // pulling the rest of an oversized body we're going to throw
+                // away.
+                controller.abort();
+                return errorResult(
+                  `Response exceeded maxBytes (${formatSize(maxBytes)}) at ${formatSize(total)}. ` +
+                  `Pass save.maxBytes to raise the limit (hard cap ${formatSize(HARD_MAX_BYTES)}).`,
+                );
+              }
+              chunks.push(value);
+            }
+          } catch (err) {
+            if ((err as Error).name === 'AbortError' || signal?.aborted) throw err;
+            return errorResult(`Network error during streaming: ${(err as Error).message}`);
+          } finally {
+            reader.releaseLock();
+          }
+        }
+        signal?.throwIfAborted();
+
+        // Concatenate the streamed chunks into one contiguous buffer for VFS.
+        const buf = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) {
+          buf.set(chunk, offset);
+          offset += chunk.byteLength;
+        }
+        const mime = (response.headers.get('content-type') ?? 'application/octet-stream').split(';')[0]!.trim();
+
+        // ── Resolve final dest path ──
+        // For directory dest we now have the headers needed to derive a
+        // filename. The overwrite check moves here so it runs against the
+        // actual file path we're about to write to.
+        let finalDest = params.dest;
+        if (destIsDirectory) {
+          const filename = deriveFilename(parsedUrl, response.headers.get('content-disposition'), mime);
+          finalDest = params.dest + filename;
+          if (!overwrite && (await vfs.exists(finalDest))) {
+            return errorResult(`File already exists at ${finalDest}; pass save.overwrite=true to replace it.`);
+          }
+        }
+
+        // ── Write ──
+        // `vfs.writeFile` accepts Uint8Array directly and auto-creates parent
+        // dirs. Mirror the other fs-* tools by invalidating the skill index
+        // if the write landed under the skills directory.
+        await vfs.writeFile(finalDest, buf);
+        invalidateSkillIndexIfNeeded(finalDest);
+
+        return {
+          content: [{
+            type: 'text',
+            text: `Saved ${finalDest} (${formatSize(total)}, ${mime}) from ${parsedUrl.href}`,
+          }],
+          details: { status: 'done' },
+        };
       } finally {
         signal?.removeEventListener('abort', onAbort);
       }
-      signal?.throwIfAborted();
-
-      // `manual` redirect mode returns an opaque-redirect response (status 0,
-      // empty body, no headers exposed). Saving that to VFS would write a
-      // zero-byte file with no useful information — reject loud and steer
-      // the agent toward `redirect: 'follow'` if it actually wants content.
-      if (response.type === 'opaqueredirect') {
-        return errorResult(
-          'Got opaque-redirect response (init.redirect="manual") — nothing to save. ' +
-          'Use init.redirect="follow" to fetch the redirect target.',
-        );
-      }
-      if (!response.ok) {
-        return errorResult(`HTTP ${response.status} ${response.statusText}`.trim(), response.status);
-      }
-
-      // ── Read body ──
-      // T4 will replace this with streaming + size-cap; T2 buffers everything
-      // for simplicity.
-      const buf = await response.arrayBuffer();
-      signal?.throwIfAborted();
-      const bytes = buf.byteLength;
-      const mime = (response.headers.get('content-type') ?? 'application/octet-stream').split(';')[0]!.trim();
-
-      // ── Resolve final dest path ──
-      // For directory dest we now have the headers needed to derive a
-      // filename. The overwrite check moves here so it runs against the
-      // actual file path we're about to write to.
-      let finalDest = params.dest;
-      if (destIsDirectory) {
-        const filename = deriveFilename(parsedUrl, response.headers.get('content-disposition'), mime);
-        finalDest = params.dest + filename;
-        if (!overwrite && (await vfs.exists(finalDest))) {
-          return errorResult(`File already exists at ${finalDest}; pass save.overwrite=true to replace it.`);
-        }
-      }
-
-      // ── Write ──
-      // `vfs.writeFile` accepts Uint8Array directly and auto-creates parent
-      // dirs. Mirror the other fs-* tools by invalidating the skill index
-      // if the write landed under the skills directory.
-      await vfs.writeFile(finalDest, new Uint8Array(buf));
-      invalidateSkillIndexIfNeeded(finalDest);
-
-      return {
-        content: [{
-          type: 'text',
-          text: `Saved ${finalDest} (${formatSize(bytes)}, ${mime}) from ${parsedUrl.href}`,
-        }],
-        details: { status: 'done' },
-      };
     } catch (err) {
-      // Same abort-pass-through as the inner catch.
+      // Same abort-pass-through as the inner catches.
       if ((err as Error).name === 'AbortError' || signal?.aborted) throw err;
       return errorResult((err as Error).message);
     }
