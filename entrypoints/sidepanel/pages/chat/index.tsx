@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { SquarePen, ArrowDown } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -67,19 +67,38 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
 
   const { messages, isAgentRunning, sessionId: activeSessionId, sessionTitle, lastError } = state;
 
+  // Mirror activeSessionId into a ref so the subscribe-effect can read the
+  // latest value WITHOUT re-running when activeSessionId changes. Putting
+  // activeSessionId in the effect's deps would cause an extra run between
+  // session_created (which sets state.sessionId) and navigate (which sets
+  // routeSessionId) — at that point isNewChat is still true, so the effect
+  // would hit portUnsubscribe() and wipe the optimistic user message.
+  const activeSessionIdRef = useRef<string | null>(null);
+  activeSessionIdRef.current = activeSessionId;
+
   // When an interactive tool (e.g. ask_user) is pending, the agent is blocked
   // waiting for user input — treat as "not running" so the input is usable.
   // Sending a message during this state triggers steer + cancelAll in the
   // background agent manager automatically.
   const effectiveRunning = isAgentRunning && pendingTools.size === 0;
 
-  // Subscribe to existing session or unsubscribe for new chat
+  // Subscribe to existing session or unsubscribe for new chat.
+  //
+  // Skip the subscribe IPC when the hook already considers this id active
+  // (`activeSessionId === routeSessionId`). That's the case right after
+  // sending the first message in a new chat: session_created set
+  // state.sessionId to the new id, and the BG port's subscribedSession was
+  // already pinned by the 'prompt' handler — we're implicitly subscribed.
+  // A redundant 'subscribe' here would race with the in-flight
+  // getOrCreateAgent: BG would fall through to a DB load of the just-written
+  // empty row and reply with session_loaded{messages:[]}, clobbering the
+  // optimistic user message and briefly flashing the welcome screen.
   useEffect(() => {
     if (isNewChat) {
       portUnsubscribe();
       return;
     }
-    if (routeSessionId) {
+    if (routeSessionId && routeSessionId !== activeSessionIdRef.current) {
       portSubscribe(routeSessionId);
     }
   }, [routeSessionId, isNewChat, portSubscribe, portUnsubscribe]);

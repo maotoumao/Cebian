@@ -309,6 +309,59 @@ class AgentManager {
 
   /** Send a prompt to the agent for a session */
   async prompt(sessionId: string, text: string, attachments: Attachment[] = []): Promise<void> {
+    // Persist + broadcast 'session_created' for brand-new sessions BEFORE any
+    // agent setup work (model resolve, tool factory, MCP, createAgent — easily
+    // several hundred ms). Without this the UI stays on /chat/new with an empty
+    // title and a no-op "new chat" button until the first agent_start arrives.
+    //
+    // Detection: not in the live sessions map AND no DB record. The DB record
+    // we write here is what getOrCreateAgent's sessionStore.load() will find,
+    // so `managed.sessionCreated` is set to true by createAgent() naturally,
+    // and we don't need a second persist-and-broadcast inside this method.
+    if (!this.sessions.has(sessionId)) {
+      const existing = await sessionStore.load(sessionId);
+      if (!existing) {
+        const [modelCfg, instructions, thinkingLvl] = await Promise.all([
+          activeModelStorage.getValue(),
+          userInstructionsStorage.getValue(),
+          thinkingLevelStorage.getValue(),
+        ]);
+        // Mirror the old behavior: refuse to create a session row when no
+        // model is selected. Otherwise the subsequent getOrCreateAgent() throws
+        // and we'd leave an orphan empty-model row in Dexie + history.
+        if (!modelCfg) {
+          throw new Error('No model selected or model not found');
+        }
+        const trimmed = text.trim();
+        const title = trimmed.slice(0, 50) + (trimmed.length > 50 ? '...' : '');
+        const session: SessionRecord = {
+          id: sessionId,
+          title: title || t('common.newChat'),
+          model: modelCfg.modelId,
+          provider: modelCfg.provider,
+          userInstructions: instructions || '',
+          thinkingLevel: thinkingLvl || 'medium',
+          messageCount: 0,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          messages: [],
+        };
+        try {
+          await sessionStore.create(session);
+          this.broadcast(sessionId, {
+            type: 'session_created',
+            sessionId,
+            title: session.title,
+          });
+        } catch (err: any) {
+          // Race: another concurrent prompt() for the same brand-new id won
+          // the create. Re-throw anything that isn't a duplicate-key violation;
+          // the winning call has already broadcast 'session_created'.
+          if (err?.name !== 'ConstraintError') throw err;
+        }
+      }
+    }
+
     let managed = await this.getOrCreateAgent(sessionId);
 
     // Check if the model has changed since the agent was created
@@ -327,38 +380,6 @@ class AgentManager {
         managed = await this.getOrCreateAgent(sessionId, currentMessages);
         managed.sessionCreated = wasCreated;
       }
-    }
-
-    // Persist the session on first prompt so the UI can navigate to /chat/<id>
-    // immediately (unlocking "new chat" and history visibility) instead of
-    // waiting for agent_end. Messages are filled in by the throttled writer
-    // on subsequent message_end events.
-    if (!managed.sessionCreated) {
-      const [modelCfg, instructions, thinkingLvl] = await Promise.all([
-        activeModelStorage.getValue(),
-        userInstructionsStorage.getValue(),
-        thinkingLevelStorage.getValue(),
-      ]);
-      const title = text.trim().slice(0, 50) + (text.trim().length > 50 ? '...' : '');
-      const session: SessionRecord = {
-        id: sessionId,
-        title: title || t('common.newChat'),
-        model: modelCfg?.modelId ?? '',
-        provider: modelCfg?.provider ?? '',
-        userInstructions: instructions || '',
-        thinkingLevel: thinkingLvl || 'medium',
-        messageCount: 0,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        messages: [],
-      };
-      await sessionStore.create(session);
-      managed.sessionCreated = true;
-      this.broadcast(sessionId, {
-        type: 'session_created',
-        sessionId,
-        title: session.title,
-      });
     }
 
     const enriched = await buildStructuredMessage(text, attachments);
