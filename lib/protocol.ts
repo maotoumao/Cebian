@@ -4,6 +4,7 @@ import type { AgentMessage } from '@mariozechner/pi-agent-core';
 import type { SessionRecord } from './db';
 import type { Attachment } from './attachments';
 import type { RecordedSession } from './recorder/types';
+import type { MCPResourceContents } from './mcp/client';
 
 // ─── Port name ───
 
@@ -36,7 +37,12 @@ export type ClientMessage =
    *  has gone away (port disconnect). Robust across window drag (tab
    *  detach/attach) because the id travels with the runtime, not the
    *  window. */
-  | { type: 'hello'; instanceId: string };
+  | { type: 'hello'; instanceId: string }
+  /** Read an MCP `ui://...` resource for rendering an MCP App iframe.
+   *  Returns via `mcp_resource_result` matched on `requestId`. The reply
+   *  is sent only to the requesting port, not broadcast — each chat
+   *  message renders its own iframe and tracks its own pending read. */
+  | { type: 'mcp_read_resource'; requestId: string; serverId: string; uri: string };
 
 // ─── Background → Client (events) ───
 
@@ -69,4 +75,17 @@ export type ServerMessage =
    *  recorder; `before_hello` = the requesting port never sent its
    *  `instanceId`. The sidepanel toasts this rather than disabling the
    *  button up front, so the click is never confusingly silent. */
-  | { type: 'recorder_start_rejected'; reason: 'busy' | 'before_hello' };
+  | { type: 'recorder_start_rejected'; reason: 'busy' | 'before_hello' }
+  /** Response to `mcp_read_resource`. `result` carries the full resource
+   *  payload including `_meta.ui` (CSP / permissions for sandboxing).
+   *  Error codes:
+   *  - `server_unavailable`: MCP server not registered or user-disabled —
+   *    surface a "this diagram can't be loaded" UI with a hint to re-enable.
+   *  - `fetch_failed`: connection, throttle, parse, or any other runtime
+   *    failure — surface the message and offer a retry. */
+  | {
+      type: 'mcp_resource_result';
+      requestId: string;
+      result?: MCPResourceContents;
+      error?: { code: 'server_unavailable' | 'fetch_failed'; message: string };
+    };

@@ -1,5 +1,10 @@
 ﻿import { mcpServers, type MCPServerConfig } from '@/lib/storage';
-import { MCPClient, type MCPTool, type MCPToolResult } from './client';
+import {
+  MCPClient,
+  type MCPResourceContents,
+  type MCPTool,
+  type MCPToolResult,
+} from './client';
 import { ServerThrottle, type ThrottleAcquire } from './throttle';
 import type { BreakerState } from './circuit-breaker';
 
@@ -162,6 +167,40 @@ class MCPManager {
       const result = await client.callTool(name, args);
       throttle.recordSuccess();
       return result;
+    } catch (err) {
+      throttle.recordFailure(err);
+      throw err;
+    }
+  }
+
+  /**
+   * Read an MCP resource (typically a `ui://` UI resource for MCP Apps).
+   *
+   * Lazily connects the server if needed — callers (e.g. the sidepanel
+   * re-opening an old chat) shouldn't have to know whether the SW just
+   * woke up. Mirrors `callTool`'s throttle pattern: when the server is
+   * cold this consumes two throttle slots (one for the connect, one for
+   * the read), which is the deliberate cost of treating reconnect as a
+   * regular touch.
+   */
+  async readResource(serverId: string, uri: string): Promise<MCPResourceContents> {
+    await this.init();
+    const entry = this.entries.get(serverId);
+    if (!entry) throw new Error(`MCP server not registered: ${serverId}`);
+    if (!entry.config.enabled) throw new Error(`MCP server disabled: ${entry.config.name}`);
+
+    await this.ensureConnected(entry);
+
+    const client = entry.client;
+    const throttle = entry.throttle;
+
+    const acquired = throttle.acquire();
+    if (!acquired.ok) throw new ThrottleError(acquired);
+
+    try {
+      const resource = await client.readResource(uri);
+      throttle.recordSuccess();
+      return resource;
     } catch (err) {
       throttle.recordFailure(err);
       throw err;

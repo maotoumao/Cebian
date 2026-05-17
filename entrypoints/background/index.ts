@@ -74,11 +74,26 @@ export default defineBackground(() => {
     }
   }
 
+  /**
+   * Post to one port, swallowing the "disconnected port" error.
+   *
+   * Chrome throws when you `postMessage` to a port whose other side has
+   * closed (sidepanel closed mid-flight, tab navigated away, SW idle
+   * suspension on the far end). For our use — sending status updates and
+   * RPC replies — the right behaviour is "best effort, don't escalate".
+   * Every BG → sidepanel post in this file goes through here so the
+   * behaviour is uniform and one inline `try/catch` doesn't drift away
+   * from another over time.
+   */
+  function safePost(port: chrome.runtime.Port, msg: ServerMessage): void {
+    try { port.postMessage(msg); } catch { /* port disconnected */ }
+  }
+
   /** Send a message to all ports subscribed to a given session. */
   function broadcast(sessionId: string, msg: ServerMessage): void {
     for (const [port, state] of ports) {
       if (state.subscribedSession === sessionId) {
-        try { port.postMessage(msg); } catch { /* port disconnected */ }
+        safePost(port, msg);
       }
     }
   }
@@ -101,7 +116,7 @@ export default defineBackground(() => {
       activeWindowId: status.activeWindowId,
     };
     for (const [port] of ports) {
-      try { port.postMessage(msg); } catch { /* disconnected */ }
+      safePost(port, msg);
     }
   }
   recorder.onStatusChange(broadcastRecorderStatus);
@@ -236,14 +251,14 @@ export default defineBackground(() => {
     if (port.name !== AGENT_PORT_NAME) return;
 
     ports.set(port, { subscribedSession: null, instanceId: null });
-    port.postMessage({ type: 'connected' } satisfies ServerMessage);
+    safePost(port, { type: 'connected' });
 
     // Sync recorder state to the new port. Without this, a sidepanel that
     // opens during an active recording (or reconnects after a brief SW
     // suspension) would display "idle" until the next event triggers a
     // broadcast.
     const recStatus = recorder.getStatus();
-    port.postMessage({
+    safePost(port, {
       type: 'recorder_status',
       isRecording: recStatus.isRecording,
       startedAt: recStatus.startedAt,
@@ -251,17 +266,17 @@ export default defineBackground(() => {
       truncated: recStatus.truncated,
       initiatorInstanceId: recStatus.initiatorInstanceId,
       activeWindowId: recStatus.activeWindowId,
-    } satisfies ServerMessage);
+    });
 
     port.onMessage.addListener(async (msg: ClientMessage) => {
       try {
         await handleClientMessage(port, msg);
       } catch (err: any) {
-        port.postMessage({
+        safePost(port, {
           type: 'error',
           sessionId: null,
           error: err.message ?? String(err),
-        } satisfies ServerMessage);
+        });
       }
     });
 
@@ -307,26 +322,26 @@ export default defineBackground(() => {
         // Send current agent state if the agent is running for this session
         const agentState = agentManager.getSessionState(msg.sessionId);
         if (agentState) {
-          port.postMessage({
+          safePost(port, {
             type: 'session_state',
             sessionId: msg.sessionId,
             messages: agentState.messages,
             isRunning: agentState.isRunning,
-          } satisfies ServerMessage);
+          });
         } else {
           // Agent not running — load from DB
           const session = await sessionStore.load(msg.sessionId);
           if (session) {
-            port.postMessage({
+            safePost(port, {
               type: 'session_loaded',
               session,
-            } satisfies ServerMessage);
+            });
           } else {
             // Session not found in DB
-            port.postMessage({
+            safePost(port, {
               type: 'session_loaded',
               session: null,
-            } satisfies ServerMessage);
+            });
           }
         }
         break;
@@ -344,11 +359,11 @@ export default defineBackground(() => {
         // broadcasts 'session_created' before starting, so the client can
         // navigate to /chat/<id> immediately.
         agentManager.prompt(sessionId, msg.text, msg.attachments).catch((err) => {
-          port.postMessage({
+          safePost(port, {
             type: 'error',
             sessionId,
             error: err.message ?? String(err),
-          } satisfies ServerMessage);
+          });
         });
         break;
       }
@@ -368,11 +383,11 @@ export default defineBackground(() => {
         // failures consistently.
         state.subscribedSession = msg.sessionId;
         agentManager.retry(msg.sessionId).catch((err) => {
-          port.postMessage({
+          safePost(port, {
             type: 'error',
             sessionId: msg.sessionId,
             error: err.message ?? String(err),
-          } satisfies ServerMessage);
+          });
         });
         break;
       }
@@ -387,10 +402,10 @@ export default defineBackground(() => {
 
       case 'session_load': {
         const session = await sessionStore.load(msg.sessionId);
-        port.postMessage({
+        safePost(port, {
           type: 'session_loaded',
           session: session ?? null,
-        } satisfies ServerMessage);
+        });
         break;
       }
 
@@ -402,10 +417,10 @@ export default defineBackground(() => {
           ...s,
           isRunning: agentManager.getSessionState(s.id)?.isRunning === true,
         }));
-        port.postMessage({
+        safePost(port, {
           type: 'session_list_result',
           sessions: annotated,
-        } satisfies ServerMessage);
+        });
         break;
       }
 
@@ -438,12 +453,10 @@ export default defineBackground(() => {
         agentManager.destroySession(msg.sessionId);
         // Broadcast deletion to all connected ports
         for (const [p] of ports) {
-          try {
-            p.postMessage({
-              type: 'session_deleted',
-              sessionId: msg.sessionId,
-            } satisfies ServerMessage);
-          } catch { /* disconnected */ }
+          safePost(p, {
+            type: 'session_deleted',
+            sessionId: msg.sessionId,
+          });
         }
         break;
       }
@@ -453,10 +466,10 @@ export default defineBackground(() => {
         if (instanceId == null) {
           // Sidepanel never sent its instanceId — reject so we never start
           // a recording we couldn't gate stop() on later.
-          port.postMessage({
+          safePost(port, {
             type: 'recorder_start_rejected',
             reason: 'before_hello',
-          } satisfies ServerMessage);
+          });
           break;
         }
         const currentOwner = recorder.getInitiatorPort();
@@ -464,10 +477,10 @@ export default defineBackground(() => {
           // Another instance already owns the recording. Tell the
           // requesting client so it can toast "another window is
           // recording" instead of silently doing nothing.
-          port.postMessage({
+          safePost(port, {
             type: 'recorder_start_rejected',
             reason: 'busy',
-          } satisfies ServerMessage);
+          });
           break;
         }
         // Resolve the requesting port's window so the recording starts
@@ -495,10 +508,10 @@ export default defineBackground(() => {
         // rejection toast.
         const ownerNow = recorder.getInitiatorPort();
         if (ownerNow != null && ownerNow !== port) {
-          port.postMessage({
+          safePost(port, {
             type: 'recorder_start_rejected',
             reason: 'busy',
-          } satisfies ServerMessage);
+          });
           break;
         }
         await recorder.start({ port, instanceId, initialWindowId });
@@ -523,6 +536,54 @@ export default defineBackground(() => {
         // per-instance id. Used to gate recorder_start/stop and to
         // distinguish 'owned' vs 'foreign' on the client.
         state.instanceId = msg.instanceId;
+        break;
+      }
+
+      case 'mcp_read_resource': {
+        // Fetch a `ui://...` UI resource for an MCP App iframe. Reply goes
+        // back to the requesting port only (not broadcast) — each iframe
+        // owns its own pending read keyed by `requestId`. Errors are
+        // classified into two coarse buckets so the sidepanel can render
+        // an appropriate fallback without parsing strings.
+        const { requestId, serverId, uri } = msg;
+        const manager = getMCPManager();
+        try {
+          // Pre-check disambiguates "server gone" from "fetch failed".
+          // Without it, the same `Error("MCP server disabled: ...")` from
+          // MCPManager would mask both cases.
+          const enabled = await manager.getEnabledServers();
+          if (!enabled.some(s => s.id === serverId)) {
+            safePost(port, {
+              type: 'mcp_resource_result',
+              requestId,
+              error: {
+                code: 'server_unavailable',
+                message: `MCP server is not enabled or no longer registered`,
+              },
+            });
+            break;
+          }
+          const result = await manager.readResource(serverId, uri);
+          safePost(port, { type: 'mcp_resource_result', requestId, result });
+        } catch (err: any) {
+          const message = err?.message ?? String(err);
+          // Re-map the narrow race where the user disables / removes the
+          // server between the pre-check and `readResource`. The MCPManager
+          // throws `MCP server disabled: ...` / `MCP server not registered: ...`
+          // for these — string-match is brittle but matches the rest of this
+          // file's error-classification style.
+          const isServerGone =
+            message.startsWith('MCP server disabled:') ||
+            message.startsWith('MCP server not registered:');
+          safePost(port, {
+            type: 'mcp_resource_result',
+            requestId,
+            error: {
+              code: isServerGone ? 'server_unavailable' : 'fetch_failed',
+              message,
+            },
+          });
+        }
         break;
       }
     }

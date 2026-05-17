@@ -37,6 +37,13 @@ const sharedTools: AgentTool<any>[] = [
  *
  * Safe to call repeatedly — manager caches results with a long TTL and dedups
  * concurrent refreshes.
+ *
+ * Filters out tools whose `_meta.ui.visibility` excludes `"model"` per MCP
+ * Apps SEP-1865 — those are app-only tools (callable by the iframe via
+ * `tools/call` but invisible to the LLM). v1 doesn't proxy app-initiated
+ * tool calls, so app-only tools are effectively dormant; we still exclude
+ * them from the agent's list to honour the spec and avoid polluting the
+ * LLM with unreachable options.
  */
 export async function discoverMCPTools(): Promise<AgentTool<any>[]> {
   const mcpResults = await getMCPManager().getAllTools();
@@ -47,6 +54,14 @@ export async function discoverMCPTools(): Promise<AgentTool<any>[]> {
       continue;
     }
     for (const t of result.tools) {
+      const visibility = t._meta?.ui?.visibility;
+      if (Array.isArray(visibility) && !visibility.includes('model')) {
+        // Spec MUST: do not expose app-only tools to the agent. Warn once
+        // per discovery so a user wondering where their tool went finds
+        // an answer in the BG console rather than digging through specs.
+        console.warn(`[mcp] hidden from agent: "${t.name}" on "${result.server.name}" — _meta.ui.visibility=${JSON.stringify(visibility)}`);
+        continue;
+      }
       out.push(createMCPAgentTool(result.server, t));
     }
   }

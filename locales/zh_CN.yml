@@ -281,6 +281,17 @@ chat:
   tool:
     args: "参数"
     result: "结果"
+  mcpApp:
+    # MCP App HTML 拉取中显示
+    loading: "加载交互视图中…"
+    # 拉取失败时重试按钮文案
+    retry: "重试"
+    # 后台没给具体 message 时的兜底文案
+    errorGeneric: "加载交互视图失败"
+    # 按错误码分发的文案。BG 原始 message 会作为详情拼在后面
+    errorServerUnavailable: "该 MCP server 已不可用，请到设置里重新启用该服务。"
+    # $1 = 后台的原始错误描述
+    errorFetchFailed: "加载交互视图失败：$1"
   message:
     # $1 = 输入 token 数（已格式化，如 "1.2k"），$2 = 输出 token 数（已格式化）
     tokensInOut: "↑$1 ↓$2"

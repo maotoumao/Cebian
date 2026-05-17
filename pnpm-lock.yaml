@@ -47,6 +47,12 @@ importers:
       '@mariozechner/pi-ai':
         specifier: ^0.73.0
         version: 0.73.0(@modelcontextprotocol/sdk@1.29.0(zod@4.3.6))(ws@8.20.0)(zod@4.3.6)
+      '@mcp-ui/client':
+        specifier: ^7.1.1
+        version: 7.1.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@modelcontextprotocol/ext-apps':
+        specifier: ^1.7.2
+        version: 1.7.2(@modelcontextprotocol/sdk@1.29.0(zod@4.3.6))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(zod@4.3.6)
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@4.3.6)
@@ -810,11 +816,31 @@ packages:
     engines: {node: '>=20.0.0'}
     hasBin: true
 
+  '@mcp-ui/client@7.1.1':
+    resolution: {integrity: sha512-Yy0q3YFl6WmcHRW0pRwD2F+Fs9Y/TFm1xpBpkuqvS1IRBaGGgc7PvkB0nvrKTqO6QZm+MufObfQM+oxo8mmLFw==}
+    peerDependencies:
+      react: ^18 || ^19
+      react-dom: ^18 || ^19
+
   '@mistralai/mistralai@2.2.1':
     resolution: {integrity: sha512-uKU8CZmL2RzYKmplsU01hii4p3pe4HqJefpWNRWXm1Tcm0Sm4xXfwSLIy4k7ZCPlbETCGcp69E7hZs+WOJ5itQ==}
 
   '@mixmark-io/domino@2.2.0':
     resolution: {integrity: sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw==}
+
+  '@modelcontextprotocol/ext-apps@1.7.2':
+    resolution: {integrity: sha512-OOWKDxdAjYDcgHkmzVzccyyag3FK+jBWPaWu4WvTxFsU4R/cgOX4eep66zPRA5n4v6WfxUNibPyvX4iJ7egYTg==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@modelcontextprotocol/sdk': ^1.29.0
+      react: ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^17.0.0 || ^18.0.0 || ^19.0.0
+      zod: ^3.25.0 || ^4.0.0
+    peerDependenciesMeta:
+      react:
+        optional: true
+      react-dom:
+        optional: true
 
   '@modelcontextprotocol/sdk@1.29.0':
     resolution: {integrity: sha512-zo37mZA9hJWpULgkRpowewez1y6ML5GsXJPY8FI0tBBCd77HEvza4jDqRKOXgHNn867PVGCyTdzqpz0izu5ZjQ==}
@@ -1912,6 +1938,9 @@ packages:
   '@smithy/uuid@1.1.2':
     resolution: {integrity: sha512-O/IEdcCUKkubz60tFbGA7ceITTAJsty+lBjNoorP4Z6XRqaFb/OjQjZODophEcuq68nKm6/0r+6/lLQ+XVpk8g==}
     engines: {node: '>=18.0.0'}
+
+  '@standard-schema/spec@1.1.0':
+    resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
   '@tailwindcss/node@4.2.2':
     resolution: {integrity: sha512-pXS+wJ2gZpVXqFaUEjojq7jzMpTGf8rU6ipJz5ovJV6PUGmlJ+jvIwGrzdHdQ80Sg+wmQxUFuoW1UAAwHNEdFA==}
@@ -5918,6 +5947,17 @@ snapshots:
       - ws
       - zod
 
+  '@mcp-ui/client@7.1.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+    dependencies:
+      '@modelcontextprotocol/ext-apps': 1.7.2(@modelcontextprotocol/sdk@1.29.0(zod@4.3.6))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(zod@3.25.76)
+      '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
+      react: 19.2.5
+      react-dom: 19.2.5(react@19.2.5)
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - supports-color
+
   '@mistralai/mistralai@2.2.1':
     dependencies:
       ws: 8.20.0
@@ -5928,6 +5968,24 @@ snapshots:
       - utf-8-validate
 
   '@mixmark-io/domino@2.2.0': {}
+
+  '@modelcontextprotocol/ext-apps@1.7.2(@modelcontextprotocol/sdk@1.29.0(zod@4.3.6))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(zod@3.25.76)':
+    dependencies:
+      '@modelcontextprotocol/sdk': 1.29.0(zod@4.3.6)
+      '@standard-schema/spec': 1.1.0
+      zod: 3.25.76
+    optionalDependencies:
+      react: 19.2.5
+      react-dom: 19.2.5(react@19.2.5)
+
+  '@modelcontextprotocol/ext-apps@1.7.2(@modelcontextprotocol/sdk@1.29.0(zod@4.3.6))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(zod@4.3.6)':
+    dependencies:
+      '@modelcontextprotocol/sdk': 1.29.0(zod@4.3.6)
+      '@standard-schema/spec': 1.1.0
+      zod: 4.3.6
+    optionalDependencies:
+      react: 19.2.5
+      react-dom: 19.2.5(react@19.2.5)
 
   '@modelcontextprotocol/sdk@1.29.0(zod@3.25.76)':
     dependencies:
@@ -7166,6 +7224,8 @@ snapshots:
   '@smithy/uuid@1.1.2':
     dependencies:
       tslib: 2.8.1
+
+  '@standard-schema/spec@1.1.0': {}
 
   '@tailwindcss/node@4.2.2':
     dependencies:

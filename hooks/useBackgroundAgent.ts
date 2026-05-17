@@ -7,6 +7,7 @@ import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage, type SessionMe
 import type { SessionRecord } from '@/lib/db';
 import type { Attachment } from '@/lib/attachments';
 import { recorderChannel } from '@/lib/recorder/sidepanel-channel';
+import { mcpAppResourceChannel } from '@/lib/mcp/sidepanel-channel';
 import { myInstanceId } from '@/lib/instance-id';
 
 // ─── State ───
@@ -184,6 +185,10 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
         case 'recorder_start_rejected':
           recorderChannel.publishRejection({ reason: msg.reason });
           break;
+
+        case 'mcp_resource_result':
+          mcpAppResourceChannel.handleResult(msg);
+          break;
       }
     };
 
@@ -213,6 +218,9 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
       portRef.current = port;
       // Expose to the recorder channel so useRecorder can post start/stop.
       recorderChannel.setPort(port);
+      // Expose to the MCP App resource channel so useMCPAppResource can
+      // fetch `ui://` HTML for inline iframe rendering.
+      mcpAppResourceChannel.setPort(port);
 
       port.onMessage.addListener(handleMessage);
 
@@ -234,6 +242,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
         if (unmounted) return;
         portRef.current = null;
         recorderChannel.setPort(null);
+        mcpAppResourceChannel.setPort(null);
         setState(prev => ({ ...prev, connected: false }));
         scheduleRetry();
       });
@@ -247,6 +256,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
       portRef.current?.disconnect();
       portRef.current = null;
       recorderChannel.setPort(null);
+      mcpAppResourceChannel.setPort(null);
     };
   }, []);
 

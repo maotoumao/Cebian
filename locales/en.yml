@@ -285,6 +285,20 @@ chat:
   tool:
     args: "Arguments"
     result: "Result"
+  mcpApp:
+    # Shown while the MCP App's HTML is being fetched from the server.
+    loading: "Loading interactive view…"
+    # Tooltip / label for the retry button when the fetch fails.
+    retry: "Retry"
+    # Fallback error message when the BG didn't supply one. Should rarely
+    # surface in practice — the BG always classifies into a `code` +
+    # `message` pair.
+    errorGeneric: "Failed to load interactive view"
+    # Code-specific error copy. The BG's raw `message` (e.g. a transport
+    # error string) is appended as a secondary detail line where useful.
+    errorServerUnavailable: "This MCP server is no longer available. Re-enable it in settings to view this diagram."
+    # $1 = raw failure detail from the BG (e.g. "connect ECONNREFUSED ...")
+    errorFetchFailed: "Couldn't load the interactive view: $1"
   message:
     # $1 = input tokens (formatted, e.g. "1.2k"), $2 = output tokens (formatted)
     tokensInOut: "↑$1 ↓$2"

@@ -16,6 +16,8 @@ import {
   ThinkingBlock,
 } from '@/components/chat/Message';
 import { ToolCard } from '@/components/chat/ToolCard';
+import { ToolCardWithUI } from '@/components/chat/ToolCardWithUI';
+import { isMcpAppResult } from '@/lib/tools/mcp-tool';
 import type { AssistantMessage, ToolResultMessage, UserMessage } from '@mariozechner/pi-ai';
 import {
   getAssistantText,
@@ -279,6 +281,32 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
 
                     // Non-interactive tool — render as ToolCard
                     const toolResult = findToolResult(messages, tc.id);
+
+                    // MCP App branch: if the tool result carries a UI
+                    // resource reference (set by `createMCPAgentTool`
+                    // when the original tool declared `_meta.ui.resourceUri`),
+                    // swap to ToolCardWithUI for inline iframe render.
+                    // While the result is still in-flight, fall through
+                    // to ToolCard so the spinner shows — switching only
+                    // once we have something to feed the iframe.
+                    //
+                    // Use a structural guard rather than a cast: `details`
+                    // is `any` (per `ToolResultMessage<TDetails = any>`),
+                    // so a truthy check would let a corrupted IDB row or
+                    // an off-spec server's bogus payload reach the iframe
+                    // and produce a vague fetch failure downstream.
+                    if (toolResult?.details && isMcpAppResult(toolResult.details)) {
+                      return (
+                        <ToolCardWithUI
+                          key={`tool-${tc.id}`}
+                          label={getToolLabel(tc.name, tc.arguments)}
+                          toolName={tc.name}
+                          serverId={toolResult.details.server.id}
+                          mcpApp={toolResult.details.mcpApp}
+                        />
+                      );
+                    }
+
                     const status = toolResult
                       ? (toolResult.isError ? 'error' : 'done')
                       : 'running';
