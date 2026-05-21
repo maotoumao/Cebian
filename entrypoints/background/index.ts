@@ -320,14 +320,33 @@ export default defineBackground(() => {
         // session so we don't kill an agent that's about to be observed again.
         cancelGrace(msg.sessionId);
         // Send current agent state if the agent is running for this session
-        const agentState = agentManager.getSessionState(msg.sessionId);
-        if (agentState) {
-          safePost(port, {
-            type: 'session_state',
-            sessionId: msg.sessionId,
-            messages: agentState.messages,
-            isRunning: agentState.isRunning,
-          });
+        if (agentManager.getSessionState(msg.sessionId)) {
+          // Title isn't part of the in-memory agent state — load it from DB
+          // so the subscriber's header can show the session title even when
+          // (re)subscribing mid-stream.
+          const session = await sessionStore.load(msg.sessionId);
+          // Re-snapshot AFTER the await: during the DB load the agent could
+          // have emitted message_update / agent_end and broadcast() already
+          // forwarded those to this port (we set subscribedSession above).
+          // Posting an older snapshot here would regress the hook's
+          // `messages` state.
+          const fresh = agentManager.getSessionState(msg.sessionId);
+          if (fresh) {
+            safePost(port, {
+              type: 'session_state',
+              sessionId: msg.sessionId,
+              title: session?.title ?? '',
+              messages: fresh.messages,
+              isRunning: fresh.isRunning,
+            });
+          } else {
+            // Agent finished during the await — fall through to DB-based
+            // session_loaded using the row we already loaded.
+            safePost(port, {
+              type: 'session_loaded',
+              session: session ?? null,
+            });
+          }
         } else {
           // Agent not running — load from DB
           const session = await sessionStore.load(msg.sessionId);

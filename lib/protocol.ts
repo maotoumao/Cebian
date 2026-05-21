@@ -56,7 +56,7 @@ export type SessionMeta = Omit<SessionRecord, 'messages'> & {
 
 export type ServerMessage =
   | { type: 'connected' }
-  | { type: 'session_state'; sessionId: string; messages: AgentMessage[]; isRunning: boolean }
+  | { type: 'session_state'; sessionId: string; title?: string; messages: AgentMessage[]; isRunning: boolean }
   | { type: 'agent_start'; sessionId: string }
   | { type: 'message_update'; sessionId: string; message: AgentMessage }
   | { type: 'message_end'; sessionId: string; messages: AgentMessage[] }

@@ -81,6 +81,10 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           setState(prev => ({
             ...prev,
             sessionId: msg.sessionId,
+            // Title is only included on initial subscribe (loaded from DB);
+            // mid-stream rebuild broadcasts omit it, so preserve the existing
+            // value rather than wiping the header.
+            ...(msg.title !== undefined ? { sessionTitle: msg.title } : {}),
             messages: msg.messages,
             isAgentRunning: msg.isRunning,
           }));
