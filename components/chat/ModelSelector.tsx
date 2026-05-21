@@ -34,6 +34,7 @@ export function ModelSelector({
   onOpenSettings,
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
+  const [commandValue, setCommandValue] = useState('');
 
   const providerModels = useMemo(() => {
     const verified = Object.entries(configuredProviders).filter(
@@ -100,7 +101,15 @@ export function ModelSelector({
   }, [activeModel, customProviders]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={next => {
+        setOpen(next);
+        if (next && activeModel) {
+          setCommandValue(`${activeModel.provider}/${activeModel.modelId}`);
+        }
+      }}
+    >
       <PopoverTrigger asChild>
         <Button variant="ghost" size="xs" className="text-[0.7rem]">
           {activeModelName ?? t('chat.model.select')}
@@ -108,7 +117,7 @@ export function ModelSelector({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="start">
-        <Command>
+        <Command value={commandValue} onValueChange={setCommandValue}>
           <CommandInput placeholder={t('chat.model.searchPlaceholder')} />
           <CommandList>
             <CommandEmpty>{t('chat.model.notFound')}</CommandEmpty>
