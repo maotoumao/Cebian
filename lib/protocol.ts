@@ -25,7 +25,6 @@ export type ClientMessage =
   | { type: 'retry'; sessionId: string }
   | { type: 'resolve_tool'; sessionId: string; toolName: string; response: any }
   | { type: 'cancel_tool'; sessionId: string; toolName: string }
-  | { type: 'session_load'; sessionId: string }
   | { type: 'session_list' }
   | { type: 'session_delete'; sessionId: string }
   | { type: 'recorder_start' }

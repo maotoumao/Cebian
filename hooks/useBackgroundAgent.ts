@@ -370,10 +370,6 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     postMessage({ type: 'unsubscribe' });
   }, [postMessage]);
 
-  const loadSession = useCallback((sessionId: string) => {
-    postMessage({ type: 'session_load', sessionId });
-  }, [postMessage]);
-
   const listSessions = useCallback(() => {
     postMessage({ type: 'session_list' });
   }, [postMessage]);
@@ -414,7 +410,6 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     retry,
     subscribe,
     unsubscribe,
-    loadSession,
     listSessions,
     deleteSession,
     resolveTool,

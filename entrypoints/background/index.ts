@@ -419,15 +419,6 @@ export default defineBackground(() => {
         agentManager.cancelTool(msg.sessionId, msg.toolName);
         break;
 
-      case 'session_load': {
-        const session = await sessionStore.load(msg.sessionId);
-        safePost(port, {
-          type: 'session_loaded',
-          session: session ?? null,
-        });
-        break;
-      }
-
       case 'session_list': {
         const sessions = await sessionStore.list();
         // Annotate with live running state so the UI can show an indicator
