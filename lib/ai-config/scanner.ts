@@ -38,8 +38,10 @@ const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 let _skillIndex: SkillMeta[] | null = null;
 let _skillIndexTimestamp = 0;
 
-/** Clear the cached skill index. Call when skills are modified. */
-export function invalidateSkillIndex(): void {
+/** Clear the cached skill index. Called by the vfs.onChange listener below
+ *  whenever a path under `~/.cebian/skills/` is touched; no external caller
+ *  needs to invoke this directly anymore. */
+function invalidateSkillIndex(): void {
   _skillIndex = null;
   _skillIndexTimestamp = 0;
 }
