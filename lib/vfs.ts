@@ -82,6 +82,101 @@ function parentDir(filePath: string): string {
   return idx <= 0 ? '/' : filePath.slice(0, idx);
 }
 
+// ─── Change event channel ───
+
+/** Kind of VFS mutation surfaced to listeners. */
+export type VfsChangeKind = 'write' | 'delete' | 'rename';
+
+/** A successful VFS mutation. Emitted synchronously after the underlying
+ *  IndexedDB write resolves. Modeled as a discriminated union so that
+ *  narrowing on `kind` guarantees `oldPath` is present on `rename`. */
+export type VfsChangeEvent =
+  | { kind: 'write'; path: string }
+  | { kind: 'delete'; path: string }
+  | { kind: 'rename'; path: string; oldPath: string };
+
+type VfsChangeListener = (event: VfsChangeEvent) => void;
+
+const _listeners = new Set<VfsChangeListener>();
+
+/** Notify all listeners in THIS context. Listener errors are logged via
+ *  console.warn but never propagated — a buggy subscriber must not be
+ *  able to fail the originating VFS operation. */
+function emitLocal(event: VfsChangeEvent): void {
+  for (const listener of _listeners) {
+    try {
+      listener(event);
+    } catch (err) {
+      console.warn('[vfs] listener threw on', event, err);
+    }
+  }
+}
+
+const MSG_TYPE = 'cebian:vfs:change' as const;
+
+interface VfsBroadcastMessage {
+  type: typeof MSG_TYPE;
+  event: VfsChangeEvent;
+}
+
+/** Called by VFS mutations on success. Notifies local listeners, then
+ *  broadcasts to other extension contexts via chrome.runtime.sendMessage.
+ *
+ *  We use chrome.runtime.sendMessage (not BroadcastChannel) because MV3
+ *  service workers do not wake from BroadcastChannel messages — only
+ *  chrome.runtime events can wake an idle SW. Without that wake-up, a UI
+ *  write while the SW is asleep would leave the SW's in-memory caches
+ *  stale until the next unrelated wake event. */
+function emitChange(event: VfsChangeEvent): void {
+  emitLocal(event);
+  try {
+    const msg: VfsBroadcastMessage = { type: MSG_TYPE, event };
+    chrome.runtime.sendMessage(msg).catch(() => {
+      // "Could not establish connection. Receiving end does not exist."
+      // — normal when no UI pages are open and the sender is the SW.
+      // Local listeners already ran above; nothing else to do.
+    });
+  } catch {
+    // chrome.runtime may be unavailable in some test environments.
+    // In-process notification (above) is still functional.
+  }
+}
+
+// Bridge: receive cross-context broadcasts and re-emit them locally so
+// the rest of this module looks single-context. Registered exactly once
+// per realm — ES modules are evaluated at most once. In MV3 SW the
+// listener registers during top-level boot, BEFORE Chrome dispatches
+// any pending wake-up message, so no broadcast is lost.
+try {
+  chrome.runtime.onMessage.addListener((msg: unknown) => {
+    const m = msg as Partial<VfsBroadcastMessage> | null;
+    if (
+      m?.type === MSG_TYPE &&
+      m.event &&
+      typeof m.event.kind === 'string' &&
+      typeof m.event.path === 'string'
+    ) {
+      emitLocal(m.event);
+    }
+    return false; // We never reply; don't hold the channel open.
+  });
+} catch {
+  /* in-process only fallback */
+}
+
+/** Subscribe to VFS mutations. The listener fires for changes that
+ *  originate in this context AND for changes broadcast from other
+ *  extension contexts. Returns an unsubscribe function.
+ *
+ *  Listeners must avoid writing back the same path they just received,
+ *  or they will trigger an infinite feedback loop. If you need to react
+ *  with a write, gate it so the listener does not re-fire on its own
+ *  output. */
+function onChange(listener: VfsChangeListener): () => void {
+  _listeners.add(listener);
+  return () => { _listeners.delete(listener); };
+}
+
 // ─── Extended methods ───
 
 interface MkdirOptions {
@@ -122,10 +217,16 @@ interface RmOptions {
 
 /**
  * Remove a file or directory. Supports `{ recursive: true, force: true }` like Node.js.
+ *
+ * Implementation detail: the recursive descent runs in `rmImpl` and does
+ * NOT emit change events per leaf — the outer `rm` emits exactly once for
+ * the top-level path on success. Subscribers that care about subtree
+ * changes filter with `event.path.startsWith(deletedPath + '/')`.
  */
-async function rm(targetPath: string, opts?: RmOptions): Promise<void> {
-  await ensureDefaults();
-  targetPath = normalizePath(targetPath);
+async function rmImpl(targetPath: string, opts?: RmOptions): Promise<void> {
+  // targetPath is already normalized by the outer `rm` (and by parent
+  // recursive calls), so we skip normalization and the bootstrap check
+  // here — saves a few ops per leaf during recursive deletes.
   const recursive = opts?.recursive ?? false;
   const force = opts?.force ?? false;
 
@@ -147,11 +248,18 @@ async function rm(targetPath: string, opts?: RmOptions): Promise<void> {
     const entries = await pfs().readdir(targetPath);
     for (const entry of entries) {
       const childPath = targetPath === '/' ? `/${entry}` : `${targetPath}/${entry}`;
-      await rm(childPath, { recursive: true, force });
+      await rmImpl(childPath, { recursive: true, force });
     }
   }
 
   return pfs().rmdir(targetPath);
+}
+
+async function rm(targetPath: string, opts?: RmOptions): Promise<void> {
+  await ensureDefaults();
+  const normalized = normalizePath(targetPath);
+  await rmImpl(normalized, opts);
+  emitChange({ kind: 'delete', path: normalized });
 }
 
 /**
@@ -194,7 +302,8 @@ async function writeFile(
   if (dir !== '/') {
     await mkdir(dir, { recursive: true });
   }
-  return pfs().writeFile(filePath, data, opts as FS.WriteFileOptions);
+  await pfs().writeFile(filePath, data, opts as FS.WriteFileOptions);
+  emitChange({ kind: 'write', path: filePath });
 }
 
 /**
@@ -250,7 +359,10 @@ export const vfs = {
   },
   async rename(oldPath: string, newPath: string) {
     await ensureDefaults();
-    return pfs().rename(normalizePath(oldPath), normalizePath(newPath));
+    const oldNorm = normalizePath(oldPath);
+    const newNorm = normalizePath(newPath);
+    await pfs().rename(oldNorm, newNorm);
+    emitChange({ kind: 'rename', path: newNorm, oldPath: oldNorm });
   },
   async symlink(target: string, path: string) {
     await ensureDefaults();
@@ -262,11 +374,15 @@ export const vfs = {
   },
   async unlink(path: string) {
     await ensureDefaults();
-    return pfs().unlink(normalizePath(path));
+    const normalized = normalizePath(path);
+    await pfs().unlink(normalized);
+    emitChange({ kind: 'delete', path: normalized });
   },
   async rmdir(path: string) {
     await ensureDefaults();
-    return pfs().rmdir(normalizePath(path));
+    const normalized = normalizePath(path);
+    await pfs().rmdir(normalized);
+    emitChange({ kind: 'delete', path: normalized });
   },
   async du(path: string) {
     await ensureDefaults();
@@ -281,4 +397,5 @@ export const vfs = {
   exists,
   appendFile,
   copyFile,
+  onChange,
 };
