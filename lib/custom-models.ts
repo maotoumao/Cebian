@@ -21,7 +21,7 @@ export function customProviderId(provider: string): string {
 }
 
 const DEFAULT_CONTEXT_WINDOW = 128000;
-const DEFAULT_MAX_TOKENS = 8192;
+const DEFAULT_MAX_TOKENS = 0;
 
 /** Convert a CustomProviderConfig + CustomModelDef into a pi-ai Model object */
 export function toModel(config: CustomProviderConfig, model: CustomModelDef): Model<Api> {
