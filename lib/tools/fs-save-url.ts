@@ -3,7 +3,7 @@ import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_FS_SAVE_URL } from '@/lib/types';
 import { vfs } from '@/lib/vfs';
 import { extensionForMime, isTextualMime } from '@/lib/mime';
-import { formatSize, invalidateSkillIndexIfNeeded } from './fs-helpers';
+import { formatSize } from './fs-helpers';
 
 /** Default ceiling on response body bytes if the caller doesn't override
  *  via `save.maxBytes`. Comfortably fits typical screenshots, short clips,
@@ -238,10 +238,10 @@ export const fsSaveUrlTool: AgentTool<typeof FsSaveUrlParameters> = {
 
         // ── Write ──
         // `vfs.writeFile` accepts Uint8Array directly and auto-creates parent
-        // dirs. Mirror the other fs-* tools by invalidating the skill index
-        // if the write landed under the skills directory.
+        // dirs. The vfs change event fires automatically on success, so any
+        // listeners (e.g. the skill index cache invalidator in scanner.ts)
+        // pick up writes under ~/.cebian/skills/ without per-tool plumbing.
         await vfs.writeFile(finalDest, buf);
-        invalidateSkillIndexIfNeeded(finalDest);
 
         // ── Optional text sample ──
         // For textual MIMEs we attach a short preview to the return so the

@@ -64,8 +64,7 @@ function pathTouchesSkills(p: string): boolean {
 //
 // Also handles renames where ONLY the old path is in the skills tree
 // (e.g. moving a SKILL.md OUT of ~/.cebian/skills/) — the previous
-// invalidateSkillIndexIfNeeded helper checked just one path and would
-// miss this case.
+// per-tool path-checker inspected just one path and would miss this case.
 vfs.onChange((event) => {
   if (pathTouchesSkills(event.path)) {
     invalidateSkillIndex();

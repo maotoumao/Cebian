@@ -2,7 +2,6 @@ import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_FS_DELETE } from '@/lib/types';
 import { vfs } from '@/lib/vfs';
-import { invalidateSkillIndexIfNeeded } from './fs-helpers';
 
 const FsDeleteParameters = Type.Object({
   path: Type.String({
@@ -31,7 +30,6 @@ export const fsDeleteTool: AgentTool<typeof FsDeleteParameters> = {
         };
       }
       await vfs.rm(params.path, { recursive: params.recursive ?? false, force: false });
-      invalidateSkillIndexIfNeeded(params.path);
       return {
         content: [{ type: 'text', text: `Deleted ${params.path}` }],
         details: { status: 'done' },

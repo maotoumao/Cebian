@@ -2,7 +2,6 @@ import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_FS_EDIT_FILE } from '@/lib/types';
 import { vfs } from '@/lib/vfs';
-import { invalidateSkillIndexIfNeeded } from './fs-helpers';
 
 const FsEditFileParameters = Type.Object({
   path: Type.String({
@@ -64,7 +63,6 @@ export const fsEditFileTool: AgentTool<typeof FsEditFileParameters> = {
 
       const newContent = content.replace(params.old_string, () => params.new_string);
       await vfs.writeFile(params.path, newContent, 'utf8');
-      invalidateSkillIndexIfNeeded(params.path);
 
       return {
         content: [{ type: 'text', text: `Edited ${params.path}` }],

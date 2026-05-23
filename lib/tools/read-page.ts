@@ -5,7 +5,6 @@ import { executeInTabWithArgs } from '@/lib/tab-helpers';
 import { ensureOffscreen } from './offscreen';
 import type { OffscreenRequest, OffscreenResponse } from '@/entrypoints/offscreen/main';
 import { vfs } from '@/lib/vfs';
-import { invalidateSkillIndexIfNeeded } from './fs-helpers';
 
 const ReadPageParameters = Type.Object({
   mode: Type.Union(
@@ -949,7 +948,6 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
           details: { status: 'error' },
         };
       }
-      invalidateSkillIndexIfNeeded(params.outputPath);
 
       const byteLen = new TextEncoder().encode(content).length;
       const preview = content.length > 1024

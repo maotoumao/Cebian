@@ -3,7 +3,6 @@ import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { TOOL_EXECUTE_JS } from '@/lib/types';
 import { executeViaDebugger } from '@/lib/tab-helpers';
 import { vfs } from '@/lib/vfs';
-import { invalidateSkillIndexIfNeeded } from './fs-helpers';
 
 /** Sentinel value returned by the injected func when CSP blocks new Function(). */
 const CSP_BLOCKED = '__cebian_csp_blocked__';
@@ -139,7 +138,6 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
           details: { status: 'error' },
         };
       }
-      invalidateSkillIndexIfNeeded(params.outputPath);
 
       const byteLen = new TextEncoder().encode(text).length;
       const preview = text.length > 1024
