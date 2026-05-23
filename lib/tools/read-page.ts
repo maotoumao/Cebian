@@ -34,7 +34,9 @@ const ReadPageParameters = Type.Object({
   maxLength: Type.Optional(
     Type.Number({
       description:
-        'Maximum character length of the returned content. Defaults to 20000.',
+        'Maximum character length of the returned content. Defaults to 20000. ' +
+        'If you expect or observe truncation, raise this value in a single call (a few times the default is typically enough) — do NOT loop the tool with multiple selectors or repeated calls to stitch a larger result together. ' +
+        'Truncated responses end with a "...(truncated at N chars)" marker.',
     }),
   ),
   frameId: Type.Optional(

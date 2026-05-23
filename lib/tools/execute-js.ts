@@ -12,8 +12,9 @@ const ExecuteJsParameters = Type.Object({
       'JavaScript code to execute in the target tab. ' +
       'The code is inserted as the body of `async () => { YOUR_CODE }` — use `return` directly to produce a result ' +
       '(e.g. `return document.title`). You can use `await` directly. ' +
-      'NEVER wrap code in an IIFE like `(()=>{ return x })()` — the inner return does not propagate and the result will be null. ' +
-      'The return value will be JSON-serialized.',
+      'NEVER wrap code in an IIFE like `(()=>{ return x })()` — the outer async function has no top-level `return`, so the result comes back as `(no return value)`. Use a bare top-level `return x` instead. ' +
+      'The return value is JSON-serialized and returned to you in full — there is no hidden size limit, so do not pre-chunk results, probe for a maximum size, or stage large outputs in localStorage. ' +
+      'If the natural result would be very large, narrow or summarize it inside the JS (filter, slice, project fields) rather than splitting it across multiple calls.',
   }),
   frameId: Type.Optional(
     Type.Number({
@@ -38,7 +39,7 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
     'Use for DOM operations, data extraction, page modifications, ' +
     'calling page APIs, or reading localStorage/sessionStorage. ' +
     'The code runs in the page context with full access to the DOM and page globals. ' +
-    'The return value is JSON-serialized.',
+    'The return value is JSON-serialized and returned in full — do not pre-chunk or probe for a size limit.',
   parameters: ExecuteJsParameters,
 
   async execute(_toolCallId, params, signal): Promise<AgentToolResult<{ status: string }>> {
