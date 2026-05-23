@@ -56,8 +56,15 @@ CDP-injected code bypasses the page's CSP for `eval`/`new Function`. While any C
 Both `execute_js` and `executeInPage` wrap your `code` string as the body of `async () => { CODE }`. Two consequences:
 
 - Use bare `return` to produce a value: `executeInPage('return document.title')`. Top-level `await` is allowed.
-- Do **not** wrap your code in an IIFE like `(() => { return x })()` — the inner `return` is swallowed and the result is `null`/empty.
-- The return value is always a string when received: strings pass through as-is, non-strings are `JSON.stringify`-ed with 2-space indent, `undefined` becomes `(no return value)`, and exceptions become `Error: <message>`.
+- Do **not** wrap your code in an IIFE like `(() => { return x })()` — the outer async function has no top-level `return`, so the result comes back as `(no return value)`. Use a bare top-level `return x` instead.
+- The return value is rendered as text: strings pass through as-is, non-strings are `JSON.stringify`-ed with 2-space indent, and `undefined` (or no top-level `return`) becomes the literal `(no return value)`.
+- Errors surface differently per path. An exception in `execute_js`'s MAIN-world path causes `chrome.scripting.executeScript` to reject and the tool call to fail outright. On the CSP-fallback path of `execute_js`, and inside `executeInPage` (always CSP), exceptions are returned in-band as a string starting with `Error: <message>` instead.
+
+## Offloading large results to VFS
+
+The `execute_js` **tool** exposes an `outputPath` parameter: when set, the return value is written directly to VFS and the agent receives only a short summary (path + byte count + 1KB preview). The full bytes never enter the conversation. Use this whenever the natural payload is large (full-page extracts, generated reports, structured data dumps) to avoid burning output tokens or hitting `max_tokens` mid-toolcall.
+
+`executeInPage` (inside a skill script) has **no equivalent shortcut** — its return value always travels through the skill script's Promise. Skill scripts cannot write to VFS directly either: the sandbox has no `vfs` global. If a skill's natural payload is large, the right answer is usually to *not* funnel it through the skill at all — let the agent call the `execute_js` tool directly with `outputPath`, then have the skill operate on smaller, already-distilled data. A skill that returns 50 KB of raw HTML to the agent is doing the wrong thing.
 
 ## When NOT to ship a skill
 
