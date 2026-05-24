@@ -44,6 +44,12 @@ Before writing any code, verify placement and structure:
 - **Low coupling** — respect the established layering between `entrypoints/`, `components/`, `hooks/`, and `lib/`. Read existing imports to understand the direction; don't introduce reverse or cross-layer dependencies.
 - **File size signal** — single files growing past ~300 lines should be evaluated for splitting along a clear seam. This is a signal, not a rule — a long file with genuinely high cohesion is fine, and a short file that mixes concerns still needs splitting. Don't design for design's sake.
 
+## Code Comments
+
+- 注释优先使用中文，其次是英文。必要的术语（API 名称、库名、协议字段、错误码等）保持英文即可，不要强行翻译。
+- Comments should be written in Chinese first, English as fallback. Keep necessary technical terms (API names, library names, protocol fields, error codes, etc.) in English — do not force-translate them.
+- 这一规则只针对新增或修改的注释。不要为没有动过的代码补注释，也不要把现有的英文注释批量翻译成中文。
+
 ## Debugging & Troubleshooting
 
 - When investigating a bug, if the root cause is uncertain or multiple rounds of investigation haven't resolved it, **stop guessing** — add targeted `console.log` / `console.warn` statements at the suspicious code paths and ask the user to reproduce the issue so the logs can be collected.
