@@ -34,3 +34,6 @@ web-ext.config.ts
 # Astro site build output / cache
 site/.astro/
 site/dist/
+
+# Private notes folder, never committed
+docs/
