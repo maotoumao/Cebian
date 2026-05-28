@@ -459,6 +459,12 @@ vfs:
   binaryFile: "[二進位檔案 — $1]"
   # $1 = 格式化後的檔案大小
   tooLargeToPreview: "檔案太大，無法預覽（$1）。請改用下載。"
+  # $1 = 路徑，$2 = 格式化後的大小，$3 = 格式化後的上限
+  inlineTooLarge: "$1（$2）—檔案過大，不在對話中內聯顯示（上限 $3）"
+  # $1 = MIME 類型
+  inlineUnsupportedMime: "檔案類型不支援內聯預覽：$1"
+  # $1 = 路徑，$2 = 錯誤文字
+  inlineLoadFailed: "$1 — $2"
   preview: "預覽"
   viewSource: "檢視原始碼"
   # $1 = 路徑

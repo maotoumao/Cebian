@@ -43,6 +43,23 @@ export function mimeFor(ext: string): string {
   return MIME_MAP[ext.toLowerCase()] ?? 'application/octet-stream';
 }
 
+/** Convenience: extract the file extension from a path and look up its
+ *  MIME. Paths without a dot, or whose last segment starts with `.`
+ *  (dotfile), return `application/octet-stream`. */
+export function mimeFromPath(path: string): string {
+  const lastSlash = path.lastIndexOf('/');
+  const base = lastSlash >= 0 ? path.slice(lastSlash + 1) : path;
+  const dot = base.lastIndexOf('.');
+  if (dot <= 0) return 'application/octet-stream';
+  return mimeFor(base.slice(dot + 1));
+}
+
+/** Return true iff `mime` is a renderable image type. Used by inline VFS
+ *  image rendering to gate the blob-URL path. */
+export function isImageMime(mime: string): boolean {
+  return mime.startsWith('image/');
+}
+
 /** Lazy reverse map: MIME → extension. Built once on first access. The
  *  reverse direction is many-to-one for some MIMEs (jpg / jpeg both map to
  *  image/jpeg), so we pick the first key seen as the canonical extension

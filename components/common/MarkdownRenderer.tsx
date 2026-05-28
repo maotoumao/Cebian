@@ -1,4 +1,4 @@
-import { memo, type ReactNode } from 'react';
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import Markdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -7,7 +7,8 @@ import { showDialog } from '@/lib/dialog';
 import { CopyButton } from './CopyButton';
 import { t } from '@/lib/i18n';
 import { CEBIAN_SKILLS_DIR, CEBIAN_PROMPTS_DIR } from '@/lib/constants';
-import { encodeRelPath } from '@/lib/vfs';
+import { encodeRelPath, vfs } from '@/lib/vfs';
+import { isImageMime, mimeFromPath } from '@/lib/mime';
 
 /**
  * Minimal structural types for the hast (HTML AST) nodes react-markdown passes
@@ -152,19 +153,226 @@ function resolveVfsHref(href: string | undefined): string | undefined {
   return href;
 }
 
-const components: Components = {
-  // Images — click to preview
-  img: ({ src, alt, ...props }) => (
+// ─── Inline VFS image rendering ───
+//
+// markdown `![alt](#/workspaces/<uuid>/<skill>/cat.png)` 这种 src 在普通 <img>
+// 里无法直接加载（hash 不是 URL），需要把 VFS 字节读出来转成 blob URL。
+//
+// 支持的 src 形态：
+// - `#/workspaces/<...>/<image>`
+// - `#/home/<...>/<image>`（用户/skill 自带资源）
+// 不匹配上述形态的 src 直接走原生 <img>，行为不变。
+//
+// 大小阈值（默认 30 MB）以上不内联，回退成 "在 VFS 浏览器中打开" 的链接，
+// 防止聊天里一张超大图把整个 sidepanel 卡住。
+
+/** 内联渲染上限。超过该值的图片改为渲染链接而非 <img>。 */
+const VFS_INLINE_IMAGE_MAX_BYTES = 30 * 1024 * 1024;
+
+/** 人类可读的文件大小，跟 lib/tools/fs-helpers 的实现保持一致。 */
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** 判断 markdown 给出的 src 是不是我们要接管的 VFS 路径形态。 */
+const VFS_HASH_PATH_RE = /^#\/(workspaces|home)\b\//;
+
+/**
+ * 从 `#/workspaces/...` 形态的 src 抽出真正的 VFS 路径。
+ * markdown 渲染前 src 通常带 URL 编码（空格 → `%20`、中文等），这里统一
+ * `decodeURIComponent` 后再交给 VFS —— `vfs.readFile` 接的是字面路径。
+ * 解码失败时退回原始 slice 结果，让 VFS 自己抛 ENOENT。
+ */
+function extractVfsPath(src: string): string | null {
+  if (!VFS_HASH_PATH_RE.test(src)) return null;
+  const raw = src.slice(1);
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+/** 异步加载状态机 —— 用 discriminated union 保证状态/字段对齐；每个状态都
+ *  带 path 一起记录，避免 vfsPath 在父级 rerender 时切换、effect 还没跑完
+ *  上一帧用旧 url 渲染新 path 的过渡帧。 */
+type VfsImageState =
+  | { kind: 'idle'; path: null }
+  | { kind: 'loading'; path: string }
+  | { kind: 'ready'; path: string; url: string }
+  | { kind: 'too-large'; path: string; bytes: number }
+  | { kind: 'error'; path: string; message: string };
+
+/**
+ * 渲染一张可能来自 VFS 的图片。
+ * - 非 VFS src → 透传给原生 <img>，跟之前行为一致
+ * - VFS src → 读字节、生成 blob URL、内联渲染；超大文件 / 非图片 MIME 降级
+ */
+function VfsImage({ src, alt, ...rest }: { src?: string; alt?: string } & Record<string, unknown>) {
+  const vfsPath = src ? extractVfsPath(src) : null;
+  const [state, setState] = useState<VfsImageState>(
+    vfsPath ? { kind: 'loading', path: vfsPath } : { kind: 'idle', path: null },
+  );
+  // 当前正在渲染的 blob URL；effect cleanup 时 revoke，避免内存泄漏。
+  const currentUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!vfsPath) {
+      setState({ kind: 'idle', path: null });
+      return;
+    }
+    let cancelled = false;
+    setState({ kind: 'loading', path: vfsPath });
+    (async () => {
+      try {
+        const mime = mimeFromPath(vfsPath);
+        if (!isImageMime(mime)) {
+          if (!cancelled) {
+            setState({
+              kind: 'error',
+              path: vfsPath,
+              message: t('vfs.inlineUnsupportedMime', [mime]),
+            });
+          }
+          return;
+        }
+        const stat = await vfs.stat(vfsPath);
+        if (cancelled) return;
+        if (stat.size > VFS_INLINE_IMAGE_MAX_BYTES) {
+          setState({ kind: 'too-large', path: vfsPath, bytes: stat.size });
+          return;
+        }
+        const bytes = (await vfs.readFile(vfsPath)) as Uint8Array;
+        if (cancelled) return;
+        const blob = new Blob([bytes as BlobPart], { type: mime });
+        const url = URL.createObjectURL(blob);
+        currentUrlRef.current = url;
+        setState({ kind: 'ready', path: vfsPath, url });
+      } catch (err) {
+        if (!cancelled) {
+          setState({
+            kind: 'error',
+            path: vfsPath,
+            message: (err as Error).message,
+          });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (currentUrlRef.current) {
+        URL.revokeObjectURL(currentUrlRef.current);
+        currentUrlRef.current = null;
+      }
+    };
+  }, [vfsPath]);
+
+  // 非 VFS：直接走原生 <img>，保持原有行为
+  if (!vfsPath) {
+    return (
+      <img
+        src={src}
+        alt={alt}
+        role="button"
+        tabIndex={0}
+        onClick={() => src && showDialog('image-preview', { src, alt })}
+        onKeyDown={(e) => e.key === 'Enter' && src && showDialog('image-preview', { src, alt })}
+        {...rest}
+        className="max-w-full rounded cursor-pointer hover:opacity-90 transition-opacity my-2"
+      />
+    );
+  }
+
+  // 上一帧 state 还停留在旧 path（effect 还没跑完）→ 强制按 loading 渲染，
+  // 避免短暂闪现旧 blob URL。
+  const effective: VfsImageState =
+    state.path === vfsPath ? state : { kind: 'loading', path: vfsPath };
+
+  // VFS：根据状态机分支渲染
+  if (effective.kind === 'loading') {
+    return (
+      <span
+        role="status"
+        aria-busy="true"
+        aria-label={alt || vfsPath}
+        className="inline-block align-middle px-3 py-2 my-2 rounded border border-dashed border-border bg-muted/30 text-xs text-muted-foreground"
+        title={vfsPath}
+      >
+        {alt || t('common.loading')}
+      </span>
+    );
+  }
+  if (effective.kind === 'too-large') {
+    const sizeStr = formatBytes(effective.bytes);
+    const limitStr = formatBytes(VFS_INLINE_IMAGE_MAX_BYTES);
+    return (
+      <a
+        href={resolveVfsHref('#' + vfsPath)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-block align-middle px-3 py-2 my-2 rounded border border-border bg-muted/40 text-xs text-info underline-offset-2 hover:underline"
+        title={t('vfs.inlineTooLarge', [vfsPath, sizeStr, limitStr])}
+      >
+        📎 {alt || vfsPath} ({sizeStr})
+      </a>
+    );
+  }
+  if (effective.kind === 'error') {
+    return (
+      <span
+        role="img"
+        aria-label={alt || vfsPath}
+        className="inline-block align-middle px-3 py-2 my-2 rounded border border-dashed border-destructive/40 bg-destructive/5 text-xs text-destructive"
+        title={t('vfs.inlineLoadFailed', [vfsPath, effective.message])}
+      >
+        ⚠ {alt || vfsPath}
+      </span>
+    );
+  }
+  // effective.kind === 'ready'
+  return (
     <img
-      src={src}
+      src={effective.url}
       alt={alt}
       role="button"
       tabIndex={0}
-      onClick={() => src && showDialog('image-preview', { src, alt })}
-      onKeyDown={(e) => e.key === 'Enter' && src && showDialog('image-preview', { src, alt })}
-      {...props}
+      onClick={() => openVfsImagePreview(vfsPath, alt)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openVfsImagePreview(vfsPath, alt);
+        }
+      }}
+      {...rest}
       className="max-w-full rounded cursor-pointer hover:opacity-90 transition-opacity my-2"
     />
+  );
+}
+
+/**
+ * 点击预览：单独读取并生成一次性 blob URL 交给 dialog 自己回收。
+ * dialog 标记 `revokeSrcOnUnmount` 后会在 unmount 时 revoke，因此这条 URL
+ * 跟 VfsImage 自身的渲染 URL 解耦——VfsImage 卸载/重渲染不会让 modal 里的
+ * 图片变破图。
+ */
+async function openVfsImagePreview(vfsPath: string, alt?: string): Promise<void> {
+  try {
+    const bytes = (await vfs.readFile(vfsPath)) as Uint8Array;
+    const mime = mimeFromPath(vfsPath);
+    const blob = new Blob([bytes as BlobPart], { type: mime });
+    const url = URL.createObjectURL(blob);
+    showDialog('image-preview', { src: url, alt, revokeSrcOnUnmount: true });
+  } catch (err) {
+    console.warn('[VfsImage] preview failed:', err);
+  }
+}
+
+const components: Components = {
+  // Images — click to preview
+  img: ({ src, alt, ...props }) => (
+    <VfsImage src={src} alt={alt} {...props} />
   ),
 
   // External links open in new tab

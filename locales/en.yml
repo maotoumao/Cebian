@@ -470,6 +470,12 @@ vfs:
   binaryFile: "[Binary file — $1]"
   # $1 = formatted file size
   tooLargeToPreview: "File too large to preview — $1. Use Download instead."
+  # $1 = path, $2 = formatted size, $3 = formatted limit
+  inlineTooLarge: "$1 ($2) — too large to display inline (max $3)"
+  # $1 = MIME type
+  inlineUnsupportedMime: "Unsupported file type for inline preview: $1"
+  # $1 = path, $2 = error message
+  inlineLoadFailed: "$1 — $2"
   preview: "Preview"
   viewSource: "View source"
   # $1 = path
