@@ -54,6 +54,8 @@ Capabilities the skill's scripts need at execution time. Only consulted by `run_
 
 - `chrome.<namespace>` — exposes a proxy to a whitelisted `chrome.*` API. See [runtime-api.md](runtime-api.md) for the full whitelist.
 - `page.executeJs` — exposes the `executeInPage(code)` async helper to inject JS into a tab.
+- `bgFetch` or `bgFetch:<match-pattern>` — exposes the `bgFetch(url, init?)` global, a `fetch`-shaped helper that runs in the background service worker and bypasses CORS. Multiple `bgFetch:` lines OR together; bare `bgFetch` defaults to `*://*/*` (any http(s) URL). Patterns follow Chrome's match-pattern syntax — `https://*.example.com/*`, `*://api.example.com/*`, `<all_urls>`. Match against **scheme + host + pathname only**; do not include query strings or fragments in the pattern. Schemes other than `http` / `https` / `*` are rejected at run setup.
+- `vfs.read` / `vfs.write` — exposes a `vfs` global with `fs/promises`-like methods (`readFile`, `writeFile`, `mkdir`, `readdir`, `stat`, `exists`, `unlink`) scoped to the per-session workspace at `/workspaces/<sessionId>/<skill>/`. `vfs.write` automatically implies the read methods on the same scope — declare only `vfs.write` when the skill both produces and inspects its own files. Absolute paths and `..` segments that escape the scope are rejected at the path-resolution layer.
 
 ```yaml
 metadata:
@@ -61,6 +63,8 @@ metadata:
     - chrome.bookmarks
     - chrome.tabs
     - page.executeJs
+    - bgFetch:https://api.example.com/*
+    - vfs.write
 ```
 
 The first time `run_skill` runs a script for a skill that declares any permissions, the user is prompted via `ask_user` with three options (Deny / Allow once / Always allow this skill). "Always allow" persists per-skill in `chrome.storage.local`; the prompt re-appears if the declared permission set changes.

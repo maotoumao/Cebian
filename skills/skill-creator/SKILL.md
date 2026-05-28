@@ -24,7 +24,9 @@ A workflow for creating Cebian skills and improving them through iteration. The 
 
 - **Before drafting any SKILL.md, you MUST `fs_read_file` [assets/skill-template/SKILL.md](assets/skill-template/SKILL.md) and copy its YAML frontmatter block (the `--- ... ---` header at the top) verbatim into the new file.** A SKILL.md without that YAML frontmatter is invalid and will not be indexed. Do not invent alternative formats — there is no `metadata.json`, no `package.json`, no separate manifest. All metadata lives inside the SKILL.md frontmatter.
 - **Skill folder name must equal frontmatter `name` exactly.** Rules: 1–64 chars, lowercase `a–z`, digits, hyphens; no leading/trailing hyphen; no `--`. The validator does not currently reject invalid names — the skill will still index — but invalid names are not portable to other agentskills.io clients. Always follow the rules.
-- **Do not invent `chrome.*` permissions.** Only the namespaces and methods in the Cebian whitelist are reachable from skill scripts. See [references/runtime-api.md](references/runtime-api.md).
+- **Do not invent permissions.** Only the values listed in [references/runtime-api.md](references/runtime-api.md) (`chrome.<ns>` from the whitelist, `page.executeJs`, `bgFetch[:<match-pattern>]`, `vfs.read`, `vfs.write`) are reachable. Anything else is silently dropped.
+- **For "skill calls an HTTPS API" workflows, default to `bgFetch` + (when there's a binary artifact) `vfs.write` + return a markdown link.** Do **not** route API calls through `executeInPage` to "dodge CORS" — that exposes the API key to any script on the user's current page, and only works while they happen to be on a same-origin tab. The whole anti-pattern catalogue is in [references/injection-patterns.md](references/injection-patterns.md#anti-patterns) — read it before writing your first script-bearing skill.
+- **Secrets live in `scripts/*.js`, never in `SKILL.md` body.** The agent reads the body on every invocation; anything in it ends up in the conversation log. Script file contents are only read when the agent explicitly `fs_read_file`s them, which is rare.
 - **Freeze a step into `scripts/` when its correctness depends on exact code — selectors, schemas, ordering, constants — that would drift if re-derived from prose each turn; otherwise keep it as instructions. Empty `scripts/` or unused `metadata.permissions` entries are misleading and train users to dismiss permission prompts.**
 - **Index cache rules.** Writes via `fs_create_file` / `fs_edit_file` / `fs_delete` under `~/.cebian/skills/` auto-invalidate the in-memory index, so the very next user message sees the change. `fs_mkdir` and `fs_rename` do **not** invalidate — after either, follow up with an `fs_edit_file` on `SKILL.md` to force a refresh before testing.
 
@@ -42,6 +44,7 @@ Skills are not free. Before scaffolding anything, eliminate cheaper alternatives
 | Reusable text template the user wants to invoke by name | A prompt under `~/.cebian/prompts/<name>.md` |
 | One-off action the agent can plan and execute in a single session | The native tools directly (`execute_js`, `chrome_api`, `read_page`, etc.) |
 | A single browser-API call available via `chrome_api` | `chrome_api` directly |
+| "Fetch this URL into VFS" — a one-off download with no API key or special pre/post-processing | `fs_save_url` directly (no permission prompt, URL is visible to the user) |
 
 `fs_list ~/.cebian/skills` and check for overlaps before proceeding. See [references/injection-patterns.md](references/injection-patterns.md) for the decision matrix in detail.
 
@@ -69,8 +72,11 @@ Default to inferring intent from existing context (the user's request, attached 
    | Skill never triggers on prompts that should match | `description` undertriggers | Rewrite description; re-run the trigger eval |
    | Skill triggers but agent ignores instructions | Body is unclear, contradictory, or buried under references | Tighten body; promote critical content out of L3 |
    | Skill loads but agent picks wrong reference / misses one | Reference is mistitled or under-cited from body | Improve cross-reference language in body |
-   | `run_skill` fails or returns wrong shape | Script bug or wrong `metadata.permissions` | Re-read [references/runtime-api.md](references/runtime-api.md), fix script, re-test |
+   | `run_skill` fails or returns wrong shape | Script bug or wrong `metadata.permissions` (e.g. `bgFetch` URL not in declared pattern, `vfs` path escaping scope, missing whitelist method) | Re-read [references/runtime-api.md](references/runtime-api.md), fix script, re-test |
    | Permission prompt fires every time | Declared permission set keeps changing across runs | Stabilize `metadata.permissions` |
+   | Skill returns huge JSON / base64 blob that bloats the conversation | Script `module.exports`-es binary or large text directly | Declare `vfs.write`, write the artifact to VFS, return a short markdown link or path — see [Anti-pattern #2](references/injection-patterns.md#2-returning-binary-data-via-moduleexports) |
+   | Skill leaks an API key into the conversation | Key embedded in `SKILL.md` body or passed via `args` | Move the key into the script file; agent never reads script content — see [Anti-pattern #3](references/injection-patterns.md#3-putting-an-api-key-in-the-skillmd-body) |
+   | Skill's API call works on one tab but fails on others | Using `executeInPage` to call a third-party API | Switch to `bgFetch:<match-pattern>` — see [Anti-pattern #1](references/injection-patterns.md#1-using-executeinpage-to-call-a-third-party-https-api) |
 
 3. **Make the minimum edit** that addresses the diagnosis. Don't restructure unrelated parts.
 4. Enter the **iteration loop** below.
@@ -124,4 +130,5 @@ Exit the loop when:
 - [references/injection-patterns.md](references/injection-patterns.md) — `executeInPage` vs `execute_js`, the cookie matrix, and when **not** to ship a skill.
 - [references/description-tuning.md](references/description-tuning.md) — anatomy of a good description, before/after rewrites, anti-patterns.
 - [assets/skill-template/](assets/skill-template/) — copy-paste starting point for a new skill.
+- [assets/examples/api-image-skill/](assets/examples/api-image-skill/) — reference example for the bgFetch + vfs.write + inline-image pattern (the recommended shape for "skill calls an HTTPS API → returns generated media"). Read alongside Anti-pattern #1 in injection-patterns.md.
 
