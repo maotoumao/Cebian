@@ -288,7 +288,7 @@ class AgentManager {
     }
 
     // Create per-session tools with isolated bridges
-    const { tools: sessionTools, ctx: toolCtx } = await createSessionTools();
+    const { tools: sessionTools, ctx: toolCtx } = await createSessionTools(sessionId);
 
     const agent = createCebianAgent({
       model: resolved.model,

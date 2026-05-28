@@ -16,19 +16,20 @@ import { fsReadFileTool } from './fs-read-file';
 import { fsListTool } from './fs-list';
 import { fsSearchTool } from './fs-search';
 import { fsSaveUrlTool } from './fs-save-url';
-import { runSkillTool } from './run-skill';
+import { createSessionRunSkillTool } from './run-skill';
 import { chromeApiTool } from './chrome-api-tool';
 import { SessionToolContext } from './session-context';
 import { TOOL_ASK_USER } from '@/lib/types';
 import { getMCPManager } from '@/lib/mcp/manager';
 import { createMCPAgentTool } from './mcp-tool';
 
-/** Non-interactive tools shared by all sessions. */
+/** Non-interactive tools shared by all sessions. `runSkillTool` is intentionally
+ *  NOT here —— 每个 session 用 `createSessionRunSkillTool(sessionId)` 拿到
+ *  绑定到该 session workspace 的实例，避免 vfs 写入丢失会话上下文。 */
 const sharedTools: AgentTool<any>[] = [
   executeJsTool, readPageTool, interactTool, inspectTool, tabTool, screenshotTool, pdfTool,
   fsCreateFileTool, fsEditFileTool, fsMkdirTool, fsRenameTool, fsDeleteTool,
   fsReadFileTool, fsListTool, fsSearchTool, fsSaveUrlTool,
-  runSkillTool,
   chromeApiTool,
 ];
 
@@ -70,17 +71,18 @@ export async function discoverMCPTools(): Promise<AgentTool<any>[]> {
 }
 
 /**
- * Build the full tool array for a session = interactive tools + shared + MCP.
- * Used both at session creation and when MCP config changes mid-session.
+ * Build the full tool array for a session = interactive tools + shared + MCP +
+ * the per-session `run_skill` instance (sessionId-bound so its vfs writes land
+ * in the session's workspace).
  *
- * Interactive tools come from the session's own `SessionToolContext`, so
- * agent-manager doesn't need to know which interactive tools exist.
+ * Used both at session creation and when MCP config changes mid-session.
  */
 export async function buildSessionToolArray(
   ctx: SessionToolContext,
 ): Promise<AgentTool<any>[]> {
   const mcpTools = await discoverMCPTools();
-  return [...ctx.getInteractiveTools(), ...sharedTools, ...mcpTools];
+  const runSkill = createSessionRunSkillTool(ctx.sessionId);
+  return [...ctx.getInteractiveTools(), ...sharedTools, runSkill, ...mcpTools];
 }
 
 /**
@@ -90,11 +92,11 @@ export async function buildSessionToolArray(
  * Async because MCP tool discovery may need to fetch from remote servers
  * (cached by the manager so subsequent sessions are fast).
  */
-export async function createSessionTools(): Promise<{
+export async function createSessionTools(sessionId: string): Promise<{
   tools: AgentTool<any>[];
   ctx: SessionToolContext;
 }> {
-  const ctx = new SessionToolContext();
+  const ctx = new SessionToolContext(sessionId);
 
   // Register interactive tools (each gets its own bridge)
   const { tool: askUserTool, bridge: askUserBridge } = createSessionAskUserTool();

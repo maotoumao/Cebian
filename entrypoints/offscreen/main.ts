@@ -131,10 +131,11 @@ chrome.runtime.onMessage.addListener(
     if ('type' in message && typeof message.type === 'string' && message.type.startsWith('sandbox:')) {
       const sandboxMsg = message as SandboxRelayMessage;
 
-      // Messages TO sandbox (run, chrome_result, page_exec_result)
+      // Messages TO sandbox (run, chrome_result, page_exec_result, vfs_result)
       if (sandboxMsg.type === 'sandbox:run' ||
           sandboxMsg.type === 'sandbox:chrome_result' ||
-          sandboxMsg.type === 'sandbox:page_exec_result') {
+          sandboxMsg.type === 'sandbox:page_exec_result' ||
+          sandboxMsg.type === 'sandbox:vfs_result') {
         ensureSandboxFrame();
         if (sandboxReady) {
           sandboxFrame!.contentWindow?.postMessage(sandboxMsg, '*');

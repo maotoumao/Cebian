@@ -18,6 +18,14 @@ export class SessionToolContext {
   private bridgeUnsubs: (() => void)[] = [];
   private pendingState = new Map<string, boolean>();
   private listeners = new Set<ToolStateCallback>();
+  /** sessionId 由 createSessionTools 注入，仅供需要 session-scoped 副作用的
+   *  工具读取（目前是 run-skill —— 计算 vfs 作用域）。其余工具不应依赖这个
+   *  字段；它存在的代价就是 SessionToolContext 不再是纯接线板，而是携带身份。 */
+  readonly sessionId: string;
+
+  constructor(sessionId: string) {
+    this.sessionId = sessionId;
+  }
 
   /**
    * Register an interactive tool's bridge AND its AgentTool instance.
