@@ -130,5 +130,4 @@ Exit the loop when:
 - [references/injection-patterns.md](references/injection-patterns.md) — `executeInPage` vs `execute_js`, the cookie matrix, and when **not** to ship a skill.
 - [references/description-tuning.md](references/description-tuning.md) — anatomy of a good description, before/after rewrites, anti-patterns.
 - [assets/skill-template/](assets/skill-template/) — copy-paste starting point for a new skill.
-- [assets/examples/api-image-skill/](assets/examples/api-image-skill/) — reference example for the bgFetch + vfs.write + inline-image pattern (the recommended shape for "skill calls an HTTPS API → returns generated media"). Read alongside Anti-pattern #1 in injection-patterns.md.
 
