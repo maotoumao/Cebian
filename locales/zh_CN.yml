@@ -2,7 +2,7 @@
 # 修改时请同步 locales/en.yml 与 locales/zh_TW.yml。规范见 .agents/skills/i18n-naming/SKILL.md。
 
 # ─── Manifest（扁平顶层 key，见规范"Manifest localization"）───
-extName: "Cebian · 开源 AI 侧边栏智能体 · 自备 API Key"
+extName: "Cebian · 开源 AI 侧边栏智能体"
 extDescription: "浏览器侧边栏里的 AI 智能体，用你自己的 OpenAI / Anthropic / Google API Key，免订阅、无账号。读网页、拾取元素、装 MCP 工具、跑 Skill 工作流，数据全部本地存储。AGPL-3.0 开源。"
 actionTitle: "打开 Cebian 侧边栏"
 

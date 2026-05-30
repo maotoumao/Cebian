@@ -3,7 +3,7 @@
 # See .agents/skills/i18n-naming/SKILL.md.
 
 # ─── Manifest (flat top-level keys, see skill "Manifest localization") ───
-extName: "Cebian · Open-Source AI Side Panel Agent · Bring Your Own API Key"
+extName: "Cebian · Open-Source AI Side Panel Agent"
 extDescription: "Side panel AI agent. BYO key (OpenAI/Anthropic/Google), no account. Element picker, MCP tools, skills. AGPL-3.0, local-first."
 actionTitle: "Open Cebian sidebar"
 
