@@ -1,6 +1,5 @@
 // ─── Provider registry ───
 
-import type { CustomProviderConfig } from './storage';
 import { t } from '@/lib/i18n';
 
 export const OAUTH_PROVIDERS = [
@@ -14,33 +13,28 @@ export const OAUTH_PROVIDERS = [
 }[];
 
 export const APIKEY_PROVIDERS = [
-  { provider: 'anthropic', label: 'Anthropic' },
-  { provider: 'openai', label: 'OpenAI' },
-  { provider: 'google', label: 'Google Gemini' },
-  { provider: 'openrouter', label: 'OpenRouter' },
-  { provider: 'deepseek', label: 'DeepSeek', preset: true },
-  { provider: 'zai', label: 'zAI' },
-  { provider: 'kimi-coding', label: 'Kimi' },
-  { provider: 'mistral', label: 'Mistral' },
-  { provider: 'xai', label: 'xAI' },
+  { provider: 'anthropic', label: 'Anthropic', pinned: true },
+  { provider: 'cerebras', label: 'Cerebras' },
+  { provider: 'deepseek', label: 'DeepSeek', pinned: true },
+  { provider: 'fireworks', label: 'Fireworks' },
+  { provider: 'google', label: 'Google Gemini', pinned: true },
   { provider: 'groq', label: 'Groq' },
+  { provider: 'huggingface', label: 'Hugging Face' },
+  { provider: 'kimi-coding', label: 'Kimi Coding Plan' },
   { provider: 'minimax', label: 'MiniMax' },
   { provider: 'minimax-cn', label: 'MiniMax (CN)' },
+  { provider: 'mistral', label: 'Mistral' },
+  { provider: 'moonshotai', label: 'Moonshot' },
+  { provider: 'moonshotai-cn', label: 'Moonshot (CN)' },
+  { provider: 'openai', label: 'OpenAI', pinned: true },
+  { provider: 'openrouter', label: 'OpenRouter', pinned: true },
+  { provider: 'together', label: 'Together AI' },
+  { provider: 'vercel-ai-gateway', label: 'Vercel AI Gateway' },
+  { provider: 'xai', label: 'xAI' },
+  { provider: 'xiaomi', label: 'Xiaomi MiMo' },
+  { provider: 'xiaomi-token-plan-cn', label: 'Xiaomi MiMo Plan (CN)' },
+  { provider: 'zai', label: 'zAI' },
 ] as const;
-
-// ─── Preset custom providers (OpenAI-compatible) ───
-
-export const PRESET_PROVIDERS: readonly CustomProviderConfig[] = [
-  {
-    id: 'deepseek',
-    name: 'DeepSeek',
-    baseUrl: 'https://api.deepseek.com',
-    models: [
-      { modelId: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', reasoning: true, contextWindow: 1048576, maxTokens: 393216 },
-      { modelId: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', reasoning: true, contextWindow: 1048576, maxTokens: 393216 },
-    ],
-  },
-];
 
 // ─── Default system prompt ───
 

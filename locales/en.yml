@@ -329,6 +329,9 @@ chat:
 provider:
   section:
     viaApiKey: "Via API Key"
+    # $1 = number of hidden providers
+    showMore: "Show more ($1)"
+    showLess: "Show less"
   status:
     connected: "Connected"
     notConfigured: "Not configured"

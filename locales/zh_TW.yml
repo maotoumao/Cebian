@@ -318,6 +318,9 @@ chat:
 provider:
   section:
     viaApiKey: "透過 API Key"
+    # $1 = 被折疊的 provider 數量
+    showMore: "展開更多（$1）"
+    showLess: "收合"
   status:
     connected: "已連線"
     notConfigured: "尚未設定"

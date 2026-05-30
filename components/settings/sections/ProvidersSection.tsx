@@ -1,4 +1,5 @@
-import { Fragment, useState, useRef } from 'react';
+import { Fragment, useState, useRef, useMemo } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { ProviderOAuthItem, type OAuthPhase } from '@/components/settings/provider/ProviderOAuthItem';
 import { ProviderApiKeyItem } from '@/components/settings/provider/ProviderApiKeyItem';
@@ -13,8 +14,8 @@ import {
   type ProviderCredentials,
   type CustomProviderConfig,
 } from '@/lib/storage';
-import { OAUTH_PROVIDERS, APIKEY_PROVIDERS, PRESET_PROVIDERS } from '@/lib/constants';
-import { customProviderKey, getCustomModels } from '@/lib/custom-models';
+import { OAUTH_PROVIDERS, APIKEY_PROVIDERS } from '@/lib/constants';
+import { customProviderKey } from '@/lib/custom-models';
 import { loginGitHubCopilot, loginOpenAICodex } from '@/lib/oauth';
 import { t } from '@/lib/i18n';
 
@@ -29,7 +30,22 @@ export function ProvidersSection() {
   const [currentModel, setCurrentModel] = useStorageItem(activeModel, null);
   const [customs, setCustoms] = useStorageItem(customProviders, []);
   const [oauthStates, setOAuthStates] = useState<Record<string, OAuthPhase>>({});
+  const [apiKeysExpanded, setApiKeysExpanded] = useState(false);
   const abortRefs = useRef<Record<string, AbortController>>({});
+
+  // API Key provider 太多，默认只展示「常驻」（pinned）与「已配置」（有凭据）的，
+  // 其余收进展开开关。两组各自保持 APIKEY_PROVIDERS 的原始（字母）顺序。
+  const { visibleApiKeyProviders, hiddenApiKeyProviders } = useMemo(() => {
+    const visible: (typeof APIKEY_PROVIDERS)[number][] = [];
+    const hidden: (typeof APIKEY_PROVIDERS)[number][] = [];
+    for (const p of APIKEY_PROVIDERS) {
+      const pinned = 'pinned' in p && p.pinned;
+      const configured = !!providers[p.provider];
+      if (pinned || configured) visible.push(p);
+      else hidden.push(p);
+    }
+    return { visibleApiKeyProviders: visible, hiddenApiKeyProviders: hidden };
+  }, [providers]);
 
   const getOAuthState = (provider: string): OAuthPhase =>
     oauthStates[provider] ?? { phase: 'idle' };
@@ -117,7 +133,7 @@ export function ProvidersSection() {
   };
 
   const handleAddCustomProvider = (config: CustomProviderConfig, apiKey?: string) => {
-    if (customs.some((c) => c.id === config.id) || PRESET_PROVIDERS.some((p) => p.id === config.id)) return;
+    if (customs.some((c) => c.id === config.id)) return;
     setCustoms([...customs, config]);
     if (apiKey) {
       const key = customProviderKey(config.id);
@@ -143,11 +159,6 @@ export function ProvidersSection() {
     setProviders(next);
     clearActiveModelIfNeeded(key);
   };
-
-  // Filter out preset providers from user customs
-  const userCustoms = customs.filter(
-    (c) => !PRESET_PROVIDERS.some((p) => p.id === c.id),
-  );
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -177,45 +188,56 @@ export function ProvidersSection() {
       {/* API Key providers */}
       <div className="space-y-4">
         <h3 className="text-xs text-muted-foreground font-medium tracking-wide uppercase">{t('provider.section.viaApiKey')}</h3>
-        {APIKEY_PROVIDERS.map((p, i) => {
-          if ('preset' in p && p.preset) {
-            const presetConfig = PRESET_PROVIDERS.find((pp) => pp.id === p.provider);
-            if (!presetConfig) return null;
-            const key = customProviderKey(presetConfig.id);
-            return (
-              <Fragment key={key}>
-                {i > 0 && <Separator />}
-                <ProviderApiKeyItem
-                  provider={key}
-                  label={presetConfig.name}
-                  models={getCustomModels(presetConfig)}
-                  credential={providers[key] as ApiKeyCredential | undefined}
-                  onSave={(cred) => handleCredentialSave(key, cred)}
-                  onRemove={() => handleApiKeyRemove(key)}
-                />
-              </Fragment>
-            );
-          }
-          return (
-            <Fragment key={p.provider}>
-              {i > 0 && <Separator />}
-              <ProviderApiKeyItem
-                provider={p.provider}
-                label={p.label}
-                credential={providers[p.provider] as ApiKeyCredential | undefined}
-                onSave={(cred) => handleCredentialSave(p.provider, cred)}
-                onRemove={() => handleApiKeyRemove(p.provider)}
+        {visibleApiKeyProviders.map((p, i) => (
+          <Fragment key={p.provider}>
+            {i > 0 && <Separator />}
+            <ProviderApiKeyItem
+              provider={p.provider}
+              label={p.label}
+              credential={providers[p.provider] as ApiKeyCredential | undefined}
+              onSave={(cred) => handleCredentialSave(p.provider, cred)}
+              onRemove={() => handleApiKeyRemove(p.provider)}
+            />
+          </Fragment>
+        ))}
+
+        {hiddenApiKeyProviders.length > 0 && (
+          <>
+            {apiKeysExpanded &&
+              hiddenApiKeyProviders.map((p) => (
+                <Fragment key={p.provider}>
+                  <Separator />
+                  <ProviderApiKeyItem
+                    provider={p.provider}
+                    label={p.label}
+                    credential={providers[p.provider] as ApiKeyCredential | undefined}
+                    onSave={(cred) => handleCredentialSave(p.provider, cred)}
+                    onRemove={() => handleApiKeyRemove(p.provider)}
+                  />
+                </Fragment>
+              ))}
+            <button
+              type="button"
+              onClick={() => setApiKeysExpanded((v) => !v)}
+              aria-expanded={apiKeysExpanded}
+              className="flex w-full items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronDown
+                className={`size-3.5 transition-transform ${apiKeysExpanded ? 'rotate-180' : ''}`}
               />
-            </Fragment>
-          );
-        })}
+              {apiKeysExpanded
+                ? t('provider.section.showLess')
+                : t('provider.section.showMore', [hiddenApiKeyProviders.length])}
+            </button>
+          </>
+        )}
       </div>
 
       {/* Custom OpenAI-compatible providers */}
       <div className="space-y-4">
         <h3 className="text-xs text-muted-foreground font-medium tracking-wide uppercase">OpenAI Compatible</h3>
 
-        {userCustoms.map((c) => {
+        {customs.map((c) => {
           const key = customProviderKey(c.id);
           const cred = providers[key] as ApiKeyCredential | undefined;
           return (

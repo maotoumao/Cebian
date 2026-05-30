@@ -11,8 +11,7 @@ import { RecordButton } from '@/components/chat/RecordButton';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { activeModel, thinkingLevel, providerCredentials, customProviders as customProvidersStorage, type ThinkingLevel } from '@/lib/storage';
 import { getModel } from '@earendil-works/pi-ai';
-import { isCustomProvider, findCustomModel, mergeCustomProviders } from '@/lib/custom-models';
-import { PRESET_PROVIDERS } from '@/lib/constants';
+import { isCustomProvider, findCustomModel } from '@/lib/custom-models';
 import { startElementPicker, cancelElementPicker } from '@/lib/element-picker';
 import { scanPrompts, type PromptMeta } from '@/lib/ai-config/scanner';
 import { replaceTemplateVars, gatherTemplateVars } from '@/lib/ai-config/template';
@@ -78,15 +77,11 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
   const [providers] = useStorageItem(providerCredentials, {});
   const [customProviderList] = useStorageItem(customProvidersStorage, []);
 
-  const allCustomProviders = useMemo(() =>
-    mergeCustomProviders(PRESET_PROVIDERS, customProviderList),
-  [customProviderList]);
-
   const isReasoningModel = useMemo(() => {
     if (!currentModel) return false;
 
     if (isCustomProvider(currentModel.provider)) {
-      return findCustomModel(allCustomProviders, currentModel.provider, currentModel.modelId)?.reasoning ?? false;
+      return findCustomModel(customProviderList, currentModel.provider, currentModel.modelId)?.reasoning ?? false;
     }
 
     try {
@@ -95,7 +90,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
     } catch {
       return false;
     }
-  }, [currentModel, allCustomProviders]);
+  }, [currentModel, customProviderList]);
 
   const handleModelSelect = useCallback((provider: string, modelId: string) => {
     setCurrentModel({ provider, modelId });
@@ -805,7 +800,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
             <ModelSelector
               activeModel={currentModel}
               configuredProviders={providers}
-              customProviders={allCustomProviders}
+              customProviders={customProviderList}
               onSelect={handleModelSelect}
               onOpenSettings={onOpenSettings ?? (() => {})}
             />

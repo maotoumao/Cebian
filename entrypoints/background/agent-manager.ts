@@ -24,8 +24,7 @@ import {
 } from '@/lib/storage';
 import { getMCPManager } from '@/lib/mcp/manager';
 import { getCopilotBaseUrl } from '@/lib/oauth';
-import { mergeCustomProviders, isCustomProvider, findCustomModel } from '@/lib/custom-models';
-import { PRESET_PROVIDERS } from '@/lib/constants';
+import { isCustomProvider, findCustomModel } from '@/lib/custom-models';
 import { t } from '@/lib/i18n';
 import { acquireKeepAlive, releaseKeepAlive } from './sw-keepalive';
 
@@ -191,11 +190,10 @@ class AgentManager {
     ]);
     if (!modelCfg) return null;
 
-    const allCustom = mergeCustomProviders(PRESET_PROVIDERS, customProvs ?? []);
     let model: Model<Api> | undefined;
 
     if (isCustomProvider(modelCfg.provider)) {
-      model = findCustomModel(allCustom, modelCfg.provider, modelCfg.modelId) ?? undefined;
+      model = findCustomModel(customProvs ?? [], modelCfg.provider, modelCfg.modelId) ?? undefined;
     } else {
       try {
         const models = getModels(modelCfg.provider as KnownProvider) as Model<Api>[];

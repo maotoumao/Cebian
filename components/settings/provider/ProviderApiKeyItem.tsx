@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Eye, EyeOff, Unplug, Save } from "lucide-react";
 import {
   getModels,
@@ -35,6 +35,15 @@ export function ProviderApiKeyItem({
   const [key, setKey] = useState(credential?.apiKey ?? "");
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // 凭据由 storage 异步加载，首次挂载时 credential 往往还是 undefined（useStorageItem
+  // 先返回 fallback）。等真实凭据到达后把它同步进本地输入框，否则保存过的 key 重进
+  // 设置页会显示为空。仅在 credential.apiKey 变化时触发：凭据加载完成后，未保存的
+  // 普通输入不会被覆盖（此时 credential.apiKey 不变）。
+  useEffect(() => {
+    setKey(credential?.apiKey ?? "");
+  }, [credential?.apiKey]);
+
   const [status, setStatus] = useState<
     | { type: "success"; message: string }
     | { type: "error"; message: string }

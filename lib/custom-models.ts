@@ -44,17 +44,6 @@ export function getCustomModels(config: CustomProviderConfig): Model<Api>[] {
   return config.models.map(m => toModel(config, m));
 }
 
-/** Merge preset providers with user custom providers, deduplicating by id */
-export function mergeCustomProviders(
-  presets: readonly CustomProviderConfig[],
-  userCustoms: CustomProviderConfig[],
-): CustomProviderConfig[] {
-  return [
-    ...presets,
-    ...userCustoms.filter(c => !presets.some(p => p.id === c.id)),
-  ];
-}
-
 /** Find a custom provider config by provider key (e.g. "custom:deepseek") */
 export function findCustomProvider(
   providers: CustomProviderConfig[],
