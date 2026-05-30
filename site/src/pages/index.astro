@@ -1,0 +1,25 @@
+---
+// GitHub Pages 是纯静态托管，无法做服务端 301/302 跳转。
+// 这里用首屏绘制前同步执行的内联脚本即时跳转，避免可见的「Redirecting」中转页。
+// 按浏览器语言选择 zh / en；无 JS 时回退到 <noscript> 的 meta refresh。
+---
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Cebian</title>
+    <script is:inline>
+      (function () {
+        var lang = (navigator.language || 'zh').toLowerCase();
+        var target = lang.indexOf('zh') === 0 ? '/zh/' : '/en/';
+        location.replace(target);
+      })();
+    </script>
+    <noscript>
+      <meta http-equiv="refresh" content="0; url=/zh/" />
+    </noscript>
+  </head>
+  <body></body>
+</html>
