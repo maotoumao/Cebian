@@ -1,5 +1,5 @@
 import { Type } from 'typebox';
-import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
+import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { TOOL_FS_LIST } from '@/lib/types';
 import { vfs } from '@/lib/vfs';
 import { formatSize } from './fs-helpers';

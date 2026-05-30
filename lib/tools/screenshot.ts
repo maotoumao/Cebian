@@ -1,5 +1,5 @@
 import { Type } from 'typebox';
-import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
+import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { TOOL_SCREENSHOT } from '@/lib/types';
 import { getActiveTabId, executeInTabWithArgs } from '@/lib/tab-helpers';
 import { ensureOffscreen } from './offscreen';

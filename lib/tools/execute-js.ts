@@ -1,5 +1,5 @@
 import { Type } from 'typebox';
-import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
+import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { TOOL_EXECUTE_JS } from '@/lib/types';
 import { executeViaDebugger } from '@/lib/tab-helpers';
 import { vfs } from '@/lib/vfs';

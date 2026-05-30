@@ -1,4 +1,4 @@
-import type { ImageContent } from '@mariozechner/pi-ai';
+import type { ImageContent } from '@earendil-works/pi-ai';
 import { escapeXml } from './utils';
 import { RECORDING_SCHEMA_COMMENT } from './recorder/schema-doc';
 

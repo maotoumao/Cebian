@@ -3,7 +3,7 @@
 // Bridge logic stays in background; this is purely for UI rendering.
 
 import type { ComponentType } from 'react';
-import type { ToolResultMessage } from '@mariozechner/pi-ai';
+import type { ToolResultMessage } from '@earendil-works/pi-ai';
 
 /** Props that every interactive tool UI component receives. */
 export interface InteractiveToolComponentProps<TRequest = any> {

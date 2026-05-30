@@ -18,7 +18,7 @@ import {
 import { ToolCard } from '@/components/chat/ToolCard';
 import { ToolCardWithUI } from '@/components/chat/ToolCardWithUI';
 import { isMcpAppResult } from '@/lib/tools/mcp-tool';
-import type { AssistantMessage, ToolResultMessage, UserMessage } from '@mariozechner/pi-ai';
+import type { AssistantMessage, ToolResultMessage, UserMessage } from '@earendil-works/pi-ai';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
   getAssistantText,

@@ -2,7 +2,7 @@
 // Replaces useAgentLifecycle + useSessionManager.
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { AgentMessage } from '@mariozechner/pi-agent-core';
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage, type SessionMeta } from '@/lib/protocol';
 import type { SessionRecord } from '@/lib/db';
 import type { Attachment } from '@/lib/attachments';

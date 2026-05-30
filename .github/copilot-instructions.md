@@ -52,7 +52,7 @@ Before writing any code, verify placement and structure:
 
 ## Tool Failure Handling
 
-Cebian's agent tools (`lib/tools/*`) implement `AgentTool` from `@mariozechner/pi-agent-core`. The protocol is literal: throw on failure, return on success.
+Cebian's agent tools (`lib/tools/*`) implement `AgentTool` from `@earendil-works/pi-agent-core`. The protocol is literal: throw on failure, return on success.
 
 - **Real errors → `throw new Error(<message>)`** (network, invalid input, missing resources, permission denied, parse failure). pi-agent-core sets `message.isError = true`, which flows to `is_error: true` in the LLM payload so the model's retry / replan engages. The thrown `Error.message` is the only thing the LLM sees — phrase it actionably.
 - **Empty results → `return` success with descriptive content** (0 search hits, empty directory, 0 elements matched, PDF has no text layer, chrome API returned undefined). The agent must be able to act on these calmly. Tiebreaker: "can the agent reasonably proceed from this result?" Yes → return; no → throw.

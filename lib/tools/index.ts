@@ -1,4 +1,4 @@
-import type { AgentTool } from '@mariozechner/pi-agent-core';
+import type { AgentTool } from '@earendil-works/pi-agent-core';
 import { createSessionAskUserTool } from './ask-user';
 import { executeJsTool } from './execute-js';
 import { readPageTool } from './read-page';

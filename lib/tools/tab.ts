@@ -1,5 +1,5 @@
 import { Type } from 'typebox';
-import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
+import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { TOOL_TAB } from '@/lib/types';
 
 // ─── Parameters: single flat object (OpenAI requires top-level "type": "object") ───

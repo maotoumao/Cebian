@@ -1,5 +1,5 @@
-import { Agent, type AgentOptions, type AgentMessage, type AgentTool } from '@mariozechner/pi-agent-core';
-import type { Api, Model, Message } from '@mariozechner/pi-ai';
+import { Agent, type AgentOptions, type AgentMessage, type AgentTool } from '@earendil-works/pi-agent-core';
+import type { Api, Model, Message } from '@earendil-works/pi-ai';
 import { providerCredentials, type OAuthCredential } from './storage';
 import { getValidOAuthToken } from './oauth';
 import { DEFAULT_SYSTEM_PROMPT } from './constants';

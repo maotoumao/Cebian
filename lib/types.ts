@@ -7,7 +7,7 @@ import type {
   ThinkingContent,
   ToolCall,
   ImageContent,
-} from '@mariozechner/pi-ai';
+} from '@earendil-works/pi-ai';
 
 // Re-export pi-ai types for convenience
 export type {

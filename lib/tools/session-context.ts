@@ -3,7 +3,7 @@
 // interactive tools exist. Adding a new interactive tool requires zero changes
 // to agent-manager — only register it here via ctx.register().
 
-import type { AgentTool } from '@mariozechner/pi-agent-core';
+import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { InteractiveBridge, PendingRequest } from './interactive-bridge';
 
 export type ToolStateCallback = (

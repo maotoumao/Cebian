@@ -1,6 +1,6 @@
 // Port communication protocol: Client (sidepanel) ↔ Server (background)
 
-import type { AgentMessage } from '@mariozechner/pi-agent-core';
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { SessionRecord } from './db';
 import type { Attachment } from './attachments';
 import type { RecordedSession } from './recorder/types';

@@ -11,7 +11,7 @@ import {
   refreshOpenAICodexToken,
   getGitHubCopilotBaseUrl,
   normalizeDomain,
-} from '@mariozechner/pi-ai/oauth';
+} from '@earendil-works/pi-ai/oauth';
 import { providerCredentials, type OAuthCredential } from './storage';
 import { t } from '@/lib/i18n';
 
@@ -94,9 +94,11 @@ export async function loginGitHubCopilot(
   callbacks: GitHubCopilotCallbacks,
 ): Promise<OAuthResult> {
   const creds = await piLoginGitHubCopilot({
-    onAuth: (url: string, instructions?: string) => {
-      chrome.tabs.create({ url });
-      callbacks.onDeviceCode(instructions ?? '', url);
+    // 0.75.5 起 onAuth(url, instructions) 改为 onDeviceCode(info)：
+    // info.verificationUri 为验证页地址，info.userCode 为用户输入码
+    onDeviceCode: (info) => {
+      chrome.tabs.create({ url: info.verificationUri });
+      callbacks.onDeviceCode(info.userCode, info.verificationUri);
     },
     onPrompt: async () => '',
     onProgress: callbacks.onProgress,

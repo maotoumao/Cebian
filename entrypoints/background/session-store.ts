@@ -9,7 +9,7 @@ import {
   ThrottledSessionWriter,
   type SessionRecord,
 } from '@/lib/db';
-import type { AgentMessage } from '@mariozechner/pi-agent-core';
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
 
 class SessionStore {
   private writers = new Map<string, ThrottledSessionWriter>();

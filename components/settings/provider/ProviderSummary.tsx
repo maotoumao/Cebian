@@ -1,4 +1,4 @@
-import { getModels, type KnownProvider, type Api, type Model } from '@mariozechner/pi-ai';
+import { getModels, type KnownProvider, type Api, type Model } from '@earendil-works/pi-ai';
 import type { ProviderCredential, CustomProviderConfig } from '@/lib/storage';
 import { isCustomProvider, findCustomProvider, getCustomModels } from '@/lib/custom-models';
 import { t } from '@/lib/i18n';

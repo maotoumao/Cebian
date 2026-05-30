@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getModels, type KnownProvider, type Api, type Model } from '@mariozechner/pi-ai';
+import { getModels, type KnownProvider, type Api, type Model } from '@earendil-works/pi-ai';
 import { Check, ChevronDown, Settings } from 'lucide-react';
 
 import type { ActiveModel, ProviderCredentials, CustomProviderConfig } from '@/lib/storage';

@@ -9,7 +9,7 @@ import { showDialog } from '@/lib/dialog';
 import { RECORDING_MIME } from '@/lib/attachments';
 import { t } from '@/lib/i18n';
 import { downloadFile, formatDuration, formatCharCount } from '@/lib/utils';
-import type { Message } from '@mariozechner/pi-ai';
+import type { Message } from '@earendil-works/pi-ai';
 
 /* ─── User Message ─── */
 export function UserMessageBubble({ msg, children }: { msg?: Message; children?: ReactNode }) {

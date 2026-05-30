@@ -1,9 +1,9 @@
 // Background Agent Manager — singleton that manages Agent instances.
 // Each session gets its own Agent + SessionToolContext (per-session isolation).
 
-import { Agent, type AgentEvent, type AgentMessage } from '@mariozechner/pi-agent-core';
-import type { Api, AssistantMessage, Model } from '@mariozechner/pi-ai';
-import { getModels, type KnownProvider } from '@mariozechner/pi-ai';
+import { Agent, type AgentEvent, type AgentMessage } from '@earendil-works/pi-agent-core';
+import type { Api, AssistantMessage, Model } from '@earendil-works/pi-ai';
+import { getModels, type KnownProvider } from '@earendil-works/pi-ai';
 import { createCebianAgent } from '@/lib/agent';
 import { scanSkillIndex, buildSkillsBlock } from '@/lib/ai-config/scanner';
 import { sessionStore } from './session-store';

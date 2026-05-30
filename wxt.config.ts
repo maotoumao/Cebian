@@ -92,7 +92,7 @@ export default defineConfig({
         resolveId(id: string, importer: string | undefined) {
           if (id !== './anthropic.js' || !importer) return null;
           const normalized = importer.replace(/\\/g, '/');
-          if (!normalized.includes('/@mariozechner/pi-ai/dist/utils/oauth/')) return null;
+          if (!normalized.includes('/@earendil-works/pi-ai/dist/utils/oauth/')) return null;
           return path.resolve(__dirname, 'lib/shims/pi-ai-anthropic.js');
         },
       },
@@ -124,7 +124,7 @@ export default defineConfig({
           // 静默 no-op，下面的 fail-loud throw 也不会触发，等于直接把
           // 混淆代码塞回 bundle。
           const normalized = id.replace(/\\/g, '/').split('?')[0];
-          if (!normalized.endsWith('/@mariozechner/pi-ai/dist/utils/oauth/github-copilot.js')) {
+          if (!normalized.endsWith('/@earendil-works/pi-ai/dist/utils/oauth/github-copilot.js')) {
             return null;
           }
           const OBFUSCATED =
@@ -151,7 +151,7 @@ export default defineConfig({
       cors: true,
     },
     // Inline the one Node-only `process.env.X` reference that
-    // `@mariozechner/pi-ai`'s OAuth modules read at module load time
+    // `@earendil-works/pi-ai`'s OAuth modules read at module load time
     // (openai-codex, anthropic). Without this, importing the oauth subpath
     // in the browser/SW throws `ReferenceError: process is not defined` at
     // module evaluation, killing background and sidepanel boot.

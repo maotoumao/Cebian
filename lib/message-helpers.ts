@@ -6,7 +6,8 @@ import type {
   ThinkingContent,
   ToolCall,
   ImageContent,
-} from '@mariozechner/pi-ai';
+} from '@earendil-works/pi-ai';
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import { unescapeXml } from './utils';
 
 // ─── Parsed attachment metadata for UI display ───
@@ -40,7 +41,7 @@ export function getToolCalls(msg: AssistantMessage): ToolCall[] {
 
 /** Find the ToolResultMessage for a given tool call id */
 export function findToolResult(
-  messages: Message[],
+  messages: AgentMessage[],
   toolCallId: string,
 ): ToolResultMessage | undefined {
   return messages.find(
