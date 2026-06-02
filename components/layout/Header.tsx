@@ -1,4 +1,4 @@
-import { Sun, Moon, Monitor, Settings, SquarePen, History } from 'lucide-react';
+import { Sun, Moon, SunMoon, Settings, SquarePen, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -51,7 +51,7 @@ export function Header({ title, theme, onToggleTheme, onOpenSettings, onNewChat,
               size="icon-xs"
               onClick={onToggleTheme}
             >
-              {theme === 'system' ? <Monitor className="size-4.5" /> : theme === 'dark' ? <Moon className="size-4.5" /> : <Sun className="size-4.5" />}
+              {theme === 'system' ? <SunMoon className="size-4.5" /> : theme === 'dark' ? <Moon className="size-4.5" /> : <Sun className="size-4.5" />}
             </Button>
           </TooltipTrigger>
           <TooltipContent>{t('common.toggleTheme')}</TooltipContent>
