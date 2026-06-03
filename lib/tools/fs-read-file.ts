@@ -1,6 +1,6 @@
 import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
-import { TOOL_FS_READ_FILE } from '@/lib/types';
+import { TOOL_FS_READ_FILE } from '@/lib/tools/names';
 import { vfs } from '@/lib/vfs';
 import { MAX_READ_SIZE, isBinaryContent, formatSize } from './fs-helpers';
 

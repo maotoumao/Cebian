@@ -73,7 +73,7 @@ export function isMcpAppResult(details: unknown): details is {
  * sanitized form of the server's user-given name (which is enforced unique
  * by the store). Encoding the slug rather than an opaque short id keeps tool
  * calls readable in logs and lets the chat UI render a human label without a
- * runtime registry lookup. See `getToolLabel` in `lib/tools/tool-labels.ts`.
+ * runtime registry lookup. See `getToolLabel` in `lib/tools/labels.ts`.
  */
 export function createMCPAgentTool(
   server: MCPServerConfig,
@@ -197,7 +197,7 @@ function extractText(blocks: RawContentBlock[]): string {
  * names CAN slugify to the same value (e.g. "GitHub Personal" and
  * "github_personal"). That collision would surface as a tool-name conflict
  * inside the agent runtime — acceptable for v1; the user can rename to
- * resolve. Keep this in sync with `parseMCPToolName` in tool-labels.ts.
+ * resolve. Keep this in sync with `parseMCPToolName` in labels.ts.
  */
 export function slugifyServerName(name: string): string {
   const slug = name

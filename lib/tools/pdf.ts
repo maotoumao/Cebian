@@ -1,6 +1,6 @@
 import { Type, type Static } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
-import { TOOL_PDF } from '@/lib/types';
+import { TOOL_PDF } from '@/lib/tools/names';
 import { vfs } from '@/lib/vfs';
 import { ensureOffscreen } from './offscreen';
 import type {

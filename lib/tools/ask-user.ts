@@ -1,7 +1,7 @@
 import { Type, type Static } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { createInteractiveBridge, INTERACTIVE_CANCELLED, type InteractiveBridge } from './interactive-bridge';
-import { TOOL_ASK_USER } from '@/lib/types';
+import { TOOL_ASK_USER } from '@/lib/tools/names';
 
 // ─── Request type ───
 

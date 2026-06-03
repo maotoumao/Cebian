@@ -4,6 +4,27 @@
  */
 
 import { t } from '@/lib/i18n';
+import {
+  TOOL_ASK_USER,
+  TOOL_EXECUTE_JS,
+  TOOL_READ_PAGE,
+  TOOL_INTERACT,
+  TOOL_INSPECT,
+  TOOL_TAB,
+  TOOL_SCREENSHOT,
+  TOOL_PDF,
+  TOOL_FS_CREATE_FILE,
+  TOOL_FS_EDIT_FILE,
+  TOOL_FS_MKDIR,
+  TOOL_FS_RENAME,
+  TOOL_FS_DELETE,
+  TOOL_FS_READ_FILE,
+  TOOL_FS_LIST,
+  TOOL_FS_SEARCH,
+  TOOL_FS_SAVE_URL,
+  TOOL_RUN_SKILL,
+  TOOL_CHROME_API,
+} from '@/lib/tools/names';
 
 export function getToolLabel(name: string, args: Record<string, any> = {}): string {
   // MCP tools: name is `mcp__<slug>__<remoteToolName>`. Parse and prettify;
@@ -20,48 +41,48 @@ export function getToolLabel(name: string, args: Record<string, any> = {}): stri
     }
   }
   switch (name) {
-    case 'read_page': {
+    case TOOL_READ_PAGE: {
       const mode = args.mode ?? 'markdown';
       const detail = args.selector ? `${mode}, ${args.selector}` : mode;
       return t('tools.readPage', [detail]);
     }
-    case 'execute_js':
+    case TOOL_EXECUTE_JS:
       return t('tools.executeJs');
-    case 'interact':
+    case TOOL_INTERACT:
       return getInteractLabel(args);
-    case 'inspect':
+    case TOOL_INSPECT:
       return getInspectLabel(args);
-    case 'tab':
+    case TOOL_TAB:
       return getTabLabel(args);
-    case 'screenshot':
+    case TOOL_SCREENSHOT:
       return t('tools.screenshot');
-    case 'pdf':
+    case TOOL_PDF:
       return getPdfLabel(args);
-    case 'ask_user':
+    case TOOL_ASK_USER:
       return t('tools.askUser');
-    case 'fs_create_file':
+    case TOOL_FS_CREATE_FILE:
       return t('tools.fs.createFile', [truncPath(args.path)]);
-    case 'fs_edit_file':
+    case TOOL_FS_EDIT_FILE:
       return t('tools.fs.editFile', [truncPath(args.path)]);
-    case 'fs_mkdir':
+    case TOOL_FS_MKDIR:
       return t('tools.fs.mkdir', [truncPath(args.path)]);
-    case 'fs_rename':
+    case TOOL_FS_RENAME:
       return t('tools.fs.rename', [truncPath(args.old_path)]);
-    case 'fs_delete':
+    case TOOL_FS_DELETE:
       return t('tools.fs.delete', [truncPath(args.path)]);
-    case 'fs_read_file':
+    case TOOL_FS_READ_FILE:
       return t('tools.fs.readFile', [truncPath(args.path)]);
-    case 'fs_list':
+    case TOOL_FS_LIST:
       return t('tools.fs.list', [truncPath(args.path)]);
-    case 'fs_search':
+    case TOOL_FS_SEARCH:
       return args.mode === 'content'
         ? t('tools.fs.searchContent', [truncPath(args.pattern)])
         : t('tools.fs.searchFiles', [truncPath(args.pattern)]);
-    case 'fs_save_url':
+    case TOOL_FS_SAVE_URL:
       return t('tools.fs.saveUrl', [truncPath(args.dest)]);
-    case 'run_skill':
+    case TOOL_RUN_SKILL:
       return t('tools.runSkill', [args.skill ?? '']);
-    case 'chrome_api':
+    case TOOL_CHROME_API:
       if (args.namespace === 'help') return t('tools.chromeApi.help');
       return t('tools.chromeApi.call', [args.namespace ?? '', args.method ?? '']);
     default:

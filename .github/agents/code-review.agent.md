@@ -23,7 +23,7 @@ If the caller does not specify a scope, infer it from the most recent uncommitte
 Evaluate every changed file against ALL of the following criteria:
 
 1. **Best practices** — idiomatic React/TypeScript, proper hook usage (dependencies, rules of hooks), correct WXT patterns
-2. **Dead code** — no unused imports, variables, functions, or unreachable branches
+2. **Dead code & single source of truth** — no unused imports, variables, functions, unreachable branches, or **unused re-exports**. Also flag any re-export or duplicate declaration that creates a *second* source of truth for a type/value which already has a canonical home: consumers should import from the origin, not a redundant pass-through. (Unused re-exports are the most common form of this.)
 3. **Correctness** — logic is correct, edge cases handled at system boundaries
 4. **Architecture** — evaluate cohesion, coupling, file size, and placement:
    - **Cohesion** — each file/module should focus on a single concern. Flag files that mix unrelated responsibilities (e.g., a UI component embedding storage IO + business rules + network calls, or a `lib/` helper that also performs DOM manipulation).
@@ -43,19 +43,21 @@ Evaluate every changed file against ALL of the following criteria:
 5. **Error handling** — no silent failures, no swallowed exceptions
 6. **Performance** — no unnecessary re-renders, no expensive operations in hot paths, proper memoization where needed
 7. **Deprecation** — no use of deprecated APIs, functions, props, or patterns from any dependency (React, WXT, AI SDK, etc.). If a deprecated usage is found, identify the current recommended alternative
-8. **Code duplication & reuse** — actively scan for repeated logic, copy-pasted blocks, or near-identical patterns both **within the changed code** and **between the changed code and the existing codebase** (`components/`, `hooks/`, `lib/`, etc.). Before flagging duplication, search the codebase for existing helpers/components/hooks the change should have reused instead of reimplementing. Per project rules, reusing existing modules is mandatory.
+8. **Code duplication & reuse** — actively scan for repeated logic, copy-pasted blocks, or near-identical patterns both **within the changed code** and **between the changed code and the existing codebase** (`components/`, `hooks/`, `lib/`, etc.). Before flagging duplication, search the codebase for existing helpers/components/hooks the change should have reused instead of reimplementing. Per project rules, reusing existing modules is mandatory. This includes **magic literals**: a hardcoded string or number that duplicates a value already defined as a named constant — or one repeated across enough call sites that it clearly *should* be a shared constant — must reference the constant instead of being re-typed inline.
 9. **Design quality & abstraction** — proactively ask "is there a better design?" for every non-trivial change:
    - Is the chosen pattern the simplest one that works, or is it over-engineered?
    - If similar logic appears 2+ times (here or elsewhere), should it be extracted into a shared utility / hook / component?
    - Conversely, is there premature abstraction — a one-off helper, wrapper, or generic layer that adds indirection without payoff? (Project rules forbid abstractions for one-time operations.)
    - Are responsibilities split along the right seams, or would a different decomposition (different module boundary, different hook shape, different data flow) be materially cleaner?
    - When proposing an abstraction, name the concrete call sites that would consume it and confirm there are enough of them to justify it.
+10. **Naming integrity** — a file, module, or symbol's name should accurately reflect what it actually contains and does. Flag misnomers (a name advertising one concern while the body is mostly another — e.g. a file named for *types* that holds runtime values) and redundant or contradictory names (a segment that just repeats information already implied by its directory). This is about accuracy and discoverability, distinct from subjective naming taste (which stays out of scope).
+11. **Comment quality** — comments on changed code must stand on their own for a future reader who never saw the authoring discussion. Flag internal jargon, design codenames, scheme/option labels, or ticket-speak that only made sense in the conversation that produced the code; these should be rewritten in plain, durable language. (This is about the *quality* of comments that are being added or changed — not about adding comments to untouched code; see Constraints.)
 
 ## Constraints
 
 - DO NOT edit any files — you are read-only
-- DO NOT suggest stylistic nitpicks (formatting, naming preferences) unless they violate project conventions
-- DO NOT suggest adding comments, docstrings, or type annotations to code that wasn't changed
+- DO NOT suggest stylistic nitpicks (formatting, subjective naming taste) unless they violate project conventions — but a name/content **mismatch** (checklist 10) is a real discoverability issue, not a nitpick, and should be reported
+- DO NOT suggest adding comments, docstrings, or type annotations to code that wasn't changed — this does not exempt the *quality* of comments that the change itself adds or edits (checklist 11)
 - ONLY report issues that are actionable and impactful
 
 ## Approach

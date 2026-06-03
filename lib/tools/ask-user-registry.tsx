@@ -4,7 +4,7 @@
 import { uiToolRegistry, type InteractiveToolComponentProps } from './ui-registry';
 import type { AskUserRequest } from './ask-user';
 import { AskUserBlock } from '@/components/chat/Message';
-import { TOOL_ASK_USER } from '@/lib/types';
+import { TOOL_ASK_USER } from '@/lib/tools/names';
 
 // ─── UI adapter for the registry's generic interface ───
 

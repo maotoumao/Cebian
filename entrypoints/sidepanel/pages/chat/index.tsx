@@ -27,7 +27,7 @@ import {
   findToolResult,
   extractUserText,
 } from '@/lib/message-helpers';
-import { getToolLabel } from '@/lib/tools/tool-labels';
+import { getToolLabel } from '@/lib/tools/labels';
 import { uiToolRegistry } from '@/lib/tools/ui-registry';
 import { useBackgroundAgent } from '@/hooks/useBackgroundAgent';
 import { useStickToBottom } from '@/hooks/useStickToBottom';

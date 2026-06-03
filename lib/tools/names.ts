@@ -1,25 +1,5 @@
-import type {
-  Message,
-  UserMessage,
-  AssistantMessage,
-  ToolResultMessage,
-  TextContent,
-  ThinkingContent,
-  ToolCall,
-  ImageContent,
-} from '@earendil-works/pi-ai';
-
-// Re-export pi-ai types for convenience
-export type {
-  Message,
-  UserMessage,
-  AssistantMessage,
-  ToolResultMessage,
-  TextContent,
-  ThinkingContent,
-  ToolCall,
-  ImageContent,
-};
+// 工具身份常量（运行时字符串字面量）。集中定义，供 lib/tools/ 下各工具实现、
+// 注册表、以及 UI 标签解析共用，避免裸字符串散落各处。
 
 // ─── Tool name constants ───
 

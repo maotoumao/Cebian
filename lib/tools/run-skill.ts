@@ -1,6 +1,6 @@
 import { Type, type Static } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
-import { TOOL_RUN_SKILL } from '@/lib/types';
+import { TOOL_RUN_SKILL } from '@/lib/tools/names';
 import { CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE } from '@/lib/constants';
 import { vfs, normalizePath } from '@/lib/vfs';
 import { parseFrontmatter } from '@/lib/frontmatter';

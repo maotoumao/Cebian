@@ -1,6 +1,6 @@
 import { Type, type Static } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
-import { TOOL_FS_SAVE_URL } from '@/lib/types';
+import { TOOL_FS_SAVE_URL } from '@/lib/tools/names';
 import { vfs } from '@/lib/vfs';
 import { extensionForMime, isTextualMime } from '@/lib/mime';
 import { formatSize } from './fs-helpers';

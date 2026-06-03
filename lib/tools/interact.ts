@@ -1,6 +1,6 @@
 import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
-import { TOOL_INTERACT } from '@/lib/types';
+import { TOOL_INTERACT } from '@/lib/tools/names';
 import { executeInTabWithArgs, waitForNavigation } from '@/lib/tab-helpers';
 
 // ─── Shared field schemas (reused by top-level params and sequence steps) ───

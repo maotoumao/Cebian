@@ -1,6 +1,6 @@
 import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
-import { TOOL_READ_PAGE } from '@/lib/types';
+import { TOOL_READ_PAGE } from '@/lib/tools/names';
 import { executeInTabWithArgs } from '@/lib/tab-helpers';
 import { ensureOffscreen } from './offscreen';
 import { isLikelyPdfUrl, pdfRedirectHint } from './pdf';

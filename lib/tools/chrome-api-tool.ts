@@ -1,6 +1,6 @@
 import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
-import { TOOL_CHROME_API } from '@/lib/types';
+import { TOOL_CHROME_API } from '@/lib/tools/names';
 import { CHROME_API_WHITELIST, isChromeCallAllowed } from './chrome-api-whitelist';
 
 // ─── API documentation for help mode ───
