@@ -20,7 +20,7 @@ import {
 } from '@earendil-works/pi-agent-core';
 import type { Api, AssistantMessage, Model } from '@earendil-works/pi-ai';
 import { getModels, type KnownProvider } from '@earendil-works/pi-ai';
-import { createCebianAgent, resolveProviderApiKey } from './agent';
+import { createCebianAgent, resolveProviderApiKey, buildSystemPrompt } from './agent';
 import {
   COMPACTION_SETTINGS,
   findCompactionCutPoint,
@@ -867,22 +867,24 @@ class AgentManager {
    * UI's "Retry" button — covers both genuine failures (`stopReason: 'error'`)
    * and successful turns the user is unhappy with.
    *
-   * # Lifecycle invariant
+   * # In-place refresh (no rebuild)
    *
-   * The `ManagedSession` entry in `this.sessions` stays put throughout the
-   * entire rebuild — we mutate its `agent` / `toolCtx` fields in place
-   * instead of `delete`-then-`set`. This is the architectural fix for the
-   * "stop button stuck after retry" bug: a `cancel()` racing the rebuild
-   * window can always locate the entry and abort it via `rebuildController`.
+   * The live agent is reused as-is. We truncate, then refresh the mutable
+   * `state.messages` / `model` / `thinkingLevel` / `systemPrompt` fields in
+   * place to pick up any settings the user changed while idle, then call
+   * `continue()`. Tools are kept current by `refreshAllSessionTools` (MCP
+   * changes), so they're not touched here. Because the agent is never torn
+   * down, a `cancel()` racing this flow always finds a live agent — this is
+   * the root-cause fix for the historical "stop button stuck after retry"
+   * bug (there is no agent-less window to get stuck in).
    *
    * # Abort handling
    *
-   * `rebuildController.signal` is checked at three boundaries: after the DB
-   * flush, after `buildAgentArtifacts`, and after wiring the new agent.
-   * If aborted, `handleRebuildAbort` tears down whatever is currently wired
-   * (if any), removes the entry from the map (the truncated state is
-   * already persisted, so the next operation cold-loads from DB consistently),
-   * and broadcasts `session_state { isRunning: false }` so the UI unblocks.
+   * `rebuildController.signal` is checked once, right before `continue()`.
+   * If aborted, `commitRetryCancel` appends a synthetic aborted marker to
+   * the truncated transcript, writes it back onto the still-live agent,
+   * persists, and broadcasts `session_state { isRunning: false }`. No
+   * teardown and no map eviction — the agent is reused for the next prompt.
    *
    * No-op if no user message exists in the transcript (defensive throw),
    * or if phase is already non-`idle` (concurrent retry or live run).
@@ -905,7 +907,7 @@ class AgentManager {
       return;
     }
 
-    // Take the rebuild slot synchronously, BEFORE any further await. A
+    // Take the preparing slot synchronously, BEFORE any further await. A
     // concurrent retry that wakes up after our await(s) below will hit the
     // phase guard above and bail.
     managed.phase = 'preparing';
@@ -932,66 +934,46 @@ class AgentManager {
         pendingTools: this.getPendingToolSnapshot(managed),
       });
 
-      // Persist truncation BEFORE tearing down. SW restart in the rebuild
-      // window must not resurrect the failed turn from disk. `flush`
-      // collapses the throttler's pending timer and writes immediately.
+      // Persist truncation BEFORE continue. An SW restart mid-run must not
+      // resurrect the failed turn from disk. `flush` collapses the
+      // throttler's pending timer and writes immediately.
       if (managed.sessionCreated) {
         sessionStore.scheduleWrite(sessionId, truncated);
         await sessionStore.flush(sessionId);
       }
 
-      // Abort checkpoint 1 — cancel landed during DB flush. The old agent
-      // is still wired; let the helper tear it down.
+      // Refresh settings in place — pick up model / thinking / instruction
+      // changes the user made while idle. The agent stays alive throughout;
+      // there is no teardown or rebuild. Tools are kept live by
+      // `refreshAllSessionTools` (MCP changes), so we don't touch them.
+      const resolved = await this.resolveModelObj();
+      if (!resolved) throw new Error('No model selected or model not found');
+      const [thinkingLvl, instructions] = await Promise.all([
+        thinkingLevelStorage.getValue(),
+        userInstructionsStorage.getValue(),
+      ]);
+
+      // Single abort checkpoint — cancel landed during the DB flush or the
+      // async settings load, both BEFORE we mutate the agent. Commit an
+      // aborted marker and bail; the live agent is left untouched.
       if (signal.aborted) {
-        await this.handleRebuildAbort(managed, truncated, /*hasWiredAgent*/ true);
+        await this.commitRetryCancel(managed, truncated);
         return;
       }
 
-      // Tear down the old agent. Defensive `cancelAll` for any pending
-      // interactive tool (UI hides retry while pending, but stale port
-      // messages could still arrive).
+      // Apply the refreshed state onto the live agent. `cancelAll` defensively
+      // drops any stale pending interactive request (the UI hides retry while
+      // a tool is pending, but a late port message could still arrive).
       managed.toolCtx.cancelAll();
-      managed.unsubscribeAgent();
-      managed.unsubscribeToolCtx();
-      managed.toolCtx.dispose();
+      managed.agent.state.messages = truncated;
+      managed.agent.state.model = resolved.model;
+      managed.agent.state.thinkingLevel = (thinkingLvl || 'medium') as any;
+      managed.agent.state.systemPrompt = buildSystemPrompt(sessionId, instructions || '');
+      managed.modelKey = `${resolved.provider}/${resolved.modelId}`;
 
-      // Build the new agent. The internal awaits (model resolve, settings
-      // load, tools setup) don't accept an AbortSignal, so we just check
-      // `signal.aborted` once after the whole build returns. The cost of an
-      // aborted-but-completed build is ~150ms of wasted setup work —
-      // acceptable to avoid threading AbortSignal through pi-* APIs.
-      const built = await this.buildAgentArtifacts(sessionId, truncated);
-
-      // Abort checkpoint 2 — cancel landed during build. The old agent is
-      // already torn down; the new one is built but not wired. Just dispose
-      // its tool context (the Agent itself has no listeners and will GC).
-      if (signal.aborted) {
-        built.toolCtx.dispose();
-        await this.handleRebuildAbort(managed, truncated, /*hasWiredAgent*/ false);
-        return;
-      }
-
-      // Install the new agent in place. `sessionCreated` is preserved by
-      // not touching it. The map entry has been continuously in `sessions`
-      // throughout this whole flow.
-      managed.agent = built.agent;
-      managed.toolCtx = built.toolCtx;
-      managed.modelKey = built.modelKey;
-      this.wireSubscriptions(managed);
-
-      // Abort checkpoint 3 — cancel landed between install and continue.
-      // The new agent is now wired; let the helper tear it down.
-      if (signal.aborted) {
-        await this.handleRebuildAbort(managed, truncated, /*hasWiredAgent*/ true);
-        return;
-      }
-
-      // Broadcast truncated state with `isRunning: true`. `continue()` is
-      // invoked on the very next line and fires `agent_start` on entry,
-      // so the agent IS effectively running. Broadcasting `false` here
-      // would cause a visible flicker on subscribed windows — briefly
-      // re-enabling the composer and breaking the optimistic-running
-      // guarantee the hook sets up on click.
+      // Re-broadcast busy. `continue()` is invoked on the very next line and
+      // fires `agent_start` on entry, so the agent IS effectively running.
+      // Broadcasting `false` here would flicker the composer back on.
       this.broadcast(sessionId, {
         type: 'session_state',
         sessionId,
@@ -1000,25 +982,25 @@ class AgentManager {
         pendingTools: this.getPendingToolSnapshot(managed),
       });
 
-      // Resume the agent loop against the truncated transcript (last
-      // message is user). Fires `agent_start` which flips phase to
-      // 'running'; subsequent `agent_end` flips it back to 'idle'.
+      // Resume the agent loop against the truncated transcript (last message
+      // is user). Fires `agent_start` which flips phase to 'running';
+      // subsequent `agent_end` flips it back to 'idle'.
       await managed.agent.continue();
     } catch (err) {
-      // Anything that throws inside the rebuild — the DB flush, the
-      // `buildAgentArtifacts` resolve, the subscription wire, the
-      // `continue()` call — leaves us with either a half-torn-down
-      // managed entry (if the throw was post-teardown) or an entry
-      // whose in-memory state may diverge from the freshly-flushed DB.
-      // Either way, evicting the entry lets the next operation
-      // cold-load consistent state from DB rather than running on a
-      // zombie managed reference. The `agent_end` event for an in-flight
-      // `continue()` failure normally cleans up via `handleAgentEvent`,
-      // but if THAT path itself throws (or never fires because we threw
-      // pre-continue), we'd otherwise be stuck. Matches `prompt()`'s
-      // model-switch catch.
-      this.sessions.delete(managed.sessionId);
-      if (busySnapshot) {
+      // In-place refresh never tears down the agent, so the managed entry
+      // stays consistent — there is no half-built zombie to evict (contrast
+      // the old rebuild path, which had to delete the entry on failure).
+      //
+      // But if we threw AFTER pre-persisting the truncated transcript yet
+      // BEFORE mutating the agent (e.g. `resolveModelObj` rejected), the live
+      // agent still holds the OLD full transcript while DB holds the truncated
+      // one. Align in-memory state to the truncated snapshot so the next prompt
+      // doesn't resurrect the messages retry just dropped, then unblock the UI.
+      // Guarded on `phase === 'preparing'`: once `continue()` has fired
+      // `agent_start` (phase `running`), the `agent_end` path owns state +
+      // broadcast and we must not clobber a marker it may have appended.
+      if (busySnapshot && managed.phase === 'preparing') {
+        managed.agent.state.messages = busySnapshot;
         this.broadcast(managed.sessionId, {
           type: 'session_state',
           sessionId: managed.sessionId,
@@ -1031,17 +1013,64 @@ class AgentManager {
     } finally {
       managed.rebuildController = undefined;
       // If the success path ran, agent_start already flipped phase to
-      // 'running' (and agent_end will later flip to 'idle'). If we threw
-      // or aborted before agent_start, phase is still 'preparing' — reset
-      // it so the next retry can proceed. Note: when `handleRebuildAbort`
-      // (or the catch above) ran, the entry was removed from `sessions`;
-      // setting `managed.phase` on a dangling object is harmless and
-      // `updateKeepAlive` correctly observes the map state.
+      // 'running' (and agent_end will later flip to 'idle'). If we threw, or
+      // bailed via `commitRetryCancel` on abort, phase is still 'preparing' —
+      // reset it to 'idle' so the next retry can proceed. The agent is never
+      // torn down, so the managed entry is always live here.
       if (managed.phase === 'preparing') {
         managed.phase = 'idle';
         this.updateKeepAlive();
       }
     }
+  }
+
+  /**
+   * Commit a retry that was cancelled during its `preparing` window (before
+   * `continue()` started). Appends a synthetic aborted marker to the
+   * truncated transcript, writes it back onto the still-live agent, persists,
+   * and broadcasts so the UI shows the cancel indicator and re-enables the
+   * composer.
+   *
+   * Unlike the old rebuild-abort path, this neither disposes the agent nor
+   * evicts the entry: the in-place agent is reused as-is for the next prompt
+   * (which appends a fresh user message, so an assistant-aborted tail is
+   * fine). Mirrors `commitCompactionCancel`'s shape so all three cancel paths
+   * (running / compaction / retry-preparing) leave the same kind of end-state
+   * and the UI needs only one rendering rule for "this turn was cancelled".
+   */
+  private async commitRetryCancel(
+    managed: ManagedSession,
+    truncated: AgentMessage[],
+  ): Promise<void> {
+    // destroySession aborts `rebuildController` then removes the entry; if we
+    // reached here because of that (not a user cancel), bail without
+    // persist/broadcast so we don't resurrect a just-deleted session row.
+    // Mirrors `commitCompactionCancel`'s guard.
+    if (!this.sessions.has(managed.sessionId)) return;
+
+    const finalMessages: AgentMessage[] = [
+      ...truncated,
+      this.buildAbortedMarker(managed),
+    ];
+    managed.agent.state.messages = finalMessages;
+    if (managed.sessionCreated) {
+      sessionStore.scheduleWrite(managed.sessionId, finalMessages);
+      try {
+        await sessionStore.flush(managed.sessionId);
+      } catch (err) {
+        console.warn(
+          `[agent-manager] flush on retry cancel failed for ${managed.sessionId}:`,
+          err,
+        );
+      }
+    }
+    this.broadcast(managed.sessionId, {
+      type: 'session_state',
+      sessionId: managed.sessionId,
+      messages: finalMessages,
+      isRunning: false,
+      pendingTools: [],
+    });
   }
 
   /**
@@ -1322,11 +1351,14 @@ class AgentManager {
   destroySession(sessionId: string): void {
     const managed = this.sessions.get(sessionId);
     if (managed) {
-      // Abort an in-flight compaction so its async tail (insert summary →
-      // scheduleWrite/flush → broadcast) can't resurrect a just-deleted
-      // session row. `maybeCompact` checks `signal.aborted` after each await
-      // and bails before persisting/broadcasting.
+      // Abort in-flight async tails so they can't resurrect a just-deleted
+      // session row. Both the compaction path (`maybeCompact` →
+      // `commitCompactionCancel`) and the retry preparing path (`retry` →
+      // `commitRetryCancel`) check their controller's `signal.aborted` after
+      // each await and bail via an entry-presence guard before persisting or
+      // broadcasting.
       managed.compactionController?.abort();
+      managed.rebuildController?.abort();
       managed.unsubscribeAgent();
       managed.toolCtx.dispose();
       managed.agent.abort();
