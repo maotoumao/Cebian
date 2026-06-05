@@ -33,6 +33,22 @@ export async function resolveProviderApiKey(
   return undefined;
 }
 
+// ─── System prompt builder ───
+
+/**
+ * 构造 agent 的 systemPrompt：基础提示词（替换 `{{SESSION_ID}}`）+ 可选的
+ * `<user-instructions>` 段。作为 systemPrompt 的单一真理来源，供
+ * `createCebianAgent`（建 agent 时）与 retry 的原地刷新（用户中途改了指令时）
+ * 共用，避免两处复制拼接逻辑。
+ */
+export function buildSystemPrompt(sessionId: string, userInstructions: string): string {
+  const basePrompt = DEFAULT_SYSTEM_PROMPT.replaceAll('{{SESSION_ID}}', sessionId);
+  const trimmedInstructions = userInstructions.trim();
+  return trimmedInstructions
+    ? `${basePrompt}\n\n<user-instructions>\n${trimmedInstructions}\n</user-instructions>`
+    : basePrompt;
+}
+
 // ─── Agent factory ───
 
 export interface CreateAgentOptions {
@@ -60,12 +76,7 @@ export function createCebianAgent(options: CreateAgentOptions): Agent {
     tools: agentTools,
   } = options;
 
-  const basePrompt = DEFAULT_SYSTEM_PROMPT
-    .replaceAll('{{SESSION_ID}}', sessionId);
-  const trimmedInstructions = userInstructions.trim();
-  const effectivePrompt = trimmedInstructions
-    ? `${basePrompt}\n\n<user-instructions>\n${trimmedInstructions}\n</user-instructions>`
-    : basePrompt;
+  const effectivePrompt = buildSystemPrompt(sessionId, userInstructions);
 
   const agentOptions: AgentOptions = {
     initialState: {
