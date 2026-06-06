@@ -512,14 +512,13 @@ class AgentManager {
     const managed = await this.getOrCreateAgent(sessionId);
 
     if (managed.phase === 'preparing' || managed.phase === 'compacting') {
-      // Another preparation OR a compaction is already in flight for this
+      // A retry's preparation OR a compaction is already in flight for this
       // session. The UI gates the composer to prevent concurrent prompts,
-      // but a stale or out-of-order IPC could still arrive — without this
-      // guard, our model-switch branch below would overwrite
-      // `managed.rebuildController` / `compactionController` and orphan the
-      // in-flight one. Silently dropping matches `retry()`'s phase-guard
-      // pattern; the in-flight work's broadcasts reconcile every subscribed
-      // window to the correct state.
+      // but a stale or out-of-order IPC could still arrive — dispatching a
+      // fresh turn now would race the in-flight `continue()` / compaction and
+      // corrupt the phase machine. Silently dropping matches `retry()`'s
+      // phase-guard pattern; the in-flight work's broadcasts reconcile every
+      // subscribed window to the correct state.
       console.debug('[agent-manager] prompt: phase busy, ignored', sessionId, managed.phase);
       return;
     }
@@ -529,90 +528,28 @@ class AgentManager {
     if (currentModel) {
       const currentKey = `${currentModel.provider}/${currentModel.modelId}`;
       if (currentKey !== managed.modelKey) {
-        // Model changed — recreate with new model, preserving in-memory
-        // messages. Same lifecycle invariant as retry's rebuild: the
-        // managed entry stays in `sessions` throughout the async work
-        // so a `cancel` racing the build can find it via the phase
-        // machinery instead of silently no-op'ing on a missing entry.
-        const currentMessages = [...managed.agent.state.messages];
-        managed.phase = 'preparing';
-        managed.rebuildController = new AbortController();
-        const signal = managed.rebuildController.signal;
-        this.updateKeepAlive();
-        this.broadcast(sessionId, {
-          type: 'session_state',
-          sessionId,
-          messages: currentMessages,
-          isRunning: true,
-          pendingTools: this.getPendingToolSnapshot(managed),
-        });
-
-        try {
-          // Tear down old in place. `sessionCreated` is preserved by
-          // leaving the field untouched. `cancelAll` on the toolCtx
-          // matches retry's teardown — any pending interactive tools
-          // get a `tool_resolved` broadcast so subscribed sidepanels
-          // learn they were cancelled.
-          managed.toolCtx.cancelAll();
-          managed.unsubscribeAgent();
-          managed.unsubscribeToolCtx();
-          managed.toolCtx.dispose();
-
-          const built = await this.buildAgentArtifacts(sessionId, currentMessages);
-
-          if (signal.aborted) {
-            // Cancel landed during the build. Bail without ever calling
-            // `agent.prompt()` — the user clicked stop fast enough that
-            // their message wasn't actually committed (no agent_start,
-            // no DB write of the new turn). The optimistic user message
-            // in subscribed sidepanels gets cleared by the broadcast
-            // below; that's the intended undo semantic for pre-commit
-            // cancels, distinct from retry-cancel which preserves the
-            // already-committed prior turn behind an aborted marker.
-            built.toolCtx.dispose();
-            this.sessions.delete(sessionId);
-            this.broadcast(sessionId, {
-              type: 'session_state',
-              sessionId,
-              messages: currentMessages,
-              isRunning: false,
-              pendingTools: [],
-            });
-            return;
-          }
-
-          // Install the new agent in place.
-          managed.agent = built.agent;
-          managed.toolCtx = built.toolCtx;
-          managed.modelKey = built.modelKey;
-          this.wireSubscriptions(managed);
-        } catch (err) {
-          // The pre-await teardown already disposed the old agent, so
-          // we cannot recover it if `buildAgentArtifacts` rejects (e.g.,
-          // the user removed the provider's credentials in a parallel
-          // tab between message send and model resolve). Evict the
-          // zombie entry so the next operation cold-loads from DB;
-          // `currentMessages` matches the on-disk transcript (we
-          // never persisted anything new in this branch), so DB
-          // consistency holds. Re-throw to surface the error to the
-          // outer `prompt()` caller, which broadcasts it as `'error'`.
-          this.sessions.delete(sessionId);
-          this.broadcast(sessionId, {
-            type: 'session_state',
-            sessionId,
-            messages: currentMessages,
-            isRunning: false,
-            pendingTools: [],
-          });
-          throw err;
-        } finally {
-          managed.rebuildController = undefined;
-          // Same finally pattern as retry: if we got here without
-          // `agent_start` flipping phase forward, reset to 'idle'.
-          if (managed.phase === 'preparing') {
-            managed.phase = 'idle';
-            this.updateKeepAlive();
-          }
+        // Model changed since the agent was created — refresh the live agent
+        // in place. Unlike retry there is no resume/cancel window here:
+        // swapping state is a synchronous field assign and the normal prompt
+        // dispatch below fires `agent_start`, so we don't enter a `preparing`
+        // phase or arm a controller. We refresh model + thinkingLevel +
+        // systemPrompt together (matching retry and the old rebuild path's
+        // side effect) so switching model also picks up thinking / instruction
+        // changes made while idle. `resolveModelObj` re-reads storage to pick
+        // up custom providers / copilot OAuth baseUrl exactly like agent
+        // creation. If resolution fails (model deleted or credentials pulled
+        // in a parallel tab), keep the existing settings and still dispatch the
+        // turn — graceful degradation beats dropping the user's message.
+        const resolved = await this.resolveModelObj();
+        if (resolved) {
+          const [thinkingLvl, instructions] = await Promise.all([
+            thinkingLevelStorage.getValue(),
+            userInstructionsStorage.getValue(),
+          ]);
+          managed.agent.state.model = resolved.model;
+          managed.agent.state.thinkingLevel = (thinkingLvl || 'medium') as any;
+          managed.agent.state.systemPrompt = buildSystemPrompt(sessionId, instructions || '');
+          managed.modelKey = currentKey;
         }
       }
     }
