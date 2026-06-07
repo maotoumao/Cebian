@@ -137,7 +137,8 @@ export function ProvidersSection() {
     setCustoms([...customs, config]);
     if (apiKey) {
       const key = customProviderKey(config.id);
-      handleCredentialSave(key, { authType: 'apiKey', apiKey, verified: true });
+      // 自定义 provider 不做连通性测试，verified 始终为 false（与预置 provider 语义统一）。
+      handleCredentialSave(key, { authType: 'apiKey', apiKey, verified: false });
     }
   };
 
@@ -145,7 +146,7 @@ export function ProvidersSection() {
     setCustoms(customs.map((c) => (c.id === config.id ? config : c)));
     const key = customProviderKey(config.id);
     if (apiKey) {
-      handleCredentialSave(key, { authType: 'apiKey', apiKey, verified: true });
+      handleCredentialSave(key, { authType: 'apiKey', apiKey, verified: false });
     } else {
       handleApiKeyRemove(key);
     }
@@ -245,7 +246,6 @@ export function ProvidersSection() {
               key={key}
               config={c}
               apiKey={cred?.apiKey ?? ''}
-              verified={!!cred?.verified}
               onUpdate={handleUpdateCustomProvider}
               onRemove={() => handleRemoveCustomProvider(c.id)}
             />

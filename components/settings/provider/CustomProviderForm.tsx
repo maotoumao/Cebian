@@ -308,12 +308,11 @@ export function CustomProviderForm({ onAdd }: CustomProviderFormProps) {
 interface CustomProviderCardProps {
   config: CustomProviderConfig;
   apiKey: string;
-  verified: boolean;
   onUpdate: (config: CustomProviderConfig, apiKey?: string) => void;
   onRemove: () => void;
 }
 
-export function CustomProviderCard({ config, apiKey, verified, onUpdate, onRemove }: CustomProviderCardProps) {
+export function CustomProviderCard({ config, apiKey, onUpdate, onRemove }: CustomProviderCardProps) {
   const [editing, setEditing] = useState(false);
   const form = useProviderForm({
     name: config.name,
@@ -372,11 +371,10 @@ export function CustomProviderCard({ config, apiKey, verified, onUpdate, onRemov
     );
   }
 
-  const badgeState = verified
-    ? { label: t('provider.status.connected'), className: 'text-success border-success/20 bg-success/5' }
-    : apiKey
-      ? { label: t('provider.status.unverified'), className: 'text-yellow-500 border-yellow-500/20 bg-yellow-500/5' }
-      : { label: t('provider.status.notConfigured'), className: 'text-muted-foreground border-border' };
+  // 自定义 provider 不做连通性测试，只区分「已配置 key（淡蓝 info）/ 未配置（灰）」。
+  const badgeState = apiKey
+    ? { label: t('provider.status.configured'), className: 'text-blue-500 border-blue-500/20 bg-blue-500/5' }
+    : { label: t('provider.status.notConfigured'), className: 'text-muted-foreground border-border' };
 
   return (
     <div className="space-y-1">

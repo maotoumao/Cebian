@@ -277,13 +277,13 @@ description: Chinese to English translation — preserves terms, natural tone.
       categories_heading: 'Three ways to plug in',
       categories: [
         { name: 'OAuth', heading: 'One-click sign-in', body: 'Copilot uses Device Flow; Codex uses PKCE. Once signed in, a background alarm refreshes tokens every 30 minutes.' },
-        { name: 'API Key', heading: 'Bring your key', body: 'Anthropic, OpenAI, Gemini, xAI, Groq, OpenRouter, Mistral, MiniMax, Kimi. Each key is verified with a real call on save and only then becomes selectable.' },
+        { name: 'API Key', heading: 'Bring your key', body: 'Anthropic, OpenAI, Gemini, xAI, Groq, OpenRouter, Mistral, MiniMax, Kimi. On save Cebian runs a real test call — pass and the key is marked verified; fail and the key is still saved but flagged unverified, so you can use it anyway.' },
         { name: 'Custom', heading: 'Any OpenAI-compatible endpoint', body: 'Provide a baseURL + key and Cebian auto-discovers models via /v1/models. Great for self-hosted, proxies, and aggregators.' },
       ],
       notes_tag: 'Notes',
       notes_heading: 'A few details',
       notes: [
-        'Unverified providers never appear in the picker, so you cannot accidentally ship a broken call',
+        'A failed connectivity test no longer blocks saving — the key is kept and flagged unverified, so a flaky check never loses your key',
         'OAuth tokens auto-refresh in the background; no manual re-login',
         'Keys are stored only in your browser; never uploaded to any server',
         'A single provider can serve multiple models; switch freely in chat',

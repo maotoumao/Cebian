@@ -51,9 +51,13 @@ export function ModelSelector({
       }
     }
 
-    // 内置 pi-ai provider：仍按已验证的凭据来门控。
+    // 内置 pi-ai provider 的门控按认证类型区分：
+    // - API key：填了 key 就可选（连通性测试失败也保存，见 issue #10），
+    //   verified 只代表「测试通过过」，不应作为可用门槛；
+    // - OAuth：仍要求已登录（verified）。
     for (const [provider, cred] of Object.entries(configuredProviders)) {
-      if (!cred.verified) continue;
+      const usable = cred.authType === 'apiKey' ? !!cred.apiKey : cred.verified;
+      if (!usable) continue;
       // 自定义的已在上面处理
       if (isCustomProvider(provider)) continue;
       if (seen.has(provider)) continue;

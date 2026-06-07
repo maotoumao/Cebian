@@ -331,9 +331,9 @@ provider:
   status:
     connected: "已連線"
     notConfigured: "尚未設定"
+    configured: "已設定"
     unverified: "未驗證"
     verifying: "驗證中"
-    connectFailed: "連線失敗"
     failed: "失敗"
   oauth:
     signIn: "登入"
@@ -351,9 +351,7 @@ provider:
     placeholder: "輸入 API Key"
     disconnect: "中斷連線"
     noModels: "無可用模型"
-    verifyNoResponse: "驗證失敗：未收到預期回應"
-    # $1 = 模型數量
-    connectedWithCount: "已連線 · $1 個模型"
+    savedUnverified: "已儲存，但連線測試未通過"
   summary:
     # $1 = 認證方式（OAuth / API Key），$2 = 模型數量
     modelsAvailable: "$1 · $2 個模型可用"

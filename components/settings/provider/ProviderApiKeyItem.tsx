@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { toast } from "sonner";
 import { Eye, EyeOff, Unplug, Save } from "lucide-react";
 import {
   getModels,
@@ -44,24 +45,16 @@ export function ProviderApiKeyItem({
     setKey(credential?.apiKey ?? "");
   }, [credential?.apiKey]);
 
-  const [status, setStatus] = useState<
-    | { type: "success"; message: string }
-    | { type: "error"; message: string }
-    | null
-  >(null);
-
-  const { cheapestModel, modelCount } = useMemo(() => {
+  const cheapestModel = useMemo(() => {
     try {
       const models = modelsProp ?? (isCustomProvider(provider) ? [] : (getModels(provider as KnownProvider) as Model<Api>[]));
-      if (models.length === 0) return { cheapestModel: undefined, modelCount: 0 };
+      if (models.length === 0) return undefined;
 
-      const cheapest = models.reduce((min, m) =>
+      return models.reduce((min, m) =>
         m.cost.input + m.cost.output < min.cost.input + min.cost.output ? m : min,
       );
-
-      return { cheapestModel: cheapest, modelCount: models.length };
     } catch {
-      return { cheapestModel: undefined, modelCount: 0 };
+      return undefined;
     }
   }, [provider, modelsProp]);
 
@@ -69,7 +62,6 @@ export function ProviderApiKeyItem({
     if (!cheapestModel || !key.trim()) return;
 
     setSaving(true);
-    setStatus(null);
 
     try {
       const result = await complete(
@@ -93,17 +85,19 @@ export function ProviderApiKeyItem({
         .join("");
 
       if (!text.toLowerCase().includes("ok")) {
-        throw new Error(t('provider.apiKey.verifyNoResponse'));
+        // 仅为进入 catch 走「失败也保存」分支；无具体原因，toast 只显示标题。
+        throw new Error();
       }
 
       onSave({ authType: "apiKey", apiKey: key, verified: true });
-      setStatus({ type: "success", message: t('provider.apiKey.connectedWithCount', [modelCount]) });
     } catch (err) {
+      // 连通性测试是脆弱的启发式（最便宜模型可能下架/限流/不听话回 "ok"），
+      // 失败不应阻断保存：仍写入 verified:false，徒留黄色「未验证」徐章；
+      // 有具体原因时（一次性信息，不持久化）用 toast 的 description 告知。
       console.error(`[ApiKey Verify] ${provider}:`, err);
-      setStatus({
-        type: "error",
-        message: err instanceof Error && err.message ? err.message : t('provider.status.connectFailed'),
-      });
+      onSave({ authType: "apiKey", apiKey: key, verified: false });
+      const reason = err instanceof Error && err.message ? err.message : undefined;
+      toast.warning(t('provider.apiKey.savedUnverified'), reason ? { description: reason } : undefined);
     } finally {
       setSaving(false);
     }
@@ -121,18 +115,7 @@ export function ProviderApiKeyItem({
         </Badge>
       );
     }
-    if (status?.type === "error") {
-      return (
-        <Badge
-          role="status"
-          variant="outline"
-          className="text-destructive border-destructive/20 bg-destructive/5 text-[0.65rem] h-4 px-1.5"
-        >
-          {t('provider.status.connectFailed')}
-        </Badge>
-      );
-    }
-    if (status?.type === "success" || credential?.verified) {
+    if (credential?.verified) {
       return (
         <Badge
           role="status"
@@ -233,7 +216,6 @@ export function ProviderApiKeyItem({
           onClick={() => {
             onRemove?.();
             setKey("");
-            setStatus(null);
           }}
           title={t('provider.apiKey.disconnect')}
         >

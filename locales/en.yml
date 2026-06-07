@@ -342,9 +342,9 @@ provider:
   status:
     connected: "Connected"
     notConfigured: "Not configured"
+    configured: "Configured"
     unverified: "Unverified"
     verifying: "Verifying"
-    connectFailed: "Connection failed"
     failed: "Failed"
   oauth:
     signIn: "Sign in"
@@ -362,9 +362,7 @@ provider:
     placeholder: "Enter API Key"
     disconnect: "Disconnect"
     noModels: "No available models"
-    verifyNoResponse: "Verification failed: unexpected response"
-    # $1 = model count
-    connectedWithCount: "Connected · $1 models"
+    savedUnverified: "Saved, but the connectivity test didn't pass"
   summary:
     # $1 = auth label (OAuth / API Key), $2 = model count
     modelsAvailable: "$1 · $2 models available"
