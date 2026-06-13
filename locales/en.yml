@@ -12,6 +12,12 @@ common:
   newChat: "New chat"
   send: "Send"
   history: "History"
+  # History list date groupings (by last-activity time)
+  historyGroup:
+    today: "Today"
+    week: "Previous 7 days"
+    month: "Previous 30 days"
+    older: "Older"
   toggleTheme: "Toggle theme"
   settings: "Settings"
   back: "Back"

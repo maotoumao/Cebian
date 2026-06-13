@@ -11,6 +11,12 @@ common:
   newChat: "新对话"
   send: "发送"
   history: "历史记录"
+  # 历史列表按最后活动时间分组
+  historyGroup:
+    today: "今天"
+    week: "7 天内"
+    month: "30 天内"
+    older: "更早"
   toggleTheme: "切换主题"
   settings: "设置"
   back: "返回"

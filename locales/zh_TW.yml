@@ -11,6 +11,12 @@ common:
   newChat: "新對話"
   send: "傳送"
   history: "歷史記錄"
+  # 歷史清單依最後活動時間分組
+  historyGroup:
+    today: "今天"
+    week: "7 天內"
+    month: "30 天內"
+    older: "更早"
   toggleTheme: "切換主題"
   settings: "設定"
   back: "返回"

@@ -1,7 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, Trash2, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage, type SessionMeta } from '@/lib/protocol';
 import { showConfirm } from '@/lib/dialog';
 import { t } from '@/lib/i18n';
@@ -11,6 +17,48 @@ interface HistoryPanelProps {
   onClose: () => void;
   onSelectSession: (sessionId: string) => void;
   onDeleteSession?: (sessionId: string) => void;
+}
+
+type RecencyBucket = 'today' | 'week' | 'month' | 'older';
+
+interface SessionGroup {
+  bucket: RecencyBucket;
+  sessions: SessionMeta[];
+}
+
+// 按 updatedAt 把已倒序的会话列表切成最多 4 段（今天 / 7 天内 / 30 天内 / 更早）。
+// 边界用本地自然日 0 点，空段直接跳过。输入需已按 updatedAt 倒序。
+function groupSessionsByRecency(sessions: SessionMeta[], now: number): SessionGroup[] {
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  // 用日历日做边界，避免固定 24h 偏移在夏令时切换日落到非 0 点。
+  // 「7 天内」含今天往前共 7 个自然日，故下界是今天 0 点往前 6 天。
+  const weekStartDate = new Date(startOfToday);
+  weekStartDate.setDate(weekStartDate.getDate() - 6);
+  const monthStartDate = new Date(startOfToday);
+  monthStartDate.setDate(monthStartDate.getDate() - 29);
+  const todayStart = startOfToday.getTime();
+  const weekStart = weekStartDate.getTime();
+  const monthStart = monthStartDate.getTime();
+
+  const buckets: Record<RecencyBucket, SessionMeta[]> = {
+    today: [],
+    week: [],
+    month: [],
+    older: [],
+  };
+
+  for (const session of sessions) {
+    if (session.updatedAt >= todayStart) buckets.today.push(session);
+    else if (session.updatedAt >= weekStart) buckets.week.push(session);
+    else if (session.updatedAt >= monthStart) buckets.month.push(session);
+    else buckets.older.push(session);
+  }
+
+  const order: RecencyBucket[] = ['today', 'week', 'month', 'older'];
+  return order
+    .filter((bucket) => buckets[bucket].length > 0)
+    .map((bucket) => ({ bucket, sessions: buckets[bucket] }));
 }
 
 function formatRelativeTime(timestamp: number): string {
@@ -31,6 +79,8 @@ function formatRelativeTime(timestamp: number): string {
 export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }: HistoryPanelProps) {
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const groups = useMemo(() => groupSessionsByRecency(sessions, Date.now()), [sessions]);
 
   // Load via the background port so we can include live `isRunning` state
   // for each session. The DB itself doesn't know which agents are mid-stream.
@@ -120,7 +170,7 @@ export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }
 
       {/* Body */}
       <ScrollArea className="flex-1 min-h-0">
-        <div className="px-5 py-3 space-y-1">
+        <div className="px-5 py-3">
           {loading && (
             <div className="text-center text-sm text-muted-foreground py-12">
               {t('common.loading')}
@@ -134,48 +184,66 @@ export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }
             </div>
           )}
 
-          {!loading && sessions.map((session) => (
-            <div
-              key={session.id}
-              role="button"
-              tabIndex={0}
-              className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-muted/50 transition-colors group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => onSelectSession(session.id)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectSession(session.id); } }}
+          {!loading && groups.length > 0 && (
+            <Accordion
+              type="multiple"
+              defaultValue={groups.map((group) => group.bucket)}
             >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 min-w-0">
-                  {session.isRunning && (
-                    <span
-                      role="img"
-                      aria-label={t('common.session.running')}
-                      title={t('common.session.running')}
-                      className="size-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"
-                    />
-                  )}
-                  <div className="text-sm font-medium truncate min-w-0">
-                    {session.title}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-                  {session.model && <span>{session.model}</span>}
-                  <span>·</span>
-                  <span>{t('common.session.messageCount', session.messageCount)}</span>
-                  <span>·</span>
-                  <span>{formatRelativeTime(session.updatedAt)}</span>
-                </div>
-              </div>
+              {groups.map((group) => (
+                <AccordionItem key={group.bucket} value={group.bucket} className="border-b-0">
+                  <AccordionTrigger className="py-2 text-xs text-muted-foreground hover:no-underline">
+                    {t(`common.historyGroup.${group.bucket}`)}
+                  </AccordionTrigger>
+                  <AccordionContent className="pb-1">
+                    <div className="flex flex-col gap-1">
+                      {group.sessions.map((session) => (
+                        <div
+                          key={session.id}
+                          role="button"
+                          tabIndex={0}
+                          className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-muted/50 transition-colors group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          onClick={() => onSelectSession(session.id)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectSession(session.id); } }}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {session.isRunning && (
+                                <span
+                                  role="img"
+                                  aria-label={t('common.session.running')}
+                                  title={t('common.session.running')}
+                                  className="size-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"
+                                />
+                              )}
+                              <div className="text-sm font-medium truncate min-w-0">
+                                {session.title}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                              {session.model && <span>{session.model}</span>}
+                              <span>·</span>
+                              <span>{t('common.session.messageCount', session.messageCount)}</span>
+                              <span>·</span>
+                              <span>{formatRelativeTime(session.updatedAt)}</span>
+                            </div>
+                          </div>
 
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive shrink-0"
-                onClick={(e) => handleDelete(e, session.id)}
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </div>
-          ))}
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive shrink-0"
+                            onClick={(e) => handleDelete(e, session.id)}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          )}
         </div>
       </ScrollArea>
     </div>
