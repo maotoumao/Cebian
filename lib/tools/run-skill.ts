@@ -5,13 +5,10 @@ import { CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE } from '@/lib/constants';
 import { vfs, normalizePath } from '@/lib/vfs';
 import { parseFrontmatter } from '@/lib/frontmatter';
 import { getSkillGrants, setSkillGrant, permissionsMatch } from '@/lib/ai-config/skill-grants';
+import { validateSkillName } from '@/lib/ai-config/skill-validator';
+import { t } from '@/lib/i18n';
+import type { ToolGate, PermissionRequestDetails } from '@/lib/tool-permissions';
 import { runInSandbox } from './sandbox-rpc';
-
-// ─── Permission confirmation nonces ───
-
-/** Nonces for permission confirmation — prevents the agent from bypassing ask_user */
-const pendingNonces = new Map<string, { skill: string; permissions: string[]; expiresAt: number }>();
-const NONCE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 // ─── Tool definition ───
 
@@ -28,12 +25,6 @@ const RunSkillParameters = Type.Object({
   tabId: Type.Number({
     description: 'Required. Tab ID for the executeInPage helper. If the skill does not declare "page.executeJs", this is ignored. Read it from the `tabId:` line under `[Active Tab]` (or the windows list) in the context block.',
   }),
-  confirmation_nonce: Type.Optional(Type.String({
-    description: 'Nonce returned by a previous permission_required response. Include after user confirms via ask_user.',
-  })),
-  always_allow: Type.Optional(Type.Boolean({
-    description: 'Set to true when the user chose "always allow" for this skill. Only effective with a valid confirmation_nonce.',
-  })),
 });
 
 export const runSkillTool: AgentTool<typeof RunSkillParameters> = {
@@ -52,12 +43,9 @@ export const runSkillTool: AgentTool<typeof RunSkillParameters> = {
     'If the skill declares "bgFetch" (or `bgFetch:<match-pattern>`), a `bgFetch(url, init?)` global is available with the same shape as native `fetch`. Requests run in the background SW with the extension\'s host_permissions, bypassing CORS. The response object has `.status` / `.ok` / `.headers` (Headers instance) / `.text()` / `.json()` / `.arrayBuffer()` / `.bytes()` / `.blob()` — same surface as native Response. Patterns use Chrome match-pattern syntax: bare `bgFetch` allows any http(s) URL (= `*://*/*`); `bgFetch:https://api.example.com/*` scopes to one host. ' +
     'The script runs as a complete JavaScript file — use `module.exports = value` to set the return value. ' +
     'Arguments are accessible via the `args` variable. Returns JSON-serialized result.\n\n' +
-    'PERMISSION FLOW: On first call, if the skill has not been granted permission, ' +
-    'the tool returns a permission prompt with a confirmation_nonce. You must then use ask_user to show the prompt ' +
-    'to the user with three options matching the user\'s language ' +
-    '(equivalents of: Deny / Allow once / Always allow this skill). ' +
-    'If the user approves, call this tool again with the same parameters plus the confirmation_nonce. ' +
-    'If they chose the "always allow" option, also set always_allow=true. If the user denies, do not call this tool again.',
+    'PERMISSION: If the skill declares metadata.permissions and has not been granted, the user is asked to ' +
+    'authorize before the script runs — this happens automatically, you do not manage it. A blocked call ' +
+    'returns an error result saying the user denied permission; in that case do not retry the same call.',
   parameters: RunSkillParameters,
 
   async execute(): Promise<AgentToolResult<{}>> {
@@ -91,31 +79,56 @@ async function executeRunSkill(
 ): Promise<AgentToolResult<{}>> {
   signal?.throwIfAborted();
 
-  const { skill, script, args = {}, tabId, confirmation_nonce, always_allow = false } = params;
+  const { skill, script, args = {}, tabId } = params;
 
-  // ─── Path traversal protection ───
+  // 授权已由 beforeToolCall 门禁（runSkillGate）在执行前强制：execute 能跑到这里，
+  // 即代表「该 skill 无需授权」或「用户已授权」。这里只解析路径 + 进沙箱执行。
+  const { permissions, code } = await resolveSkillRun(skill, script);
+
+  signal?.throwIfAborted();
+
+  const result = await runInSandbox(code, args as Record<string, unknown>, permissions, skill, sessionId, tabId);
+  const serialized = result !== undefined ? JSON.stringify(result, null, 2) : '(no return value)';
+
+  return {
+    content: [{ type: 'text', text: serialized }],
+    details: {},
+  };
+}
+
+// ─── Skill resolution (shared by execute + gate) ───
+
+/**
+ * 解析 skill 目录、校验路径安全、读 SKILL.md 并解析声明的 `metadata.permissions`。
+ * 被 `runSkillGate`（只要 permissions）与 `resolveSkillRun`（再读脚本）复用。
+ * 任何一步失败都 throw —— 调用方据场景决定是抛给 LLM 还是 fail-open。
+ */
+async function resolveSkillPermissions(
+  skill: string,
+): Promise<{ normalizedSkillDir: string; permissions: string[] }> {
+  // 技能身份 = 文件夹名（全代码库一致：grants / 扫描 / 导入清理都用它）。先按
+  // agentskills.io 规范校验，拒掉 `foo/../bar` 这类别名——它们能指向同一目录却
+  // 让 grant 的存/读/清用上不同 key，制造授权错配（详见 skill-validator）。
+  const nameCheck = validateSkillName(skill);
+  if (!nameCheck.valid) {
+    throw new Error(`Invalid skill name "${skill}": ${nameCheck.error}`);
+  }
 
   const normalizedSkillsRoot = normalizePath(CEBIAN_SKILLS_DIR);
   const normalizedSkillDir = normalizePath(`${CEBIAN_SKILLS_DIR}/${skill}`);
+  // 防御性兜底：规范名已排除路径分隔符，这层 containment 检查理论上不会触发。
   if (!normalizedSkillDir.startsWith(normalizedSkillsRoot + '/')) {
     throw new Error('Invalid skill name — path traversal detected.');
   }
-  const normalizedScriptPath = normalizePath(`${normalizedSkillDir}/${script}`);
-  if (!normalizedScriptPath.startsWith(normalizedSkillDir + '/')) {
-    throw new Error('Script path escapes skill directory.');
-  }
-
-  // ─── ① Read SKILL.md and parse permissions ───
 
   const skillMdPath = `${normalizedSkillDir}/${SKILL_ENTRY_FILE}`;
-
   if (!(await vfs.exists(skillMdPath))) {
     throw new Error(`Skill "${skill}" not found. No SKILL.md at ${skillMdPath}`);
   }
 
-  let permissions: string[] = [];
   const raw = await vfs.readFile(skillMdPath, 'utf8');
   const content = typeof raw === 'string' ? raw : new TextDecoder().decode(raw as Uint8Array);
+  let permissions: string[] = [];
   try {
     const { data } = parseFrontmatter(content);
     if (data.metadata && typeof data.metadata === 'object') {
@@ -128,67 +141,82 @@ async function executeRunSkill(
     throw new Error(`Failed to parse SKILL.md: ${(err as Error).message}`);
   }
 
-  // ─── ② Read script file ───
+  return { normalizedSkillDir, permissions };
+}
 
+/**
+ * execute 专用：在 `resolveSkillPermissions` 之上再校验脚本路径不逃逸出 skill 目录、
+ * 读出脚本源码。返回执行所需的 `permissions` + `code`。
+ */
+async function resolveSkillRun(
+  skill: string,
+  script: string,
+): Promise<{ permissions: string[]; code: string }> {
+  const { normalizedSkillDir, permissions } = await resolveSkillPermissions(skill);
+
+  const normalizedScriptPath = normalizePath(`${normalizedSkillDir}/${script}`);
+  if (!normalizedScriptPath.startsWith(normalizedSkillDir + '/')) {
+    throw new Error('Script path escapes skill directory.');
+  }
   if (!(await vfs.exists(normalizedScriptPath))) {
     throw new Error(`Script not found: ${normalizedScriptPath}`);
   }
   const rawScript = await vfs.readFile(normalizedScriptPath, 'utf8');
   const code = typeof rawScript === 'string' ? rawScript : new TextDecoder().decode(rawScript as Uint8Array);
 
-  // ─── ③ Check permission grant ───
+  return { permissions, code };
+}
 
-  if (permissions.length > 0) {
+// ─── Permission gate (registered into agent-manager's PERMISSION_GATES) ───
+
+/**
+ * run_skill 的执行前授权策略。由通用门禁在 `beforeToolCall` 调用——
+ * - `check`：解析声明的 permissions；无声明或已 `always` 授权且权限集匹配 → 放行；
+ *   否则要求授权，request 携带成句标题 + 原始权限 token（UI 经 describePermission 渲染）。
+ * - `persistGrant`：用户选「始终允许」时落 `skillGrants`，best-effort（失败降级为仅本次）。
+ *
+ * 解析失败（skill 不存在 / SKILL.md 损坏 / 路径穿越）在 `check` 里一律 fail-open 到
+ * `execute()`：那时尚无脚本执行，execute 会再解析并抛出权威错误给 LLM，无安全风险。
+ */
+export const runSkillGate: ToolGate = {
+  toolName: TOOL_RUN_SKILL,
+
+  async check(args): Promise<{ needsGrant: boolean; request?: PermissionRequestDetails }> {
+    const { skill, script } = args as Static<typeof RunSkillParameters>;
+
+    let permissions: string[];
+    try {
+      ({ permissions } = await resolveSkillPermissions(skill));
+    } catch {
+      // 解析失败 → 交给 execute 抛权威错误
+      return { needsGrant: false };
+    }
+
+    if (permissions.length === 0) return { needsGrant: false };
+
     const grants = await getSkillGrants();
     const grant = grants[skill];
-    const isGranted = grant?.granted === 'always' && permissionsMatch(grant.permissions, permissions);
-
-    if (!isGranted) {
-      // 已经带了 nonce —— 校验是不是用户确认过的那次
-      if (confirmation_nonce) {
-        const nonceData = pendingNonces.get(confirmation_nonce);
-        pendingNonces.delete(confirmation_nonce);
-        if (!nonceData || nonceData.skill !== skill || nonceData.expiresAt < Date.now()) {
-          throw new Error('Invalid or expired confirmation nonce. Please retry the permission flow.');
-        }
-        // 合法 nonce —— 持久化授权
-        if (always_allow) {
-          await setSkillGrant(skill, permissions);
-        }
-      } else {
-        // 没 nonce —— 生成一个并返回 permission prompt。这是正常的 next-step
-        // 返回，不是错误：agent 读到内容会去调 ask_user 然后再来一次。
-        const nonce = crypto.randomUUID();
-        pendingNonces.set(nonce, { skill, permissions, expiresAt: Date.now() + NONCE_TTL_MS });
-        const permList = permissions.map((p) => `  • ${p}`).join('\n');
-        return {
-          content: [{
-            type: 'text',
-            text: `Permission required to execute skill code.\n\n` +
-              `Skill: ${skill}\n` +
-              `Script: ${script}\n` +
-              `Requested permissions:\n${permList}\n\n` +
-              `confirmation_nonce: ${nonce}\n\n` +
-              `Use ask_user to ask the user for confirmation with three options in the user's language ` +
-              `(equivalents of: Deny / Allow once / Always allow this skill). ` +
-              `If approved, call run_skill again with the same skill/script/args plus confirmation_nonce="${nonce}". ` +
-              `If "always allow", also set always_allow=true. If denied, do not call again.`,
-          }],
-          details: {},
-        };
-      }
+    if (grant?.granted === 'always' && permissionsMatch(grant.permissions, permissions)) {
+      return { needsGrant: false };
     }
-  }
 
-  signal?.throwIfAborted();
+    return {
+      needsGrant: true,
+      request: {
+        title: t('chat.permission.title', [skill, script]),
+        permissions,
+      },
+    };
+  },
 
-  // ─── ④ Execute in sandbox ───
-
-  const result = await runInSandbox(code, args as Record<string, unknown>, permissions, skill, sessionId, tabId);
-  const serialized = result !== undefined ? JSON.stringify(result, null, 2) : '(no return value)';
-
-  return {
-    content: [{ type: 'text', text: serialized }],
-    details: {},
-  };
-}
+  async persistGrant(args): Promise<void> {
+    const { skill } = args as Static<typeof RunSkillParameters>;
+    try {
+      const { permissions } = await resolveSkillPermissions(skill);
+      await setSkillGrant(skill, permissions);
+    } catch (err) {
+      // 持久化失败不阻断本次已授权的执行——降级为「仅本次」。
+      console.warn('[run-skill] failed to persist skill grant:', err);
+    }
+  },
+};

@@ -389,6 +389,36 @@ chat:
     autoStoppedTime: "Recording auto-stopped: time limit reached"
   askUser:
     placeholder: "Type a reply…"
+  permission:
+    # Permission prompt shown before a skill script runs. $1 = skill name, $2 = script path
+    title: "Skill $1 wants to run $2"
+    requests: "It is requesting these permissions:"
+    deny: "Deny"
+    allowOnce: "Allow once"
+    allowAlways: "Always allow this skill"
+    # Shown when the request can no longer be answered (e.g. the background
+    # was restarted while it was pending).
+    expired: "This permission request has expired"
+    perm:
+      pageExecuteJs: "Run scripts in your web pages — read and change page content, and act through your logged-in sessions"
+      vfsRead: "Read files in this skill's own workspace folder"
+      vfsWrite: "Read and write files in this skill's own workspace folder"
+      bgFetchAny: "Make network requests to any website in the background, bypassing cross-origin limits"
+      # $1 = match pattern (host scope)
+      bgFetchPattern: "Make background network requests to $1, bypassing cross-origin limits"
+      chromeTabs: "View and manage your browser tabs (open, close, move, reload) and capture the visible tab's contents"
+      chromeWindows: "View and manage your browser windows"
+      chromeAlarms: "Schedule and manage background timers"
+      chromeWebNavigation: "Read navigation details of your open pages and their frames"
+      chromeBookmarks: "Read and modify your bookmarks"
+      chromeHistory: "Read and modify your browsing history"
+      chromeCookies: "Read, change, and delete cookies for sites you visit, including login-session cookies normally hidden from web pages"
+      chromeTopSites: "Read your most-visited sites"
+      chromeSessions: "View and restore recently closed tabs and windows, including sessions synced from your other devices"
+      chromeDownloads: "View and manage your downloads, and start new ones"
+      chromeNotifications: "Create and manage system notifications"
+      # $1 = chrome namespace
+      chromeFallback: "Call the browser's chrome.$1 API"
   model:
     select: "Select model"
     searchPlaceholder: "Search models…"

@@ -1,4 +1,4 @@
-import { Bot, ChevronRight, Lightbulb, CircleHelp, CheckCircle, Send, Crosshair, FileText, Film, FoldVertical } from 'lucide-react';
+import { Bot, ChevronRight, Lightbulb, CircleHelp, CheckCircle, Send, Crosshair, FileText, Film, FoldVertical, ShieldAlert } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, type ReactNode, type KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import { extractUserText, extractUserAttachments } from '@/lib/message-helpers';
 import { showDialog } from '@/lib/dialog';
 import { RECORDING_MIME } from '@/lib/attachments';
 import { t } from '@/lib/i18n';
+import { describePermission } from '@/lib/tool-permissions';
 import { downloadFile, formatDuration, formatCharCount } from '@/lib/utils';
 import type { Message } from '@earendil-works/pi-ai';
 
@@ -256,6 +257,37 @@ export function ThinkingBlock({ content, isLive }: { content: string; isLive?: b
   );
 }
 
+/* ─── Shared option button ─── */
+// 交互卡片（AskUserBlock / PermissionRequestBlock）共用的小号选项按钮。
+// `selected` 用 default 实心高亮表达「这个选项被选中了」（权限卡片决策后用），
+// AskUserBlock 不传 selected 即普通 outline 按钮。
+function PromptOptionButton({
+  label,
+  description,
+  selected,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  description?: string;
+  selected?: boolean;
+  disabled?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <Button
+      variant={selected ? 'default' : 'outline'}
+      size="sm"
+      className="text-xs h-7"
+      disabled={disabled}
+      onClick={onClick}
+      title={description}
+    >
+      {label}
+    </Button>
+  );
+}
+
 /* ─── Ask User Block (interactive tool UI) ─── */
 export function AskUserBlock({
   question,
@@ -306,17 +338,13 @@ export function AskUserBlock({
         return (
           <div className="flex flex-wrap gap-2 mt-2.5">
             {safeOptions.map((opt, i) => (
-              <Button
+              <PromptOptionButton
                 key={`${i}-${opt.label}`}
-                variant="outline"
-                size="sm"
-                className="text-xs h-7"
+                label={opt.label}
+                description={opt.description}
                 disabled={!onSelect}
-                onClick={() => onSelect?.(opt.label)}
-                title={opt.description}
-              >
-                {opt.label}
-              </Button>
+                onClick={onSelect ? () => onSelect(opt.label) : undefined}
+              />
             ))}
           </div>
         );
@@ -345,6 +373,84 @@ export function AskUserBlock({
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─── Permission Request Block (tool pre-execution authorization) ─── */
+// 渲染一条 permissionRequest 自定义消息。三种态：
+// - answerable（pending 且 isLive）：三按钮可点，卡片正常。
+// - decided（once/always/denied/dismissed）：卡片置灰；被选中的按钮高亮，
+//   dismissed（发消息隐式未授权）无任何按钮高亮。
+// - expired（pending 但 !isLive，例如 SW 重启后无活 agent 在等）：卡片置灰，
+//   按钮禁用，额外显示「已失效」。
+export function PermissionRequestBlock({
+  title,
+  permissions,
+  decision,
+  isLive,
+  onResolve,
+}: {
+  title: string;
+  permissions: string[];
+  decision: 'pending' | 'once' | 'always' | 'denied' | 'dismissed';
+  isLive: boolean;
+  onResolve?: (decision: 'once' | 'always' | 'denied') => void;
+}) {
+  const pending = decision === 'pending';
+  const answerable = pending && isLive && !!onResolve;
+  const expired = pending && !isLive;
+
+  return (
+    <div className={`relative mt-3 p-3.5 border border-primary/20 bg-primary/5 rounded-lg ${answerable ? '' : 'opacity-60'}`}>
+      <div className="flex items-center gap-2 text-primary font-medium text-[0.85rem] mb-1.5">
+        <ShieldAlert className="size-4.5 shrink-0" />
+        {title}
+      </div>
+
+      {/* Requested permissions — omitted entirely when none declared */}
+      {permissions.length > 0 && (
+        <div className="text-[0.8rem] text-muted-foreground">
+          {t('chat.permission.requests')}
+          <ul className="mt-1 space-y-1">
+            {permissions.map((perm, i) => (
+              <li key={`${i}-${perm}`} className="flex items-start gap-1.5">
+                <span className="text-primary/60 mt-0.5 shrink-0">•</span>
+                <span>{describePermission(perm)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Expired notice — only when a persisted pending card has no live agent */}
+      {expired && (
+        <div className="text-xs text-muted-foreground/80 italic mt-2">
+          {t('chat.permission.expired')}
+        </div>
+      )}
+
+      {/* Decision buttons */}
+      <div className="flex flex-wrap gap-2 mt-2.5">
+        <PromptOptionButton
+          label={t('chat.permission.deny')}
+          selected={decision === 'denied'}
+          disabled={!answerable}
+          onClick={answerable ? () => onResolve!('denied') : undefined}
+        />
+        <PromptOptionButton
+          label={t('chat.permission.allowOnce')}
+          selected={decision === 'once'}
+          disabled={!answerable}
+          onClick={answerable ? () => onResolve!('once') : undefined}
+        />
+        <PromptOptionButton
+          label={t('chat.permission.allowAlways')}
+          selected={decision === 'always'}
+          disabled={!answerable}
+          onClick={answerable ? () => onResolve!('always') : undefined}
+        />
+      </div>
     </div>
   );
 }

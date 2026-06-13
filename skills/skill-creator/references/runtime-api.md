@@ -275,16 +275,14 @@ The renderer handles loading state, broken paths (red warning card), unsupported
 
 ## User permission flow
 
-The first time `run_skill` is asked to run a script for a skill that declares any `metadata.permissions`, it does NOT execute. Instead:
+The first time `run_skill` is asked to run a script for a skill that declares any `metadata.permissions`, the run pauses for the user's authorization **before the script executes** — this is automatic, the agent does not manage it:
 
-1. `run_skill` returns a `permission_required` result containing a one-time `confirmation_nonce` (5-minute TTL) and the list of requested permissions.
-2. The agent must call `ask_user` with three options in the user's language: equivalents of "Deny", "Allow once", "Always allow this skill".
-3. If the user picks "Allow once" or "Always allow", the agent re-invokes `run_skill` with the same `skill` / `script` / `args` / `tabId` plus `confirmation_nonce`. For "Always allow", also pass `always_allow: true`.
-4. With a valid nonce the script runs. With `always_allow: true`, the grant is persisted in `chrome.storage.local` under `skillGrants[<skillName>]`.
-5. The grant is keyed to the exact permission set. If the skill is later edited to declare a different permission set (added or removed), the next call re-prompts.
-6. Nonces are single-use and expire after 5 minutes; the agent cannot fabricate one.
+1. A permission card appears inline in the chat showing the skill, the script, and a human-readable description of each requested permission, with three buttons: "Deny", "Allow once", "Always allow this skill". The agent just calls `run_skill` normally — the gate handles authorization for you.
+2. "Allow once" runs the script this time without persisting. "Always allow" runs it and persists the grant in `chrome.storage.local` under `skillGrants[<skillName>]`.
+3. "Deny" (or the user sending a new message instead of answering) blocks the run; `run_skill` returns an **error result** saying permission was not granted. Do not retry the same call after a denial.
+4. The grant is keyed to the exact permission set. If the skill is later edited to declare a different permission set (added or removed), the next call re-prompts.
 
-Skills with no `metadata.permissions` skip this flow entirely.
+Skills with no `metadata.permissions` skip this flow entirely and run immediately.
 
 ## Errors
 

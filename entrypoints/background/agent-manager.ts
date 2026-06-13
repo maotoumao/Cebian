@@ -34,7 +34,21 @@ import { sessionStore } from './session-store';
 import { gatherPageContext } from '@/lib/page-context';
 import { buildTextPrefix, extractImages, type Attachment } from '@/lib/attachments';
 import { createSessionTools, buildSessionToolArray } from '@/lib/tools';
+import { runSkillGate } from '@/lib/tools/run-skill';
 import type { SessionToolContext } from '@/lib/tools/session-context';
+import {
+  createInteractiveBridge,
+  INTERACTIVE_CANCELLED,
+  type InteractiveBridge,
+} from '@/lib/tools/interactive-bridge';
+import {
+  createPermissionGate,
+  createPermissionRequestMessage,
+  isPermissionRequest,
+  type PermissionRequest,
+  type PermissionDecision,
+  type ToolGate,
+} from '@/lib/tool-permissions';
 import type { ServerMessage } from '@/lib/protocol';
 import type { SessionRecord } from '@/lib/db';
 import { truncateForRetry } from '@/lib/message-helpers';
@@ -118,6 +132,16 @@ async function buildStructuredMessage(text: string, attachments: Attachment[]): 
  */
 type ManagedPhase = 'idle' | 'preparing' | 'running' | 'compacting';
 
+/**
+ * 注册了执行前授权门禁的工具策略（ToolGate）集合。policy 对象本身是
+ * session-independent 的纯策略，所以放模块级单一来源；每个会话只是用它
+ * 构造一个绑定到自身 `requestPermissionDecision` 的 `beforeToolCall` 闭包。
+ *
+ * 目前只有 run_skill 接入；未来 chrome_api / execute_js 等要执行前授权时，
+ * 在各自工具文件里实现 ToolGate 并加进这个数组即可，本编排层零改动。
+ */
+const PERMISSION_GATES: ToolGate[] = [runSkillGate];
+
 interface ManagedSession {
   agent: Agent;
   sessionId: string;
@@ -140,6 +164,14 @@ interface ManagedSession {
   modelKey: string;
   /** Unified interactive tool bridge manager for this session. */
   toolCtx: SessionToolContext;
+  /**
+   * Per-session bridge for tool pre-execution permission prompts. Kept
+   * separate from `toolCtx` because a permission prompt is NOT an LLM tool —
+   * it pauses an otherwise-normal tool inside its `beforeToolCall` gate and
+   * uses the dedicated permission broadcast path, not `tool_pending`.
+   * At most one request is in-flight at a time (gate preflight is sequential).
+   */
+  permissionBridge: InteractiveBridge<PermissionRequest, PermissionDecision>;
   unsubscribeAgent: () => void;
 }
 
@@ -175,6 +207,94 @@ class AgentManager {
       toolCallId: pending.toolCallId,
       args: pending.request,
     }));
+  }
+
+  /** Snapshot of the session's in-flight permission prompt (0 or 1). */
+  private getPendingPermissions(managed: ManagedSession): PermissionRequest[] {
+    const pending = managed.permissionBridge.getPending();
+    return pending ? [pending.request] : [];
+  }
+
+  /**
+   * Broadcast a full `session_state` snapshot for the session. Used by the
+   * permission flow to push the inserted / updated `permissionRequest` card
+   * plus the live `pendingPermissions` set in one shot — mirroring how
+   * `maybeCompact` delivers an inserted `compactionSummary`.
+   */
+  private broadcastSessionSnapshot(managed: ManagedSession): void {
+    this.broadcast(managed.sessionId, {
+      type: 'session_state',
+      sessionId: managed.sessionId,
+      messages: [...managed.agent.state.messages],
+      isRunning: managed.phase !== 'idle',
+      isCompacting: managed.phase === 'compacting',
+      pendingTools: this.getPendingToolSnapshot(managed),
+      pendingPermissions: this.getPendingPermissions(managed),
+    });
+  }
+
+  /**
+   * Injected as the permission gate's `RequestDecisionFn`. Runs while a tool
+   * is paused in its `beforeToolCall` gate (loop is suspended here).
+   *
+   * Flow: insert a `pending` permissionRequest message → persist + broadcast →
+   * await the user's click on the bridge → write the final decision back onto
+   * that message → persist + broadcast → return the decision to the gate.
+   *
+   * The inserted message lands between the assistant(toolCall) and the
+   * (not-yet-produced) toolResult — exactly the order needed so `convertToLlm`
+   * filtering keeps toolCall↔toolResult adjacent for the provider.
+   *
+   * Terminal mapping: an explicit `bridge.resolve(decision)` returns that
+   * decision; a `bridge.cancel()` / abort (user sent a new message, or the
+   * session is being torn down) surfaces `INTERACTIVE_CANCELLED` → `dismissed`.
+   */
+  private async requestPermissionDecision(
+    sessionId: string,
+    request: PermissionRequest,
+    signal?: AbortSignal,
+  ): Promise<PermissionDecision> {
+    const managed = this.sessions.get(sessionId);
+    // No live session (shouldn't happen — gate fires only for a live agent),
+    // fail closed as dismissed so the tool does not execute.
+    if (!managed) return 'dismissed';
+
+    // ① 插入 pending 卡片消息（setter 赋值，与 compaction 同款）。
+    managed.agent.state.messages = [
+      ...managed.agent.state.messages,
+      createPermissionRequestMessage(request),
+    ];
+
+    // ② 先发起 bridge 请求——它会**同步**置上 pending（Promise executor 同步执行），
+    // 这样紧接着的 broadcast 才能在 pendingPermissions 里带上本次请求。若先广播
+    // 再 request，那一帧 pendingPermissions 会是空的，UI 会把刚插入的卡片误判为
+    // 已失效（失效判定 = toolCallId 不在活 pending 快照里）。
+    const decisionPromise = managed.permissionBridge.request(request.toolCallId, request, signal);
+    if (managed.sessionCreated) {
+      sessionStore.scheduleWrite(sessionId, [...managed.agent.state.messages]);
+    }
+    this.broadcastSessionSnapshot(managed);
+
+    // ③ 等用户在卡片上点击（或被取消 / abort）。
+    const result = await decisionPromise;
+    const decision: PermissionDecision =
+      result === INTERACTIVE_CANCELLED ? 'dismissed' : result;
+
+    // 会话在等待期间被销毁 / 替换：放弃回写与广播，避免复活已删会话行。
+    if (this.sessions.get(sessionId) !== managed) return decision;
+
+    // ④ 把最终决策回写到那条 pending 卡片上（按 toolCallId 定位）。
+    managed.agent.state.messages = managed.agent.state.messages.map((m) =>
+      isPermissionRequest(m) && m.toolCallId === request.toolCallId
+        ? { ...m, decision }
+        : m,
+    );
+    if (managed.sessionCreated) {
+      sessionStore.scheduleWrite(sessionId, [...managed.agent.state.messages]);
+    }
+    this.broadcastSessionSnapshot(managed);
+
+    return decision;
   }
 
   /**
@@ -283,6 +403,7 @@ class AgentManager {
       phase: 'idle',
       modelKey: built.modelKey,
       toolCtx: built.toolCtx,
+      permissionBridge: built.permissionBridge,
       unsubscribeAgent: () => {},
     };
     this.wireSubscriptions(managed);
@@ -303,6 +424,7 @@ class AgentManager {
   ): Promise<{
     agent: Agent;
     toolCtx: SessionToolContext;
+    permissionBridge: InteractiveBridge<PermissionRequest, PermissionDecision>;
     modelKey: string;
     sessionCreated: boolean;
   }> {
@@ -322,6 +444,16 @@ class AgentManager {
     // Create per-session tools with isolated bridges
     const { tools: sessionTools, ctx: toolCtx } = await createSessionTools(sessionId);
 
+    // 工具执行前授权门禁：每会话一个独立 bridge；用它构造绑定到本会话
+    // `requestPermissionDecision` 的 beforeToolCall 闭包。requestDecision 在
+    // gate 真正触发时才按 sessionId 反查 managed（那时一定已入 map），因此
+    // 这里不构成与 agent/managed 的循环依赖。
+    const permissionBridge = createInteractiveBridge<PermissionRequest, PermissionDecision>();
+    const beforeToolCall = createPermissionGate(
+      PERMISSION_GATES,
+      (request, signal) => this.requestPermissionDecision(sessionId, request, signal),
+    );
+
     const agent = createCebianAgent({
       model: resolved.model,
       sessionId,
@@ -329,11 +461,13 @@ class AgentManager {
       thinkingLevel: (thinkingLvl || 'medium') as any,
       messages,
       tools: sessionTools,
+      beforeToolCall,
     });
 
     return {
       agent,
       toolCtx,
+      permissionBridge,
       modelKey: `${resolved.provider}/${resolved.modelId}`,
       sessionCreated,
     };
@@ -425,6 +559,9 @@ class AgentManager {
         this.updateKeepAlive();
         // Cancel any pending interactive tools on this session
         managed.toolCtx.cancelAll();
+        // 同理取消在途的授权请求（→ dismissed），否则 run 结束后 gate 还在
+        // await 一个永不到来的点击。
+        managed.permissionBridge.cancel();
         const messages = [...agent.state.messages];
         this.broadcast(sessionId, { type: 'agent_end', sessionId, messages });
         // Persist final state before flushing. Normally the trailing
@@ -562,8 +699,12 @@ class AgentManager {
     // turn — bail; `cancel()` already broadcast the authoritative end state.
     if (this.sessions.get(sessionId) !== managed) return;
 
-    // If any interactive tool is pending, steer the agent instead of prompting
-    if (managed.toolCtx.hasPending()) {
+    // If any interactive tool OR a permission prompt is pending, the agent is
+    // paused waiting for the user — steer the new message into the loop and
+    // cancel the pending prompt instead of starting a fresh turn. A cancelled
+    // permission prompt surfaces as `dismissed` (implicit non-grant), which
+    // blocks the gated tool; the steered message then drives the next turn.
+    if (managed.toolCtx.hasPending() || managed.permissionBridge.getPending()) {
       const content: any[] = [{ type: 'text', text: enriched }];
       if (images.length > 0) content.push(...images);
       const userMessage: AgentMessage = {
@@ -574,6 +715,7 @@ class AgentManager {
       // Enqueue BEFORE cancelling so getSteeringMessages() sees it when the loop drains.
       managed.agent.steer(userMessage);
       managed.toolCtx.cancelAll();
+      managed.permissionBridge.cancel();
     } else {
       // 构造本轮「待投递」的用户消息，形状对齐 steering 分支。压缩成功路径不会
       // 用它（由 agent.prompt() 自行 append 真实用户消息），它只用于压缩期间的
@@ -906,6 +1048,7 @@ class AgentManager {
       // drops any stale pending interactive request (the UI hides retry while
       // a tool is pending, but a late port message could still arrive).
       managed.toolCtx.cancelAll();
+      managed.permissionBridge.cancel();
       managed.agent.state.messages = truncated;
       managed.agent.state.model = resolved.model;
       managed.agent.state.thinkingLevel = (thinkingLvl || 'medium') as any;
@@ -1122,6 +1265,9 @@ class AgentManager {
     managed.agent.abort();
     managed.unsubscribeAgent();
     managed.toolCtx.dispose();
+    // 显式取消在途授权请求。abort() 的 signal 通常已让 bridge.request 解析，
+    // 这里再 cancel 一次是幂等的兜底（bridge 内部有 pendingResolve 守卫）。
+    managed.permissionBridge.cancel();
     // Wait for the agent's lifecycle to actually settle. `waitForIdle()`
     // resolves to `Promise.resolve()` when there's no active run (idle
     // branch falls through cheaply) and otherwise waits for
@@ -1184,6 +1330,26 @@ class AgentManager {
     managed?.toolCtx.cancel(toolName);
   }
 
+  /**
+   * Resolve a tool's pending pre-execution permission prompt with the user's
+   * explicit choice. `toolCallId` must match the in-flight request (a stale
+   * click on an already-resolved / superseded prompt is ignored). The
+   * write-back of the decision onto the permissionRequest message and the
+   * broadcast happen inside `requestPermissionDecision`, which is awaiting
+   * this bridge.
+   */
+  resolvePermission(
+    sessionId: string,
+    toolCallId: string,
+    decision: 'once' | 'always' | 'denied',
+  ): void {
+    const managed = this.sessions.get(sessionId);
+    if (!managed) return;
+    const pending = managed.permissionBridge.getPending();
+    if (!pending || pending.toolCallId !== toolCallId) return; // stale / mismatched
+    managed.permissionBridge.resolve(decision);
+  }
+
   /** Get current state for a session (for reconnecting clients).
    *
    *  `isRunning` is the sidepanel's "busy" signal: true while the session
@@ -1196,6 +1362,7 @@ class AgentManager {
     isRunning: boolean;
     isCompacting: boolean;
     pendingTools: { toolName: string; toolCallId: string; args: any }[];
+    pendingPermissions: PermissionRequest[];
   } | null {
     const managed = this.sessions.get(sessionId);
     if (!managed) return null;
@@ -1204,6 +1371,7 @@ class AgentManager {
       isRunning: managed.phase !== 'idle',
       isCompacting: managed.phase === 'compacting',
       pendingTools: this.getPendingToolSnapshot(managed),
+      pendingPermissions: this.getPendingPermissions(managed),
     };
   }
 
@@ -1221,6 +1389,7 @@ class AgentManager {
       managed.prepareController?.abort();
       managed.unsubscribeAgent();
       managed.toolCtx.dispose();
+      managed.permissionBridge.cancel();
       managed.agent.abort();
       this.sessions.delete(sessionId);
       this.updateKeepAlive();

@@ -6,6 +6,7 @@ import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage, type SessionMeta } from '@/lib/protocol';
 import type { SessionRecord } from '@/lib/db';
 import type { Attachment } from '@/lib/attachments';
+import type { PermissionRequest } from '@/lib/tool-permissions';
 import { truncateForRetry } from '@/lib/message-helpers';
 import { t } from '@/lib/i18n';
 import { recorderChannel } from '@/lib/recorder/sidepanel-channel';
@@ -33,6 +34,9 @@ export interface PendingToolInfo {
   toolCallId: string;
   args: any;
 }
+
+// 权限提示卡片的请求形状（PermissionRequest）来自 @/lib/tool-permissions，
+// UI 需要时直接从那里 import；本 hook 仅在内部按 toolCallId 维护活 pending。
 
 export type PromptDispatchResult =
   | { status: 'dispatched' }
@@ -63,6 +67,11 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
   });
 
   const [pendingTools, setPendingTools] = useState<Map<string, PendingToolInfo>>(new Map());
+
+  // Live permission prompts keyed by toolCallId. Drives the answerable-vs-expired
+  // distinction for permissionRequest cards: a card whose toolCallId is absent
+  // here has no live agent awaiting it.
+  const [pendingPermissions, setPendingPermissions] = useState<Map<string, PermissionRequest>>(new Map());
 
   const portRef = useRef<chrome.runtime.Port | null>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -105,6 +114,13 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
               });
             }
             setPendingTools(next);
+          }
+          if (msg.pendingPermissions) {
+            const nextPerms = new Map<string, PermissionRequest>();
+            for (const req of msg.pendingPermissions) {
+              nextPerms.set(req.toolCallId, req);
+            }
+            setPendingPermissions(nextPerms);
           }
           setState(prev => ({
             ...prev,
@@ -152,6 +168,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
             isCompacting: false,
           }));
           setPendingTools(new Map());
+          setPendingPermissions(new Map());
           break;
 
         case 'tool_pending':
@@ -175,6 +192,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
         case 'session_created':
           if (!isCurrentSession(msg.sessionId)) break;
           setPendingTools(new Map());
+          setPendingPermissions(new Map());
           setState(prev => ({
             ...prev,
             sessionId: msg.sessionId,
@@ -186,6 +204,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
         case 'session_loaded':
           if (!isCurrentSession(msg.sessionId)) break;
           setPendingTools(new Map());
+          setPendingPermissions(new Map());
           if (msg.session) {
             setState(prev => ({
               ...prev,
@@ -476,6 +495,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     const isSessionChange = sessionIdRef.current !== sessionId;
     if (isSessionChange) {
       setPendingTools(new Map());
+      setPendingPermissions(new Map());
     }
     sessionIdRef.current = sessionId;
     setState(prev => isSessionChange
@@ -503,6 +523,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
       lastError: null,
     });
     setPendingTools(new Map());
+    setPendingPermissions(new Map());
     postMessage({ type: 'unsubscribe' });
   }, [postMessage]);
 
@@ -538,9 +559,28 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     }
   }, [postMessage]);
 
+  // Answer a tool's pre-execution permission prompt. We do NOT optimistically
+  // clear `pendingPermissions` here: the BG resolves the bridge, writes the
+  // decision back onto the permissionRequest message, and re-broadcasts a
+  // single `session_state` carrying both the decided message AND an empty
+  // pendingPermissions — so the card transitions answerable→decided in one
+  // atomic update. Clearing locally first would momentarily leave the message
+  // as `pending` with no live entry, which `PermissionRequestBlock` would
+  // render as the "expired" state — a misleading flash on a valid click.
+  const resolvePermission = useCallback(
+    (toolCallId: string, decision: 'once' | 'always' | 'denied') => {
+      const sessionId = sessionIdRef.current;
+      if (sessionId) {
+        postMessage({ type: 'resolve_permission', sessionId, toolCallId, decision });
+      }
+    },
+    [postMessage],
+  );
+
   return {
     state,
     pendingTools,
+    pendingPermissions,
     send,
     cancel,
     retry,
@@ -550,5 +590,6 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     deleteSession,
     resolveTool,
     cancelTool,
+    resolvePermission,
   };
 }

@@ -67,7 +67,7 @@ metadata:
     - vfs.write
 ```
 
-The first time `run_skill` runs a script for a skill that declares any permissions, the user is prompted via `ask_user` with three options (Deny / Allow once / Always allow this skill). "Always allow" persists per-skill in `chrome.storage.local`; the prompt re-appears if the declared permission set changes.
+The first time `run_skill` runs a script for a skill that declares any permissions, the run pauses **before the script executes** and the user sees an inline permission card (Deny / Allow once / Always allow this skill) listing the requested permissions in human-readable form. The agent just calls `run_skill` normally — authorization is handled for you. "Always allow" persists per-skill in `chrome.storage.local`; the prompt re-appears if the declared permission set changes. A denial (or the user sending a new message instead of answering) returns an error result and the script does not run.
 
 Omit `permissions` entirely if the skill ships no scripts. Declaring permissions you do not actually use trains the user to dismiss prompts.
 

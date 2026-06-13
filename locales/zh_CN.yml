@@ -385,6 +385,35 @@ chat:
     autoStoppedTime: "录制已自动停止：达到时长上限"
   askUser:
     placeholder: "输入回复…"
+  permission:
+    # 技能脚本运行前的授权提示。$1 = 技能名，$2 = 脚本路径
+    title: "技能 $1 想要运行 $2"
+    requests: "它申请以下权限："
+    deny: "拒绝"
+    allowOnce: "仅本次允许"
+    allowAlways: "始终允许此技能"
+    # 该请求已无法再被响应时显示（例如待决期间后台被重启）。
+    expired: "此授权请求已失效"
+    perm:
+      pageExecuteJs: "在你的网页中执行脚本 —— 读取和修改页面内容，并借助你的登录态进行操作"
+      vfsRead: "读取该技能自己工作区文件夹中的文件"
+      vfsWrite: "读写该技能自己工作区文件夹中的文件"
+      bgFetchAny: "在后台向任意网站发起网络请求，绕过跨域限制"
+      # $1 = 匹配模式（主机范围）
+      bgFetchPattern: "在后台向 $1 发起网络请求，绕过跨域限制"
+      chromeTabs: "查看和管理你的浏览器标签页（打开、关闭、移动、重新加载），并截取当前可见标签页的内容"
+      chromeWindows: "查看和管理你的浏览器窗口"
+      chromeAlarms: "创建和管理后台定时器"
+      chromeWebNavigation: "读取你已打开页面及其框架的导航信息"
+      chromeBookmarks: "读取和修改你的书签"
+      chromeHistory: "读取和修改你的浏览历史"
+      chromeCookies: "读取、修改和删除你访问站点的 Cookie，包括网页通常无法访问的登录会话 Cookie"
+      chromeTopSites: "读取你最常访问的网站"
+      chromeSessions: "查看并恢复最近关闭的标签页和窗口，包括从你其他设备同步过来的会话"
+      chromeDownloads: "查看和管理你的下载，并发起新的下载"
+      chromeNotifications: "创建和管理系统通知"
+      # $1 = chrome 命名空间
+      chromeFallback: "调用浏览器的 chrome.$1 接口"
   model:
     select: "选择模型"
     searchPlaceholder: "搜索模型…"

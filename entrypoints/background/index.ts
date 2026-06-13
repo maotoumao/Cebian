@@ -345,6 +345,7 @@ export default defineBackground(() => {
               isRunning: fresh.isRunning,
               isCompacting: fresh.isCompacting,
               pendingTools: fresh.pendingTools,
+              pendingPermissions: fresh.pendingPermissions,
             });
           } else {
             // Agent finished during the await — fall through to DB-based
@@ -427,6 +428,10 @@ export default defineBackground(() => {
 
       case 'cancel_tool':
         agentManager.cancelTool(msg.sessionId, msg.toolName);
+        break;
+
+      case 'resolve_permission':
+        agentManager.resolvePermission(msg.sessionId, msg.toolCallId, msg.decision);
         break;
 
       case 'session_list': {

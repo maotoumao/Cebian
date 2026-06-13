@@ -385,6 +385,35 @@ chat:
     autoStoppedTime: "錄製已自動停止：達到時長上限"
   askUser:
     placeholder: "輸入回覆…"
+  permission:
+    # 技能腳本執行前的授權提示。$1 = 技能名，$2 = 腳本路徑
+    title: "技能 $1 想要執行 $2"
+    requests: "它申請以下權限："
+    deny: "拒絕"
+    allowOnce: "僅本次允許"
+    allowAlways: "永遠允許此技能"
+    # 該請求已無法再被回應時顯示（例如待決期間背景被重新啟動）。
+    expired: "此授權請求已失效"
+    perm:
+      pageExecuteJs: "在你的網頁中執行腳本 —— 讀取和變更頁面內容，並借助你的登入狀態進行操作"
+      vfsRead: "讀取該技能自己工作區資料夾中的檔案"
+      vfsWrite: "讀寫該技能自己工作區資料夾中的檔案"
+      bgFetchAny: "在背景向任意網站發出網路請求，繞過跨來源限制"
+      # $1 = 比對模式（主機範圍）
+      bgFetchPattern: "在背景向 $1 發出網路請求，繞過跨來源限制"
+      chromeTabs: "檢視和管理你的瀏覽器分頁（開啟、關閉、移動、重新載入），並擷取目前可見分頁的內容"
+      chromeWindows: "檢視和管理你的瀏覽器視窗"
+      chromeAlarms: "建立和管理背景計時器"
+      chromeWebNavigation: "讀取你已開啟頁面及其框架的導覽資訊"
+      chromeBookmarks: "讀取和修改你的書籤"
+      chromeHistory: "讀取和修改你的瀏覽紀錄"
+      chromeCookies: "讀取、變更和刪除你造訪網站的 Cookie，包括網頁通常無法存取的登入工作階段 Cookie"
+      chromeTopSites: "讀取你最常造訪的網站"
+      chromeSessions: "檢視並還原最近關閉的分頁和視窗，包括從你其他裝置同步過來的工作階段"
+      chromeDownloads: "檢視和管理你的下載，並開始新的下載"
+      chromeNotifications: "建立和管理系統通知"
+      # $1 = chrome 命名空間
+      chromeFallback: "呼叫瀏覽器的 chrome.$1 介面"
   model:
     select: "選擇模型"
     searchPlaceholder: "搜尋模型…"

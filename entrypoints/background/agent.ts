@@ -64,6 +64,13 @@ export interface CreateAgentOptions {
   messages?: AgentMessage[];
   /** Session-specific tools array (includes per-session ask_user). */
   tools: AgentTool<any>[];
+  /**
+   * Optional pre-execution gate. pi-agent-core calls it after a tool's args
+   * are validated and before `execute()`; returning `{ block: true, reason }`
+   * blocks the call and emits an error tool result. Used to require user
+   * authorization before certain tools run (see `lib/tool-permissions.ts`).
+   */
+  beforeToolCall?: AgentOptions['beforeToolCall'];
 }
 
 export function createCebianAgent(options: CreateAgentOptions): Agent {
@@ -74,6 +81,7 @@ export function createCebianAgent(options: CreateAgentOptions): Agent {
     thinkingLevel,
     messages = [],
     tools: agentTools,
+    beforeToolCall,
   } = options;
 
   const effectivePrompt = buildSystemPrompt(sessionId, userInstructions);
@@ -130,6 +138,11 @@ export function createCebianAgent(options: CreateAgentOptions): Agent {
     // Dynamic API key resolution (handles OAuth token refresh)
     getApiKey: (provider: string): Promise<string | undefined> =>
       resolveProviderApiKey(provider),
+
+    // 工具执行前授权门禁（可选）。permissionRequest 自定义消息无需在
+    // convertToLlm 里特判——上面的 user/assistant/toolResult 白名单已把它
+    // 连同其它自定义类型一并过滤，不会发给 provider。
+    beforeToolCall,
   };
 
   return new Agent(agentOptions);

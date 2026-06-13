@@ -16,6 +16,7 @@ import {
   ThinkingBlock,
   CompactionDivider,
   CompactionPlaceholder,
+  PermissionRequestBlock,
 } from '@/components/chat/Message';
 import { ToolCard } from '@/components/chat/ToolCard';
 import { ToolCardWithUI } from '@/components/chat/ToolCardWithUI';
@@ -32,6 +33,7 @@ import {
 import { getToolLabel } from '@/lib/tools/labels';
 import { uiToolRegistry } from '@/lib/tools/ui-registry';
 import { isCompactionSummary } from '@/lib/compaction';
+import { isPermissionRequest } from '@/lib/tool-permissions';
 import { useBackgroundAgent } from '@/hooks/useBackgroundAgent';
 import { useStickToBottom } from '@/hooks/useStickToBottom';
 import { useStorageItem } from '@/hooks/useStorageItem';
@@ -54,12 +56,14 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
   const {
     state,
     pendingTools,
+    pendingPermissions,
     send,
     cancel,
     retry,
     subscribe: portSubscribe,
     unsubscribe: portUnsubscribe,
     resolveTool,
+    resolvePermission,
   } = useBackgroundAgent({
     onSessionCreated: useCallback((sessionId: string, title: string) => {
       onTitleChange?.(title);
@@ -83,11 +87,12 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
   const activeSessionIdRef = useRef<string | null>(null);
   activeSessionIdRef.current = activeSessionId;
 
-  // When an interactive tool (e.g. ask_user) is pending, the agent is blocked
-  // waiting for user input — treat as "not running" so the input is usable.
-  // Sending a message during this state triggers steer + cancelAll in the
-  // background agent manager automatically.
-  const effectiveRunning = isAgentRunning && pendingTools.size === 0;
+  // When an interactive tool (e.g. ask_user) OR a permission prompt is pending,
+  // the agent is blocked waiting for user input — treat as "not running" so the
+  // composer stays usable. For permissions this is deliberate: sending a message
+  // while a prompt is pending is the implicit "dismiss" (non-grant) path, handled
+  // by steer + bridge cancel in the background.
+  const effectiveRunning = isAgentRunning && pendingTools.size === 0 && pendingPermissions.size === 0;
 
   // Subscribe to existing session or unsubscribe for new chat.
   //
@@ -176,6 +181,22 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
               );
             }
 
+            if (isPermissionRequest(msg)) {
+              // isLive = 后台有活 agent 正等这次授权（按 toolCallId 匹配）。
+              // 查不到 → 失效态（如 SW 重启后），卡片置灰且按钮禁用。
+              const isLive = pendingPermissions.has(msg.toolCallId);
+              return (
+                <PermissionRequestBlock
+                  key={`perm-${msg.toolCallId}`}
+                  title={msg.title}
+                  permissions={msg.permissions}
+                  decision={msg.decision}
+                  isLive={isLive}
+                  onResolve={isLive ? (decision) => resolvePermission(msg.toolCallId, decision) : undefined}
+                />
+              );
+            }
+
             if (msg.role === 'user') {
               return (
                 <UserMessageBubble key={`user-${idx}`} msg={msg} />
@@ -209,6 +230,9 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                   if (info?.renderResultAsUserBubble && !tr.details?.cancelled) break;
                   continue;
                 }
+                // 权限卡片是这一轮中间插入的授权环节，对头折叠「透明」：穿透它
+                // 继续往前看，避免把本来连续的 assistant 块劈成两轮、长出重复的头。
+                if (isPermissionRequest(prev)) continue;
                 if (prev.role === 'assistant') showHeader = false;
                 break;
               }

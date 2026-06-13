@@ -5,6 +5,7 @@ import type { SessionRecord } from './db';
 import type { Attachment } from './attachments';
 import type { RecordedSession } from './recorder/types';
 import type { MCPResourceContents } from './mcp/client';
+import type { PermissionRequest } from './tool-permissions';
 
 // ─── Port name ───
 
@@ -25,6 +26,11 @@ export type ClientMessage =
   | { type: 'retry'; sessionId: string }
   | { type: 'resolve_tool'; sessionId: string; toolName: string; response: any }
   | { type: 'cancel_tool'; sessionId: string; toolName: string }
+  /** User's decision on a tool's pre-execution permission prompt, keyed by
+   *  `toolCallId`. Only the three explicit allow/deny choices travel here;
+   *  an implicit "dismissed" (the user sent a new message instead) is handled
+   *  by the existing steer/cancel path, not this message. */
+  | { type: 'resolve_permission'; sessionId: string; toolCallId: string; decision: 'once' | 'always' | 'denied' }
   | { type: 'session_list' }
   | { type: 'session_delete'; sessionId: string }
   | { type: 'recorder_start' }
@@ -67,6 +73,11 @@ export type ServerMessage =
        *  `error` 时清掉它。 */
       isCompacting?: boolean;
       pendingTools?: { toolName: string; toolCallId: string; args: any }[];
+      /** Snapshot of in-flight permission prompts (a tool is paused in its
+       *  `beforeToolCall` gate awaiting the user). Drives reconnect/restore
+       *  of the prompt card, and lets the UI mark a persisted permissionRequest
+       *  message as "expired" when its toolCallId is absent here. */
+      pendingPermissions?: PermissionRequest[];
     }
   | { type: 'agent_start'; sessionId: string }
   | { type: 'message_update'; sessionId: string; message: AgentMessage }

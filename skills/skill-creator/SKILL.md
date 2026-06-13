@@ -109,7 +109,7 @@ After the description-eval passes:
 
 1. Tell the user to send a fresh message using one of the should-fire prompts.
 2. Confirm in the message stream that the agent calls `fs_read_file` on the new `SKILL.md` before answering.
-3. If the skill ships scripts: invoke `run_skill` with sample `args`. Expect a `permission_required` response on first use — walk the user through the three-option `ask_user` prompt (Deny / Allow once / Always allow this skill). After approval, re-invoke and verify the return value matches what the body promises. See [references/runtime-api.md](references/runtime-api.md).
+3. If the skill ships scripts: invoke `run_skill` with sample `args`. On first use a permission card appears inline (Deny / Allow once / Always allow this skill) — this is automatic, just call `run_skill` normally and let the user choose. After approval, the script runs; verify the return value matches what the body promises. See [references/runtime-api.md](references/runtime-api.md).
 4. Inspect the agent's actual output. Two failure modes to watch:
    - **Description level**: skill didn't load. Loop back to A.
    - **Body level**: skill loaded but produced wrong output. Edit the body (clarify steps, add an example, move a key fact from a reference into the body).
