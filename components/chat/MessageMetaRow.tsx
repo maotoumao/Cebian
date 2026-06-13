@@ -2,6 +2,7 @@ import { RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { CopyButton } from '@/components/common/CopyButton';
+import { SpeakButton } from '@/components/common/SpeakButton';
 import { t } from '@/lib/i18n';
 
 export interface MessageMetaProps {
@@ -16,6 +17,9 @@ export interface MessageMetaProps {
   /** When provided, a copy button is rendered on the left of the row,
    *  before any retry button. */
   text?: string;
+  /** When provided (alongside `text`), a read-aloud button is rendered to the
+   *  left of the copy button. Lazily yields the message's plain text. */
+  getSpeakText?: () => string;
   /** When provided, a retry button is rendered next to the copy button.
    *  The caller decides eligibility (last turn-closing assistant, agent idle, etc.). */
   onRetry?: () => void;
@@ -35,7 +39,7 @@ function formatTokens(n: number): string {
  * entirely when no cache activity occurred.
  */
 export function MessageMetaRow({
-  modelLabel, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, text, onRetry,
+  modelLabel, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, text, getSpeakText, onRetry,
 }: MessageMetaProps) {
   const parts: string[] = [];
   if (modelLabel) parts.push(modelLabel);
@@ -75,6 +79,7 @@ export function MessageMetaRow({
   // alone (the meta span is omitted, not just emptied).
   return (
     <div className="mt-2 flex items-center gap-2 text-[0.7rem] text-muted-foreground/70">
+      {text && getSpeakText && <SpeakButton getText={getSpeakText} />}
       {text && <CopyButton text={text} />}
       {onRetry && (
         <Tooltip>

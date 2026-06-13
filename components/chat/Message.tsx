@@ -116,6 +116,43 @@ export function CompactionPlaceholder() {
 }
 
 /* ─── Agent Message ─── */
+
+/**
+ * 把消息的「回复正文」转成「所见即所读」的纯文本，供朗读使用。内容容器里除了
+ * 回复正文，还夹杂着 thinking 块、工具卡片、错误/取消提示等不该朝读的块；故采
+ * 用 opt-in：只读打了 `data-speech-content` 标记的回复正文（AgentTextBlock）子树，
+ * 新增的其它块默认不会被读。未找到标记时回退到整个容器（防御性）。
+ *
+ * react-markdown 渲染后的 DOM 已脱去 Markdown 语法，`textContent` 即用户看到的
+ * 文字，无需正则反解。代码块（`<pre>` 及其外层容器，含语言标签 + 复制按钮）
+ * 不逐字朗读——克隆节点后整体替换成一句「已略过」提示，含语言时报出语言名
+ * （首字母大写）。
+ */
+function extractSpeakText(el: HTMLElement | null): string {
+  if (!el) return '';
+  const clone = el.cloneNode(true) as HTMLElement;
+  // 只取回复正文子树；缺失时退回整个内容容器。
+  const target = clone.querySelector<HTMLElement>('[data-speech-content]') ?? clone;
+  for (const pre of Array.from(target.querySelectorAll('pre'))) {
+    const langClass = Array.from(pre.querySelector('code')?.classList ?? [])
+      .find((c) => c.startsWith('language-'));
+    const lang = langClass ? langClass.slice('language-'.length) : '';
+    const label = lang ? lang.charAt(0).toUpperCase() + lang.slice(1) : '';
+    const notice = label
+      ? t('common.speakCodeSkipped', [label])
+      : t('common.speakCodeSkippedPlain');
+    // 代码块容器是 <pre> 的父节点（CodeBlock 的外层 div，含头部语言标签 + 复制
+    // 按钮）；整体替换掉，避免把代码和「Code」标签也念出来。两端补句末标点，让这
+    // 句提示成为独立、完整的一句——否则 speechSynthesis 会按内部逗号把它拆成「黏
+    // 上文的前半句 + 黏下文的后半句」，听不出这里是跳过（标点是断句结构，归提取
+    // 逻辑管，不放进 locale 文案）。
+    const period = /[\u4e00-\u9fff]/.test(notice) ? '。' : '. ';
+    const container = pre.parentElement ?? pre;
+    container.replaceWith(document.createTextNode(`${period}${notice}${period}`));
+  }
+  return (target.textContent ?? '').replace(/\s+/g, ' ').trim();
+}
+
 export function AgentMessage({
   children,
   isStreaming,
@@ -135,6 +172,8 @@ export function AgentMessage({
    *  eligibility (last turn-closing assistant, agent idle). */
   onRetry?: () => void;
 }) {
+  // 朗读按钮惰性读取这个容器的 DOM 文本（见 extractSpeakText），避免提前求值。
+  const contentRef = useRef<HTMLDivElement>(null);
   return (
     <div className={`self-start w-full ${showHeader ? '' : '-mt-1'}`}>
       {showHeader && (
@@ -143,7 +182,7 @@ export function AgentMessage({
           Cebian Agent
         </div>
       )}
-      <div className="text-[0.9rem] leading-relaxed space-y-3">
+      <div ref={contentRef} className="text-[0.9rem] leading-relaxed space-y-3">
         {children}
         {isStreaming && (
           <span
@@ -153,7 +192,12 @@ export function AgentMessage({
         )}
       </div>
       {!isStreaming && (meta || copyText || onRetry) && (
-        <MessageMetaRow {...(meta ?? {})} text={copyText} onRetry={onRetry} />
+        <MessageMetaRow
+          {...(meta ?? {})}
+          text={copyText}
+          getSpeakText={() => extractSpeakText(contentRef.current)}
+          onRetry={onRetry}
+        />
       )}
     </div>
   );
@@ -161,7 +205,13 @@ export function AgentMessage({
 
 /* ─── Agent Text Block (Markdown) ─── */
 export function AgentTextBlock({ content }: { content: string }) {
-  return <MarkdownRenderer content={content} />;
+  // data-speech-content：标记「可朗读的回复正文」，供 extractSpeakText 只读此子树，
+  // 从而跳过 thinking / 工具卡片 / 错误提示等同处一个容器下的其它块。
+  return (
+    <div data-speech-content>
+      <MarkdownRenderer content={content} />
+    </div>
+  );
 }
 
 /* ─── Thinking Block (renders pi-ai ThinkingContent) ─── */

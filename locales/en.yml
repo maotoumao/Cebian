@@ -34,6 +34,11 @@ common:
   copy: "Copy"
   copied: "Copied"
   copyFailed: "Copy failed"
+  speak: "Read aloud"
+  stopSpeaking: "Stop reading aloud"
+  # $1 = code language label (e.g. "Ts", "Python")
+  speakCodeSkipped: "Skipped $1 code block"
+  speakCodeSkippedPlain: "Skipped code block"
   download: "Download"
   downloadFailed: "Download failed"
   newFile: "New file"

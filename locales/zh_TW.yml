@@ -33,6 +33,11 @@ common:
   copy: "複製"
   copied: "已複製"
   copyFailed: "複製失敗"
+  speak: "朗讀"
+  stopSpeaking: "停止朗讀"
+  # $1 = 程式碼語言名（如 "Ts"、"Python"）
+  speakCodeSkipped: "$1 程式碼，已略過朗讀"
+  speakCodeSkippedPlain: "程式碼，已略過朗讀"
   download: "下載"
   downloadFailed: "下載失敗"
   newFile: "新增檔案"
