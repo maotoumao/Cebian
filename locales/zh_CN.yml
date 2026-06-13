@@ -70,12 +70,12 @@ common:
 settings:
   nav:
     aria: "设置导航"
-    providers: "提供商"
+    providers: "AI 提供商"
     instructions: "指引"
     prompts: "提示词"
     skills: "技能"
     mcp: "MCP 服务器"
-    backup: "备份"
+    backup: "备份与恢复"
     advanced: "高级"
     about: "关于"
   providers:

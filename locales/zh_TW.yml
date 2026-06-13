@@ -70,12 +70,12 @@ common:
 settings:
   nav:
     aria: "設定導覽"
-    providers: "供應商"
+    providers: "AI 供應商"
     instructions: "指引"
     prompts: "提示詞"
     skills: "技能"
     mcp: "MCP 伺服器"
-    backup: "備份"
+    backup: "備份與復原"
     advanced: "進階"
     about: "關於"
   providers:

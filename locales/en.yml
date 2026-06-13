@@ -74,12 +74,12 @@ common:
 settings:
   nav:
     aria: "Settings navigation"
-    providers: "Providers"
+    providers: "AI providers"
     instructions: "Instructions"
     prompts: "Prompts"
     skills: "Skills"
     mcp: "MCP Servers"
-    backup: "Backup"
+    backup: "Backup & Restore"
     advanced: "Advanced"
     about: "About"
   providers:

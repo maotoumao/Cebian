@@ -13,6 +13,7 @@ export const OAUTH_PROVIDERS = [
 }[];
 
 export const APIKEY_PROVIDERS = [
+  { provider: 'ant-ling', label: 'Ant Ling' },
   { provider: 'anthropic', label: 'Anthropic', pinned: true },
   { provider: 'cerebras', label: 'Cerebras' },
   { provider: 'deepseek', label: 'DeepSeek', pinned: true },
@@ -26,6 +27,7 @@ export const APIKEY_PROVIDERS = [
   { provider: 'mistral', label: 'Mistral' },
   { provider: 'moonshotai', label: 'Moonshot' },
   { provider: 'moonshotai-cn', label: 'Moonshot (CN)' },
+  { provider: 'nvidia', label: 'NVIDIA NIM' },
   { provider: 'openai', label: 'OpenAI', pinned: true },
   { provider: 'openrouter', label: 'OpenRouter', pinned: true },
   { provider: 'together', label: 'Together AI' },
