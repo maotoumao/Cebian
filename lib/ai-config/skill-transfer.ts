@@ -44,7 +44,7 @@
  */
 
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
-import { vfs, normalizePath } from '@/lib/vfs';
+import { vfs, normalizePath, isJunkPath, isSafeRelPath } from '@/lib/vfs';
 import { CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE } from '@/lib/constants';
 import { parseFrontmatter } from '@/lib/frontmatter';
 import { CHROME_API_WHITELIST } from '@/lib/tools/chrome-api-whitelist';
@@ -124,31 +124,14 @@ export class SkillPackageError extends Error {
 
 // ─── Path safety ───
 
-/** Junk entries common in macOS/Windows zips that we silently drop on import. */
-function isJunkPath(p: string): boolean {
-  if (p.startsWith('__MACOSX/')) return true;
-  const base = p.split('/').pop() ?? '';
-  if (base === '.DS_Store' || base === 'Thumbs.db') return true;
-  return false;
-}
-
 /**
- * Validate a relative POSIX path inside a package. Throws SkillPackageError
- * with code `unsafePath` for anything that could escape its container.
+ * 校验包内的相对 POSIX 路径，对任何可能逃出容器的路径抛出 `unsafePath`
+ * 的 SkillPackageError。真正的路径判定在 `lib/vfs.ts`（`isSafeRelPath`），
+ * 这个包装只负责把「被拒绝」映射成 skill 包的 i18n 错误码。
  */
 function assertSafeRelPath(p: string): void {
-  if (!p) throw new SkillPackageError('unsafePath', '<empty>');
-  if (p.includes('\\')) throw new SkillPackageError('unsafePath', p);
-  // Control chars & NUL.
-  // eslint-disable-next-line no-control-regex
-  if (/[\x00-\x1f]/.test(p)) throw new SkillPackageError('unsafePath', p);
-  if (p.startsWith('/')) throw new SkillPackageError('unsafePath', p);
-  // Reject Windows drive letters like `C:`.
-  if (/^[a-zA-Z]:/.test(p)) throw new SkillPackageError('unsafePath', p);
-  for (const seg of p.split('/')) {
-    if (seg === '' || seg === '.' || seg === '..') {
-      throw new SkillPackageError('unsafePath', p);
-    }
+  if (!isSafeRelPath(p)) {
+    throw new SkillPackageError('unsafePath', p || '<empty>');
   }
 }
 
@@ -172,29 +155,6 @@ function assertPermissionsAllowed(permissions: string[]): void {
     if (m && Object.prototype.hasOwnProperty.call(CHROME_API_WHITELIST, m[1])) continue;
     throw new SkillPackageError('unsupportedPermission', p);
   }
-}
-
-// ─── VFS walk ───
-
-/** Recursively list all files under an absolute VFS dir, returning POSIX
- *  paths relative to that dir. */
-async function walkVfs(rootAbs: string): Promise<string[]> {
-  const out: string[] = [];
-  async function recurse(currentAbs: string, relPrefix: string): Promise<void> {
-    const entries = await vfs.readdir(currentAbs);
-    for (const entry of entries) {
-      const childAbs = `${currentAbs}/${entry}`;
-      const rel = relPrefix ? `${relPrefix}/${entry}` : entry;
-      const info = await vfs.stat(childAbs);
-      if (info.isDirectory()) {
-        await recurse(childAbs, rel);
-      } else if (info.isFile()) {
-        out.push(rel);
-      }
-    }
-  }
-  await recurse(rootAbs, '');
-  return out;
 }
 
 // ─── Frontmatter helpers ───
@@ -235,14 +195,14 @@ function readSkillFrontmatter(skillMd: string): SkillFrontmatter {
  * `skillAbsDir` must be an absolute VFS path under `~/.cebian/skills/`.
  */
 export async function exportSkillPackage(skillAbsDir: string): Promise<Blob> {
-  const fileList = await walkVfs(skillAbsDir);
-  if (!fileList.includes(SKILL_ENTRY_FILE)) {
+  const files = await vfs.walkFiles(skillAbsDir);
+  if (!files.some((f) => f.relPath === SKILL_ENTRY_FILE)) {
     throw new SkillPackageError('missingEntry');
   }
   const zipMap: Record<string, Uint8Array> = {};
-  for (const rel of fileList) {
-    const raw = await vfs.readFile(`${skillAbsDir}/${rel}`);
-    zipMap[rel] = raw instanceof Uint8Array ? raw : strToU8(raw as string);
+  for (const { relPath, absPath } of files) {
+    const raw = await vfs.readFile(absPath);
+    zipMap[relPath] = raw instanceof Uint8Array ? raw : strToU8(raw as string);
   }
   return new Blob([zipSync(zipMap) as BlobPart], { type: 'application/zip' });
 }
@@ -274,12 +234,12 @@ export async function exportAllSkillsPackage(): Promise<{ blob: Blob; count: num
     try { stat = await vfs.stat(dirAbs); } catch { continue; }
     if (!stat.isDirectory()) continue;
 
-    const fileList = await walkVfs(dirAbs);
-    if (!fileList.includes(SKILL_ENTRY_FILE)) continue;
+    const files = await vfs.walkFiles(dirAbs);
+    if (!files.some((f) => f.relPath === SKILL_ENTRY_FILE)) continue;
 
-    for (const rel of fileList) {
-      const raw = await vfs.readFile(`${dirAbs}/${rel}`);
-      zipMap[`${dirName}/${rel}`] = raw instanceof Uint8Array ? raw : strToU8(raw as string);
+    for (const { relPath, absPath } of files) {
+      const raw = await vfs.readFile(absPath);
+      zipMap[`${dirName}/${relPath}`] = raw instanceof Uint8Array ? raw : strToU8(raw as string);
     }
     count++;
   }

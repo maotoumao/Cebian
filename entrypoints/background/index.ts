@@ -3,11 +3,13 @@ import { agentManager } from './agent-manager';
 import { sessionStore } from './session-store';
 import { recorder } from './recorder';
 import { seedDevStorage } from './dev-seed';
+import { registerBackupHandler } from './backup-handler';
 import { getMCPManager } from '@/lib/mcp/manager';
 import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage } from '@/lib/protocol';
 import { isRecorderRuntimeMessage, RECORDER_MSG_KIND, type RecorderControlMessage } from '@/lib/recorder/protocol';
 import { isInjectablePage } from '@/lib/tab-helpers';
 import { vfs } from '@/lib/vfs';
+import { isValidSessionId } from '@/lib/utils';
 
 /**
  * Grace period after the last subscribed port disconnects before the agent
@@ -28,6 +30,9 @@ export default defineBackground(() => {
     .catch((error) => console.error(error));
 
   setupOAuthRefresh();
+
+  // 注册备份 IPC 响应器（会话采集 / 写回；Dexie 唯一写者经此转发）。
+  registerBackupHandler();
 
   // Dev-only: seed a custom provider from .env.local if configured.
   // No-op in production builds and when WXT_DEV_API_KEY is empty.
@@ -446,8 +451,7 @@ export default defineBackground(() => {
         // would let `vfs.rm({recursive:true})` escape `/workspaces/` and
         // wipe `/`, `/home`, or `~/.cebian/` (skills + prompts).
         // Lock to the shape of `crypto.randomUUID()`.
-        const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (!UUID_RE.test(msg.sessionId)) {
+        if (!isValidSessionId(msg.sessionId)) {
           console.warn('[session_delete] rejecting non-UUID sessionId:', msg.sessionId);
           break;
         }

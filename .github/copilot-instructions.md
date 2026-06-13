@@ -44,6 +44,17 @@ Before writing any code, verify placement and structure:
 - **Low coupling** — respect the established layering between `entrypoints/`, `components/`, `hooks/`, and `lib/`. Read existing imports to understand the direction; don't introduce reverse or cross-layer dependencies.
 - **File size signal** — single files growing past ~300 lines should be evaluated for splitting along a clear seam. This is a signal, not a rule — a long file with genuinely high cohesion is fine, and a short file that mixes concerns still needs splitting. Don't design for design's sake.
 
+### Naming & module API
+
+Names carry the design. Get them right the first time — the user reviews names closely and will push back on confusing ones.
+
+- **Name what it does, not how.** A name states its effect, not its mechanism. `fillMissing` beats `restoreMerge`; `collectStorage` beats anything mentioning Dexie / `chrome.storage`. Implementation details (transport, backend, `viaBackground`, IPC) never belong in a public name — callers only care about the semantic action.
+- **Make the layer visible when names collide.** When two symbols sit at different layers but share a verb, rename so the layer shows. Page-side IPC entry `restoreSessions` vs background-only pure decision `planSessionWrites` — never leave two `restore*` reading as if they were the same level. State the execution context in a comment when it isn't obvious.
+- **Parallel modules share one verb vocabulary.** Sibling modules doing the same job use identical verb patterns — every backup source exposes `collect<Source>` / `restore<Source>`. A reader learns the shape once and applies it everywhere.
+- **Organize by the thing, not the direction.** Split files by data source / domain entity, each holding both directions (every `lib/backup/sources/*.ts` has both collect and restore), not by operation. Don't mix naming dimensions across siblings (one file named by direction, another by source).
+- **One concept, one type.** Don't split a single concept into near-duplicate types — collapse `VfsMultiRootGroup` + `VfsSingleRootGroup` into one `VfsRootGroup { roots: string[] }`. A "more complete looking" pair of shapes is usually one shape.
+- **Exports at the bottom.** Put the public API at the end of the file, with types and internal helpers above, so opening the file shows "what this module offers" first. Group exports by audience when a file serves more than one (e.g. a "source API" block and an "IPC wire contract" block).
+
 ## Code Comments
 
 - 注释优先使用中文，其次是英文。必要的术语（API 名称、库名、协议字段、错误码等）保持英文即可，不要强行翻译。
@@ -65,6 +76,18 @@ Cebian's agent tools (`lib/tools/*`) implement `AgentTool` from `@earendil-works
 - When investigating a bug, if the root cause is uncertain or multiple rounds of investigation haven't resolved it, **stop guessing** — add targeted `console.log` / `console.warn` statements at the suspicious code paths and ask the user to reproduce the issue so the logs can be collected.
 - Clearly tell the user what to do (e.g., "open the sidepanel, trigger X, then share the console output") and what information you need from the logs.
 - Do not keep making speculative fixes without evidence. Logging → user feedback → informed fix.
+
+## Testing
+
+Unit tests use **Vitest** with the **`WxtVitest`** plugin (`wxt/testing/vitest-plugin`), which polyfills the extension `browser` API in-memory (`@webext-core/fake-browser`), wires `#imports` auto-imports, and configures the `@/*` alias — so tests can import production modules exactly as source code does.
+
+- **Unit tests are co-located** — a unit test lives **next to the file it tests**, as a same-named `*.test.ts` in the same directory (e.g. `lib/backup/registry.ts` → `lib/backup/registry.test.ts`). Imports still use the `@/` alias.
+- **Not every file needs a test** — only cover high-risk pure logic where a silent bug corrupts or leaks data: crypto (encrypt/decrypt round-trips, wrong-password failure), merge/replace semantics, secret split/recombine, manifest parsing, path-safety predicates. Don't chase coverage on trivial glue or UI wiring — those are verified manually.
+- **`test/` is for E2E / integration only** — the top-level `test/` folder is reserved for future tests that wire multiple modules together end-to-end. There are none yet, so the folder does not exist. Do NOT put unit tests there.
+- **Run** — `pnpm test` (watch) / `pnpm test:run` (single pass). `pnpm check` runs `test:run` after typecheck + i18n lint.
+- **Storage in tests** — do NOT mock `chrome.storage` / WXT storage items. `fakeBrowser` implements storage in-memory; call `fakeBrowser.reset()` in `beforeEach`. Set state by calling the real storage item's `setValue`, then assert via `getValue`.
+- **Mocking `#imports`** — vitest sees the resolved import paths, not `#imports`. To mock a WXT util, `vi.mock` its real path (look it up in `.wxt/types/imports-module.d.ts`), not `'#imports'`.
+- **Exhaustiveness / registry guards** — when a registry or discriminated union must stay in sync with another source of truth (e.g. every storage item must be classified), back it with a test that enumerates the source and asserts completeness, so an omission fails CI instead of silently slipping through.
 
 ## Post-Task Code Review
 

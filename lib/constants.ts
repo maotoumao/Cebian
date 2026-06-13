@@ -166,6 +166,10 @@ LIMITATIONS:
 /** Absolute VFS base path for Cebian user config. */
 export const CEBIAN_HOME = '/home/user/.cebian';
 
+/** 各会话工作区目录的公共父目录（`/workspaces/{sessionId}/`）。是 VFS 的结构性
+ *  根之一——放在 constants 作单一事实源，供 vfs 的受保护根清单与备份布局共用。 */
+export const WORKSPACES_ROOT = '/workspaces';
+
 /** Tilde-prefixed path to prompts directory (used by scanner / agent). */
 export const CEBIAN_PROMPTS_DIR = '~/.cebian/prompts';
 

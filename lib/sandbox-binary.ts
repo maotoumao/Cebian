@@ -13,6 +13,8 @@
  * 既能覆盖现有用例，又避免对普通 JSON 对象徒增 walk 成本。
  */
 
+import { bytesToBase64, base64ToBytes } from '@/lib/utils';
+
 const BIN_MARKER = '__cebianBin';
 
 interface BinaryWrapper {
@@ -26,27 +28,6 @@ function isBinaryWrapper(v: unknown): v is BinaryWrapper {
     !Array.isArray(v) &&
     typeof (v as { [BIN_MARKER]?: unknown })[BIN_MARKER] === 'string'
   );
-}
-
-/**
- * 把 Uint8Array 编码成 base64。逐块切片避免 `String.fromCharCode(...bytes)`
- * 在大数组（>~120 KB）触发 stack overflow。
- */
-function bytesToBase64(bytes: Uint8Array): string {
-  // 32 KB —— 远低于 V8 默认 arg 数上限，保证 fromCharCode.apply 不会爆栈。
-  const CHUNK = 0x8000;
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + CHUNK)));
-  }
-  return btoa(binary);
-}
-
-function base64ToBytes(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const out = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
-  return out;
 }
 
 /**

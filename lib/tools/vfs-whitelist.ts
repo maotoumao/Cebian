@@ -15,6 +15,7 @@
  */
 
 import { normalizePath } from '@/lib/vfs';
+import { isValidSessionId } from '@/lib/utils';
 
 // ─── Method groups (white-list) ───
 
@@ -37,17 +38,6 @@ export const VFS_PERM_WRITE = 'vfs.write';
 
 /** Prototype-pollution guard for method names and skill segments. */
 const FORBIDDEN_PARTS = new Set(['__proto__', 'constructor', 'prototype']);
-
-/** crypto.randomUUID() 输出形态 —— 跟 background/index.ts 的 session_delete 用同一条正则。 */
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** Validate sessionId before interpolating into a VFS path — same shape
- *  guard that `session_delete` uses, so we never construct a workspace
- *  path with anything other than a real UUID. */
-export function isValidSessionId(sessionId: string): boolean {
-  if (typeof sessionId !== 'string') return false;
-  return UUID_RE.test(sessionId);
-}
 
 /**
  * Validate a skill folder name for the purpose of **path construction**.

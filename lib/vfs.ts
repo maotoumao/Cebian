@@ -10,7 +10,7 @@
  * to the host page origin there, not the extension origin.
  */
 import FS from '@isomorphic-git/lightning-fs';
-import { CEBIAN_HOME } from './constants';
+import { CEBIAN_HOME, WORKSPACES_ROOT } from './constants';
 
 // Lazy-initialized singleton — defers IndexedDB connection until first use.
 let _pfs: FS.PromisifiedFS | null = null;
@@ -24,7 +24,7 @@ function pfs(): FS.PromisifiedFS {
 const DEFAULT_DIRS = [
   '/home', '/home/user', CEBIAN_HOME,
   `${CEBIAN_HOME}/skills`, `${CEBIAN_HOME}/prompts`,
-  '/workspaces',
+  WORKSPACES_ROOT,
 ];
 let _bootstrapPromise: Promise<void> | null = null;
 
@@ -74,6 +74,52 @@ export function normalizePath(p: string): string {
  *  a separator. Useful for embedding a relative VFS path in a URL fragment. */
 export function encodeRelPath(rel: string): string {
   return rel.split('/').map(encodeURIComponent).join('/');
+}
+
+/** macOS / Windows 打包的 zip 里常见的垃圾条目，调用方在把归档解压进 VFS
+ *  时静默丢弃。 */
+export function isJunkPath(p: string): boolean {
+  if (p.startsWith('__MACOSX/')) return true;
+  const base = p.split('/').pop() ?? '';
+  return base === '.DS_Store' || base === 'Thumbs.db';
+}
+
+/** 判断从 zip 归档取出的相对 POSIX 路径是否可安全解压进 VFS——即不会逃出其
+ *  容器。拒绝空路径、反斜杠、控制字符、绝对路径、Windows 盘符以及任何 `.` /
+ *  `..` / 空段。返回布尔值，便于各调用方抛出自己的领域错误（zip-slip 防护）。 */
+export function isSafeRelPath(p: string): boolean {
+  if (!p) return false;
+  if (p.includes('\\')) return false;
+  // 控制字符与 NUL。
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f]/.test(p)) return false;
+  if (p.startsWith('/')) return false;
+  // 拒绝形如 `C:` 的 Windows 盘符。
+  if (/^[a-zA-Z]:/.test(p)) return false;
+  for (const seg of p.split('/')) {
+    if (seg === '' || seg === '.' || seg === '..') return false;
+  }
+  return true;
+}
+
+/** 结构性目录清单：这些目录是「容器」，恢复 / 清空时应保证它们恒为目录——既不被当作
+ *  文件写入，清空时也只清「内容」、保留目录节点本身。目前这条约束由 backup 恢复链路
+ *  （`planVfsWrites` / `restoreVfs`）强制执行；vfs.ts 的底层 mutator（writeFile / rm /
+ *  rename）并不内建此守卫，调用方若要新增「会破坏结构根」的操作需自行参考此清单。以后
+ *  新增结构目录只改这一处。值为 normalizePath 后的绝对路径，与 backup 的分类根（技能 /
+ *  提示词 / 工作区）一致。 */
+export const PROTECTED_VFS_ROOTS: readonly string[] = [
+  '/',
+  WORKSPACES_ROOT,
+  `${CEBIAN_HOME}/skills`,
+  `${CEBIAN_HOME}/prompts`,
+];
+
+/** 判断一个绝对路径是否正好是某个受保护根目录（按 normalizePath 归一化后逐一比对）。
+ *  注意是「正好等于」，不含其子孙——子孙是普通文件 / 目录，不受此约束。 */
+export function isProtectedVfsRoot(absPath: string): boolean {
+  const norm = normalizePath(absPath);
+  return PROTECTED_VFS_ROOTS.some((r) => normalizePath(r) === norm);
 }
 
 /** Return the parent directory of a file path. */
@@ -337,6 +383,58 @@ async function copyFile(src: string, dest: string): Promise<void> {
   await writeFile(dest, data as Uint8Array);
 }
 
+/** {@link walkFiles} 返回的一个常规文件条目。 */
+export interface VfsFileEntry {
+  /** 相对遍历根的 POSIX 路径，无前导斜杠。 */
+  relPath: string;
+  /** 规范化后的绝对 VFS 路径。 */
+  absPath: string;
+}
+
+/**
+ * 递归遍历 `rootPath`，返回其下所有常规文件。
+ *
+ * - symlink 经 `stat`（而非 `lstat`）解析：指向文件的链接算文件，指向目录的
+ *   链接会被递归进去。用一个已访问目录集合避免对同一绝对路径重复递归。
+ *   注意这是语法路径去重，并不能完全杜绝自引用 symlink 形成的死循环——此
+ *   行为与改造前的 `zipDirectory` 一致，VFS 当前也不向用户暴露建链接的入口。
+ * - 单个 entry 的 `stat` 失败（断链、竞态）会被跳过，一个坏条目不会让整次
+ *   遍历失败；但根目录的 `readdir` 失败会向上抛出，与改造前一致（调用方需要
+ *   据此区分「空目录」与「目录不存在」）。
+ * - 只产出常规文件（`isFile()`）；目录与其它特殊节点会被遍历但不返回。
+ */
+async function walkFiles(rootPath: string): Promise<VfsFileEntry[]> {
+  await ensureDefaults();
+  const root = normalizePath(rootPath);
+  const out: VfsFileEntry[] = [];
+  const visited = new Set<string>([root]);
+
+  async function recurse(dirAbs: string, relPrefix: string): Promise<void> {
+    const names = await pfs().readdir(dirAbs);
+    for (const name of names) {
+      if (name === '.' || name === '..') continue;
+      const childAbs = dirAbs === '/' ? `/${name}` : `${dirAbs}/${name}`;
+      const rel = relPrefix ? `${relPrefix}/${name}` : name;
+      let st: Awaited<ReturnType<FS.PromisifiedFS['stat']>>;
+      try {
+        st = await pfs().stat(childAbs);
+      } catch {
+        continue;
+      }
+      if (st.isDirectory()) {
+        if (visited.has(childAbs)) continue;
+        visited.add(childAbs);
+        await recurse(childAbs, rel);
+      } else if (st.isFile()) {
+        out.push({ relPath: rel, absPath: childAbs });
+      }
+    }
+  }
+
+  await recurse(root, '');
+  return out;
+}
+
 // ─── Public API (fs/promises-like) ───
 
 // Typed wrappers instead of .bind() to preserve overload signatures
@@ -397,5 +495,6 @@ export const vfs = {
   exists,
   appendFile,
   copyFile,
+  walkFiles,
   onChange,
 };

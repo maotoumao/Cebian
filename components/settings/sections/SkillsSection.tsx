@@ -19,6 +19,7 @@ import {
 } from '@/lib/ai-config/skill-transfer';
 import { showDialog } from '@/lib/dialog';
 import { vfs, normalizePath } from '@/lib/vfs';
+import { downloadFile } from '@/lib/utils';
 import type { SettingsOutletContext } from '@/components/settings/SettingsLayout';
 import { t } from '@/lib/i18n';
 
@@ -87,39 +88,23 @@ export function SkillsSection() {
     return err instanceof Error ? err.message : String(err);
   }, []);
 
-  /** Trigger a browser download for the given blob. Uses an ephemeral
-   *  anchor + object URL since the project has no existing download
-   *  helper and chrome.downloads requires the optional `downloads`
-   *  permission. */
-  const triggerDownload = useCallback((blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    // Defer revoke so the click has a chance to start the download.
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }, []);
-
   const handleExportCurrent = useCallback(async () => {
     if (!currentSkillName) return;
     try {
       const skillsRoot = normalizePath(CEBIAN_SKILLS_DIR);
       const blob = await exportSkillPackage(`${skillsRoot}/${currentSkillName}`);
-      triggerDownload(blob, `${currentSkillName}.cebian-skill.zip`);
+      downloadFile(`${currentSkillName}.cebian-skill.zip`, blob, 'application/zip');
       toast.success(t('settings.skills.exportSuccess', [currentSkillName]));
     } catch (err) {
       toast.error(formatError(err));
     }
-  }, [currentSkillName, formatError, triggerDownload]);
+  }, [currentSkillName, formatError]);
 
   const handleExportAll = useCallback(async () => {
     try {
       const { blob, count } = await exportAllSkillsPackage();
       const date = new Date().toISOString().slice(0, 10);
-      triggerDownload(blob, `cebian-skills-backup-${date}.zip`);
+      downloadFile(`cebian-skills-backup-${date}.zip`, blob, 'application/zip');
       toast.success(t('settings.skills.exportAllSuccess', count));
     } catch (err) {
       if (err instanceof SkillPackageError && err.code === 'missingEntry') {
@@ -129,7 +114,7 @@ export function SkillsSection() {
       }
       toast.error(formatError(err));
     }
-  }, [formatError, triggerDownload]);
+  }, [formatError]);
 
   /** Caller for the import preview dialog. Refreshes the file tree and
    *  shows a localized success toast based on package type. The scanner's

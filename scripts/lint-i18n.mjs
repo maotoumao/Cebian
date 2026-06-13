@@ -27,6 +27,8 @@ const EXEMPT_FILE_REGEXES = [
   /[\\/]\.output[\\/]/,
   /[\\/]node_modules[\\/]/,
   /[\\/]design[\\/]/,
+  // 单元测试的 describe/it 标题不是用户可见文案，允许中文。
+  /\.test\.tsx?$/,
   // i18n wrapper itself contains comments, but no zh strings.
 ];
 

@@ -170,3 +170,23 @@ export const updateNoticeState = storage.defineItem<UpdateNoticeState>(
   'local:updateNoticeState',
   { fallback: { skippedVersion: null, lastPromptedAt: 0 } },
 );
+
+// ─── WebDAV 备份连接配置 ───
+
+/**
+ * WebDAV 远程备份的连接配置。归入备份的「密钥信息」分类（含明文密码），
+ * 因此默认不备份、备份时单独警告并可加密。`null` 表示尚未配置。
+ */
+export interface WebDavConfig {
+  /** WebDAV 服务端点 URL。 */
+  url: string;
+  username: string;
+  password: string;
+  /** 远程目录路径，如 '/cebian'。 */
+  directory: string;
+}
+
+export const webdavConfig = storage.defineItem<WebDavConfig | null>(
+  'local:webdavConfig',
+  { fallback: null },
+);
