@@ -67,7 +67,7 @@
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.20",
-    "@tailwindcss/vite": "^4.2.2",
+    "@tailwindcss/vite": "^4.3.1",
     "@types/chrome": "^0.1.43",
     "@types/isomorphic-git__lightning-fs": "^4.4.8",
     "@types/picomatch": "^4.0.3",
@@ -78,7 +78,7 @@
     "@wxt-dev/module-react": "^1.1.5",
     "shadcn": "^4.11.0",
     "simple-git-hooks": "^2.13.1",
-    "tailwindcss": "^4.2.2",
+    "tailwindcss": "^4.3.1",
     "typescript": "^5.9.3",
     "vitest": "^3.2.6",
     "wxt": "^0.20.26"
