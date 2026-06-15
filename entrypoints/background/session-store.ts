@@ -50,19 +50,10 @@ class SessionStore {
     if (writer) await writer.flush();
   }
 
-  /** 把全部待写的节流写立即落库。备份快照前调用，确保采集到的记录包含最新的
-   *  在途消息。 */
+  /** 把全部待写的节流写立即落库。采集备份前由 flush 信号触发，确保页面随后直读 Dexie
+   *  时能读到仍躺在 throttle 计时器里的在途消息。 */
   async flushAll(): Promise<void> {
     await Promise.all([...this.writers.values()].map((w) => w.flush()));
-  }
-
-  /**
-   * 备份：采集全部会话记录（含完整消息历史）。先 flush 待写的节流写，避免漏掉
-   * 仍躺在 throttle 计时器里的在途消息。
-   */
-  async collectAll(): Promise<SessionRecord[]> {
-    await this.flushAll();
-    return listSessions();
   }
 
   /**
