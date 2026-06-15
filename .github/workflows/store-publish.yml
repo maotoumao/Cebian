@@ -12,7 +12,7 @@ name: Publish to Stores
 #   - publish-chrome / publish-edge 共用 store-publish 环境(审批门 + 环境级密钥),
 #     一次审批同时放行两个商店;未审批前 job 拿不到任何商店密钥。
 #   - 顶层权限收到最小(contents: read,仅够下载 Release 资产)。
-#   - 跳过 pre-release:只有正式版才自动提交商店(手动触发不受此限)。
+#   - 统一跳过 pre-release:无论自动还是手动触发,预发布都不提交商店。
 on:
   release:
     types: [published]
@@ -30,7 +30,7 @@ jobs:
   fetch:
     name: Fetch verified chrome zip from release
     runs-on: ubuntu-latest
-    # 跳过预发布:仅在 release 事件触发时判断(手动触发 release 上下文为空,不受限)
+    # release 事件的预发布在这里干净跳过;手动触发的预发布在下方步骤运行时校验
     if: ${{ github.event_name != 'release' || !github.event.release.prerelease }}
     steps:
       - name: Download chrome zip asset
@@ -41,6 +41,12 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          # 统一跳过预发布:手动触发时也校验该 tag 是否为预发布(release 触发已由 job-level if 跳过)
+          isPre=$(gh release view "$TAG" --repo "$REPO" --json isPrerelease -q .isPrerelease)
+          if [ "$isPre" = "true" ]; then
+            echo "::error::$TAG 是预发布(prerelease),不提交商店。"
+            exit 1
+          fi
           gh release download "$TAG" --repo "$REPO" \
             --pattern 'cebian-*-chrome.zip' --dir dist
           # 必须恰好命中一个 chrome zip,否则下游商店 action 会静默选错或报错
