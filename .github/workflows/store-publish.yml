@@ -1,0 +1,107 @@
+name: Publish to Stores
+
+# 监听 GitHub Release 发布事件:你在仓库点 "Publish release" 后自动把扩展提交到
+# Chrome Web Store 与 Edge Add-ons。复用该 Release 上已验证的 chrome zip 资产,
+# 绝不重新构建,确保上架的字节与你 smoke-test 过的完全一致。
+#
+# 也支持手动触发(workflow_dispatch):指定一个已发布的 tag 重新推商店,用于
+# token 失效修复后重推、或某个商店单独补推等场景。手动触发同样要过审批门。
+#
+# 安全设计:
+#   - 第三方 action 全部 pin 到完整 commit SHA(防供应链投毒)。
+#   - publish-chrome / publish-edge 共用 store-publish 环境(审批门 + 环境级密钥),
+#     一次审批同时放行两个商店;未审批前 job 拿不到任何商店密钥。
+#   - 顶层权限收到最小(contents: read,仅够下载 Release 资产)。
+#   - 跳过 pre-release:只有正式版才自动提交商店(手动触发不受此限)。
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '已发布的 Release tag(例 v1.3.2),从其资产取 chrome zip 重新推商店'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    name: Fetch verified chrome zip from release
+    runs-on: ubuntu-latest
+    # 跳过预发布:仅在 release 事件触发时判断(手动触发 release 上下文为空,不受限)
+    if: ${{ github.event_name != 'release' || !github.event.release.prerelease }}
+    steps:
+      - name: Download chrome zip asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 手动触发用输入的 tag;release 触发用事件里的 tag
+          TAG: ${{ github.event.inputs.tag || github.event.release.tag_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release download "$TAG" --repo "$REPO" \
+            --pattern 'cebian-*-chrome.zip' --dir dist
+          # 必须恰好命中一个 chrome zip,否则下游商店 action 会静默选错或报错
+          count=$(find dist -maxdepth 1 -name 'cebian-*-chrome.zip' | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "::error::expected exactly 1 chrome zip, found $count"
+            ls -la dist
+            exit 1
+          fi
+          # 归一化成固定文件名,下游无需再用 glob
+          mv dist/cebian-*-chrome.zip dist/extension.zip
+          ls -la dist
+
+      - name: Upload zip for store jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-chrome-zip
+          path: dist/extension.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-chrome:
+    name: Publish to Chrome Web Store
+    runs-on: ubuntu-latest
+    needs: fetch
+    environment: store-publish # 审批门 + 商店密钥(Chrome 与 Edge 共用同一环境)
+    steps:
+      - name: Download chrome zip
+        uses: actions/download-artifact@v4
+        with:
+          name: store-chrome-zip
+          path: dist
+
+      # mnao305/chrome-extension-upload v6.0.0
+      - name: Upload & publish to Chrome Web Store
+        uses: mnao305/chrome-extension-upload@fdfe79400af990f5145a319e834aee64907ccff4
+        with:
+          file-path: dist/extension.zip
+          extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
+          client-id: ${{ secrets.CHROME_CLIENT_ID }}
+          client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
+          refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
+          publish: true
+
+  publish-edge:
+    name: Publish to Edge Add-ons
+    runs-on: ubuntu-latest
+    needs: fetch
+    environment: store-publish # 审批门 + 商店密钥(Chrome 与 Edge 共用同一环境)
+    steps:
+      - name: Download chrome zip
+        uses: actions/download-artifact@v4
+        with:
+          name: store-chrome-zip
+          path: dist
+
+      # wdzeng/edge-addon v2.1.1
+      - name: Upload & submit to Edge Add-ons
+        uses: wdzeng/edge-addon@9881f57720358040d079eaa06a4596dc9c273eb6
+        with:
+          product-id: ${{ secrets.EDGE_PRODUCT_ID }}
+          zip-path: dist/extension.zip
+          client-id: ${{ secrets.EDGE_CLIENT_ID }}
+          api-key: ${{ secrets.EDGE_API_KEY }}
