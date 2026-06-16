@@ -37,16 +37,37 @@ export async function resolveProviderApiKey(
 
 /**
  * 构造 agent 的 systemPrompt：基础提示词（替换 `{{SESSION_ID}}`）+ 可选的
- * `<user-instructions>` 段。作为 systemPrompt 的单一真理来源，供
- * `createCebianAgent`（建 agent 时）与 retry 的原地刷新（用户中途改了指令时）
- * 共用，避免两处复制拼接逻辑。
+ * `<skills>`（skills 索引）段 + 可选的 `<user-instructions>` 段。作为
+ * systemPrompt 拼接的单一真理来源，由 agent-manager 的 `composeSystemPrompt`
+ * 在会话创建 / 切模型 / retry / 每轮派发前刷新时调用。
+ *
+ * 保持纯/同步：skills 与 instructions 的数据获取留在 agent-manager（它本就
+ * import 了 scanner），本函数只负责拼接，不依赖 VFS / scanner。
+ *
+ * skills 块置于 system 顶部（贴近 base prompt），随整个 system 落入缓存前缀——
+ * skills 不变则逐字节一致、每轮命中缓存；skills 变则击穿一次（装/卸 skill 的
+ * 实时性代价，低频可接受）。system 末尾只有一个缓存断点，skills 与 instructions
+ * 谁先谁后不影响命中率，顺序仅取语义可读性。
  */
-export function buildSystemPrompt(sessionId: string, userInstructions: string): string {
+export function buildSystemPrompt(
+  sessionId: string,
+  userInstructions: string,
+  skillsBlock?: string,
+): string {
   const basePrompt = DEFAULT_SYSTEM_PROMPT.replaceAll('{{SESSION_ID}}', sessionId);
+  const parts: string[] = [basePrompt];
+
+  const trimmedSkills = skillsBlock?.trim();
+  if (trimmedSkills) {
+    parts.push(trimmedSkills);
+  }
+
   const trimmedInstructions = userInstructions.trim();
-  return trimmedInstructions
-    ? `${basePrompt}\n\n<user-instructions>\n${trimmedInstructions}\n</user-instructions>`
-    : basePrompt;
+  if (trimmedInstructions) {
+    parts.push(`<user-instructions>\n${trimmedInstructions}\n</user-instructions>`);
+  }
+
+  return parts.join('\n\n');
 }
 
 // ─── Agent factory ───

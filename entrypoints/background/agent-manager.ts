@@ -70,19 +70,14 @@ import { acquireKeepAlive, releaseKeepAlive } from './sw-keepalive';
 async function buildStructuredMessage(text: string, attachments: Attachment[]): Promise<string> {
   const parts: string[] = [];
 
-  // ① Session-dynamic config: inject skill index
-  const skillMetas = await scanSkillIndex();
-  const skillsBlock = buildSkillsBlock(skillMetas);
-  parts.push(`<agent-config>\n${skillsBlock}\n</agent-config>`);
-
-  // ② Tool/behavior reminders (placeholder)
+  // ① Tool/behavior reminders (placeholder)
   parts.push('<reminder-instructions>\n</reminder-instructions>');
 
-  // ③ Attachments (elements + files; images go via multimodal content blocks)
+  // ② Attachments (elements + files; images go via multimodal content blocks)
   const attachmentBlock = buildTextPrefix(attachments);
   if (attachmentBlock) parts.push(attachmentBlock);
 
-  // ④ Context: date + page state
+  // ③ Context: date + page state
   const ctxLines: string[] = [];
   ctxLines.push(`The current date is ${new Date().toLocaleDateString('en-CA')}.`);
   const pageCtx = await gatherPageContext();
@@ -92,7 +87,7 @@ async function buildStructuredMessage(text: string, attachments: Attachment[]): 
   }
   parts.push(`<context>\n${ctxLines.join('\n')}\n</context>`);
 
-  // ⑤ User request (always last)
+  // ④ User request (always last)
   // TODO: user text is NOT sanitized — users are trusted; stripping structural tags would alter their intent.
   parts.push(`<user-request>\n${text.trim()}\n</user-request>`);
 
@@ -412,6 +407,22 @@ class AgentManager {
   }
 
   /**
+   * 组装会话的 systemPrompt——systemPrompt 的单一来源。读取用户指令 + 扫描 skills
+   * 索引（命中缓存，开销≈ 0），交给纯函数 `buildSystemPrompt` 拼接。每轮派发前无
+   * 条件调用：skills 不变则产出逐字节相同的字符串、命中 system 缓存；skills 变则产
+   * 出变化、击穿缓存一次（= 装/卸 skill 的实时性代价）。因此无需写「skills 是否变
+   * 化」的 diff 逻辑。
+   */
+  private async composeSystemPrompt(sessionId: string): Promise<string> {
+    const [instructions, skillMetas] = await Promise.all([
+      userInstructionsStorage.getValue(),
+      scanSkillIndex(),
+    ]);
+    const skillsBlock = buildSkillsBlock(skillMetas);
+    return buildSystemPrompt(sessionId, instructions || '', skillsBlock);
+  }
+
+  /**
    * Build a fresh Agent + tool context for a session without installing it
    * into the managed map or wiring subscriptions. Returns raw artifacts so
    * `createAgent` can construct a brand-new managed entry and write it to the
@@ -463,6 +474,12 @@ class AgentManager {
       tools: sessionTools,
       beforeToolCall,
     });
+
+    // skills 索引随会话级 system prompt 注入（迁出每条用户消息以吃满 prompt
+    // caching）。createCebianAgent 内部只拼了 base + instructions，这里用
+    // composeSystemPrompt 覆盖一次补上 skills——与切模型 / retry / 派发前刷新
+    // 走同一条 composeSystemPrompt 路径，保证四处产出逐字节一致。
+    agent.state.systemPrompt = await this.composeSystemPrompt(sessionId);
 
     return {
       agent,
@@ -673,13 +690,13 @@ class AgentManager {
         // the user is no longer pointing at.
         const resolved = await this.resolveModelObj();
         if (!resolved) throw new Error('No model selected or model not found');
-        const [thinkingLvl, instructions] = await Promise.all([
+        const [thinkingLvl, systemPrompt] = await Promise.all([
           thinkingLevelStorage.getValue(),
-          userInstructionsStorage.getValue(),
+          this.composeSystemPrompt(sessionId),
         ]);
         managed.agent.state.model = resolved.model;
         managed.agent.state.thinkingLevel = (thinkingLvl || 'medium') as any;
-        managed.agent.state.systemPrompt = buildSystemPrompt(sessionId, instructions || '');
+        managed.agent.state.systemPrompt = systemPrompt;
         managed.modelKey = currentKey;
       }
     }
@@ -698,6 +715,10 @@ class AgentManager {
     // If the entry is gone (or was replaced), the user already stopped this
     // turn — bail; `cancel()` already broadcast the authoritative end state.
     if (this.sessions.get(sessionId) !== managed) return;
+
+    const refreshedSystemPrompt = await this.composeSystemPrompt(sessionId);
+    if (this.sessions.get(sessionId) !== managed) return;
+    managed.agent.state.systemPrompt = refreshedSystemPrompt;
 
     // If any interactive tool OR a permission prompt is pending, the agent is
     // paused waiting for the user — steer the new message into the loop and
@@ -1031,10 +1052,7 @@ class AgentManager {
       // `refreshAllSessionTools` (MCP changes), so we don't touch them.
       const resolved = await this.resolveModelObj();
       if (!resolved) throw new Error('No model selected or model not found');
-      const [thinkingLvl, instructions] = await Promise.all([
-        thinkingLevelStorage.getValue(),
-        userInstructionsStorage.getValue(),
-      ]);
+      const thinkingLvl = await thinkingLevelStorage.getValue();
 
       // Single abort checkpoint — cancel landed during the DB flush or the
       // async settings load, both BEFORE we mutate the agent. Commit an
@@ -1052,7 +1070,6 @@ class AgentManager {
       managed.agent.state.messages = truncated;
       managed.agent.state.model = resolved.model;
       managed.agent.state.thinkingLevel = (thinkingLvl || 'medium') as any;
-      managed.agent.state.systemPrompt = buildSystemPrompt(sessionId, instructions || '');
       managed.modelKey = `${resolved.provider}/${resolved.modelId}`;
 
       // Re-broadcast busy. `continue()` is invoked on the very next line and

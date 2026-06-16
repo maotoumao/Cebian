@@ -16,7 +16,7 @@ What Cebian adds, drops, or interprets differently vs. the upstream [agentskills
 
 ## What goes into the L1 skills index
 
-Every user message includes an `<agent-config><skills>` block listing every enabled skill. For each skill the agent sees:
+The session system prompt includes an `<skills>` block listing every enabled skill. It is rebuilt before every prompt dispatch, so changes take effect on the next turn. For each skill the agent sees:
 
 - `<name>` — frontmatter `name`.
 - `<description>` — frontmatter `description`.
@@ -108,6 +108,6 @@ The path `~/.cebian/skills/<name>/SKILL.md` is the canonical entry. Every skill 
 
 ## Index caching
 
-The skill index is cached in memory for 30 minutes. Writes via `fs_create_file`, `fs_edit_file`, and `fs_delete` to any path under `~/.cebian/skills/` invalidate the cache automatically, so a freshly authored or modified skill is picked up on the very next user message — no chat-session restart required.
+The skill index is cached in memory for 30 minutes. Writes via `fs_create_file`, `fs_edit_file`, and `fs_delete` to any path under `~/.cebian/skills/` invalidate the cache automatically, so a freshly authored or modified skill is picked up on the very next prompt dispatch (the system prompt is rebuilt each turn) — no chat-session restart required.
 
 `fs_mkdir` and `fs_rename` do **not** invalidate the cache. After renaming or creating a skill directory, follow up with `fs_edit_file` on `SKILL.md` (or `fs_create_file` for a brand-new file) to force a refresh.

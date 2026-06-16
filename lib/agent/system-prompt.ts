@@ -46,7 +46,6 @@ VFS Browser: Users can open VFS files via in-chat links. When you create or edit
 
 USER MESSAGE STRUCTURE:
 Each user message is wrapped in structured XML blocks:
-- <agent-config>: session-dynamic configuration (skills, instructions — may be empty).
 - <reminder-instructions>: behavioral reminders (may be empty).
 - <attachments>: user-attached elements and files (only present when attachments exist).
   - <selected-element>: a DOM element the user selected on the page.

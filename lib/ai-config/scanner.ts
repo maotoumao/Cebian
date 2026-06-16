@@ -11,7 +11,7 @@ import { CEBIAN_PROMPTS_DIR, CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE } from '@/lib/p
 import { escapeXml } from '@/lib/utils';
 import { parseFrontmatter } from '@/lib/content/frontmatter';
 
-// ─── Skills preamble (injected into <agent-config>) ───
+// ─── Skills preamble ───
 
 const SKILLS_PREAMBLE = `Skills are vetted, domain-specific instruction packs. Each skill folder contains rules
 (naming, structure, required fields, trigger conditions) the native tools alone do not encode.
@@ -209,6 +209,12 @@ export async function scanSkillIndex(): Promise<SkillMeta[]> {
     }
   }
 
+  // 按 filePath 确定性排序：skills 索引已迁入被缓存的 system prompt，相同的 skills
+  // 集合必须产出逐字节相同的字符串才能命中 prompt cache。vfs.readdir 返回的是
+  // 目录插入顺序（非字典序，且随增删 / SW 冷启抖动），不可依赖；filePath 内嵌唯一
+  // dirName、永远存在、天然唯一，是稳定排序键。
+  results.sort((a, b) => a.filePath.localeCompare(b.filePath));
+
   _skillIndex = results;
   _skillIndexTimestamp = Date.now();
   return results;
@@ -217,7 +223,7 @@ export async function scanSkillIndex(): Promise<SkillMeta[]> {
 // ─── Skill Index → XML Builder ───
 
 /**
- * Build the <skills>...</skills> XML block for injection into <agent-config>.
+ * Build the <skills>...</skills> XML block.
  * Returns an empty string if no skills exist.
  */
 export function buildSkillsBlock(metas: SkillMeta[]): string {

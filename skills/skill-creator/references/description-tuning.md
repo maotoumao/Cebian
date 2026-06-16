@@ -1,6 +1,6 @@
 # Description tuning
 
-The `description` field is the primary triggering signal. The agent only sees `name`, `description`, `metadata`, and the file path for every skill on every user message — it does not load the body until it has already decided to activate the skill. A vague or under-keyworded description means the skill silently never fires.
+The `description` field is the primary triggering signal. The agent only sees `name`, `description`, `metadata`, and the file path for every skill in the session system prompt's skills index — it does not load the body until it has already decided to activate the skill. A vague or under-keyworded description means the skill silently never fires.
 
 This reference covers how to write and rewrite descriptions so the agent picks the skill up reliably.
 
