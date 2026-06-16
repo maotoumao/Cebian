@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronRight, Loader2, Check, X } from 'lucide-react';
+import { ChevronRight, Loader2, Check, X, Ban } from 'lucide-react';
 import { t } from '@/lib/i18n';
 
 interface ToolCardImage {
@@ -9,7 +9,7 @@ interface ToolCardImage {
 
 interface ToolCardProps {
   label: string;
-  status: 'running' | 'done' | 'error';
+  status: 'running' | 'done' | 'error' | 'cancelled';
   args: string;
   result?: string;
   images?: ToolCardImage[];
@@ -35,6 +35,10 @@ export function ToolCard({ label, status, args, result, images }: ToolCardProps)
         )}
         {status === 'error' && (
           <X className="size-4 text-destructive shrink-0" />
+        )}
+        {/* Tool cancelled mid-run: neutral gray stopped icon — cancelling isn't an error */}
+        {status === 'cancelled' && (
+          <Ban className="size-4 text-muted-foreground shrink-0" />
         )}
 
         {/* Label */}

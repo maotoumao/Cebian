@@ -305,11 +305,6 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                       {assistantMsg.errorMessage ?? t('chat.session.modelError')}
                     </div>
                   )}
-                  {isAborted && (
-                    <div className="text-xs text-muted-foreground/80 italic mt-2">
-                      {t('chat.session.cancelled')}
-                    </div>
-                  )}
                   {/* Generic tool rendering */}
                   {toolCalls.map((tc) => {
                     const uiInfo = uiToolRegistry.get(tc.name);
@@ -380,7 +375,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
 
                     const status = toolResult
                       ? (toolResult.isError ? 'error' : 'done')
-                      : 'running';
+                      : (isAborted ? 'cancelled' : 'running');
                     const label = getToolLabel(tc.name, tc.arguments);
                     const argsStr = JSON.stringify(tc.arguments, null, 2);
                     const resultText = toolResult
@@ -404,6 +399,12 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                       />
                     );
                   })}
+                  {/* Cancelled marker sits after the tool cards, matching the text -> tool card -> cancelled timeline */}
+                  {isAborted && (
+                    <div className="text-xs text-muted-foreground/80 italic mt-2">
+                      {t('chat.session.cancelled')}
+                    </div>
+                  )}
                 </AgentMessage>
               );
             }

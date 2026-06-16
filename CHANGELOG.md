@@ -22,9 +22,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - 备份文件名使用用户填写的名称
 - 规避会话备份/恢复时的 64 MiB runtime message 体积限制
+- 工具执行中点击停止后，工具卡片不再一直显示加载图标，「已取消」提示也移到工具卡片下方 (#21)
 
 - Use the user-provided name for backup filenames
 - Avoid the 64 MiB runtime message limit on session backup and restore
+- Stop the tool card from spinning forever after cancelling a running tool, and move the "Cancelled" marker below the tool card (#21)
 
 ### 变更 / Changed
 
