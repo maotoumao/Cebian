@@ -5,7 +5,7 @@ import { isSafeSnapshotName, assertValidBaseUrl, WebDavError } from '@/lib/backu
 // 集成测试，不在 node 环境单测。
 describe('isSafeSnapshotName', () => {
   it('接受正常的 .zip 文件名', () => {
-    expect(isSafeSnapshotName('cebian-backup-2026-06-07-1430.zip')).toBe(true);
+    expect(isSafeSnapshotName('备份 2026-06-09 14-30.zip')).toBe(true);
     expect(isSafeSnapshotName('a.ZIP')).toBe(true);
   });
 

@@ -223,9 +223,11 @@ settings:
       restore: "从文件恢复…"
     create:
       title: "创建备份"
-      # $1 = formatted timestamp (e.g. "2026-06-09 14:30")
+      # $1 = formatted timestamp (e.g. "2026-06-09 14-30")
       defaultName: "备份 $1"
       nameLabel: "名称"
+      # $1 = max name length (characters)
+      nameInvalid: "名称不能包含 / \\ : * ? \" < > | 或超过 $1 个字符"
       descriptionLabel: "描述"
       descriptionPlaceholder: "可选的描述信息…"
       mode: "备份模式"

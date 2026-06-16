@@ -11,7 +11,8 @@ import { t } from '@/lib/i18n';
 
 /** 远程快照库里的一个快照（一个 .zip 文件）。 */
 interface WebDavSnapshot {
-  /** 远程文件名，如 `cebian-backup-2026-06-07-1430.zip`。也是下载 / 删除的 key。 */
+  /** 远程文件名，如 `备份 2026-06-09 14-30.zip`（由用户填的备份名净化而来）。也是下载 /
+   *  删除的 key。 */
   name: string;
   /** 文件字节数；服务端未返回 `getcontentlength` 时为 undefined。 */
   size?: number;

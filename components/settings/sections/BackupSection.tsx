@@ -2,7 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Cloud, DatabaseBackup, Download, Loader2, RefreshCw, RotateCcw, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { CreateBackupDialog } from '@/components/settings/backup/CreateBackupDialog';
+import {
+  CreateBackupDialog,
+  FORBIDDEN_NAME_CHARS,
+  MAX_BACKUP_NAME_LENGTH,
+  defaultBackupName,
+} from '@/components/settings/backup/CreateBackupDialog';
 import { RestorePreviewDialog } from '@/components/settings/backup/RestorePreviewDialog';
 import { WebDavConnectionForm } from '@/components/settings/backup/WebDavConnectionForm';
 import { createBackup } from '@/lib/backup/collect';
@@ -28,11 +33,29 @@ import type {
   RestoreStrategy,
 } from '@/lib/backup/types';
 
-/** 备份文件名：`cebian-backup-YYYY-MM-DD-HHmm.zip`。本地下载与 WebDAV 上传共用。 */
-function backupFileName(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `cebian-backup-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.zip`;
+/** 把用户填的备份名净化成安全文件名（纵深防御：UI 已挡危险字符，但 BackupOptions 不一定
+ *  只来自创建弹窗）。剥离危险字符（复用弹窗同一黑名单的 `.source`，单一事实源）、折叠空白、
+ *  去首尾点 / 空格、剥掉用户可能自带的 `.zip`、限长；净化后为空（或退化成 `.`/`..`）则回退
+ *  默认名。最后统一补 `.zip`。本地下载与 WebDAV 上传共用。 */
+function backupFileName(name: string): string {
+  const strip = new RegExp(FORBIDDEN_NAME_CHARS.source, 'g');
+  // 去首尾点 / 空格：Windows 文件名禁尾点 / 尾空格。剥掉用户自带的 `.zip`：下方统一再补。
+  // 截断按 Unicode 码点（Array.from），避免把 emoji / 非 BMP 字符切成孤立代理对——那会让
+  // 后续 WebDAV 上传的 encodeURIComponent 抛 URIError。
+  const clean = (s: string): string => {
+    const stripped = s
+      .replace(strip, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^[.\s]+|[.\s]+$/g, '')
+      .replace(/\.zip$/i, '')
+      .trim();
+    return Array.from(stripped).slice(0, MAX_BACKUP_NAME_LENGTH).join('').trim();
+  };
+
+  let base = clean(name);
+  if (base === '') base = clean(defaultBackupName());
+  return `${base}.zip`;
 }
 
 /** 快照文件字节数转人类可读（B / KB / MB）；未知大小返回 undefined。 */
@@ -157,13 +180,13 @@ export function BackupSection() {
         const bytes = await createBackup(options);
         if (createTarget === 'webdav') {
           if (!config) throw new Error(t('settings.backup.webdav.notConfigured'));
-          const name = backupFileName();
+          const name = backupFileName(options.name);
           await uploadSnapshot(config, name, bytes);
           toast.success(t('settings.backup.webdav.uploadSuccess'));
           await loadSnapshots(config);
         } else {
           downloadFile(
-            backupFileName(),
+            backupFileName(options.name),
             new Blob([bytes as BlobPart], { type: 'application/zip' }),
             'application/zip',
           );

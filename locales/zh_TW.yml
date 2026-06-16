@@ -223,9 +223,11 @@ settings:
       restore: "從檔案復原…"
     create:
       title: "建立備份"
-      # $1 = formatted timestamp (e.g. "2026-06-09 14:30")
+      # $1 = formatted timestamp (e.g. "2026-06-09 14-30")
       defaultName: "備份 $1"
       nameLabel: "名稱"
+      # $1 = max name length (characters)
+      nameInvalid: "名稱不能包含 / \\ : * ? \" < > | 或超過 $1 個字元"
       descriptionLabel: "描述"
       descriptionPlaceholder: "可選的描述資訊…"
       mode: "備份模式"

@@ -21,11 +21,19 @@ import type { BackupCategory, BackupOptions } from '@/lib/backup/types';
 
 type Mode = 'full' | 'partial';
 
-/** 默认备份名：`<本地化前缀> YYYY-MM-DD HH:mm`。 */
-function defaultBackupName(): string {
+/** 备份名 / 文件名里禁止的字符：文件系统 / URL 危险字符与控制符。中文 / 空格 /
+ *  `-` / `_` / `.` 等均放行。输入层与文件名生成层（backupFileName）共用同一黑名单。 */
+// eslint-disable-next-line no-control-regex
+export const FORBIDDEN_NAME_CHARS = /[/\\:*?"<>|\x00-\x1f]/;
+/** 备份名长度上限（字符数）。 */
+export const MAX_BACKUP_NAME_LENGTH = 60;
+
+/** 默认备份名：`<本地化前缀> YYYY-MM-DD HH-mm`。时分用 `-` 而非 `:`，避开文件名
+ *  非法字符，让显示名与最终文件名一致。净化为空时 backupFileName 也回退到此。 */
+export function defaultBackupName(): string {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
-  const ts = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const ts = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}-${pad(d.getMinutes())}`;
   return t('settings.backup.create.defaultName', [ts]);
 }
 
@@ -85,6 +93,10 @@ export function CreateBackupDialog({ open, onOpenChange, onConfirm }: CreateBack
   const anySelected =
     effective.sessions || effective.settings || effective.skillsPrompts || effective.credentials;
 
+  // 名称非法：含禁用字符或超长。空名不算非法（confirm 会回退默认名）。“允许输入但
+  // 标红”：不静默剔除字符，只提示并禁用确认，让用户自行修改。
+  const nameInvalid = FORBIDDEN_NAME_CHARS.test(name) || name.length > MAX_BACKUP_NAME_LENGTH;
+
   const confirm = () => {
     const categories: BackupCategory[] = [];
     if (effective.sessions) categories.push('sessions');
@@ -112,7 +124,18 @@ export function CreateBackupDialog({ open, onOpenChange, onConfirm }: CreateBack
           {/* name + description */}
           <div className="space-y-1.5">
             <Label htmlFor="backup-name" className="text-sm">{t('settings.backup.create.nameLabel')}</Label>
-            <Input id="backup-name" value={name} onChange={(e) => setName(e.target.value)} className="h-8 text-sm" />
+            <Input
+              id="backup-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              aria-invalid={nameInvalid}
+              className="h-8 text-sm"
+            />
+            {nameInvalid && (
+              <p className="text-xs text-destructive">
+                {t('settings.backup.create.nameInvalid', [String(MAX_BACKUP_NAME_LENGTH)])}
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="backup-desc" className="text-sm">{t('settings.backup.create.descriptionLabel')}</Label>
@@ -210,7 +233,7 @@ export function CreateBackupDialog({ open, onOpenChange, onConfirm }: CreateBack
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>{t('common.cancel')}</Button>
-          <Button onClick={confirm} disabled={!anySelected || (encrypt && !password)}>
+          <Button onClick={confirm} disabled={!anySelected || nameInvalid || (encrypt && !password)}>
             {t('common.confirm')}
           </Button>
         </DialogFooter>

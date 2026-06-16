@@ -227,9 +227,11 @@ settings:
       restore: "Restore from file…"
     create:
       title: "Create backup"
-      # $1 = formatted timestamp (e.g. "2026-06-09 14:30")
+      # $1 = formatted timestamp (e.g. "2026-06-09 14-30")
       defaultName: "Backup $1"
       nameLabel: "Name"
+      # $1 = max name length (characters)
+      nameInvalid: "Name cannot contain / \\ : * ? \" < > | or exceed $1 characters"
       descriptionLabel: "Description"
       descriptionPlaceholder: "Optional description…"
       mode: "Backup mode"
