@@ -690,13 +690,9 @@ class AgentManager {
         // the user is no longer pointing at.
         const resolved = await this.resolveModelObj();
         if (!resolved) throw new Error('No model selected or model not found');
-        const [thinkingLvl, systemPrompt] = await Promise.all([
-          thinkingLevelStorage.getValue(),
-          this.composeSystemPrompt(sessionId),
-        ]);
+        const thinkingLvl = await thinkingLevelStorage.getValue();
         managed.agent.state.model = resolved.model;
         managed.agent.state.thinkingLevel = (thinkingLvl || 'medium') as any;
-        managed.agent.state.systemPrompt = systemPrompt;
         managed.modelKey = currentKey;
       }
     }
