@@ -103,6 +103,11 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
   const allowNewFolder = (tree.props as any).allowNewFolder ?? true;
   const editStartRef = useRef<number>(0);
 
+  const runMenuAction = (action: () => void) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    action();
+  };
+
   const handleClick = (e: React.MouseEvent) => {
     if (node.isEditing) return; // Don't activate/toggle while inline-renaming
     if (node.isInternal) {
@@ -192,19 +197,19 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
   if (node.isInternal) {
     menuItems = (
       <>
-        <ContextMenuItem onClick={() => (tree.props as any).onCreateFile?.(node.id)}>
+        <ContextMenuItem onClick={runMenuAction(() => (tree.props as any).onCreateFile?.(node.id))}>
           <FilePlus className="size-3.5 mr-2" /> {t('common.newFile')}
         </ContextMenuItem>
         {allowNewFolder && (
-          <ContextMenuItem onClick={() => (tree.props as any).onCreateFolder?.(node.id)}>
+          <ContextMenuItem onClick={runMenuAction(() => (tree.props as any).onCreateFolder?.(node.id))}>
             <FolderPlus className="size-3.5 mr-2" /> {t('common.newFolder')}
           </ContextMenuItem>
         )}
         <ContextMenuSeparator />
-        <ContextMenuItem onClick={() => node.edit()}>
+        <ContextMenuItem onClick={runMenuAction(() => node.edit())}>
           <Pencil className="size-3.5 mr-2" /> {t('common.rename')}
         </ContextMenuItem>
-        <ContextMenuItem onClick={() => tree.delete(node.id)} className="text-destructive focus:text-destructive">
+        <ContextMenuItem onClick={runMenuAction(() => tree.delete(node.id))} className="text-destructive focus:text-destructive">
           <Trash2 className="size-3.5 mr-2" /> {t('common.delete')}
         </ContextMenuItem>
       </>
@@ -212,10 +217,10 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
   } else {
     menuItems = (
       <>
-        <ContextMenuItem onClick={() => node.edit()}>
+        <ContextMenuItem onClick={runMenuAction(() => node.edit())}>
           <Pencil className="size-3.5 mr-2" /> {t('common.rename')}
         </ContextMenuItem>
-        <ContextMenuItem onClick={() => tree.delete(node.id)} className="text-destructive focus:text-destructive">
+        <ContextMenuItem onClick={runMenuAction(() => tree.delete(node.id))} className="text-destructive focus:text-destructive">
           <Trash2 className="size-3.5 mr-2" /> {t('common.delete')}
         </ContextMenuItem>
       </>

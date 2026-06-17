@@ -24,11 +24,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 规避会话备份/恢复时的 64 MiB runtime message 体积限制
 - 工具执行中点击停止后，工具卡片不再一直显示加载图标，「已取消」提示也移到工具卡片下方 (#21)
 - 询问用户/权限确认卡片的文本现在保留换行，多行时图标与首行对齐 (#23)
+- 文件编辑页窄屏布局下，右键删除文件时不再误把该文件重新打开 (#22)
 
 - Use the user-provided name for backup filenames
 - Avoid the 64 MiB runtime message limit on session backup and restore
 - Stop the tool card from spinning forever after cancelling a running tool, and move the "Cancelled" marker below the tool card (#21)
 - Preserve line breaks in ask-user and permission-prompt card text, and align the icon to the first line for multi-line text (#23)
+- File editor: deleting a file from the right-click menu no longer spuriously reopens it in the compact (narrow) layout (#22)
 
 ### 变更 / Changed
 
