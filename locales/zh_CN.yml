@@ -1,4 +1,4 @@
-﻿# Cebian 扩展 i18n —— 简体中文（zh_CN，大陆用户）。
+# Cebian 扩展 i18n —— 简体中文（zh_CN，大陆用户）。
 # 修改时请同步 locales/en.yml 与 locales/zh_TW.yml。规范见 .agents/skills/i18n-naming/SKILL.md。
 
 # ─── Manifest（扁平顶层 key，见规范"Manifest localization"）───
@@ -384,6 +384,16 @@ chat:
     autoStoppedTime: "录制已自动停止：达到时长上限"
   askUser:
     placeholder: "输入回复…"
+  form:
+    submit: "提交"
+    required: "此项为必填"
+    selectPlaceholder: "请选择…"
+    # $1 = 最少，$2 = 最多
+    selectRange: "请选择 $1-$2 个选项"
+    # $1 = 最少
+    minSelect: "请至少选择 $1 个选项"
+    # $1 = 最多
+    maxSelect: "最多选择 $1 个选项"
   permission:
     # 技能脚本运行前的授权提示。$1 = 技能名，$2 = 脚本路径
     title: "技能 $1 想要运行 $2"
@@ -534,6 +544,7 @@ tools:
   executeJs: "正在执行脚本"
   screenshot: "正在截取页面截图"
   askUser: "等待用户回答"
+  presentForm: "收集用户输入"
   pdf:
     info: "正在读取 PDF 元信息"
     # $1 = 页码范围（如 "1-10"）或字面量 "all pages"

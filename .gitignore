@@ -31,6 +31,10 @@ web-ext.config.ts
 .env.local
 .env.*.local
 
+# pnpm-only project — npm lockfile must never be committed
+package-lock.json
+pnpm-workspace.yaml
+
 # Astro site build output / cache
 site/.astro/
 site/dist/

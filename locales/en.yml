@@ -1,4 +1,4 @@
-﻿# Cebian extension i18n — English (default).
+# Cebian extension i18n — English (default).
 # Edit this file along with locales/zh_CN.yml and locales/zh_TW.yml.
 # See .agents/skills/i18n-naming/SKILL.md.
 
@@ -388,6 +388,16 @@ chat:
     autoStoppedTime: "Recording auto-stopped: time limit reached"
   askUser:
     placeholder: "Type a reply…"
+  form:
+    submit: "Submit"
+    required: "This field is required"
+    selectPlaceholder: "Select…"
+    # $1 = min, $2 = max
+    selectRange: "Select $1-$2 options"
+    # $1 = min
+    minSelect: "Select at least $1 option(s)"
+    # $1 = max
+    maxSelect: "Select at most $1 option(s)"
   permission:
     # Permission prompt shown before a skill script runs. $1 = skill name, $2 = script path
     title: "Skill $1 wants to run $2"
@@ -547,6 +557,7 @@ tools:
   executeJs: "Running script"
   screenshot: "Taking page screenshot"
   askUser: "Waiting for user reply"
+  presentForm: "Collecting user input"
   pdf:
     info: "Reading PDF metadata"
     # $1 = page range (e.g. "1-10") or the literal "all pages"

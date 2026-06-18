@@ -1,5 +1,6 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import { createSessionAskUserTool } from './ask-user';
+import { createSessionPresentFormTool } from './present-form';
 import { executeJsTool } from './execute-js';
 import { readPageTool } from './read-page';
 import { interactTool } from './interact';
@@ -19,7 +20,7 @@ import { fsSaveUrlTool } from './fs-save-url';
 import { createSessionRunSkillTool } from './run-skill';
 import { chromeApiTool } from './chrome-api-tool';
 import { SessionToolContext } from './session-context';
-import { TOOL_ASK_USER } from '@/lib/tools/names';
+import { TOOL_ASK_USER, TOOL_PRESENT_FORM } from '@/lib/tools/names';
 import { getMCPManager } from '@/lib/mcp/manager';
 import { createMCPAgentTool } from './mcp-tool';
 
@@ -101,6 +102,9 @@ export async function createSessionTools(sessionId: string): Promise<{
   // Register interactive tools (each gets its own bridge)
   const { tool: askUserTool, bridge: askUserBridge } = createSessionAskUserTool();
   ctx.register(TOOL_ASK_USER, askUserBridge, askUserTool);
+
+  const { tool: presentFormTool, bridge: presentFormBridge } = createSessionPresentFormTool();
+  ctx.register(TOOL_PRESENT_FORM, presentFormBridge, presentFormTool);
 
   const tools = await buildSessionToolArray(ctx);
 

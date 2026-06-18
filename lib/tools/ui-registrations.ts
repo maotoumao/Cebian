@@ -3,3 +3,4 @@
 // Add new interactive tool UI registrations here — do NOT scatter them in main.tsx.
 
 import './ask-user-registry';
+import './present-form-registry';

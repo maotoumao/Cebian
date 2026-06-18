@@ -24,6 +24,7 @@ import {
   TOOL_FS_SAVE_URL,
   TOOL_RUN_SKILL,
   TOOL_CHROME_API,
+  TOOL_PRESENT_FORM,
 } from '@/lib/tools/names';
 
 export function getToolLabel(name: string, args: Record<string, any> = {}): string {
@@ -85,6 +86,8 @@ export function getToolLabel(name: string, args: Record<string, any> = {}): stri
     case TOOL_CHROME_API:
       if (args.namespace === 'help') return t('tools.chromeApi.help');
       return t('tools.chromeApi.call', [args.namespace ?? '', args.method ?? '']);
+    case TOOL_PRESENT_FORM:
+      return t('tools.presentForm');
     default:
       return name;
   }

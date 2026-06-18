@@ -44,3 +44,5 @@ export const TOOL_FS_SAVE_URL = 'fs_save_url' as const;
 export const TOOL_RUN_SKILL = 'run_skill' as const;
 /** Tool that calls Chrome browser APIs directly via structured parameters */
 export const TOOL_CHROME_API = 'chrome_api' as const;
+/** Tool that presents a multi-field form to the user and collects structured responses */
+export const TOOL_PRESENT_FORM = 'present_form' as const;
