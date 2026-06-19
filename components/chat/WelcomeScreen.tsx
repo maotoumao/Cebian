@@ -34,7 +34,7 @@ export function WelcomeScreen({ hasModel, onPickExample, onOpenSettings }: Welco
   ];
 
   return (
-    <div className="m-auto flex w-full max-w-105 flex-col items-center gap-3 px-2 py-12 text-center">
+    <div className="m-auto flex w-full max-w-105 flex-col items-center gap-3 px-2 pt-24 pb-12 text-center">
       <div className="grid size-10 place-items-center rounded-xl bg-primary/10">
         <SquarePen className="size-5 text-primary" />
       </div>
@@ -49,7 +49,7 @@ export function WelcomeScreen({ hasModel, onPickExample, onOpenSettings }: Welco
         </div>
       ) : (
         <>
-          <p className="text-sm text-muted-foreground">{t('chat.session.welcomeReady')}</p>
+          <p className="text-base font-medium text-foreground">{t('chat.session.welcomeReady')}</p>
 
           <div className="mt-2 grid w-full grid-cols-1 gap-2.5 min-[340px]:grid-cols-2">
             {examples.map(({ icon: Icon, title, prompt }) => (
