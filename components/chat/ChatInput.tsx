@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { ModelSelector } from '@/components/chat/ModelSelector';
 import { ThinkingLevelSelector } from '@/components/chat/ThinkingLevelSelector';
 import { RecordButton } from '@/components/chat/RecordButton';
+import { MicButton } from '@/components/chat/MicButton';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { activeModel, thinkingLevel, providerCredentials, customProviders as customProvidersStorage, type ThinkingLevel } from '@/lib/persistence/storage';
 import { getModel } from '@earendil-works/pi-ai';
@@ -28,6 +29,9 @@ import {
 import { recordingToAttachment } from '@/lib/recorder/to-attachment';
 import { recorderChannel } from '@/lib/recorder/sidepanel-channel';
 import { useRecorder } from '@/hooks/useRecorder';
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
+import { appendTranscript, cleanTranscript } from '@/lib/speech/transcript';
+import { queryMicPermission, openMicPermissionPage, openSystemMicSettings } from '@/lib/speech/mic-permission';
 import { useMobileEmulation } from '@/hooks/useMobileEmulation';
 import { downloadFile, formatDuration, formatCharCount } from '@/lib/utils';
 import { t } from '@/lib/i18n';
@@ -143,6 +147,127 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     setCurrentThinkingLevel(level);
   };
 
+  // ─── 语音输入（本地 on-device 识别）──────────────────────────────
+  // hook 持有在 ChatInput 这一层（而非 MicButton 内），因为识别结果要写进本
+  // 输入框。
+  //
+  // 设计（「直接改 input」）：interim 直接作为 value 末尾的「未定稿后缀」写进
+  // 真实 value——输入框始终可编辑（不 readOnly、不屏蔽键盘）。
+  //
+  // 两个 ref 保证正确：
+  //  - interimSuffixRef：当前挂在 value 末尾的未定稿后缀（含补的空格），下一段
+  //    interim/final 到来时按其长度精确剥掉再追加。
+  //  - lastSpeechValueRef：上次由语音写入的完整 value。若当前 value 与之不等，
+  //    说明用户/历史/斜杠菜单等外部路径改了 value——此时不剥旧后缀，直接以当前
+  //    value 为新 base 往后追加，绝不删用户内容（符合「编辑时说话是用户自己的
+  //    事」，且保证无数据丢失）。
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const interimSuffixRef = useRef('');
+  const lastSpeechValueRef = useRef(value);
+
+  // 计算本次语音写入的 base：value 自上次语音写入后被外部改动 → 以当前 value 为
+  // base（不剥后缀）；否则按已知后缀长度精确剥掉。
+  const speechBase = (): string => {
+    const cur = valueRef.current;
+    // 外部改过 value（用户/历史/斜杠菜单），丢弃旧后缀跟踪，以当前 value 为 base。
+    if (cur !== lastSpeechValueRef.current) return cur;
+    const suffixLen = interimSuffixRef.current.length;
+    return suffixLen > 0 ? cur.slice(0, cur.length - suffixLen) : cur;
+  };
+
+  const writeSpeechValue = (next: string, suffix: string) => {
+    interimSuffixRef.current = suffix;
+    lastSpeechValueRef.current = next;
+    valueRef.current = next;
+    setValue(next);
+    setHistoryIndex(null);
+  };
+
+  // 实时中间结果：以当前 base 追加最新 interim 预览。
+  const handleInterim = useCallback((interimRaw: string) => {
+    const base = speechBase();
+    const next = appendTranscript(base, interimRaw);
+    writeSpeechValue(next, next.slice(base.length));
+  }, []);
+
+  // 每段 final（已清洗 + 经 correctTranscript）：以当前 base 追加正式文本，清空后缀。
+  const commitTranscript = useCallback((text: string) => {
+    const base = speechBase();
+    const next = appendTranscript(base, text);
+    writeSpeechValue(next, '');
+  }, []);
+
+  // 把当前未定稿的 interim 后缀就地清洗定稿，返回定稿后的文本。用于停止 / 发送
+  // 前，确保「正在说的那句」不丢、且 CJK 空格被清掉。
+  const finalizePendingInterim = useCallback((): string => {
+    if (!interimSuffixRef.current) return valueRef.current;
+    const base = speechBase();
+    const finalized = appendTranscript(base, cleanTranscript(interimSuffixRef.current));
+    writeSpeechValue(finalized, '');
+    return finalized;
+  }, []);
+
+  // 归一化错误 → toast / 引导。`not-allowed` 兜底处理「query 返回 unknown 后
+  // 实际未授权」的情况：打开授权页。
+  const handleSpeechError = useCallback((kind: string) => {
+    switch (kind) {
+      case 'not-allowed':
+        toast.info(t('chat.composer.voiceNeedPermission'));
+        openMicPermissionPage();
+        break;
+      case 'language-unavailable':
+        toast.error(t('chat.composer.voiceLanguageUnavailable'));
+        break;
+      case 'no-speech':
+        toast.info(t('chat.composer.voiceNoSpeech'));
+        break;
+      case 'audio-capture':
+        toast.error(t('chat.composer.voiceAudioCapture'));
+        break;
+      // network（强制本地后理论上不出现）/ unknown：通用失败提示。
+      case 'network':
+      case 'unknown':
+        toast.error(t('chat.composer.voiceFailed'));
+        break;
+      // aborted 不会经此上报；其余忽略。
+      default:
+        break;
+    }
+  }, []);
+
+  const speech = useSpeechRecognition({
+    onInterim: handleInterim,
+    onFinal: commitTranscript,
+    onError: handleSpeechError,
+  });
+
+  const speechActive = speech.state === 'listening' || speech.state === 'preparing';
+
+  // 点击麦克风：听写中→定稿当前 interim 并停止；否则按授权态决定直接听写 /
+  // 开授权页 / 开设置页。
+  const handleMicClick = useCallback(async () => {
+    if (speechActive) {
+      finalizePendingInterim();
+      speech.stop();
+      return;
+    }
+    const perm = await queryMicPermission();
+    if (perm === 'granted' || perm === 'unknown') {
+      // unknown：无法探测，乐观尝试；若实际未授权，识别会回 not-allowed 走引导。
+      void speech.start();
+      return;
+    }
+    if (perm === 'denied') {
+      toast.error(t('chat.composer.voiceDenied'));
+      openSystemMicSettings();
+      return;
+    }
+    // prompt：尚未授权，打开授权页让用户在普通标签页完成一次授权。
+    toast.info(t('chat.composer.voiceNeedPermission'));
+    openMicPermissionPage();
+  }, [speechActive, finalizePendingInterim, speech]);
+
   // Auto-resize textarea. When the value is empty (initial mount, after
   // send) we clear the inline height entirely and let CSS `min-h-11 /
   // max-h-37.5` drive sizing. This avoids a first-paint race in the
@@ -242,9 +367,17 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       return;
     }
 
+    // 发送前停止听写并把当前未定稿的 interim 就地清洗定稿，确保「正在说的那句」
+    // 一并发出、且 CJK 空格被清掉。
+    let outgoingText = value;
+    if (speechActive) {
+      outgoingText = finalizePendingInterim();
+      speech.stop();
+    }
+
     // Snapshot the text BEFORE any await so a fast follow-up edit doesn't
     // leak into the outgoing message.
-    const text = value.trim();
+    const text = outgoingText.trim();
     const dispatchSessionId = sessionIdRef.current;
 
     isDispatchingRef.current = true;
@@ -283,11 +416,16 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     }
   };
 
-  // Reset history navigation when switching sessions.
+  // Reset history navigation when switching sessions. Also stop any active
+  // dictation and drop the pending interim tracking so a late final from the
+  // previous session can't append into the new session's composer
+  // （speech.stop 在空闲时是无副作用的 no-op）。
   useEffect(() => {
     setHistoryIndex(null);
     setDraft('');
-  }, [sessionId]);
+    interimSuffixRef.current = '';
+    speech.stop();
+  }, [sessionId, speech.stop]);
 
   const handleKeyDown = (e: KeyboardEvent) => {
     // Don't intercept anything while the IME is composing (e.g. Chinese pinyin).
@@ -904,6 +1042,13 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           </div>
 
           <div className="flex items-center gap-1">
+            {speech.supported && (
+              <MicButton
+                state={speech.state}
+                onClick={() => { void handleMicClick(); }}
+                disabled={isDispatching}
+              />
+            )}
             {isAgentRunning ? (
               <Button
                 variant="destructive"

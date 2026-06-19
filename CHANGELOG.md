@@ -18,6 +18,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 新增 / Added
+
+- 对话输入框支持语音输入：点击麦克风按钮即可把语音实时转写进输入框，离线本地识别（基于浏览器 on-device 语音引擎，音频不离开设备），首次使用会自动下载所选语言的语音模型 (#20)
+- 新增通用授权页用于在标签页中完成麦克风授权（侧边栏无法直接弹出授权框）
+
+- Voice input in the chat composer: click the mic button to transcribe speech into the input in real time, recognized locally on-device (the browser's on-device speech engine — audio never leaves your device); the language model for your locale is downloaded automatically on first use (#20)
+- Added a generic permission page to grant microphone access from a tab (the side panel can't show the prompt directly)
+
 ### 修复 / Fixed
 
 - 备份文件名使用用户填写的名称

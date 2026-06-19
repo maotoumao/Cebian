@@ -40,7 +40,7 @@ const ALLOWED_TOP_KEYS = new Set([
   // Manifest exception (Chrome __MSG_*__ does not allow dots in key).
   'extName', 'extDescription', 'actionTitle',
   // Namespaces.
-  'common', 'chat', 'settings', 'provider', 'tools', 'vfs', 'dialogs', 'errors', 'agent',
+  'common', 'chat', 'settings', 'provider', 'tools', 'vfs', 'permission', 'dialogs', 'errors', 'agent',
 ]);
 
 async function* walk(dir) {

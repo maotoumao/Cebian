@@ -370,6 +370,16 @@ chat:
     noPrompts: "No prompts yet — create one from AI config"
     noMatch: "No matches"
     iframeEnterHint: "⏎ enter"
+    # Voice input (on-device speech recognition)
+    voiceStart: "Voice input"
+    voiceStop: "Stop voice input"
+    voicePreparing: "Preparing the speech model…"
+    voiceNeedPermission: "Microphone access is needed — grant it in the tab that just opened, then click the mic again."
+    voiceDenied: "Microphone access is blocked. Allow it for Cebian in Chrome settings, then try again."
+    voiceLanguageUnavailable: "On-device speech isn't available for your language on this device."
+    voiceNoSpeech: "No speech detected. Try again."
+    voiceAudioCapture: "No microphone was found, or it couldn't be accessed."
+    voiceFailed: "Voice input failed. Please try again."
   attachments:
     image: "Image"
     screenshot: "Screenshot"
@@ -655,6 +665,21 @@ vfs:
   # $1 = path
   pathNotFound: "Path not found: $1"
   unknownError: "Unknown error"
+
+# ─── Standalone user-permission page (entrypoints/user-permission) ───
+permission:
+  retry: "Request again"
+  unknownType: "Unsupported permission request."
+  microphone:
+    title: "Request microphone access"
+    description: "Cebian needs microphone access for voice input. Click the button below, then choose Allow in the browser prompt."
+    allow: "Allow microphone"
+    requesting: "Waiting for your response…"
+    granted: "Microphone access granted. This tab will close automatically."
+    dismissed: "The request was dismissed. You can try again."
+    denied: "Microphone access was blocked."
+    deniedHint: "To use voice input, allow the microphone for Cebian in Chrome settings — it just opened in a new tab."
+    deviceError: "No microphone was found, or it couldn't be accessed. Check your device and try again."
 
 # ─── Errors (toasts, thrown messages) ───
 errors:

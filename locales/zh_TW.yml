@@ -366,6 +366,16 @@ chat:
     noPrompts: "尚無 Prompt，前往 AI 設定建立"
     noMatch: "無相符結果"
     iframeEnterHint: "⏎ 點擊進入"
+    # 語音輸入（本地語音辨識）
+    voiceStart: "語音輸入"
+    voiceStop: "停止語音輸入"
+    voicePreparing: "正在準備語音模型…"
+    voiceNeedPermission: "需要麥克風權限——請在剛開啟的分頁裡授權，然後再點一次麥克風。"
+    voiceDenied: "麥克風權限被拒絕。請在 Chrome 設定裡允許 Cebian 使用麥克風，然後重試。"
+    voiceLanguageUnavailable: "本裝置的本地語音辨識不支援當前語言。"
+    voiceNoSpeech: "沒有聽到語音，請重試。"
+    voiceAudioCapture: "找不到麥克風，或無法存取。"
+    voiceFailed: "語音輸入失敗，請重試。"
   attachments:
     image: "圖片"
     screenshot: "螢幕截圖"
@@ -642,6 +652,21 @@ vfs:
   # $1 = 路徑
   pathNotFound: "路徑不存在：$1"
   unknownError: "未知錯誤"
+
+# ─── 獨立授權頁（entrypoints/user-permission）───
+permission:
+  retry: "重新請求"
+  unknownType: "不支援的權限請求。"
+  microphone:
+    title: "請求使用麥克風"
+    description: "語音輸入需要麥克風權限。點擊下面的按鈕，然後在瀏覽器彈窗中選擇「允許」。"
+    allow: "允許麥克風"
+    requesting: "等待你的選擇…"
+    granted: "已取得麥克風權限，此分頁將自動關閉。"
+    dismissed: "請求被關閉了，可以重新嘗試。"
+    denied: "麥克風權限被拒絕了。"
+    deniedHint: "要使用語音輸入，請在剛開啟的 Chrome 設定頁裡允許 Cebian 使用麥克風。"
+    deviceError: "找不到麥克風，或無法存取。請檢查裝置後重試。"
 
 # ─── 錯誤（toast、抛出的錯誤訊息）───
 errors:

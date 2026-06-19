@@ -59,6 +59,7 @@ settings    # /settings/* page (layout, providers, instructions, prompts, skills
 provider    # provider sub-components (oauth, apiKey, custom)
 tools       # agent tool runtime labels (shown in ToolCard while a tool runs)
 vfs         # standalone VFS browser entrypoint (entrypoints/vfs)
+permission  # standalone user-permission entrypoint (entrypoints/user-permission)
 dialogs     # modal dialogs
 errors      # toast / inline error messages
 agent       # agent-runtime user-facing strings

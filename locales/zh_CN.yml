@@ -366,6 +366,16 @@ chat:
     noPrompts: "暂无 Prompt，前往 AI 配置创建"
     noMatch: "无匹配结果"
     iframeEnterHint: "⏎ 点击进入"
+    # 语音输入（本地语音识别）
+    voiceStart: "语音输入"
+    voiceStop: "停止语音输入"
+    voicePreparing: "正在准备语音模型…"
+    voiceNeedPermission: "需要麦克风权限——请在刚打开的标签页里授权，然后再点一次麦克风。"
+    voiceDenied: "麦克风权限被拒绝。请在 Chrome 设置里允许 Cebian 使用麦克风，然后重试。"
+    voiceLanguageUnavailable: "本设备的本地语音识别不支持当前语言。"
+    voiceNoSpeech: "没有听到语音，请重试。"
+    voiceAudioCapture: "没有找到麦克风，或无法访问。"
+    voiceFailed: "语音输入失败，请重试。"
   attachments:
     image: "图片"
     screenshot: "截图"
@@ -643,6 +653,21 @@ vfs:
   # $1 = 路径
   pathNotFound: "路径不存在：$1"
   unknownError: "未知错误"
+
+# ─── 独立授权页（entrypoints/user-permission）───
+permission:
+  retry: "重新请求"
+  unknownType: "不支持的权限请求。"
+  microphone:
+    title: "请求使用麦克风"
+    description: "语音输入需要麦克风权限。点击下面的按钮，然后在浏览器弹窗中选择「允许」。"
+    allow: "允许麦克风"
+    requesting: "等待你的选择…"
+    granted: "已获得麦克风权限，此标签页将自动关闭。"
+    dismissed: "请求被关闭了，可以重新尝试。"
+    denied: "麦克风权限被拒绝了。"
+    deniedHint: "要使用语音输入，请在刚打开的 Chrome 设置页里允许 Cebian 使用麦克风。"
+    deviceError: "没有找到麦克风，或无法访问。请检查设备后重试。"
 
 # ─── 错误（toast、抛出的错误信息）───
 errors:
