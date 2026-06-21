@@ -571,6 +571,8 @@ tools:
     help: "正在查询 Chrome API 文档"
     # $1 = namespace，$2 = method
     call: "正在调用 chrome.$1.$2"
+  # $1 = 搜索关键词
+  searchDocuments: "正在搜索文档 \"$1\""
   interact:
     # $1 = 目标后缀（含前导空格）或为空
     click: "正在点击$1"
@@ -623,7 +625,10 @@ dialogs:
 
 # ─── VFS 浏览入口 ───
 vfs:
-
+  allDocuments: "所有文档"
+  searchPlaceholder: "搜索文件…"
+  searchResults: "搜索结果"
+  noResults: "没有匹配的文件"
   backToRoot: "返回根目录"
   zipping: "打包中…"
   # $1 = 行数

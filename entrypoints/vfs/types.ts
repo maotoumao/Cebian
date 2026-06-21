@@ -22,4 +22,15 @@ export type ViewState =
   | { kind: 'loading' }
   | { kind: 'dir'; path: string; entries: DirEntry[] }
   | { kind: 'file'; path: string; media: FileMedia }
-  | { kind: 'error'; path: string; message: string };
+  | { kind: 'error'; path: string; message: string }
+  | { kind: 'search'; query: string; results: DirEntry[]; paths: string[] }
+  | { kind: 'allDocuments'; entries: AllDocsEntry[] };
+
+/** Entry for the "All Documents" view — includes modification time. */
+export interface AllDocsEntry {
+  name: string;
+  absPath: string;
+  isDir: boolean;
+  size: number;
+  modifiedAt: number;
+}

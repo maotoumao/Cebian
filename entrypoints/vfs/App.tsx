@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Download, Loader2 } from 'lucide-react';
-import { vfs } from '@/lib/persistence/vfs';
+import { Download, Loader2, Search, FileText, Folder, X, List } from 'lucide-react';
+import { vfs, type VfsSearchResult } from '@/lib/persistence/vfs';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { themePreference } from '@/lib/persistence/storage';
 import { downloadFile } from '@/lib/utils';
@@ -15,18 +15,18 @@ import { zipDirectory, zipNameFor } from './lib/download';
 import { Breadcrumbs } from './ui/Breadcrumbs';
 import { DirView } from './ui/DirView';
 import { FileView } from './ui/FileView';
-import type { FileMedia, ViewState } from './types';
+import type { FileMedia, ViewState, AllDocsEntry } from './types';
 
 export default function App() {
   const [theme] = useStorageItem(themePreference, 'system');
   const [themeReady, setThemeReady] = useState(false);
   const [view, setView] = useState<ViewState>({ kind: 'loading' });
-  // Global busy flag for the download button. Kept outside `view` because a
-  // download started on `/prompts` MUST keep running even if the user
-  // navigates away mid-zip (decision A: don't interrupt explicit downloads).
-  // The handler captures its target path from the closure at click time, so
-  // the in-flight task is independent of subsequent view changes.
   const [isDownloading, setIsDownloading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Ref to track if the current view is a "special" view (search / allDocs)
+  // that should not interact with the normal hash-based navigation.
+  const specialViewRef = useRef(false);
 
   // ── Theme sync ──
   useEffect(() => {
@@ -50,19 +50,6 @@ export default function App() {
   }, [theme]);
 
   // ── Load path from hash ──
-  //
-  // Two pieces of cross-call state live in refs:
-  //
-  // 1. `loadIdRef` — every call to loadPath() captures a monotonically
-  //    increasing id at entry and re-checks it after each await. A rapid
-  //    sequence of hashchange events (or a hashchange that fires while a
-  //    previous load is still resolving) would otherwise let a stale
-  //    setView win the race. The old `let stale` flag only flipped on
-  //    effect unmount, so it could not protect against this.
-  //
-  // 2. `blobUrlRef` — image/video/audio media is exposed as `URL.createObjectURL`.
-  //    We revoke the previous URL before issuing a new one (and on unmount)
-  //    to keep memory bounded across many navigations.
   const loadIdRef = useRef(0);
   const blobUrlRef = useRef<string | null>(null);
 
@@ -80,6 +67,17 @@ export default function App() {
       const myId = ++loadIdRef.current;
       const p = getHashPath();
       revokeBlobUrl();
+
+      // If the current view is a special view and the hash hasn't changed
+      // back to a real path, keep the special view active.
+      if (specialViewRef.current) {
+        // Only override if hash is not root/default. Same as "don't interrupt
+        // a search or all-docs view when the hash changes to itself".
+        if (p === '/') return;
+        // User navigated to a real path — clear special mode
+        specialViewRef.current = false;
+      }
+
       setView({ kind: 'loading' });
 
       try {
@@ -105,9 +103,6 @@ export default function App() {
           return;
         }
 
-        // File branch. One blanket size guard for every type — a 50 MB
-        // markdown file is just as painful to render as a 50 MB image,
-        // and the placeholder still lets the user fall back to Download.
         if (st.size > MAX_PREVIEW_BYTES) {
           setView({ kind: 'file', path: p, media: { type: 'tooLarge', size: st.size } });
           return;
@@ -126,19 +121,12 @@ export default function App() {
           const data = (await vfs.readFile(p)) as unknown as Uint8Array;
           if (myId !== loadIdRef.current) return;
           const mime = mimeFor(ext);
-          // `as BlobPart` for the same reason as the download path: the TS
-          // DOM lib types Uint8Array<ArrayBufferLike> which BlobPart's
-          // ArrayBufferView constraint won't accept directly, but the vfs
-          // always hands us a plain ArrayBuffer-backed view.
           const url = URL.createObjectURL(new Blob([data as BlobPart], { type: mime }));
           blobUrlRef.current = url;
           media = { type: klass, mime, size: st.size, url };
         } else if (klass === 'binary') {
-          // No read — just surface size. Download still works independently.
           media = { type: 'binary', size: st.size };
         } else {
-          // Exhaustiveness guard — matches FileView's pattern. If
-          // classifyFile's return union ever grows, TS will flag this.
           const _exhaustive: never = klass;
           throw new Error(`unreachable file class: ${_exhaustive}`);
         }
@@ -157,20 +145,96 @@ export default function App() {
     loadPath();
     window.addEventListener('hashchange', loadPath);
     return () => {
-      // Invalidate any in-flight load and revoke the last blob URL so we
-      // don't leak object URLs across remounts.
       loadIdRef.current++;
       revokeBlobUrl();
       window.removeEventListener('hashchange', loadPath);
     };
   }, [themeReady]);
 
+  // ── Search handler ──
+  const handleSearch = useCallback(async (keyword: string) => {
+    const trimmed = keyword.trim();
+    if (!trimmed) return;
+
+    specialViewRef.current = true;
+    setView({ kind: 'loading' });
+
+    try {
+      const results: VfsSearchResult[] = await vfs.searchAll(trimmed, '/', 200);
+      if (!specialViewRef.current) return; // aborted by navigation
+
+      const entries = results.map((r) => ({
+        name: r.name,
+        isDir: r.isDir,
+        size: r.size,
+      }));
+      const paths = results.map((r) => r.absPath);
+
+      setView({ kind: 'search', query: trimmed, results: entries, paths });
+    } catch (err) {
+      console.error('[vfs.search]', err);
+      setView({ kind: 'error', path: '/', message: 'Search failed' });
+    }
+  }, []);
+
+  // ── All Documents handler ──
+  const handleAllDocuments = useCallback(async () => {
+    specialViewRef.current = true;
+    setView({ kind: 'loading' });
+
+    try {
+      // Use walkFiles to get all files recursively
+      const files = await vfs.walkFiles('/');
+      if (!specialViewRef.current) return;
+
+      // Stat each file for size, also walk directories for the listing
+      const entries: AllDocsEntry[] = [];
+      for (const file of files) {
+        if (!specialViewRef.current) return;
+        try {
+          const st = await vfs.stat(file.absPath);
+          entries.push({
+            name: file.relPath,
+            absPath: file.absPath,
+            isDir: false,
+            size: st.size,
+            modifiedAt: 0, // lightning-fs doesn't expose mtime; sort alphabetically
+          });
+        } catch {
+          entries.push({
+            name: file.relPath,
+            absPath: file.absPath,
+            isDir: false,
+            size: 0,
+            modifiedAt: 0,
+          });
+        }
+      }
+
+      // Sort alphabetically by path for consistent ordering
+      entries.sort((a, b) => a.absPath.localeCompare(b.absPath));
+
+      setView({ kind: 'allDocuments', entries });
+    } catch (err) {
+      console.error('[vfs.allDocuments]', err);
+      setView({ kind: 'error', path: '/', message: 'Failed to list documents' });
+    }
+  }, []);
+
+  // ── Navigate from search / all-docs result ──
+  const handleNavigateTo = useCallback((absPath: string) => {
+    specialViewRef.current = false;
+    navigateTo(absPath);
+  }, []);
+
+  // ── Clear special view ──
+  const handleBackToNavigation = useCallback(() => {
+    specialViewRef.current = false;
+    setSearchQuery('');
+    navigateTo('/');
+  }, []);
+
   // ── Download (file or zipped folder) ──
-  //
-  // Snapshots `view` into a const before the first await so a concurrent
-  // hashchange that flips us to a different path can't redirect the
-  // download to the wrong content. We intentionally do NOT abort on
-  // navigation — see the `isDownloading` declaration comment.
   async function handleDownload() {
     if (isDownloading) return;
     const snapshot = view;
@@ -181,13 +245,6 @@ export default function App() {
       if (snapshot.kind === 'file') {
         const data = (await vfs.readFile(snapshot.path)) as unknown as Uint8Array;
         const name = snapshot.path.split('/').pop() || 'file';
-        // Wrap in Blob — `downloadFile` accepts ArrayBuffer/Blob/string but
-        // not Uint8Array directly. The `as BlobPart` cast is required: the
-        // current TS DOM lib types `Uint8Array<ArrayBufferLike>` which
-        // includes SharedArrayBuffer, but BlobPart only accepts plain
-        // ArrayBuffer-backed views. The vfs always hands us regular
-        // ArrayBuffer, so the cast is sound. Generic octet-stream mime
-        // keeps the browser from rewriting the extension (e.g. .md → .txt).
         downloadFile(name, new Blob([data as BlobPart], { type: 'application/octet-stream' }), 'application/octet-stream');
       } else {
         const data = await zipDirectory(snapshot.path);
@@ -205,7 +262,11 @@ export default function App() {
 
   if (!themeReady) return null;
 
-  const currentPath = view.kind !== 'loading' ? view.path : getHashPath();
+  const currentPath = view.kind !== 'loading' && view.kind !== 'search' && view.kind !== 'allDocuments'
+    ? view.path
+    : getHashPath();
+
+  const isSpecialView = view.kind === 'search' || view.kind === 'allDocuments';
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -218,30 +279,100 @@ export default function App() {
           </div>
           <div className="h-4 w-px bg-border shrink-0" />
           <div className="flex-1 min-w-0">
-            <Breadcrumbs path={currentPath} />
+            {isSpecialView ? (
+              <button
+                onClick={handleBackToNavigation}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                ← {t('vfs.backToRoot')}
+              </button>
+            ) : (
+              <Breadcrumbs path={currentPath} />
+            )}
           </div>
-          {/* Keep the button mounted while a download is in flight, even if
-           *  `view` has flipped to `loading` because the user navigated
-           *  away — otherwise the spinner unmounts and the user loses the
-           *  busy indicator until the download finishes. Hidden only on
-           *  `error` (nothing to download) and on a clean `loading` state
-           *  with no active download. */}
-          {(view.kind === 'file' || view.kind === 'dir' || isDownloading) && (
+          {/* Search toggle + action buttons */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Search button — opens search bar inline */}
             <button
-              onClick={handleDownload}
-              disabled={isDownloading}
-              title={isDownloading ? t('vfs.zipping') : t('common.download')}
-              aria-label={isDownloading ? t('vfs.zipping') : t('common.download')}
-              className="shrink-0 size-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+              onClick={() => {
+                const input = document.querySelector<HTMLInputElement>('[data-vfs-search]');
+                if (input) {
+                  input.focus();
+                  input.select();
+                }
+              }}
+              title={t('vfs.searchPlaceholder')}
+              aria-label={t('vfs.searchPlaceholder')}
+              className="shrink-0 size-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
-              {isDownloading ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Download className="size-4" />
-              )}
+              <Search className="size-4" />
             </button>
-          )}
+            {/* All Documents button */}
+            <button
+              onClick={handleAllDocuments}
+              disabled={view.kind === 'loading'}
+              title={t('vfs.allDocuments')}
+              aria-label={t('vfs.allDocuments')}
+              className="shrink-0 size-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+            >
+              <List className="size-4" />
+            </button>
+            {!isSpecialView && (view.kind === 'file' || view.kind === 'dir' || isDownloading) && (
+              <button
+                onClick={handleDownload}
+                disabled={isDownloading}
+                title={isDownloading ? t('vfs.zipping') : t('common.download')}
+                aria-label={isDownloading ? t('vfs.zipping') : t('common.download')}
+                className="shrink-0 size-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+              >
+                {isDownloading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Download className="size-4" />
+                )}
+              </button>
+            )}
+          </div>
         </header>
+
+        {/* Search bar */}
+        <div className="px-5 py-2 border-b border-border">
+          <div className="max-w-3xl mx-auto relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground/60 pointer-events-none" />
+            <input
+              data-vfs-search
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSearch(searchQuery);
+                }
+                if (e.key === 'Escape') {
+                  setSearchQuery('');
+                  if (isSpecialView) handleBackToNavigation();
+                }
+              }}
+              placeholder={t('vfs.searchPlaceholder')}
+              className="w-full pl-9 pr-8 py-1.5 text-sm bg-muted/50 border border-border rounded-md
+                text-foreground placeholder:text-muted-foreground/40
+                focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/30
+                transition-colors"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  if (isSpecialView) handleBackToNavigation();
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 size-5 inline-flex items-center justify-center
+                  rounded text-muted-foreground/50 hover:text-foreground hover:bg-accent transition-colors"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
 
         {/* Main content */}
         <main className="flex-1 min-h-0 overflow-y-auto">
@@ -255,6 +386,22 @@ export default function App() {
             {view.kind === 'dir' && <DirView path={view.path} entries={view.entries} />}
 
             {view.kind === 'file' && <FileView path={view.path} media={view.media} />}
+
+            {view.kind === 'search' && (
+              <SearchResultsView
+                query={view.query}
+                entries={view.results}
+                paths={view.paths}
+                onNavigate={handleNavigateTo}
+              />
+            )}
+
+            {view.kind === 'allDocuments' && (
+              <AllDocumentsView
+                entries={view.entries}
+                onNavigate={handleNavigateTo}
+              />
+            )}
 
             {view.kind === 'error' && (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -276,4 +423,146 @@ export default function App() {
       </div>
     </TooltipProvider>
   );
+}
+
+// ─── Search Results View ───
+
+function SearchResultsView({
+  query,
+  entries,
+  paths,
+  onNavigate,
+}: {
+  query: string;
+  entries: { name: string; isDir: boolean; size: number }[];
+  paths: string[];
+  onNavigate: (absPath: string) => void;
+}) {
+  if (entries.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
+        <Search size={48} strokeWidth={1} className="opacity-30" />
+        <span className="text-sm">{t('vfs.noResults')}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <h2 className="text-sm font-semibold">{t('vfs.searchResults')}</h2>
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {t('vfs.searchResultCount', [String(entries.length)])}
+        </span>
+      </div>
+      <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
+        {entries.map((entry, i) => {
+          const fullPath = paths[i];
+          // Determine relative display path by stripping the file/dir name
+          const parentDir = fullPath.lastIndexOf('/') > 0
+            ? fullPath.slice(0, fullPath.lastIndexOf('/'))
+            : '/';
+          return (
+            <button
+              key={fullPath}
+              onClick={() => onNavigate(fullPath)}
+              className="group w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-colors text-left"
+            >
+              {entry.isDir ? (
+                <Folder size={18} strokeWidth={1.5} className="shrink-0 text-primary/80 group-hover:text-primary transition-colors" />
+              ) : (
+                <FileText size={18} strokeWidth={1.5} className="shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
+              )}
+              <div className="flex-1 min-w-0">
+                <span className="text-sm truncate block text-foreground/90 group-hover:text-foreground transition-colors">
+                  {entry.name}
+                </span>
+                <span className="text-xs text-muted-foreground/60 truncate block">
+                  {parentDir}
+                </span>
+              </div>
+              {!entry.isDir && (
+                <span className="shrink-0 text-xs text-muted-foreground/60 tabular-nums">
+                  {formatEntrySize(entry.size)}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── All Documents View ───
+
+function AllDocumentsView({
+  entries,
+  onNavigate,
+}: {
+  entries: AllDocsEntry[];
+  onNavigate: (absPath: string) => void;
+}) {
+  if (entries.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
+        <FileText size={48} strokeWidth={1} className="opacity-30" />
+        <span className="text-sm">{t('common.empty.folder')}</span>
+      </div>
+    );
+  }
+
+  // Group by top-level directory for readability
+  const dirs = new Map<string, AllDocsEntry[]>();
+  for (const entry of entries) {
+    const topDir = entry.absPath.split('/')[1] || '(root)';
+    const group = dirs.get(topDir);
+    if (group) group.push(entry);
+    else dirs.set(topDir, [entry]);
+  }
+
+  const sortedDirs = [...dirs.entries()].sort(([a], [b]) => a.localeCompare(b));
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <h2 className="text-sm font-semibold">{t('vfs.allDocuments')}</h2>
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {t('vfs.searchResultCount', [String(entries.length)])}
+        </span>
+      </div>
+      {sortedDirs.map(([topDir, groupEntries]) => (
+        <div key={topDir} className="mb-6">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 px-1">
+            /{topDir}
+          </h3>
+          <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
+            {groupEntries.map((entry) => (
+              <button
+                key={entry.absPath}
+                onClick={() => onNavigate(entry.absPath)}
+                className="group w-full flex items-center gap-3 px-4 py-2 hover:bg-accent/50 transition-colors text-left"
+              >
+                <FileText size={16} strokeWidth={1.5} className="shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm truncate block text-foreground/90 group-hover:text-foreground transition-colors">
+                    {entry.name}
+                  </span>
+                </div>
+                <span className="shrink-0 text-xs text-muted-foreground/60 tabular-nums">
+                  {formatEntrySize(entry.size)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function formatEntrySize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
