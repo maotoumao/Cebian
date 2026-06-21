@@ -1,9 +1,59 @@
 ---
-title: Providers
-description: The model providers Cebian supports.
+title: Provider list
+description: An overview of the model providers Cebian supports.
 group: reference
 order: 1
-placeholder: true
 ---
 
-> This page is being written. Content coming soon.
+Cebian itself doesn't provide model credits. You need to connect your own existing subscription or API Key under "Settings → AI providers", then select a model in the chat input box.
+
+The following is just the list of currently built-in Providers. The actually available models will change with each service; the models selectable in the settings page are authoritative.
+
+## OAuth
+
+These Providers don't require manually entering an API Key; just sign in as prompted on the page.
+
+| Provider | Notes |
+| --- | --- |
+| GitHub Copilot | Access models with a Copilot subscription |
+| OpenAI Codex | Use a ChatGPT Plus / Pro subscription |
+
+## API Key
+
+These Providers require the API Key for the corresponding platform. When saving, Cebian runs a simple connectivity test; if the test doesn't pass, it's still saved, just shown as "Unverified".
+
+- Ant Ling
+- Anthropic
+- Cerebras
+- DeepSeek
+- Fireworks
+- Google Gemini
+- Groq
+- Hugging Face
+- Kimi Coding Plan
+- MiniMax
+- MiniMax (CN)
+- Mistral
+- Moonshot
+- Moonshot (CN)
+- NVIDIA NIM
+- OpenAI
+- OpenRouter
+- Together AI
+- Vercel AI Gateway
+- xAI
+- Xiaomi MiMo
+- Xiaomi MiMo Plan (CN)
+- zAI
+
+## OpenAI Compatible
+
+If you're using an OpenAI-compatible interface, you can add a Provider yourself.
+
+Common scenarios include:
+
+- Locally running Ollama / LM Studio
+- Your own deployment of vLLM, LiteLLM, or a gateway service
+- An OpenAI-compatible interface inside your company
+
+When adding one, enter the name, Base URL, and API Key (if required), then add or automatically fetch the model list.

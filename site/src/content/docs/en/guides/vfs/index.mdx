@@ -3,7 +3,63 @@ title: VFS file system
 description: Cebian's in-browser virtual file system.
 group: guides
 order: 6
-placeholder: true
 ---
 
-> This page is being written. Content coming soon.
+import Placeholder from '@/components/Placeholder.astro';
+import QA from '@/components/docs/QA.astro';
+import QAItem from '@/components/docs/QAItem.astro';
+
+The VFS is Cebian's virtual file system inside the browser. It's not a real directory on your computer, and paths like `/workspaces/` and `~/.cebian/skills/` won't show up in Finder or File Explorer.
+
+Think of it as Cebian's own local file area: model-generated files, Prompts, Skills, and materials in session workspaces are all stored here.
+
+<Placeholder
+dim="1200 × 760"
+ratio="16 / 10"
+label="VFS browser interface"
+/>
+
+## What's stored
+
+The VFS mainly has a few kinds of directories:
+
+- `/workspaces/{sessionId}/`: each conversation's own workspace. When Cebian generates files such as reports, tables, or images in a conversation, they generally go here.
+- `~/.cebian/prompts/`: the prompt files for Slash Prompts.
+- `~/.cebian/skills/`: Skill folders; each Skill is usually a whole directory.
+- `~`: equivalent to `/home/user`, just a virtual user directory.
+
+For everyday use, you don't need to memorize these paths. You only encounter them when viewing files Cebian generated, organizing Prompts / Skills, or troubleshooting file links.
+
+## How it works
+
+The VFS lives in the browser extension's own IndexedDB. That means:
+
+- The data is stored in your local browser; it won't be uploaded to a server just because Cebian has a VFS.
+- It's isolated from your real disk; the model can't directly read or write arbitrary files on your computer.
+- When you uninstall the extension or clear the browser extension's data, the files inside may be deleted along with it.
+
+Cebian's file tools read and write this very VFS. For example, when the model generates a Markdown report for you, it actually creates a `.md` file in the VFS and then gives you a clickable link in the conversation.
+
+## How to open it
+
+The most common way is to open it from a file link in a conversation.
+
+When Cebian creates or saves a file, it usually provides a link such as "View file" or "Open directory" in its reply. Clicking it opens a standalone VFS browser page.
+
+In the VFS browser, you can:
+
+- View directories and files
+- Preview common files such as text, Markdown, images, and audio/video
+- Download a single file
+- Download an entire directory as a zip
+
+If you're just managing Prompts or Skills, prefer the corresponding pages in Settings; the VFS browser is better suited for viewing file results and workspace content.
+
+## Q&A
+
+<QA>
+<QAItem q="I can't find a real folder?">That's normal. The VFS isn't a system directory; it lives in the browser extension's own data area.</QAItem>
+<QAItem q="A file is too large to preview. What now?">Use the download button in the top-right corner to download it first, then open it.</QAItem>
+<QAItem q="A file link in a conversation won't open. What now?">The file may have been deleted, or the current browser data may have been cleared.</QAItem>
+<QAItem q="I want to back up these files. What now?">When using Cebian's backup feature, remember to include workspace files, Prompts, and Skills.</QAItem>
+</QA>

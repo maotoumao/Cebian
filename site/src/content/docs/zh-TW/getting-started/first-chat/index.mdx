@@ -1,9 +1,57 @@
 ---
-title: 第一次对话
-description: 配好模型，发出第一条消息。
+title: 第一次對話
+description: 配好模型，發出第一條訊息。
 group: getting-started
 order: 2
-placeholder: true
 ---
 
-> 本页正在编写中，内容即将补充。
+{/* AUTO-GENERATED from docs/zh by scripts/gen-zhtw.mjs — do not edit; edit zh then run `pnpm gen:zhtw`. */}
+
+import providerConfig from '@/assets/demo/provider-config.mp4';
+
+安裝完成後，點選瀏覽器工具欄裡的 Cebian 圖示開啟側邊欄。第一次使用時，如果還沒配置模型，會看到「請先選擇一個 AI 模型」。
+
+你需要先給 Cebian 接一個 AI 提供商，然後選擇一個模型，就可以開始對話了。
+
+## 配置 AI 提供商
+
+Cebian 本身不提供模型額度，也不需要註冊 Cebian 賬號。你可以使用自己已有的 API Key 或訂閱。
+
+目前主要有幾種方式：
+
+- 如果你有 GitHub Copilot 或 OpenAI Codex 訂閱，可以在 OAuth 區域點選「登入」
+- 如果你有 OpenAI、Anthropic、Google Gemini、DeepSeek、OpenRouter 等 API Key，可以在「通過 API Key」裡填入並儲存
+- 如果你使用 Ollama、LM Studio 或自己搭的 OpenAI 相容服務，可以在 OpenAI Compatible 裡新增自定義提供商
+
+普通使用的話，先配置一個自己最常用的提供商就行，MCP 和 Skill 都可以之後再看。
+
+<video controls preload="metadata" src={providerConfig} aria-label="配置 AI 提供商並選擇模型的操作演示"></video>
+
+## 選擇模型
+
+配置完成後，回到新對話頁面，在輸入框左下角點選「選擇模型」。
+
+選擇一個模型後，就可以在輸入框裡輸入內容了。如果當前模型支援思考檔，旁邊還會出現「思考」選項；不知道選哪個的話，先保持預設就行。
+
+## 發出第一條訊息
+
+你可以直接問當前頁面相關的問題，比如：
+
+- 總結一下當前頁面
+- 把我選中的內容翻譯成中文
+- 提取這個頁面裡的關鍵連結
+- 看看我打開了哪些標籤頁，幫我整理一下
+
+Cebian 會帶上當前標籤頁的標題、URL、選中文本和標籤頁列表等上下文。如果需要讀取頁面正文，它會再按需呼叫工具去讀。
+
+## 可以先試試示例
+
+配置好模型後，新對話頁會出現幾個示例卡片，比如「總結當前頁面」「翻譯當前頁面」「提取頁面要點」。
+
+點選示例卡片後，它會把對應的內容填到輸入框裡，你可以直接傳送，也可以先改成自己的說法再發送。
+
+## 如果發不出去
+
+- 提示「請先選擇一個 AI 模型」：回到輸入框左下角選擇模型
+- 提供商顯示「未驗證」：API Key 已儲存，但連通性測試沒通過，可以先試著傳送一條訊息看看
+- 當前頁面無法讀取：Chrome 外掛市場、瀏覽器設定頁、部分特殊頁面本來就不允許擴充套件讀取內容，可以換一個普通網頁再試

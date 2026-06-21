@@ -6,8 +6,13 @@ interface Props {
   feature: Dict['home']['features'][number];
   /** 偶数正常、奇数左右翻转 */
   index: number;
+  /** 演示视频（已 import 的资源 URL）；缺省时回退到占位框。 */
+  video?: string;
+  /** 暂停 / 播放按钮的无障碍文案（随状态切换）。 */
+  pauseLabel?: string;
+  playLabel?: string;
 }
-const { feature, index } = Astro.props;
+const { feature, index, video, pauseLabel, playLabel } = Astro.props;
 const flip = index % 2 === 1;
 ---
 <div class:list={['feature', { flip }]}>
@@ -24,22 +29,102 @@ const flip = index % 2 === 1;
     </ul>
   </div>
   <div class="feature-media">
-    <Placeholder dim="1040 × 715" label={feature.shotLabel} ratio="16 / 11" />
+    {video
+      ? (
+        <div class="feature-vid-wrap">
+          <video class="feature-vid" src={video} autoplay muted loop playsinline preload="metadata" aria-label={feature.shotLabel}></video>
+          <button type="button" class="vid-toggle" data-playing="true" data-pause={pauseLabel} data-play={playLabel} aria-label={pauseLabel}>
+            <svg class="ic-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+            <svg class="ic-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+        </div>
+      )
+      : <Placeholder dim="1040 × 715" label={feature.shotLabel} ratio="16 / 11" />}
   </div>
 </div>
 
 <style>
-  .feature { display: grid; grid-template-columns: 1fr 1.14fr; gap: clamp(32px, 5vw, 68px); align-items: center; }
+  /* 视频列固定为宽列；翻转行连列宽一起反转，保证三个视频始终落在同样宽的轨道。 */
+  .feature { display: grid; grid-template-columns: 0.82fr 1.45fr; gap: clamp(32px, 5vw, 60px); align-items: center; }
+  .feature.flip { grid-template-columns: 1.45fr 0.82fr; }
   .feature.flip .feature-text { order: 2; }
   .feature.flip .feature-media { order: 1; }
   .feature h2 { font-size: clamp(26px, 3.2vw, 36px); font-weight: 700; letter-spacing: -0.03em; }
-  .feature p { margin-top: 16px; max-width: 46ch; color: var(--ink-muted); font-size: 16px; line-height: 1.62; }
+  .feature p { margin-top: 16px; max-width: 42ch; color: var(--ink-muted); font-size: 16px; line-height: 1.62; }
   .feature-points { margin-top: 22px; display: flex; flex-direction: column; gap: 13px; list-style: none; }
   .feature-points li { display: flex; gap: 11px; font-size: 15px; color: var(--ink); }
   .feature-points svg { width: 18px; height: 18px; color: var(--accent); flex: none; margin-top: 1px; }
 
+  .feature-vid-wrap { position: relative; }
+  /* 统一 16:9 盒子 + contain：三个视频尺寸完全一致，且不裁切画面内容。 */
+  .feature-vid {
+    display: block; width: 100%; aspect-ratio: 16 / 9; height: auto;
+    object-fit: contain;
+    border-radius: 12px; border: 1px solid var(--line);
+    background: var(--surface-2);
+    box-shadow:
+      0 2px 4px rgba(24, 24, 27, 0.04),
+      0 18px 40px -22px rgba(24, 24, 27, 0.22);
+  }
+  [data-theme="dark"] .feature-vid {
+    border-color: var(--line-2);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 20px 44px -22px rgba(0, 0, 0, 0.6);
+  }
+
+  /* 暂停 / 播放小钮：环境播放保持简洁，又给所有用户一个控制入口（无障碍）。 */
+  .vid-toggle {
+    position: absolute; right: 12px; bottom: 12px;
+    width: 36px; height: 36px; display: grid; place-items: center;
+    border: none; border-radius: 50%; cursor: pointer;
+    color: #fff; background: rgba(20, 20, 22, 0.55);
+    backdrop-filter: blur(6px);
+    opacity: 0; transition: opacity .2s var(--ease), background .15s;
+  }
+  .feature-vid-wrap:hover .vid-toggle,
+  .vid-toggle:focus-visible { opacity: 1; }
+  .vid-toggle[data-playing="false"] { opacity: 1; }
+  .vid-toggle:hover { background: rgba(20, 20, 22, 0.72); }
+  .vid-toggle svg { width: 18px; height: 18px; }
+  .vid-toggle .ic-play { display: none; margin-left: 1px; }
+  .vid-toggle[data-playing="false"] .ic-pause { display: none; }
+  .vid-toggle[data-playing="false"] .ic-play { display: block; }
+
   @media (max-width: 900px) {
-    .feature { grid-template-columns: 1fr; gap: 32px; }
+    .feature, .feature.flip { grid-template-columns: 1fr; gap: 28px; }
     .feature.flip .feature-text, .feature.flip .feature-media { order: initial; }
+    /* 移动端按钮常驻，触屏没有 hover */
+    .vid-toggle { opacity: 1; }
   }
 </style>
+
+<script>
+  // 首页演示视频：环境自动循环播放 + 暂停/播放小钮（方案 b，对所有用户可控）。
+  // reduced-motion 时默认暂停并显示按钮，由用户主动播放。
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  for (const wrap of document.querySelectorAll<HTMLElement>('.feature-vid-wrap')) {
+    const video = wrap.querySelector<HTMLVideoElement>('.feature-vid');
+    const btn = wrap.querySelector<HTMLButtonElement>('.vid-toggle');
+    if (!video || !btn) continue;
+
+    if (reduce) {
+      video.removeAttribute('autoplay');
+      video.pause();
+    }
+    const sync = () => {
+      const playing = !video.paused;
+      btn.setAttribute('data-playing', String(playing));
+      // 标签描述「按钮按下后的动作」：播放中 → 暂停，已暂停 → 播放。
+      const label = playing ? btn.dataset.pause : btn.dataset.play;
+      if (label) btn.setAttribute('aria-label', label);
+    };
+    btn.addEventListener('click', () => {
+      if (video.paused) video.play();
+      else video.pause();
+    });
+    video.addEventListener('play', sync);
+    video.addEventListener('pause', sync);
+    sync();
+  }
+</script>
+
+

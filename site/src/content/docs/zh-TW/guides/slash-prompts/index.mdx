@@ -1,9 +1,95 @@
 ---
 title: Slash Prompts
-description: 用斜杠唤起你自己的提示词库。
+description: 用斜槓喚起你自己的提示詞庫。
 group: guides
 order: 2
-placeholder: true
 ---
 
-> 本页正在编写中，内容即将补充。
+{/* AUTO-GENERATED from docs/zh by scripts/gen-zhtw.mjs — do not edit; edit zh then run `pnpm gen:zhtw`. */}
+
+import Placeholder from '@/components/Placeholder.astro';
+import QA from '@/components/docs/QA.astro';
+import QAItem from '@/components/docs/QAItem.astro';
+
+Slash Prompt 是一組你自己寫的提示詞模板。平時輸入訊息時，只要先輸入 `/`，就可以從列表裡選一個模板填進輸入框。
+
+它適合儲存那些你經常重複寫的要求，比如總結網頁、翻譯選中內容、整理會議記錄、改寫文案等。
+
+![截圖](./input-box.png)
+
+## 建立 Prompt
+
+入口在「設定 → 提示詞」。
+
+![截圖](./snapshot.png)
+
+點選左側的「新建檔案」後，會建立一個 Markdown 檔案。一個 Prompt 檔案大致長這樣：
+
+```md
+---
+name: summarize-page
+description: 總結當前頁面
+---
+
+請閱讀當前頁面內容，用簡潔的要點總結它。
+```
+
+其中：
+
+- `name` 是斜槓選單裡顯示的名字
+- `description` 是一行說明，方便你之後區分
+- frontmatter 下面的正文，就是最終會填進輸入框的內容
+
+普通使用的話，先寫幾個短模板就夠了。等用順手了，再慢慢整理成自己的提示詞庫。
+
+> 注意：檔名沒有特別的意義，斜槓選單裡顯示的名字是 frontmatter 裡的 `name` 欄位。你可以隨時改 `name` 來調整選單裡的顯示，而不必改檔名。
+
+## 在對話裡使用
+
+回到對話輸入框，輸入 `/` 就會開啟 Prompt 列表。
+
+你可以繼續輸入關鍵詞篩選，選中後按回車，或者直接點選某一項。Cebian 會把 Prompt 內容填進輸入框。
+
+填入後不會自動傳送。你可以先改一下，再手動傳送。
+
+## 模板變數
+
+Prompt 裡可以寫一些變數，觸發時 Cebian 會替換成當前環境裡的真實內容。
+
+| 變數 | 含義 |
+| --- | --- |
+| `{{selected_text}}` | 當前頁面選中的文字 |
+| `{{page_url}}` | 當前頁面 URL |
+| `{{page_title}}` | 當前頁面標題 |
+| `{{date}}` | 當前日期 |
+| `{{clipboard}}` | 剪貼簿內容 |
+
+比如：
+
+```md
+---
+name: translate-selection
+description: 翻譯選中的內容
+---
+
+請把下面這段內容翻譯成簡體中文：
+
+{{selected_text}}
+```
+
+如果某個變數取不到內容，會被替換成空字串；如果變數名寫錯了，會原樣留在文本里。
+
+## 檔案位置
+
+Prompt 檔案儲存在 VFS 裡的 `~/.cebian/prompts/`。
+
+你一般不用手動開啟這個路徑，直接在「設定 → 提示詞」裡編輯就行。備份時選擇「技能與提示詞」，這些檔案也會一起備份。
+
+## Q&A
+
+<QA>
+	<QAItem q="輸入 / 沒有看到列表怎麼辦？">先去「設定 → 提示詞」建立一個 Prompt。</QAItem>
+	<QAItem q="選中 Prompt 後沒有自動傳送？">這是正常的。Cebian 只會幫你填入輸入框，你可以先改，再手動傳送。</QAItem>
+	<QAItem q="頁面變數為空怎麼辦？">當前頁面可能不允許讀取，或者你沒有選中文字。</QAItem>
+	<QAItem q="Prompt 太長不好維護怎麼辦？">可以拆成幾個更短的模板，用的時候再補充具體要求。</QAItem>
+</QA>

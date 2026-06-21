@@ -7,6 +7,9 @@ import FeatureRow from '../../components/home/FeatureRow.astro';
 import Capabilities from '../../components/home/Capabilities.astro';
 import InstallOptions from '../../components/home/InstallOptions.astro';
 import { getDict, langStaticPaths, type Lang } from '../../lib/i18n';
+import providerConfig from '@/assets/demo/provider-config.mp4';
+import selectTool from '@/assets/demo/select-tool.mp4';
+import recordReplay from '@/assets/demo/record-replay.mp4';
 
 export function getStaticPaths() {
   return langStaticPaths();
@@ -14,6 +17,9 @@ export function getStaticPaths() {
 
 const lang = Astro.params.lang as Lang;
 const t = getDict(lang);
+
+// 三个功能行的演示视频，按 features 顺序一一对应。
+const featureVideos = [providerConfig, selectTool, recordReplay];
 ---
 <BaseLayout lang={lang} title={`${t.site.name} — ${t.site.tagline}`} description={t.site.description} path="/">
   <Hero lang={lang} />
@@ -21,7 +27,7 @@ const t = getDict(lang);
 
   <div class="features wrap section">
     {t.home.features.map((feature, i) => (
-      <FeatureRow feature={feature} index={i} />
+      <FeatureRow feature={feature} index={i} video={featureVideos[i]} pauseLabel={t.home.videoPause} playLabel={t.home.videoPlay} />
     ))}
   </div>
 
@@ -32,5 +38,6 @@ const t = getDict(lang);
 <style>
   .features { display: flex; flex-direction: column; gap: var(--space-section); }
 </style>
+
 
 

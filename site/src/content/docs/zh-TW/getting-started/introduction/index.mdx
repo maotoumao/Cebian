@@ -1,30 +1,42 @@
 ---
-title: 简介
-description: Cebian 是什么、能做什么，以及它和普通 AI 工具的不同。
+title: 簡介
+description: Cebian 是什麼、能做什麼，以及它和普通 AI 工具的不同。
 group: getting-started
 order: 1
 ---
+
+{/* AUTO-GENERATED from docs/zh by scripts/gen-zhtw.mjs — do not edit; edit zh then run `pnpm gen:zhtw`. */}
 import Callout from '@/components/docs/Callout.astro';
 
-Cebian 是一个常驻浏览器侧边栏的 AI Agent。和把对话框开在新标签页的工具不同，它就停在你正在看的页面旁边——读取页面内容、操作浏览器，并通过 MCP 与 Skill 扩展能力。
+Cebian 是一個常駐瀏覽器側邊欄的 AI Agent。安裝之後，你可以點選瀏覽器上的 Cebian 圖示開啟它：
+
+![截圖](./snapshot.png)
+
+在完成 AI 提供商配置後，就可以開始對話了。
 
 <Callout type="tip">
-第一次用不必一上来就配 MCP 和 Skill。先把模型跑通、感受一下页面感知能力，再逐步加深。
+第一次使用時不需要一上來就配置 MCP 和 Skill。可以先試試著做一些一下頁面感知能力，再逐步加深。
 </Callout>
 
-## 核心特点
+## 核心特點
 
-- **本地优先**：对话、Prompt、Skill、附件都存在浏览器本地。除了发给模型厂商的必要请求，不向任何服务器上传数据。
-- **直连你自己的模型**：填入任意厂商的 API Key 即可，不需要账号、不需要积分。
-- **可扩展**：用 Skill 把工作流打包成模型能自取的操作手册，用 MCP 把外部工具接进来。
+- **本地優先**：對話、Prompt、Skill、附件都存在瀏覽器本地。除了發給模型廠商的必要請求，不向任何伺服器上傳資料。
+- **直連你自己的模型**：填入任意廠商的 API Key 即可，不需要賬號、不需要積分、也沒有登入機制。
+- **可擴充套件**：可以接入 MCP 工具*，也可以把常用的操作封裝成 Skill。
 
-## 它能做什么
+> 注：MCP 只支援 http 協議，詳情見 [MCP 章節](/zh-TW/docs/guides/mcp/)。
 
-- 总结当前网页、长文、文档或 PR。
-- 选中任意内容，让模型总结、翻译、改写。
-- 抓取页面里的表格、列表、价格，转成 JSON 或 Markdown。
-- 录制一遍操作，让 Agent 之后自己重放。
+## 能力示例
 
-## 接下来
+- 總結當前網頁、長文、文件或 PR。
+- 選中任意內容，讓模型總結、翻譯、改寫。
+- 抓取頁面裡的表格、列表、價格，轉成 JSON 或 Markdown。
+- 錄製一遍操作，讓 Agent 之後自己重放。
+- 閱讀 PDF 文件，回答相關問題。
+- ……
 
-更多上手内容正在编写中。可以先回到 [文档首页](/zh-TW/docs/) 看看现有的章节。
+## 接下來
+
+如果你還沒安裝，可以先看看 [安裝指南](/zh-TW/docs/getting-started/installation/)。
+如果你已經裝好了，那麼可以看看 [第一次對話](/zh-TW/docs/getting-started/first-chat/) 。
+

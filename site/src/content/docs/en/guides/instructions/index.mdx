@@ -1,9 +1,75 @@
 ---
 title: Custom instructions
-description: Override the default system prompt to shape the model's tone and role.
+description: Override the default System Prompt to set the model's tone and role.
 group: guides
 order: 3
-placeholder: true
 ---
 
-> This page is being written. Content coming soon.
+import QA from '@/components/docs/QA.astro';
+import QAItem from '@/components/docs/QAItem.astro';
+
+Custom instructions tell Cebian how it should answer by default in future conversations with you.
+
+They're best suited for long-term preferences, such as reply language, tone, code style, and explanation depth. For one-off tasks, it's still better to write them directly in the input box.
+
+![Screenshot](./snapshot.png)
+
+
+## How to set it
+
+The entry point is under "Settings → Instructions".
+
+Just write your preferences in "Custom instructions"; the content is saved automatically. The next time you send a message, Cebian appends these instructions after the default rules.
+
+For example, you might write:
+
+```md
+- Reply in Chinese by default
+- Keep answers as concise as possible
+- Use TypeScript by default when discussing code
+- When giving a solution, state the recommended approach first, then the alternatives
+```
+
+## What to put here
+
+It's best to write stable, long-lasting preferences:
+
+- Reply language: Chinese by default, keep necessary terms in English
+- Output style: less small talk, get straight to the conclusion
+- Technical preferences: prefer TypeScript for code examples, pnpm for commands
+- Collaboration habits: ask when unsure, don't just guess
+
+If it's a request for just one conversation, write it directly in that message instead of putting it in custom instructions.
+
+## Boundaries
+
+Custom instructions are appended after Cebian's default rules, but they cannot override the tool protocol and safety rules.
+
+For example:
+
+- They can't make the model bypass tool permissions
+- They can't make the model read pages the browser doesn't allow reading
+- They can't make the model access the real file system on your computer
+- They can't make the model ignore the risk of malicious instructions in web page content
+
+In short, they're for adjusting "how to answer", not for changing Cebian's safety boundaries.
+
+## Common patterns
+
+You can start with a short snippet; it doesn't have to be complete:
+
+```md
+Reply in Chinese by default. Give the conclusion first, then the necessary steps.
+If I need to choose between options, make it clear which one you recommend and why.
+```
+
+Come back and refine it later wherever it doesn't feel right.
+
+## Q&A
+
+<QA>
+<QAItem q="The model talks too much. What now?">Write "Keep answers as concise as possible" here.</QAItem>
+<QAItem q="I want a fixed output format. What now?">Spell out your format preferences for headings, lists, tables, etc.</QAItem>
+<QAItem q="I don't want a certain conversation to follow these instructions. What now?">Just say so in that message.</QAItem>
+<QAItem q="It works worse when written too elaborately. What now?">Remove the rarely used rules and keep just the most important ones.</QAItem>
+</QA>

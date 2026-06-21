@@ -54,6 +54,9 @@ export interface Dict {
       heroShotLabel: string;
     };
     trust: { title: string; note: string }[];
+    /** 演示视频的暂停 / 播放按钮无障碍文案 */
+    videoPause: string;
+    videoPlay: string;
     features: {
       title: string;
       body: string;

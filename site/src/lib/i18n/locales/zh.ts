@@ -55,6 +55,8 @@ export const zh: Dict = {
       { title: '无需账号 / 积分', note: '无需登录，安装即用' },
       { title: '直连自有 API', note: '10+ Provider' },
     ],
+    videoPause: '暂停演示视频',
+    videoPlay: '播放演示视频',
     features: [
       {
         title: '在侧边栏接入任何大模型',

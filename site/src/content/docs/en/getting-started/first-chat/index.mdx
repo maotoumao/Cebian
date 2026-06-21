@@ -1,9 +1,55 @@
 ---
-title: First chat
-description: Set up a model and send your first message.
+title: Your first chat
+description: Configure a model and send your first message.
 group: getting-started
 order: 2
-placeholder: true
 ---
 
-> This page is being written. Content coming soon.
+import providerConfig from '@/assets/demo/provider-config.mp4';
+
+Once installed, click the Cebian icon in your browser toolbar to open the sidebar. The first time you use it, if you haven't configured a model yet, you'll see "Please select an AI model first".
+
+You need to connect an AI provider to Cebian, then select a model, and you can start chatting.
+
+## Configure an AI provider
+
+Cebian itself doesn't provide model credits, and you don't need to register a Cebian account. You can use your own existing API Key or subscription.
+
+There are currently a few main approaches:
+
+- If you have a GitHub Copilot or OpenAI Codex subscription, click "Sign in" in the OAuth area
+- If you have an API Key for OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter, etc., enter and save it under "Via API Key"
+- If you use Ollama, LM Studio, or your own OpenAI-compatible service, add a custom provider under OpenAI Compatible
+
+For everyday use, just configure the one provider you use most; you can look at MCP and Skills later.
+
+<video controls preload="metadata" src={providerConfig} aria-label="Demo of configuring an AI provider and selecting a model"></video>
+
+## Select a model
+
+Once configured, go back to the new conversation page and click "Select model" in the lower-left corner of the input box.
+
+After selecting a model, you can type in the input box. If the current model supports thinking levels, a "Thinking" option will also appear next to it; if you're not sure which to pick, just keep the default.
+
+## Send your first message
+
+You can directly ask questions about the current page, for example:
+
+- Summarize the current page
+- Translate the content I selected into Chinese
+- Extract the key links on this page
+- See which tabs I have open and help me organize them
+
+Cebian will include context such as the current tab's title, URL, selected text, and the tab list. If it needs to read the page body, it will call a tool on demand to read it.
+
+## Try an example first
+
+After configuring a model, the new conversation page will show a few example cards, such as "Summarize the current page", "Translate the current page", and "Extract page highlights".
+
+When you click an example card, it fills the corresponding content into the input box. You can send it directly, or edit it into your own wording first and then send.
+
+## If you can't send
+
+- Prompt "Please select an AI model first": go back to the lower-left corner of the input box and select a model
+- Provider shows "Unverified": the API Key is saved, but the connectivity test didn't pass; try sending a message and see what happens
+- The current page can't be read: the Chrome Web Store, browser settings pages, and some special pages simply don't allow extensions to read their content; try a regular web page instead

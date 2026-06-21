@@ -55,6 +55,8 @@ export const en: Dict = {
       { title: 'No account, no credits', note: 'No sign-in, install and go' },
       { title: 'Your own API', note: '10+ providers' },
     ],
+    videoPause: 'Pause demo video',
+    videoPlay: 'Play demo video',
     features: [
       {
         title: 'Connect any model, in one sidebar',

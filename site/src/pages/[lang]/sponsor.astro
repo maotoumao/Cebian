@@ -56,7 +56,9 @@ const channels = [
         <p>{sp.wechat.desc}</p>
         <div class="sp-action">
           <div class="sp-qr">
-            <img src={WECHAT_QR} alt={sp.wechat.title} width="96" height="96" />
+            <div class="sp-qr-frame">
+              <img src={WECHAT_QR} alt={sp.wechat.title} width="96" height="96" />
+            </div>
             <span class="sp-qr-hint">
               {sp.wechat.hint}
               <a href={WECHAT_QR} target="_blank" rel="noopener">{sp.wechat.viewLarge}</a>
@@ -96,7 +98,9 @@ const channels = [
   /* 操作行贴底，让两张卡片下沿对齐 */
   .sp-action { margin-top: auto; padding-top: 20px; }
   .sp-qr { display: flex; align-items: center; gap: 16px; }
-  .sp-qr img { width: 96px; height: 96px; border-radius: 10px; border: 1px solid var(--line-2); object-fit: cover; background: #fff; }
+  /* 框尺寸不变，框内放大裁切，只保留二维码主体，方便扫码 */
+  .sp-qr-frame { flex: none; width: 96px; height: 96px; border-radius: 10px; border: 1px solid var(--line-2); background: #fff; overflow: hidden; }
+  .sp-qr-frame img { width: 96px; height: 96px; object-fit: cover; transform: translateY(13px) scale(2.3); transform-origin: 50% 36%; }
   .sp-qr-hint { font-size: 13px; color: var(--ink-muted); line-height: 1.6; }
   .sp-qr-hint a { display: block; margin-top: 4px; color: var(--accent); font-weight: 600; }
 

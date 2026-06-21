@@ -1,30 +1,39 @@
 ---
 title: Introduction
-description: What Cebian is, what it does, and how it differs from ordinary AI tools.
+description: What Cebian is, what it can do, and how it differs from ordinary AI tools.
 group: getting-started
 order: 1
 ---
 import Callout from '@/components/docs/Callout.astro';
 
-Cebian is an AI agent that lives in your browser sidebar. Unlike tools that open a chat box in a new tab, it stays right next to the page you're reading — reading page content, driving the browser, and extending its abilities through MCP and Skills.
+Cebian is an AI Agent that lives in your browser sidebar. Once installed, click the Cebian icon in your browser to open it:
+
+![Screenshot](./snapshot.png)
+
+After configuring an AI provider, you can start chatting.
 
 <Callout type="tip">
-You don't need to set up MCP and Skills on day one. Get a model working first, get a feel for the page-aware features, then go deeper.
+You don't need to set up MCP and Skills the first time you use it. Start by trying out some of the page-awareness features, then go deeper step by step.
 </Callout>
 
-## Core ideas
+## Core features
 
-- **Local-first**: conversations, prompts, Skills, and attachments all live in your browser. Apart from the requests needed to reach your model provider, nothing is uploaded to any server.
-- **Your own model**: enter any provider's API key — no account, no credits.
-- **Extensible**: package workflows into Skills the model can pick up, and plug external tools in through MCP.
+- **Local-first**: Conversations, Prompts, Skills, and attachments are all stored locally in your browser. Apart from the requests necessary to reach the model provider, no data is uploaded to any server.
+- **Connect directly to your own models**: Just enter an API Key from any provider. No account, no credits, and no login required.
+- **Extensible**: You can connect MCP tools*, and package common operations into Skills.
 
-## What it can do
+> Note: MCP only supports the HTTP protocol. See the [MCP section](/en/docs/guides/mcp/) for details.
 
-- Summarize the current page, long reads, docs, or PRs.
-- Select anything and have the model summarize, translate, or rewrite it.
-- Grab tables, lists, and prices from a page and turn them into JSON or Markdown.
-- Record a set of actions once, then let the agent replay them.
+## Capability examples
 
-## Next
+- Summarize the current web page, a long article, a document, or a PR.
+- Select any content and have the model summarize, translate, or rewrite it.
+- Extract tables, lists, or prices from a page and convert them to JSON or Markdown.
+- Record a sequence of actions once and have the Agent replay it later on its own.
+- Read PDF documents and answer related questions.
+- ...
 
-More getting-started content is being written. For now, head back to the [docs home](/en/docs/) to see the available sections.
+## What's next
+
+If you haven't installed it yet, start with the [Installation guide](/en/docs/getting-started/installation/).
+If you've already installed it, take a look at [Your first chat](/en/docs/getting-started/first-chat/).

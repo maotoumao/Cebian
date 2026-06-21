@@ -1,9 +1,82 @@
 ---
 title: MCP tools
-description: Plug external tools into Cebian over HTTP.
+description: Connect external tools into Cebian over HTTP.
 group: guides
 order: 5
-placeholder: true
 ---
 
-> This page is being written. Content coming soon.
+import Placeholder from '@/components/Placeholder.astro';
+import QA from '@/components/docs/QA.astro';
+import QAItem from '@/components/docs/QAItem.astro';
+import StatusLegend from '@/components/docs/StatusLegend.astro';
+
+MCP is used to connect external tools into Cebian. Once an MCP server is configured, the tools it provides appear in the Agent's tool list, and the model can call them on demand during a conversation.
+
+It's a good fit for connecting databases, internal systems, file services, business APIs, or any tool already packaged as an MCP server.
+
+![Screenshot](./snapshot.png)
+
+## Add an MCP server
+
+The entry point is under "Settings → MCP servers".
+
+After clicking "Add MCP server", you need to fill in:
+
+- Name: to help you tell them apart in the list, such as `github`, `weather`, or `my-tools`
+- Transport: `streamable-http` or `sse`
+- URL: the HTTP address of the MCP server
+- Authentication: none, or Bearer Token
+- Custom headers: fill in when you need extra request headers
+
+After saving, Cebian connects to the server in the background and reads the tools it provides.
+
+## Choosing a transport
+
+If your MCP server supports `streamable-http`, prefer it.
+
+`sse` is mainly for compatibility with some older services. Both require an HTTP or HTTPS address; you can't enter a local file path or other protocols.
+
+## Use it in a conversation
+
+After configuring and enabling a server, you don't need to manually copy tool names.
+
+When your question requires an external tool, the Agent decides on its own whether to call an MCP tool. For example, if you connected a weather-lookup server, you can simply ask:
+
+```md
+Look up tomorrow's weather in Shanghai for me.
+```
+
+If the server provides an MCP App with a UI, the tool result may also include an embedded interactive view. This view is provided by the corresponding server; Cebian is responsible for displaying it in the conversation.
+
+## Status indicators
+
+Each MCP server has a small dot on its left, using different colors to indicate the current status:
+
+<StatusLegend
+items={[
+{ color: 'blue', label: 'Waiting for first call', text: 'Saved, but not actually used yet' },
+{ color: 'green', label: 'Connected', text: 'The connection is currently working' },
+{ color: 'sky', label: 'Not connected', text: 'It will reconnect on the next call' },
+{ color: 'yellow', label: 'Reconnecting', text: 'Trying to restore the connection' },
+{ color: 'red', label: 'Temporarily unavailable', text: 'After repeated failures it briefly circuit-breaks; try again later' },
+{ color: 'gray', label: 'Disabled', text: "This server won't appear in the Agent's tool list" },
+]}
+/>
+
+If a service isn't needed for now, you can disable it instead of deleting the configuration.
+
+## Authentication and headers
+
+If the server requires a Bearer Token, select Bearer Token under "Authentication" and enter the token.
+
+If the server requires other request headers, add them under "Custom headers". Note: when using a Bearer Token, don't manually add an `Authorization` header again; Cebian handles it automatically.
+
+## Q&A
+
+<QA>
+<QAItem q="The tool isn't being called. What now?">First confirm the server is enabled and that your question really needs this tool.</QAItem>
+<QAItem q="The status stays unavailable. What now?">Check the URL, network, token, and server logs.</QAItem>
+<QAItem q="It reports an invalid URL when adding. What now?">The URL must start with <code>http://</code> or <code>https://</code>.</QAItem>
+<QAItem q="Not sure which transport to choose?">Try <code>streamable-http</code> first.</QAItem>
+<QAItem q="Worried about losing the configuration. What now?">When backing up, choose "General settings" and "Secrets", and the MCP configuration and tokens will be backed up too.</QAItem>
+</QA>

@@ -1,9 +1,67 @@
 ---
-title: VFS 文件系统
-description: Cebian 的浏览器内虚拟文件系统。
+title: VFS 檔案系統
+description: Cebian 的瀏覽器內虛擬檔案系統。
 group: guides
 order: 6
-placeholder: true
 ---
 
-> 本页正在编写中，内容即将补充。
+{/* AUTO-GENERATED from docs/zh by scripts/gen-zhtw.mjs — do not edit; edit zh then run `pnpm gen:zhtw`. */}
+
+import Placeholder from '@/components/Placeholder.astro';
+import QA from '@/components/docs/QA.astro';
+import QAItem from '@/components/docs/QAItem.astro';
+
+VFS 是 Cebian 放在瀏覽器裡的虛擬檔案系統。它不是你電腦上的真實目錄，`/workspaces/`、`~/.cebian/skills/` 這些路徑也不會出現在 Finder 或資源管理器裡。
+
+你可以把它理解成 Cebian 自己的一塊本地檔案區：模型生成的檔案、Prompt、Skill、會話工作區裡的資料，都會放在這裡。
+
+<Placeholder
+	dim="1200 × 760"
+	ratio="16 / 10"
+	label="VFS 瀏覽器介面"
+/>
+
+## 儲存內容
+
+VFS 裡主要有幾類目錄：
+
+- `/workspaces/{sessionId}/`：每個對話自己的工作區。Cebian 在對話裡生成報告、表格、圖片等檔案時，一般會放在這裡。
+- `~/.cebian/prompts/`：Slash Prompt 的提示詞檔案。
+- `~/.cebian/skills/`：Skill 資料夾，每個 Skill 通常是一整個目錄。
+- `~`：等同於 `/home/user`，只是一個虛擬的使用者目錄。
+
+普通使用時，你不需要記住這些路徑。只有在檢視 Cebian 生成的檔案、整理 Prompt / Skill，或者排查檔案連結時，才會接觸到它們。
+
+## 執行機制
+
+VFS 存在瀏覽器擴充套件自己的 IndexedDB 裡。也就是說：
+
+- 資料儲存在本機瀏覽器裡，不會因為 Cebian 有 VFS 就上傳到伺服器。
+- 它和你的真實磁碟隔離，模型不能直接讀寫你電腦上的任意檔案。
+- 解除安裝擴充套件、清理瀏覽器擴充套件資料時，裡面的檔案也可能一起被刪掉。
+
+Cebian 的檔案工具讀寫的就是這套 VFS。比如模型幫你生成一個 Markdown 報告，實際就是在 VFS 裡建立一個 `.md` 檔案，然後在對話裡給你一個可點選連結。
+
+## 開啟方式
+
+最常見的方式，是從對話裡的檔案連結開啟。
+
+當 Cebian 建立或儲存了檔案，它通常會在回覆裡給出類似「檢視檔案」「開啟目錄」的連結。點選後，會開啟一個獨立的 VFS 瀏覽器頁面。
+
+在 VFS 瀏覽器裡，你可以：
+
+- 檢視目錄和檔案
+- 預覽文本、Markdown、圖片、音影片等常見檔案
+- 下載單個檔案
+- 下載整個目錄的 zip
+
+如果你只是管理 Prompt 或 Skill，優先使用設定裡的對應頁面；VFS 瀏覽器更適合檢視檔案結果和工作區內容。
+
+## Q&A
+
+<QA>
+	<QAItem q="找不到真實資料夾？">這是正常的。VFS 不是系統目錄，它存在瀏覽器擴充套件自己的資料區裡。</QAItem>
+	<QAItem q="檔案太大無法預覽怎麼辦？">可以用右上角下載按鈕下載後再開啟。</QAItem>
+	<QAItem q="對話裡的檔案連結打不開怎麼辦？">可能是檔案已經被刪除，或者當前瀏覽器資料被清理過。</QAItem>
+	<QAItem q="想備份這些檔案怎麼辦？">使用 Cebian 的備份功能時，記得包含工作區檔案、Prompt 和 Skill。</QAItem>
+</QA>

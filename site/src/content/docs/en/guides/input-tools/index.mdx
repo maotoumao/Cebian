@@ -1,9 +1,127 @@
 ---
 title: Input tools
-description: The quick actions above the chat composer.
+description: The quick-access shortcuts above the chat input box
 group: guides
 order: 1
-placeholder: true
 ---
 
-> This page is being written. Content coming soon.
+import Placeholder from '@/components/Placeholder.astro';
+import LucideIcon from '@/components/docs/LucideIcon.astro';
+import QA from '@/components/docs/QA.astro';
+import QAItem from '@/components/docs/QAItem.astro';
+import selectTool from '@/assets/demo/select-tool.mp4';
+import recordReplay from '@/assets/demo/record-replay.mp4';
+
+There's a row of small buttons above the chat input box, used to hand the current page, files, screenshots, or a sequence of actions over to Cebian.
+
+You don't necessarily need them for ordinary chatting. Only when you want the model to see something more specific do you click the corresponding tool.
+
+![Selecting an element on the page as context](./tools.png)
+
+## <LucideIcon name="mouse-pointer-2" />Select element
+
+If you want to ask about a specific area of the page, click "Select element" and then click the target element on the page.
+
+For example:
+
+- Explain the fields in this table
+- Figure out why this button's style is off
+- Extract this snippet of code or error message
+- Have Cebian focus only on a specific card on the page
+
+After selecting, an element tag appears above the input box. Add a sentence about what you want to do, then send.
+
+<video controls preload="metadata" src={selectTool} aria-label="Select an element and interact with it"></video>
+
+
+> Browser settings pages, extension stores, and some special pages don't allow extensions to inject scripts, so element selection may be unavailable on those pages.
+
+## <LucideIcon name="circle-dot" />Record actions
+
+Recording is ideal for the "I do it once, you understand what I just did" scenario.
+
+After clicking the record button, perform your actions on the page as usual; when done, click stop again, or just send your next message. Cebian attaches this sequence of actions and sends it to the model.
+
+For example:
+
+- Record the steps to reproduce a problem
+- Record a form-filling flow and have the model help you summarize the rules
+- Record a repetitive operation and have the model judge which steps can be automated
+
+<video controls preload="metadata" src={recordReplay} aria-label="Record actions and replay them"></video>
+
+
+> What's recorded is the sequence of actions, not a video. It records events such as clicks, input, and page navigation, so the model can understand what you just did.
+
+## <LucideIcon name="camera" />Screenshot
+
+If the state of the page matters, click "Screenshot" to send the visible area of the current tab along with your message.
+
+It's good for asking visual questions, such as:
+
+- What's wrong with this page's layout
+- Which button should I click in the current dialog
+- Roughly what does this chart convey
+
+The screenshot appears as an image attachment above the input box. You can keep typing your question and send them together.
+
+> Screenshots require the current model to support multimodal input. If the button is unavailable, switch to a model that supports images first.
+
+## <LucideIcon name="paperclip" />Upload file
+
+If your question involves a local file, click "Upload file".
+
+It's currently best suited for two kinds of files:
+
+- Images: screenshots, design mockups, error screenshots, etc.
+- Text files: Markdown, JSON, CSV, code files, log files, etc.
+
+After uploading, the file is attached to your next message. Plain text files are handed directly to the model to read; images likewise require the current model to support multimodal input.
+
+> A single message can carry up to 10 attachments. For very large files, it's best to extract the relevant portion before uploading.
+
+## <LucideIcon name="smartphone" />Mobile mode
+
+If you want to check how the current page behaves in a mobile viewport, click "Mobile mode".
+
+Once enabled, the current tab is temporarily emulated as a phone screen. You can watch the page change while asking Cebian:
+
+- Where does the mobile layout get cramped
+- Is this button too small on a phone
+- Is any above-the-fold information being obscured
+
+Click the button again to exit mobile mode.
+
+> This mode only affects the current tab and is meant for quickly checking the mobile state; if the page itself isn't responsive, it won't automatically make the page better.
+
+## <LucideIcon name="mic" />Voice input
+
+If you don't want to type, click the microphone button to dictate your words into the input box.
+
+The first time you use it, the browser may ask for microphone permission. Once granted, Cebian appends the recognized text directly into the input box, where you can keep editing it before sending manually.
+
+Voice input is handy for quickly jotting down a longer thought, such as:
+
+- Dictating a set of requirements to summarize
+- Quickly describing a page issue
+- Saying what you want the model to do while looking at the page
+
+> Speech recognition is done locally. Availability may differ across browsers and system environments; if the button doesn't appear, just use the keyboard.
+
+## Choosing a tool
+
+- Want to ask about a part of the page: use "Select element"
+- Want the model to see the current screen: use "Screenshot"
+- Want the model to read local content: use "Upload file"
+- Want to explain a series of steps: use "Record actions"
+- Want to check the mobile page: turn on "Mobile mode"
+- Don't want to type: use "Voice input"
+
+## Q&A
+
+<QA>
+<QAItem q="What if the screenshot or image button is unavailable?">The current model doesn't support multimodal input; switch to a model that supports images.</QAItem>
+<QAItem q="What if a file won't upload?">Currently images and common text files are supported, with up to 10 attachments per message.</QAItem>
+<QAItem q="What if I can't select an element on a special page?">For security reasons, the browser doesn't allow extensions to read these pages. Try a regular web page instead.</QAItem>
+<QAItem q="What if clicking the record button does nothing?">Another sidebar may be recording; stop the recording over there first and try again.</QAItem>
+</QA>

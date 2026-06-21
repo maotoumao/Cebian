@@ -1,9 +1,108 @@
 ---
-title: Backup & restore
-description: Back up your data locally or to WebDAV, and restore anytime.
+title: Backup and restore
+description: Back up your data locally or to WebDAV, and restore it anytime.
 group: guides
 order: 7
-placeholder: true
 ---
 
-> This page is being written. Content coming soon.
+import Placeholder from '@/components/Placeholder.astro';
+import QA from '@/components/docs/QA.astro';
+import QAItem from '@/components/docs/QAItem.astro';
+
+Cebian's data is mostly stored locally in the browser. When switching devices, reinstalling the browser, or wanting an insurance copy before tinkering with your configuration, make a backup first.
+
+The backup entry point is under "Settings → Backup and restore". There are two methods here: download locally, or upload to WebDAV.
+
+![Screenshot](./snapshot.png)
+
+## Local backup
+
+A local backup exports your data into a `.zip` file that you keep yourself.
+
+The steps are:
+
+1. Open "Settings → Backup and restore"
+2. Click "Create backup" under "Local backup"
+3. Choose a backup mode, and enable "Encrypt backup" if needed
+4. After confirming, the browser downloads a `.zip` file
+
+If you just want a temporary insurance copy, just create a full backup.
+
+## WebDAV backup
+
+If you want to restore the same backup across multiple devices, you can configure WebDAV.
+
+The first time, you need to fill in:
+
+- Server address
+- Username
+- Password or app-specific password
+- Remote directory
+
+Once filled in, you can click "Test connection" first. After the connection works, save it, and then you can click "Back up to WebDAV" to upload a snapshot.
+
+The WebDAV page lists the snapshots already on the server. Each snapshot can be restored or deleted.
+
+## Backup modes
+
+There are two modes when creating a backup:
+
+- Full backup: conversations, settings, Skills & Prompts, and secrets are all backed up
+- Partial backup: choose what to back up yourself
+
+In a partial backup, you can select:
+
+- Conversation history
+- Include workspace files
+- General settings
+- Skills & Prompts
+- Secrets
+
+For everyday use, a full backup is recommended; if you only want to migrate Prompts or Skills, use a partial backup.
+
+## Encrypted backup
+
+If the backup includes "Secrets", enabling encryption is strongly recommended.
+
+Secrets include API Keys, OAuth tokens, WebDAV passwords, and so on. Without encryption, this content is stored together with the backup file, which isn't suitable for sharing with others.
+
+After enabling encryption, you need to enter a passphrase. You must enter the same passphrase when restoring.
+
+> The passphrase is not saved by Cebian. Remember it well; if you forget the passphrase, you won't be able to restore the backup.
+
+## Restore from a backup
+
+Both local backups and WebDAV snapshots go through the same restore flow.
+
+Before restoring, Cebian first shows what the backup contains. You can select the categories to restore, then choose the restore method:
+
+- Merge: only add and update, without deleting local data
+- Replace: clear the selected categories first, then restore exactly as in the backup
+
+If you're not sure which to pick, choose "Merge" first. It's better suited for everyday restoration and is less likely to accidentally delete local data.
+
+"Replace" is for cases where you clearly want the current device to become the state in the backup. For example, a freshly installed browser, or when your local configuration is already a mess and you want to start over from a backup.
+
+## Backup contents
+
+The content of each category is roughly as follows:
+
+| Category | Content |
+| --- | --- |
+| Conversation history | Past conversations, messages, conversation titles, etc. |
+| Workspace files | Files generated in conversations or saved to `/workspaces/` |
+| General settings | Theme, default model, custom instructions, non-secret MCP configuration, etc. |
+| Skills & Prompts | Files in `~/.cebian/skills/` and `~/.cebian/prompts/` |
+| Secrets | Provider API Keys, OAuth tokens, MCP tokens, WebDAV credentials, etc. |
+
+The backup does not include browser cookies or website login states. So after restoring to a new device, some model subscriptions or website logins may still need to be re-authorized.
+
+## Q&A
+
+<QA>
+<QAItem q="I want to migrate to a new device. How should I back up?">Create a full backup, ideally with encryption enabled, then restore from the file or WebDAV on the new device.</QAItem>
+<QAItem q="What if I only want to keep Prompts / Skills?">Create a partial backup and check only "Skills & Prompts".</QAItem>
+<QAItem q="I'm worried about overwriting local data when restoring. What now?">Choose "Merge". It only adds and updates, without deleting local data.</QAItem>
+<QAItem q="What if I want to start over exactly from the backup?">Choose "Replace", but it's best to export another copy of your current data before confirming.</QAItem>
+<QAItem q="WebDAV won't connect. What now?">First check the server address, username, password, and remote directory. Some services require an app-specific password.</QAItem>
+</QA>
