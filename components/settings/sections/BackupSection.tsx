@@ -294,6 +294,29 @@ export function BackupSection() {
     [setConfig],
   );
 
+  // 断开连接：仅清除本地连接配置（含密码），不动远程已上传的快照。
+  const handleRemoveConnection = useCallback(async () => {
+    if (!beginBusy()) return;
+    try {
+      const ok = await showConfirm({
+        title: t('settings.backup.webdav.removeConfirmTitle'),
+        description: t('settings.backup.webdav.removeConfirmBody'),
+        destructive: true,
+      });
+      if (!ok) return;
+      await setConfig(null);
+      setEditingConnection(false);
+      // 作废在途的快照加载，避免旧请求晚到回填已断开连接的列表 / 错误。
+      loadGenRef.current += 1;
+      setSnapshots([]);
+      setSnapshotsError(null);
+      setSnapshotsLoading(false);
+      toast.success(t('settings.backup.webdav.removeSuccess'));
+    } finally {
+      endBusy();
+    }
+  }, [setConfig, beginBusy, endBusy]);
+
   const handleRestoreSnapshot = useCallback(
     async (name: string) => {
       if (!config) return;
@@ -395,9 +418,20 @@ export function BackupSection() {
                 <span className="font-mono break-all">{config!.url}</span>
                 <span className="break-all"> · {config!.directory || '/'}</span>
               </div>
-              <Button size="xs" variant="ghost" onClick={() => setEditingConnection(true)} disabled={busy}>
-                {t('settings.backup.webdav.changeConnection')}
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button size="xs" variant="ghost" onClick={() => setEditingConnection(true)} disabled={busy}>
+                  {t('settings.backup.webdav.changeConnection')}
+                </Button>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => void handleRemoveConnection()}
+                  disabled={busy}
+                  className="text-destructive hover:text-destructive"
+                >
+                  {t('settings.backup.webdav.removeConnection')}
+                </Button>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-2">
