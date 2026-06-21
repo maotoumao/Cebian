@@ -50,9 +50,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### 变更 / Changed
 
-- 升级 pi-agent-core / pi-ai 至 0.79.4
+- 升级 pi-agent-core / pi-ai 至 0.79.9（含 GitHub Copilot OAuth 可用模型列表改用登录账号自身的模型目录等修复）
 
-- Upgrade pi-agent-core and pi-ai to 0.79.4
+- Upgrade pi-agent-core and pi-ai to 0.79.9 (includes fixes such as GitHub Copilot OAuth model availability now using the signed-in account's own model catalog)
 
 ## 1.3.2 - 2026-06-14
 

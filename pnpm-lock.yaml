@@ -36,11 +36,11 @@ importers:
         specifier: ^6.43.1
         version: 6.43.1
       '@earendil-works/pi-agent-core':
-        specifier: ^0.79.8
-        version: 0.79.8(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
+        specifier: ^0.79.9
+        version: 0.79.9(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
       '@earendil-works/pi-ai':
-        specifier: ^0.79.8
-        version: 0.79.8(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
+        specifier: ^0.79.9
+        version: 0.79.9(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
       '@isomorphic-git/lightning-fs':
         specifier: ^4.6.2
         version: 4.6.2
@@ -502,12 +502,12 @@ packages:
     resolution: {integrity: sha512-utL3cpZoFzflyqUkjYbxYujI6STBTmO5LFn4bbin/NZnRWN6wQ7eErhr3/Vpa5h/jicPFC6kTa42r940mQftJQ==}
     hasBin: true
 
-  '@earendil-works/pi-agent-core@0.79.8':
-    resolution: {integrity: sha512-8m5fcqRpoGpq3QY0I/tFXROSTmPwBb1dAuzYZO3XYgjsdCokkRMAGRjA9P8s/UD6Jy9yy69lyE4H6sz/5A1TmQ==}
+  '@earendil-works/pi-agent-core@0.79.9':
+    resolution: {integrity: sha512-GsFbPR85nhncKoU9++fTKa11PzwUkAmkrKXo97dBOzi10Td72rVV6vmfxKjwPLHTzRbJMa0byr12YhODZ59yLA==}
     engines: {node: '>=22.19.0'}
 
-  '@earendil-works/pi-ai@0.79.8':
-    resolution: {integrity: sha512-ZpSwaD7oNpsjn9vtEatZQNT9PSdDJXi6rFeY5Qv+OHQGFDKlmcrfJE4ypm4SAc/fBECPs4Rdi3l+YjVtXYrkKw==}
+  '@earendil-works/pi-ai@0.79.9':
+    resolution: {integrity: sha512-fHmgNMONwCCE7bQAKbcz76sgm3iQuA7km1mpIc4H5xXd9+zhPh/faULz6ARkgjQE0EufHnfZPJY39+lNf8Sa9g==}
     engines: {node: '>=22.19.0'}
     hasBin: true
 
@@ -4217,8 +4217,8 @@ packages:
   path-browserify@1.0.1:
     resolution: {integrity: sha512-b7uo2UCUOYZcnF/3ID0lulOJi/bafxa1xPe7ZPsammBSpjSWQkjNxlt635YGS2MiR9GjvuXCtz2emr3jbsz98g==}
 
-  path-expression-matcher@1.5.0:
-    resolution: {integrity: sha512-cbrerZV+6rvdQrrD+iGMcZFEiiSrbv9Tfdkvnusy6y0x0GKBXREFg/Y65GhIfm0tnLntThhzCnfKwp1WRjeCyQ==}
+  path-expression-matcher@1.6.0:
+    resolution: {integrity: sha512-e5y7RCLHKjemsgQ4eqGJtPyr10ILz25HO7flzxhTV8bgvd5yHx98DGtCAtbVW9f2TqnYI/gEVZd+vz7snrdPTw==}
     engines: {node: '>=14.0.0'}
 
   path-key@3.1.1:
@@ -5881,9 +5881,9 @@ snapshots:
       which: 4.0.0
       yocto-spinner: 1.1.0
 
-  '@earendil-works/pi-agent-core@0.79.8(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)':
+  '@earendil-works/pi-agent-core@0.79.9(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)':
     dependencies:
-      '@earendil-works/pi-ai': 0.79.8(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
+      '@earendil-works/pi-ai': 0.79.9(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
       ignore: 7.0.5
       typebox: 1.1.38
       yaml: 2.9.0
@@ -5895,7 +5895,7 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-ai@0.79.8(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)':
+  '@earendil-works/pi-ai@0.79.9(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)':
     dependencies:
       '@anthropic-ai/sdk': 0.91.1(zod@4.4.3)
       '@aws-sdk/client-bedrock-runtime': 3.1048.0
@@ -8376,14 +8376,14 @@ snapshots:
 
   fast-xml-builder@1.2.0:
     dependencies:
-      path-expression-matcher: 1.5.0
+      path-expression-matcher: 1.6.0
       xml-naming: 0.1.0
 
   fast-xml-parser@5.7.3:
     dependencies:
       '@nodable/entities': 2.2.0
       fast-xml-builder: 1.2.0
-      path-expression-matcher: 1.5.0
+      path-expression-matcher: 1.6.0
       strnum: 2.4.1
 
   fastq@1.20.1:
@@ -9634,7 +9634,7 @@ snapshots:
 
   path-browserify@1.0.1: {}
 
-  path-expression-matcher@1.5.0: {}
+  path-expression-matcher@1.6.0: {}
 
   path-key@3.1.1: {}
 
