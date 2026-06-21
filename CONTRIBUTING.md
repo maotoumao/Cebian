@@ -38,10 +38,9 @@ tied to a maintainer-approved issue**. The flow is:
 
 1. **Open or find an issue** describing the bug or feature, and discuss your
    proposed approach there.
-2. **Wait for approval.** The maintainer replies with exactly `/ready` as a
-   standalone comment on the issue, which applies the `ready-to-implement`
-   label. This signals the approach is agreed upon and the issue is open for
-   implementation.
+2. **Wait for approval.** The maintainer replies `/ready` on the issue, which
+   applies the `ready-to-implement` label. This signals the approach is agreed
+   upon and the issue is open for implementation.
 3. **Then open your PR**, referencing the issue with `Closes #<issue number>`
    in the description.
 

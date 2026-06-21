@@ -33,8 +33,8 @@ pnpm run build        # 生产构建
 流程如下：
 
 1. **新建或找到一个 issue**，描述要修的 bug 或要做的功能，并在其中讨论你的方案。
-2. **等待批准**。维护者会在该 issue 单独回复一条内容完全为 `/ready` 的评论，
-   从而打上 `ready-to-implement` 标签，表示方案已达成共识、可以开始实现。
+2. **等待批准**。维护者会在该 issue 回复 `/ready`，从而打上 `ready-to-implement` 标签，
+   表示方案已达成共识、可以开始实现。
 3. **再提交 PR**，并在描述里用 `Closes #<issue 编号>` 关联该 issue。
 
 **未绑定**带 `ready-to-implement` 标签 issue 的 PR 会被机器人**自动关闭**，并附上

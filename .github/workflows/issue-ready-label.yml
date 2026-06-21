@@ -27,12 +27,13 @@ jobs:
             const READY_LABEL = 'ready-to-implement';
             const LABEL_COLOR = '0e8a16'; // green
 
-            const comment = (context.payload.comment.body || '').trim();
+            const body = context.payload.comment.body || '';
             const author = context.payload.comment.user.login;
 
-            // 触发词必须整条匹配，避免在闲聊里误触发。
-            // Trigger must match the whole comment to avoid accidental fires.
-            if (comment !== READY_TRIGGER) return;
+            // 触发条件：评论第一行（去空格后）正好是 /ready，后续行可写说明。
+            // Trigger when the first line (trimmed) is exactly /ready; later lines may add notes.
+            const firstLine = body.split(/\r?\n/, 1)[0].trim();
+            if (firstLine !== READY_TRIGGER) return;
 
             // 仅维护者可授予准入标签。
             // Only the maintainer may grant the ready label.
