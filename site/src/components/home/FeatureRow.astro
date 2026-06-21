@@ -32,7 +32,7 @@ const flip = index % 2 === 1;
     {video
       ? (
         <div class="feature-vid-wrap">
-          <video class="feature-vid" src={video} autoplay muted loop playsinline preload="metadata" aria-label={feature.shotLabel}></video>
+          <video class="feature-vid" src={video} muted loop playsinline preload="none" fetchpriority="low" aria-label={feature.shotLabel}></video>
           <button type="button" class="vid-toggle" data-playing="true" data-pause={pauseLabel} data-play={playLabel} aria-label={pauseLabel}>
             <svg class="ic-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
             <svg class="ic-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
@@ -98,18 +98,18 @@ const flip = index % 2 === 1;
 </style>
 
 <script>
-  // 首页演示视频：环境自动循环播放 + 暂停/播放小钮（方案 b，对所有用户可控）。
-  // reduced-motion 时默认暂停并显示按钮，由用户主动播放。
+  // 首页演示视频：滚进视口才加载并播放（preload="none" + fetchpriority="low"），
+  // 避免视频抢首屏带宽、拖慢驱动导航交互的脚本。暂停/播放小钮对所有用户可控；
+  // reduced-motion 时默认不自动播放，由用户主动点。
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   for (const wrap of document.querySelectorAll<HTMLElement>('.feature-vid-wrap')) {
     const video = wrap.querySelector<HTMLVideoElement>('.feature-vid');
     const btn = wrap.querySelector<HTMLButtonElement>('.vid-toggle');
     if (!video || !btn) continue;
 
-    if (reduce) {
-      video.removeAttribute('autoplay');
-      video.pause();
-    }
+    // 用户是否手动暂停过：手动暂停后，滚动不再自动恢复播放。
+    let userPaused = reduce;
+
     const sync = () => {
       const playing = !video.paused;
       btn.setAttribute('data-playing', String(playing));
@@ -117,12 +117,33 @@ const flip = index % 2 === 1;
       const label = playing ? btn.dataset.pause : btn.dataset.play;
       if (label) btn.setAttribute('aria-label', label);
     };
+
     btn.addEventListener('click', () => {
-      if (video.paused) video.play();
-      else video.pause();
+      if (video.paused) {
+        userPaused = false;
+        void video.play();
+      } else {
+        userPaused = true;
+        video.pause();
+      }
     });
     video.addEventListener('play', sync);
     video.addEventListener('pause', sync);
+
+    // 进入视口才真正拉流并播放；离开视口暂停以省资源。
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            if (!userPaused) void video.play();
+          } else if (!video.paused) {
+            video.pause();
+          }
+        }
+      },
+      { threshold: 0.25 },
+    );
+    io.observe(wrap);
     sync();
   }
 </script>
