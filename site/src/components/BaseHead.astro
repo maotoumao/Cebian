@@ -67,6 +67,19 @@ const xDefault = new URL(localePath(DEFAULT_LANG, path), site).toString();
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="generator" content={Astro.generator} />
 
+{/* Google Analytics (gtag.js)：仅生产构建注入，避免本地开发污染统计数据。 */}
+{import.meta.env.PROD && (
+  <>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-N61KMD3FN5"></script>
+    <script is:inline>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-N61KMD3FN5');
+    </script>
+  </>
+)}
+
 <title>{title}</title>
 <meta name="description" content={description} />
 {noindex && <meta name="robots" content="noindex" />}
