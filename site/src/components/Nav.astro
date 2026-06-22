@@ -40,9 +40,9 @@ const isActive = (match: string) =>
     <div class="nav-spacer"></div>
 
     <div class="nav-tools">
-      <a class="nav-sponsor" href={localePath(lang, '/sponsor')} aria-current={isActive('/sponsor') ? 'page' : undefined}>
+      <a class="nav-sponsor" href={localePath(lang, '/sponsor')} aria-label={t.nav.sponsor} aria-current={isActive('/sponsor') ? 'page' : undefined}>
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
-        {t.nav.sponsor}
+        <span class="sponsor-label">{t.nav.sponsor}</span>
       </a>
 
       <button class="icon-btn" id="theme-toggle" type="button" aria-label={t.nav.theme}>
@@ -107,7 +107,7 @@ const isActive = (match: string) =>
   .nav-links a:hover { color: var(--ink); background: var(--surface-2); }
   .nav-links a[aria-current="page"] { color: var(--ink); }
   .nav-spacer { margin-left: auto; }
-  .nav-tools { display: flex; align-items: center; gap: 8px; }
+  .nav-tools { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
   .icon-btn {
     width: 36px; height: 36px; display: grid; place-items: center;
@@ -123,7 +123,7 @@ const isActive = (match: string) =>
 
   .nav-sponsor {
     display: inline-flex; align-items: center; gap: 7px; height: 36px;
-    font-size: 14px; font-weight: 500; color: var(--accent);
+    font-size: 14px; font-weight: 500; color: var(--accent); white-space: nowrap;
     padding: 0 13px; border: 1px solid var(--accent-line); border-radius: 9px;
     background: var(--accent-wash); transition: border-color .15s, background .15s;
   }
@@ -145,7 +145,7 @@ const isActive = (match: string) =>
   .lang { position: relative; }
   .lang-trigger {
     display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px;
-    font-family: inherit; font-size: 13.5px; font-weight: 500; color: var(--ink-muted);
+    font-family: inherit; font-size: 13.5px; font-weight: 500; color: var(--ink-muted); white-space: nowrap;
     background: var(--surface); border: 1px solid var(--line-2); border-radius: 9px;
     cursor: pointer; transition: color .15s, border-color .15s;
   }
@@ -186,6 +186,14 @@ const isActive = (match: string) =>
     .nav-links { display: none; }
     .nav-burger { display: grid; }
     .nav-drawer:not([hidden]) { display: block; }
+    /* 移动端赞助按钮退化为纯图标，释放导航栏宽度 */
+    .nav-sponsor { padding: 0; width: 36px; justify-content: center; }
+    .sponsor-label { display: none; }
+  }
+
+  @media (max-width: 380px) {
+    /* 极窄屏进一步隐藏语言标签文字，仅保留图标和箭头 */
+    .lang-label { display: none; }
   }
 </style>
 

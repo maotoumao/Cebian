@@ -18,6 +18,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 修复 / Fixed
+
+- 修复站点在移动端（≤820px）导航栏中"赞助"和语言标签文字因 flex 压缩折行的问题；移动端赞助按钮退化为纯图标，极窄屏（≤380px）同步隐藏语言标签文字
+
+- Fixed nav bar text wrapping on mobile (≤820px) where the sponsor label and language label were line-breaking due to flex shrink; the sponsor button now degrades to an icon-only style on mobile, and the language label is additionally hidden on extra-narrow screens (≤380px)
+
 ## 1.3.3 - 2026-06-21
 
 ### 新增 / Added
