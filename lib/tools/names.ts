@@ -44,3 +44,5 @@ export const TOOL_FS_SAVE_URL = 'fs_save_url' as const;
 export const TOOL_RUN_SKILL = 'run_skill' as const;
 /** Tool that calls Chrome browser APIs directly via structured parameters */
 export const TOOL_CHROME_API = 'chrome_api' as const;
+/** Tool that searches all documents/files in VFS by name */
+export const TOOL_SEARCH_DOCUMENTS = 'search_documents' as const;

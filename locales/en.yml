@@ -598,6 +598,8 @@ tools:
     help: "Looking up Chrome API docs"
     # $1 = namespace, $2 = method
     call: "Calling chrome.$1.$2"
+  # $1 = keyword
+  searchDocuments: "Searching documents for \"$1\""
   interact:
     # $1 = target suffix (with leading space) or empty
     click: "Clicking$1"
@@ -650,6 +652,10 @@ dialogs:
 
 # ─── VFS browser entrypoint ───
 vfs:
+  allDocuments: "All Documents"
+  searchPlaceholder: "Search files…"
+  searchResults: "Search Results"
+  noResults: "No files match your search"
   backToRoot: "Back to root"
   zipping: "Zipping…"
   # $1 = line count
@@ -669,6 +675,8 @@ vfs:
   # $1 = path
   pathNotFound: "Path not found: $1"
   unknownError: "Unknown error"
+  # $1 = result count
+  searchResultCount: "$1 results"
 
 # ─── Standalone user-permission page (entrypoints/user-permission) ───
 permission:

@@ -435,6 +435,81 @@ async function walkFiles(rootPath: string): Promise<VfsFileEntry[]> {
   return out;
 }
 
+/**
+ * 递归搜索 VFS 树中所有路径，返回路径中包含 `keyword` 的文件和目录。
+ * 使用 `toLocaleLowerCase()` 做不区分大小写的匹配。
+ * 与 `walkFiles` 不同，`searchAll` 也会包含目录名匹配，且返回完整路径信息。
+ *
+ * @param keyword 搜索关键词（不区分大小写）
+ * @param rootPath 搜索的起始路径，默认 `/`
+ * @returns 匹配的文件和目录条目列表
+ */
+export interface VfsSearchResult {
+  /** 文件名或目录名 */
+  name: string;
+  /** 规范化后的绝对 VFS 路径 */
+  absPath: string;
+  /** 是否为目录 */
+  isDir: boolean;
+  /** 文件大小（目录为 0） */
+  size: number;
+}
+
+async function searchAll(
+  keyword: string,
+  rootPath: string = '/',
+  maxResults: number = 100,
+): Promise<VfsSearchResult[]> {
+  await ensureDefaults();
+  const root = normalizePath(rootPath);
+  const out: VfsSearchResult[] = [];
+  const lowerKeyword = keyword.toLocaleLowerCase();
+  if (!lowerKeyword) return out;
+
+  async function recurse(dirAbs: string): Promise<void> {
+    if (out.length >= maxResults) return;
+    let names: string[];
+    try {
+      names = await pfs().readdir(dirAbs);
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      if (name === '.' || name === '..') continue;
+      if (out.length >= maxResults) return;
+      const childAbs = dirAbs === '/' ? `/${name}` : `${dirAbs}/${name}`;
+      let st: Awaited<ReturnType<FS.PromisifiedFS['stat']>>;
+      try {
+        st = await pfs().stat(childAbs);
+      } catch {
+        continue;
+      }
+      const isDir = st.isDirectory();
+      if (name.toLocaleLowerCase().includes(lowerKeyword)) {
+        out.push({ name, absPath: childAbs, isDir, size: isDir ? 0 : st.size });
+      }
+      if (isDir) {
+        await recurse(childAbs);
+      }
+    }
+  }
+
+  // Also check the root itself
+  if (root !== '/') {
+    const name = root.split('/').pop() ?? '';
+    if (name.toLocaleLowerCase().includes(lowerKeyword)) {
+      let st: Awaited<ReturnType<FS.PromisifiedFS['stat']>>;
+      try {
+        st = await pfs().stat(root);
+        out.push({ name, absPath: root, isDir: st.isDirectory(), size: st.isDirectory() ? 0 : st.size });
+      } catch { /* skip */ }
+    }
+  }
+
+  await recurse(root);
+  return out;
+}
+
 // ─── Public API (fs/promises-like) ───
 
 // Typed wrappers instead of .bind() to preserve overload signatures
@@ -496,5 +571,6 @@ export const vfs = {
   appendFile,
   copyFile,
   walkFiles,
+  searchAll,
   onChange,
 };

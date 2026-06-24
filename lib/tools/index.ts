@@ -18,6 +18,7 @@ import { fsSearchTool } from './fs-search';
 import { fsSaveUrlTool } from './fs-save-url';
 import { createSessionRunSkillTool } from './run-skill';
 import { chromeApiTool } from './chrome-api-tool';
+import { searchDocumentsTool } from './search-documents';
 import { SessionToolContext } from './session-context';
 import { TOOL_ASK_USER } from '@/lib/tools/names';
 import { getMCPManager } from '@/lib/mcp/manager';
@@ -30,7 +31,7 @@ const sharedTools: AgentTool<any>[] = [
   executeJsTool, readPageTool, interactTool, inspectTool, tabTool, screenshotTool, pdfTool,
   fsCreateFileTool, fsEditFileTool, fsMkdirTool, fsRenameTool, fsDeleteTool,
   fsReadFileTool, fsListTool, fsSearchTool, fsSaveUrlTool,
-  chromeApiTool,
+  chromeApiTool, searchDocumentsTool,
 ];
 
 /**
