@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
@@ -38,6 +38,15 @@ function App() {
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  // 记住最近访问过的聊天路由（/chat/new 或 /chat/:sessionId），供退出设置时回到原处。
+  // 缺省 /chat/new 兜底首次进设置的情况。
+  const lastChatPathRef = useRef('/chat/new');
+  useEffect(() => {
+    if (location.pathname.startsWith('/chat/')) {
+      lastChatPathRef.current = location.pathname;
+    }
+  }, [location.pathname]);
 
   // 侧边栏打开后，若后台在升级时留了「待展示更新日志」标记，则打开更新日志页。
   useChangelogOnUpdate();
@@ -94,6 +103,11 @@ function App() {
     }
   }, [location.pathname, navigate]);
 
+  // 退出设置：回到进设置前的聊天路由（记不到则 /chat/new 兜底）。
+  const handleExitSettings = useCallback(() => {
+    navigate(lastChatPathRef.current, { replace: true });
+  }, [navigate]);
+
   if (!themeReady) return null;
 
   return (
@@ -118,7 +132,7 @@ function App() {
             path="/settings/*"
             element={
               <Suspense fallback={null}>
-                <SettingsRoutes basePath="/settings" showBackButton showOpenInTab />
+                <SettingsRoutes basePath="/settings" showBackButton showOpenInTab onBack={handleExitSettings} />
               </Suspense>
             }
           />

@@ -27,6 +27,8 @@ interface SettingsLayoutProps {
   showBackButton?: boolean;
   /** Show the "open in new tab" button in the top bar (sidepanel only). */
   showOpenInTab?: boolean;
+  /** 返回回调；传入时由它决定退出设置后去哪（回到进设置前的聊天）。缺省退回 /chat/new。 */
+  onBack?: () => void;
 }
 
 /**
@@ -37,7 +39,7 @@ interface SettingsLayoutProps {
  * - medium (640-1200): top icon+text tabs -> full-width Outlet (two-column still).
  * - wide   (>=1200px): left labeled sidebar -> Outlet on the right.
  */
-export function SettingsLayout({ basePath, showBackButton = false, showOpenInTab = false }: SettingsLayoutProps) {
+export function SettingsLayout({ basePath, showBackButton = false, showOpenInTab = false, onBack }: SettingsLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -56,10 +58,14 @@ export function SettingsLayout({ basePath, showBackButton = false, showOpenInTab
     if (section && showBackButton) lastSettingsSection.setValue(section);
   }, [section, showBackButton]);
 
-  // Back button always exits Settings entirely - single-step escape.
+  // 返回键一步退出设置：优先回到进设置前的聊天路由（onBack），缺省回新对话。
   const handleBack = useCallback(() => {
+    if (onBack) {
+      onBack();
+      return;
+    }
     navigate('/chat/new', { replace: true });
-  }, [navigate]);
+  }, [onBack, navigate]);
 
   // Open the current Settings path in the standalone tab page.
   const handleOpenInTab = useCallback(() => {

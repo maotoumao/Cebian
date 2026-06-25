@@ -28,9 +28,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - 修复站点在移动端（≤820px）导航栏中"赞助"和语言标签文字因 flex 压缩折行的问题；移动端赞助按钮退化为纯图标，极窄屏（≤380px）同步隐藏语言标签文字
 - 语音输入改为「本地优先、云端兜底」：本地语音引擎不可用的浏览器（如 Edge）现在自动改用云端识别，不再误报「本设备的本地语音识别不支持当前语言」；云端识别连接失败时给出明确的网络提示 (#33)
+- 修复从某个对话进入设置后点返回会落到新对话的问题：现在返回会回到进入设置前正在查看的对话
 
 - Fixed nav bar text wrapping on mobile (≤820px) where the sponsor label and language label were line-breaking due to flex shrink; the sponsor button now degrades to an icon-only style on mobile, and the language label is additionally hidden on extra-narrow screens (≤380px)
 - Voice input now follows "local first, cloud fallback": browsers without an on-device speech engine (such as Edge) automatically switch to cloud recognition instead of wrongly reporting that the language isn't supported on-device; a clear network message is shown when the cloud service can't be reached (#33)
+- Fixed the Settings back button landing on a new chat: returning from Settings now restores the conversation you were viewing before opening it
 
 ## 1.3.3 - 2026-06-21
 

@@ -9,6 +9,7 @@ import { PromptsSection } from '@/components/settings/sections/PromptsSection';
 import { SkillsSection } from '@/components/settings/sections/SkillsSection';
 import { MCPSection } from '@/components/settings/sections/MCPSection';
 import { BackupSection } from '@/components/settings/sections/BackupSection';
+import { StorageSection } from '@/components/settings/sections/StorageSection';
 // 高级设置暂时停用（导航入口同步注释，见 components/settings/SectionNav.tsx）。
 // import { AdvancedSection } from '@/components/settings/sections/AdvancedSection';
 import { AboutSection } from '@/components/settings/sections/AboutSection';
@@ -21,6 +22,8 @@ interface SettingsRoutesProps {
   showBackButton?: boolean;
   /** Show "open in new tab" button. True in sidepanel only. */
   showOpenInTab?: boolean;
+  /** 返回按钮的回调；侧边栏传入「回到进设置前的聊天路由」。缺省时退回 /chat/new。 */
+  onBack?: () => void;
 }
 
 /**
@@ -31,10 +34,10 @@ interface SettingsRoutesProps {
  * so the same tree works under both routers. `basePath` is forwarded to
  * `SettingsLayout`/`SectionNav` so they can build absolute NavLinks.
  */
-export function SettingsRoutes({ basePath, showBackButton = false, showOpenInTab = false }: SettingsRoutesProps) {
+export function SettingsRoutes({ basePath, showBackButton = false, showOpenInTab = false, onBack }: SettingsRoutesProps) {
   return (
     <Routes>
-      <Route element={<SettingsLayout basePath={basePath} showBackButton={showBackButton} showOpenInTab={showOpenInTab} />}>
+      <Route element={<SettingsLayout basePath={basePath} showBackButton={showBackButton} showOpenInTab={showOpenInTab} onBack={onBack} />}>
         <Route index element={<SettingsIndexRedirect />} />
         <Route path="providers" element={<ProvidersSection />} />
         <Route path="instructions" element={<InstructionsSection />} />
@@ -42,6 +45,7 @@ export function SettingsRoutes({ basePath, showBackButton = false, showOpenInTab
         <Route path="skills/*" element={<SkillsSection />} />
         <Route path="mcp" element={<MCPSection />} />
         <Route path="backup" element={<BackupSection />} />
+        <Route path="storage" element={<StorageSection />} />
         {/* Advanced settings temporarily disabled; restore once new options land (see SectionNav.tsx). */}
         {/* <Route path="advanced" element={<AdvancedSection />} /> */}
         <Route path="about" element={<AboutSection />} />
