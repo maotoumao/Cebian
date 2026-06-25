@@ -1,10 +1,16 @@
 // 语音识别核心（无 React、无 DOM 组件依赖）。
 //
-// 封装浏览器 Web Speech API 的 `SpeechRecognition`，并**强制走本地
-// on-device 识别**（`processLocally = true`）。Cebian 的运行环境拿不到
-// Google 云端语音端点（音频上传会失败，典型报 `error: 'network'`），所以
-// 云端这条路不可用，只走 Chrome 139+ 的 SODA 本地引擎：首次需要下载语言包
-// （`install()`），装好后完全离线、免费、有实时中间结果。
+// 封装浏览器 Web Speech API 的 `SpeechRecognition`，支持**本地 on-device**
+// 与**云端**两种识别路径，由调用方按 `processLocally` 选择：
+//  - 本地（`processLocally = true`）：Chrome 139+ 的 SODA 引擎，首次需下载语言包
+//    （`install()`），装好后完全离线、免费、有实时中间结果。
+//  - 云端（`processLocally = false`）：浏览器默认（多为云端）识别，无需下载，
+//    对没有本地引擎的浏览器（如 Edge，on-device 对所有语言都 `unavailable`）
+//    仍可用——实测在扩展 sidepanel 环境亦可正常转写。
+//
+// 上层默认「本地优先、云端兜底」（见 `hooks/useSpeechRecognition.ts` 的决策树）：
+// 本地可用走本地（隐私、离线、免费），本地不可用再退到云端。注意国内网络下
+// 云端可能被墙而回 `network`，所以本地优先才是覆盖最广的策略。
 //
 // 这一层只做「与浏览器 API 打交道」的纯逻辑：特性检测、locale→BCP-47、
 // 语言包可用性查询 / 下载、启动一次识别会话。状态机与 React 绑定在
@@ -12,6 +18,12 @@
 //
 // Web Speech API 的完整类型（含 on-device 静态方法与 `processLocally`）声明
 // 在 `lib/speech/speech-recognition.d.ts`，TypeScript lib.dom 未覆盖。
+
+/** 识别模式选择（供上层决定走哪条路径，并预留给将来的用户开关）：
+ *  - `auto`：本地优先、云端兜底（默认）。
+ *  - `on-device`：强制本地，本地不可用即报错、不退云端。
+ *  - `cloud`：强制云端，跳过本地语言包检查。 */
+export type SpeechMode = 'auto' | 'on-device' | 'cloud';
 
 /** on-device 语言包可用性。对应 `SpeechRecognition.available()` 的返回。 */
 export type SpeechAvailability = 'available' | 'downloadable' | 'downloading' | 'unavailable';
@@ -102,8 +114,10 @@ export function isSpeechRecognitionSupported(): boolean {
   return getRecognitionCtor() !== undefined;
 }
 
-/** 是否支持 on-device 识别（存在 `available`/`install` 静态方法）。
- *  Cebian 只走本地路径，所以这是语音功能可用的真正前提。 */
+/** 是否支持 on-device 本地识别（存在 `available`/`install` 静态方法）。
+ *  仅表征「本地路径」的能力——注意方法存在不代表真能用（Edge 上方法都在，
+ *  但对所有语言都 `unavailable`）。允许云端兜底时，语音功能的真正前提是
+ *  `isSpeechRecognitionSupported()`，不要拿本函数当整体可用性闸门。 */
 export function isOnDeviceSupported(): boolean {
   const Ctor = getRecognitionCtor();
   return typeof Ctor?.available === 'function' && typeof Ctor?.install === 'function';
@@ -137,7 +151,9 @@ export async function installLanguage(lang: string): Promise<boolean> {
   }
 }
 
-/** 启动一次识别会话。调用前应确保语言包 `available` 且麦克风已授权。
+/** 启动一次识别会话。调用前应确保语言包 `available`（本地路径）且麦克风已
+ *  授权。`mode` 决定走本地 on-device（`'on-device'`）还是云端（`'cloud'`）；
+ *  `'auto'` 是上层策略，到这一层时已被决议成具体的两者之一。
  *
  *  返回 handle 用 `abort()` 兜底停止（实测 `abort()` 能可靠触发 `onend`，
  *  而 continuous 模式下 `stop()` 有时迟迟不结束）。`stop()` 仍保留用于
@@ -146,7 +162,11 @@ export async function installLanguage(lang: string): Promise<boolean> {
  *  启动失败（无构造函数 / `start()` 抛错）时返回 `null` —— 不会触发任何
  *  回调，由调用方据此判定失败。这样调用方拿到的「成功 handle」一定对应一个
  *  真正在跑的会话，不会出现回调先于返回值到达导致状态错乱。 */
-export function startSpeechSession(lang: string, cb: SpeechSessionCallbacks): SpeechSessionHandle | null {
+export function startSpeechSession(
+  lang: string,
+  cb: SpeechSessionCallbacks,
+  mode: Exclude<SpeechMode, 'auto'>,
+): SpeechSessionHandle | null {
   const Ctor = getRecognitionCtor();
   if (!Ctor) return null;
 
@@ -155,9 +175,9 @@ export function startSpeechSession(lang: string, cb: SpeechSessionCallbacks): Sp
   rec.interimResults = true;
   rec.continuous = true;
   try {
-    rec.processLocally = true;
+    rec.processLocally = mode === 'on-device';
   } catch {
-    // 不支持该属性的环境：忽略，靠上层的 on-device 检测拦截。
+    // 不支持该属性的环境：忽略，靠上层的模式决策与 on-device 检测拦截。
   }
 
   rec.onresult = (ev: SpeechRecognitionEvent) => {

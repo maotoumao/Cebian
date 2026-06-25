@@ -5,13 +5,15 @@
 //  - 本 hook 只管「识别会话生命周期 + 状态」。麦克风授权的探测与引导由
 //    调用方（MicButton）用 `lib/speech/mic-permission.ts` 处理，再调用
 //    `start()`——所以 `start()` 假定已授权。
-//  - 语言包未就绪时，`start()` 会先进入 `preparing` 态后台 `install()`，
-//    下载完自动接着听写（无需用户再点）。
+//  - 识别路径由 `mode` 决定，默认 `auto`：本地优先、云端兜底。本地可用走本地
+//    （隐私、离线、免费），本地不可用（如 Edge 对所有语言都 `unavailable`）退到
+//    云端。语言包未就绪时先进入 `preparing` 态后台 `install()`，下载完自动接着
+//    听写（无需用户再点）；下载失败则退到云端。
 //  - 中间结果通过 `onInterim` 回调实时交给上层（ChatInput 把它作为 value
 //    末尾的「未定稿后缀」直接写入输入框，因此输入框始终可编辑）；每段最终
 //    结果经清洗 + `correctTranscript` 后由 `onFinal` 回调交给上层定稿。
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   isSpeechRecognitionSupported,
   isOnDeviceSupported,
@@ -20,6 +22,7 @@ import {
   installLanguage,
   startSpeechSession,
   type SpeechErrorKind,
+  type SpeechMode,
   type SpeechSessionHandle,
 } from '@/lib/speech/recognition';
 import { cleanTranscript } from '@/lib/speech/transcript';
@@ -39,10 +42,12 @@ export interface UseSpeechRecognitionOptions {
   onFinal: (text: string) => void;
   /** 归一化错误回调，用于 toast/降级（如 not-allowed、language-unavailable）。 */
   onError?: (kind: SpeechErrorKind) => void;
+  /** 识别模式，默认 `auto`（本地优先、云端兜底）。预留给将来的用户开关。 */
+  mode?: SpeechMode;
 }
 
 export interface UseSpeechRecognitionResult {
-  /** 浏览器是否支持本地语音识别。为 false 时上层应隐藏整个按钮。 */
+  /** 浏览器是否支持语音识别。为 false 时上层应隐藏整个按钮。 */
   supported: boolean;
   state: SpeechState;
   /** 开始语音输入（假定麦克风已授权）。必要时先下载语言包再听写。 */
@@ -52,10 +57,15 @@ export interface UseSpeechRecognitionResult {
 }
 
 export function useSpeechRecognition(options: UseSpeechRecognitionOptions): UseSpeechRecognitionResult {
-  const { onInterim, onFinal, onError } = options;
+  const { onInterim, onFinal, onError, mode = 'auto' } = options;
 
-  // 仅在挂载时判定一次能力：构造函数 + on-device 静态方法都在才算支持。
-  const [supported] = useState(() => isSpeechRecognitionSupported() && isOnDeviceSupported());
+  // 能力判定随 mode 变化：有 SpeechRecognition 构造函数即可（auto/cloud 模式靠
+  // 云端兜底，无需本地引擎）；仅 `on-device` 强制模式额外要求本地静态方法存在。
+  // 随 mode 派生（而非挂载时算一次），否则将来运行时切换模式后 supported 会陈旧。
+  const supported = useMemo(
+    () => isSpeechRecognitionSupported() && (mode === 'on-device' ? isOnDeviceSupported() : true),
+    [mode],
+  );
   const [state, setState] = useState<SpeechState>('idle');
 
   const handleRef = useRef<SpeechSessionHandle | null>(null);
@@ -71,6 +81,9 @@ export function useSpeechRecognition(options: UseSpeechRecognitionOptions): UseS
   onFinalRef.current = onFinal;
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
+  // 镜像最新 mode，供 start 内的决策读取，且不把它绑进 useCallback 依赖。
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
   // 卸载时让序号前进并中止进行中的会话，避免组件销毁后识别仍在跑或回调仍 setState。
   useEffect(() => {
@@ -100,19 +113,29 @@ export function useSpeechRecognition(options: UseSpeechRecognitionOptions): UseS
     const seq = ++seqRef.current;
     const isCurrent = () => mountedRef.current && seqRef.current === seq;
 
+    const mode = modeRef.current;
     const lang = resolveRecognitionLang();
 
-    // 语言包就绪检查；downloadable/downloading 时进入 preparing 后台下载。
-    let status = await getLanguageStatus(lang);
-    if (!isCurrent()) return; // 期间被 stop / 重启 / 卸载，放弃。
-    if (status === 'downloadable' || status === 'downloading') {
-      setState('preparing');
-      const ok = await installLanguage(lang);
-      if (!isCurrent()) return;
-      status = ok ? await getLanguageStatus(lang) : 'unavailable';
-      if (!isCurrent()) return;
+    // 决定本次会话走本地还是云端。本地优先（除非强制 cloud）：on-device 支持时
+    // 查语言包，downloadable/downloading 则进入 preparing 后台下载，最终 available
+    // 才用本地。本地走不通时（不支持 / 不可用 / 下载失败）退到云端兜底。
+    let sessionMode: Exclude<SpeechMode, 'auto'> | null = null;
+    if (mode !== 'cloud' && isOnDeviceSupported()) {
+      let status = await getLanguageStatus(lang);
+      if (!isCurrent()) return; // 期间被 stop / 重启 / 卸载，放弃。
+      if (status === 'downloadable' || status === 'downloading') {
+        setState('preparing');
+        const ok = await installLanguage(lang);
+        if (!isCurrent()) return;
+        status = ok ? await getLanguageStatus(lang) : 'unavailable';
+        if (!isCurrent()) return;
+      }
+      if (status === 'available') sessionMode = 'on-device';
     }
-    if (status !== 'available') {
+    // 云端兜底（除非强制 on-device）。
+    if (sessionMode === null && mode !== 'on-device') sessionMode = 'cloud';
+    // 强制 on-device 但本地不可用：报错，不退云端。
+    if (sessionMode === null) {
       setState('error');
       onErrorRef.current?.('language-unavailable');
       return;
@@ -153,7 +176,7 @@ export function useSpeechRecognition(options: UseSpeechRecognitionOptions): UseS
         // 出错路径已置 error；正常结束回到 idle。
         setState((s) => (s === 'error' ? s : 'idle'));
       },
-    });
+    }, sessionMode);
 
     // 启动失败（无构造函数 / start 抛错）：handle 为 null，不会有任何回调。
     if (!handle) {

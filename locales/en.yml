@@ -374,15 +374,16 @@ chat:
     noPrompts: "No prompts yet — create one from AI config"
     noMatch: "No matches"
     iframeEnterHint: "⏎ enter"
-    # Voice input (on-device speech recognition)
+    # Voice input (local-first speech recognition with cloud fallback)
     voiceStart: "Voice input"
     voiceStop: "Stop voice input"
     voicePreparing: "Preparing the speech model…"
     voiceNeedPermission: "Microphone access is needed — grant it in the tab that just opened, then click the mic again."
     voiceDenied: "Microphone access is blocked. Allow it for Cebian in Chrome settings, then try again."
-    voiceLanguageUnavailable: "On-device speech isn't available for your language on this device."
+    voiceLanguageUnavailable: "Speech recognition isn't available for the current language."
     voiceNoSpeech: "No speech detected. Try again."
     voiceAudioCapture: "No microphone was found, or it couldn't be accessed."
+    voiceNetworkFailed: "Couldn't reach the speech recognition service. Check your network and try again."
     voiceFailed: "Voice input failed. Please try again."
   attachments:
     image: "Image"

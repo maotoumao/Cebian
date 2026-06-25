@@ -151,7 +151,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     onThinkingChange(level);
   };
 
-  // ─── 语音输入（本地 on-device 识别）──────────────────────────────
+  // ─── 语音输入（本地优先、云端兜底的语音识别）──────────────────────
   // hook 持有在 ChatInput 这一层（而非 MicButton 内），因为识别结果要写进本
   // 输入框。
   //
@@ -229,8 +229,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       case 'audio-capture':
         toast.error(t('chat.composer.voiceAudioCapture'));
         break;
-      // network（强制本地后理论上不出现）/ unknown：通用失败提示。
+      // network：云端识别连不上（如国内云端被墙 / 断网）——给网络专属提示。
       case 'network':
+        toast.error(t('chat.composer.voiceNetworkFailed'));
+        break;
+      // unknown：无法归类，通用失败提示。
       case 'unknown':
         toast.error(t('chat.composer.voiceFailed'));
         break;

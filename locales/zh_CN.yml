@@ -370,15 +370,16 @@ chat:
     noPrompts: "暂无 Prompt，前往 AI 配置创建"
     noMatch: "无匹配结果"
     iframeEnterHint: "⏎ 点击进入"
-    # 语音输入（本地语音识别）
+    # 语音输入（本地优先、云端兜底的语音识别）
     voiceStart: "语音输入"
     voiceStop: "停止语音输入"
     voicePreparing: "正在准备语音模型…"
     voiceNeedPermission: "需要麦克风权限——请在刚打开的标签页里授权，然后再点一次麦克风。"
     voiceDenied: "麦克风权限被拒绝。请在 Chrome 设置里允许 Cebian 使用麦克风，然后重试。"
-    voiceLanguageUnavailable: "本设备的本地语音识别不支持当前语言。"
+    voiceLanguageUnavailable: "当前语言暂不支持语音识别。"
     voiceNoSpeech: "没有听到语音，请重试。"
     voiceAudioCapture: "没有找到麦克风，或无法访问。"
+    voiceNetworkFailed: "语音识别服务连接失败，请检查网络后重试。"
     voiceFailed: "语音输入失败，请重试。"
   attachments:
     image: "图片"

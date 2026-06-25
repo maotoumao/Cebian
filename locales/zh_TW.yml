@@ -370,15 +370,16 @@ chat:
     noPrompts: "尚無 Prompt，前往 AI 設定建立"
     noMatch: "無相符結果"
     iframeEnterHint: "⏎ 點擊進入"
-    # 語音輸入（本地語音辨識）
+    # 語音輸入（本地優先、雲端兜底的語音辨識）
     voiceStart: "語音輸入"
     voiceStop: "停止語音輸入"
     voicePreparing: "正在準備語音模型…"
     voiceNeedPermission: "需要麥克風權限——請在剛開啟的分頁裡授權，然後再點一次麥克風。"
     voiceDenied: "麥克風權限被拒絕。請在 Chrome 設定裡允許 Cebian 使用麥克風，然後重試。"
-    voiceLanguageUnavailable: "本裝置的本地語音辨識不支援當前語言。"
+    voiceLanguageUnavailable: "當前語言暫不支援語音辨識。"
     voiceNoSpeech: "沒有聽到語音，請重試。"
     voiceAudioCapture: "找不到麥克風，或無法存取。"
+    voiceNetworkFailed: "語音辨識服務連線失敗，請檢查網路後重試。"
     voiceFailed: "語音輸入失敗，請重試。"
   attachments:
     image: "圖片"
