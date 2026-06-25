@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { getModels, type KnownProvider, type Api, type Model } from '@earendil-works/pi-ai';
+import { getModels } from '@earendil-works/pi-ai/compat';
+import type { KnownProvider, Api, Model } from '@earendil-works/pi-ai';
 import { Check, ChevronDown, Settings } from 'lucide-react';
 
 import type { ModelIdentity, ProviderCredentials, CustomProviderConfig } from '@/lib/persistence/storage';

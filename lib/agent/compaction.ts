@@ -1,7 +1,14 @@
 // 上下文压缩（compaction）领域模块：集中存放压缩消息类型、切点计算与摘要生成，
 // 使压缩特性自包含。具体的「何时压缩 / 插入摘要 / 状态广播」编排在 agent-manager。
 
-import type { Api, Model } from '@earendil-works/pi-ai';
+import type { Api, Model, Models } from '@earendil-works/pi-ai';
+import {
+  createModels,
+  createProvider,
+  envApiKeyAuth,
+  InMemoryCredentialStore,
+} from '@earendil-works/pi-ai';
+import { getApiProvider } from '@earendil-works/pi-ai/compat';
 import {
   type AgentMessage,
   type ThinkingLevel,
@@ -137,9 +144,44 @@ export interface RunCompactionParams {
   previousSummary?: string;
   /** 为摘要提示词与输出预留的 token；默认取 pi 的 DEFAULT_COMPACTION_SETTINGS。 */
   reserveTokens?: number;
-  headers?: Record<string, string>;
   signal?: AbortSignal;
   thinkingLevel?: ThinkingLevel;
+}
+
+/**
+ * 用已解析好的 apiKey 构造一个只服务该 model 的临时 Models 集合。
+ *
+ * 0.80 的 generateSummary 经 Models 集合解析 auth、不再接受 apiKey 参数（主循环仍走
+ * agent-core 内部的显式 apiKey 路径，二者在 0.80 不对称）。Cebian 是浏览器扩展、无
+ * env，apiKey / OAuth-token 全由 resolveProviderApiKey 自己解析，故把已解析好的 key
+ * （OAuth 已刷新为 bearer）以 api_key 凭证注入内存 store，envApiKeyAuth 让它成为唯一
+ * 来源。model 对象本身已带正确 baseUrl / headers（resolveModel 烤入 copilot baseUrl /
+ * openrouter 归因头），直接复用。每次压缩单独构造，无全局状态、无并发串扰，复刻
+ * 主循环「显式 model + 显式 key」语义。
+ *
+ * api 实现（按 model.api 选 wire protocol）直接取 `/compat` 的 api-registry（`getApiProvider`）
+ * ——它就是 pi 内部 BUILTIN_APIS 的公开入口，返回的是 lazy 包装（SDK 延迟加载）。
+ * 复用 pi 的单一真理源，无需自己维护一张 api→impl 映射；agent-core 内部本就已 import
+ * `/compat`，故内置 api 在此时均已注册。
+ */
+async function modelsForSummary(model: Model<Api>, apiKey: string): Promise<Models> {
+  const credentials = new InMemoryCredentialStore();
+  await credentials.modify(model.provider, async () => ({ type: 'api_key', key: apiKey }));
+
+  const streams = getApiProvider(model.api);
+  if (!streams) {
+    throw new Error(`[compaction] no API implementation registered for "${model.api}"`);
+  }
+
+  const models = createModels({ credentials });
+  models.setProvider(createProvider({
+    id: model.provider,
+    baseUrl: model.baseUrl,
+    auth: { apiKey: envApiKeyAuth(model.provider, []) },
+    models: [model],
+    api: streams,
+  }));
+  return models;
 }
 
 /**
@@ -160,19 +202,21 @@ export async function runCompaction(params: RunCompactionParams): Promise<string
     apiKey,
     previousSummary,
     reserveTokens = DEFAULT_COMPACTION_SETTINGS.reserveTokens,
-    headers,
     signal,
     thinkingLevel,
   } = params;
+
+  // 0.80 的 generateSummary 经 Models 集合解析 auth：用已解析好的 key 构造一个只
+  // 服务该 model 的临时集合（见 modelsForSummary），两次重试复用同一集合。
+  const models = await modelsForSummary(model, apiKey);
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     if (signal?.aborted) return null;
     const result = await generateSummary(
       messagesToSummarize,
+      models,
       model,
       reserveTokens,
-      apiKey,
-      headers,
       signal,
       // customInstructions：Cebian 暂不暴露自定义摘要指令
       undefined,

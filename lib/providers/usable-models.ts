@@ -1,4 +1,5 @@
-import { getModels, type KnownProvider, type Api, type Model } from '@earendil-works/pi-ai';
+import { getModels } from '@earendil-works/pi-ai/compat';
+import type { KnownProvider, Api, Model } from '@earendil-works/pi-ai';
 import type { ProviderCredentials, CustomProviderConfig } from '@/lib/persistence/storage';
 import { isCustomProvider, getCustomModels, customProviderKey } from '@/lib/providers/custom-models';
 

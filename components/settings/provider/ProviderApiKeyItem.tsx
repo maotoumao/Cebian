@@ -1,13 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { Eye, EyeOff, Unplug, Save } from "lucide-react";
-import {
-  getModels,
-  complete,
-  type KnownProvider,
-  type Api,
-  type Model,
-} from "@earendil-works/pi-ai";
+import { getModels, complete } from "@earendil-works/pi-ai/compat";
+import type { KnownProvider, Api, Model } from "@earendil-works/pi-ai";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";

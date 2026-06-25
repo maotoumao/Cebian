@@ -1,5 +1,5 @@
-import type { Api, Model } from '@earendil-works/pi-ai';
-import { getModels, type KnownProvider } from '@earendil-works/pi-ai';
+import type { Api, KnownProvider, Model } from '@earendil-works/pi-ai';
+import { getModels } from '@earendil-works/pi-ai/compat';
 import type {
   ModelIdentity,
   ProviderCredentials,

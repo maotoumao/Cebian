@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getModels, type KnownProvider, type Api, type Model } from '@earendil-works/pi-ai';
+import { getModels } from '@earendil-works/pi-ai/compat';
+import type { KnownProvider, Api, Model } from '@earendil-works/pi-ai';
 import { resolveModel } from '@/lib/providers/resolve-model';
 import { customProviderKey } from '@/lib/providers/custom-models';
 import type {

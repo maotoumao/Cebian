@@ -12,7 +12,7 @@ import { RecordButton } from '@/components/chat/RecordButton';
 import { MicButton } from '@/components/chat/MicButton';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { providerCredentials, customProviders as customProvidersStorage, type ThinkingLevel, type ModelIdentity } from '@/lib/persistence/storage';
-import { getModel } from '@earendil-works/pi-ai';
+import { getModel } from '@earendil-works/pi-ai/compat';
 import { isCustomProvider, findCustomModel } from '@/lib/providers/custom-models';
 import { startElementPicker, cancelElementPicker } from '@/lib/browser/element-picker';
 import { scanPrompts, type PromptMeta } from '@/lib/ai-config/scanner';
