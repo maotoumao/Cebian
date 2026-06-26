@@ -20,9 +20,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     
 ### 新增 / Added
 
-- 文件浏览器现在把会话工作区目录（原本是一串 UUID）显示成「会话标题 · 日期」，并在进入某个工作区时于顶部展示该会话的标题与创建时间，让 AI 生成的文档更好找；设置新增「文件系统」一节，显示虚拟文件系统已用空间，并可一键打开文件浏览器 (#26)
+- 文件浏览器现在把会话工作区目录（原本是一串 UUID）显示成「会话标题 · 日期」，并在进入某个工作区时于顶部展示该会话的标题与创建时间，让 AI 生成的文档更好找；设置新增「文件系统」一节，显示虚拟文件系统已用空间，并可一键打开文件浏览器 ([#26](https://github.com/maotoumao/Cebian/pull/26))
 
-- The file browser now shows session workspace folders (previously raw UUIDs) as "conversation title · date", and displays the conversation's title and creation time at the top when you open a workspace, making AI-generated documents easier to find; Settings gains a "Filesystem" section that shows used space and opens the file browser in one click (#26)
+- The file browser now shows session workspace folders (previously raw UUIDs) as "conversation title · date", and displays the conversation's title and creation time at the top when you open a workspace, making AI-generated documents easier to find; Settings gains a "Filesystem" section that shows used space and opens the file browser in one click ([#26](https://github.com/maotoumao/Cebian/pull/26))
 
 ### 变更 / Changed
 
@@ -33,29 +33,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### 修复 / Fixed
 
 - 修复站点在移动端（≤820px）导航栏中"赞助"和语言标签文字因 flex 压缩折行的问题；移动端赞助按钮退化为纯图标，极窄屏（≤380px）同步隐藏语言标签文字
-- 语音输入改为「本地优先、云端兜底」：本地语音引擎不可用的浏览器（如 Edge）现在自动改用云端识别，不再误报「本设备的本地语音识别不支持当前语言」；云端识别连接失败时给出明确的网络提示 (#33)
+- 语音输入改为「本地优先、云端兜底」：本地语音引擎不可用的浏览器（如 Edge）现在自动改用云端识别，不再误报「本设备的本地语音识别不支持当前语言」；云端识别连接失败时给出明确的网络提示 ([#33](https://github.com/maotoumao/Cebian/pull/33))
 - 修复从某个对话进入设置后点返回会落到新对话的问题：现在返回会回到进入设置前正在查看的对话
-- 修复 skill 导入时错误拒绝合法的 `vfs.read`、`vfs.write`、`bgFetch`、`bgFetch:<pattern>` 权限声明；声明了这些权限的 skill 此前在导入预览时会报 `unsupportedPermission` 并拒绝安装 (#37, by @LinYanZhi)
+- 修复 skill 导入时错误拒绝合法的 `vfs.read`、`vfs.write`、`bgFetch`、`bgFetch:<pattern>` 权限声明；声明了这些权限的 skill 此前在导入预览时会报 `unsupportedPermission` 并拒绝安装 ([#37](https://github.com/maotoumao/Cebian/pull/37) by [@LinYanZhi](https://github.com/LinYanZhi))
 
 - Fixed nav bar text wrapping on mobile (≤820px) where the sponsor label and language label were line-breaking due to flex shrink; the sponsor button now degrades to an icon-only style on mobile, and the language label is additionally hidden on extra-narrow screens (≤380px)
-- Voice input now follows "local first, cloud fallback": browsers without an on-device speech engine (such as Edge) automatically switch to cloud recognition instead of wrongly reporting that the language isn't supported on-device; a clear network message is shown when the cloud service can't be reached (#33)
+- Voice input now follows "local first, cloud fallback": browsers without an on-device speech engine (such as Edge) automatically switch to cloud recognition instead of wrongly reporting that the language isn't supported on-device; a clear network message is shown when the cloud service can't be reached ([#33](https://github.com/maotoumao/Cebian/pull/33))
 - Fixed the Settings back button landing on a new chat: returning from Settings now restores the conversation you were viewing before opening it
-- Fixed skill import incorrectly rejecting valid `vfs.read`, `vfs.write`, `bgFetch`, and `bgFetch:<pattern>` permission declarations; skills declaring these permissions previously failed at import time with an `unsupportedPermission` error (#37, by @LinYanZhi)
+- Fixed skill import incorrectly rejecting valid `vfs.read`, `vfs.write`, `bgFetch`, and `bgFetch:<pattern>` permission declarations; skills declaring these permissions previously failed at import time with an `unsupportedPermission` error ([#37](https://github.com/maotoumao/Cebian/pull/37) by [@LinYanZhi](https://github.com/LinYanZhi))
 
 ## 1.3.3 - 2026-06-21
 
 ### 新增 / Added
 
-- 对话输入框支持语音输入：点击麦克风按钮即可把语音实时转写进输入框，离线本地识别（基于浏览器 on-device 语音引擎，音频不离开设备），首次使用会自动下载所选语言的语音模型 (#20)
+- 对话输入框支持语音输入：点击麦克风按钮即可把语音实时转写进输入框，离线本地识别（基于浏览器 on-device 语音引擎，音频不离开设备），首次使用会自动下载所选语言的语音模型 ([#20](https://github.com/maotoumao/Cebian/pull/20))
 - 新增通用授权页用于在标签页中完成麦克风授权（侧边栏无法直接弹出授权框）
-- 每个对话各自记住自己的模型与思考档：在某个对话里切换模型/思考档只影响该对话，新对话沿用你上一次选择的模型作为默认；适合多开标签分散使用、按对话把请求分摊到不同供应商 (#11)
+- 每个对话各自记住自己的模型与思考档：在某个对话里切换模型/思考档只影响该对话，新对话沿用你上一次选择的模型作为默认；适合多开标签分散使用、按对话把请求分摊到不同供应商 ([#11](https://github.com/maotoumao/Cebian/pull/11))
 - 使用 OpenRouter 时，请求会附带应用标识请求头（`HTTP-Referer` / `X-Title`），让 Cebian 出现在 OpenRouter 的应用榜单中；不含任何用户数据，仅对 OpenRouter 发送
 - WebDAV 备份新增「断开连接」：可移除已保存的连接配置（含密码），远程已上传的快照会保留，重新连接后仍可访问
 - 扩展升级后，下次打开侧边栏会自动打开更新日志页并定位到新版本，方便查看本次更新内容
 
-- Voice input in the chat composer: click the mic button to transcribe speech into the input in real time, recognized locally on-device (the browser's on-device speech engine — audio never leaves your device); the language model for your locale is downloaded automatically on first use (#20)
+- Voice input in the chat composer: click the mic button to transcribe speech into the input in real time, recognized locally on-device (the browser's on-device speech engine — audio never leaves your device); the language model for your locale is downloaded automatically on first use ([#20](https://github.com/maotoumao/Cebian/pull/20))
 - Added a generic permission page to grant microphone access from a tab (the side panel can't show the prompt directly)
-- Each conversation now remembers its own model and thinking level: switching the model/thinking level inside one chat affects only that chat, and a new chat defaults to the model you last picked; handy for spreading work across multiple tabs and routing requests to different providers per conversation (#11)
+- Each conversation now remembers its own model and thinking level: switching the model/thinking level inside one chat affects only that chat, and a new chat defaults to the model you last picked; handy for spreading work across multiple tabs and routing requests to different providers per conversation ([#11](https://github.com/maotoumao/Cebian/pull/11))
 - When using OpenRouter, requests now carry app-identifying headers (`HTTP-Referer` / `X-Title`) so Cebian appears on OpenRouter's app rankings; they contain no user data and are sent to OpenRouter only
 - WebDAV backup can now be disconnected: remove the saved connection (including the password); snapshots already uploaded to the server are kept and stay accessible after reconnecting
 - After an extension upgrade, opening the side panel next time automatically opens the changelog page scrolled to the new version, so you can see what changed
@@ -64,18 +64,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - 备份文件名使用用户填写的名称
 - 规避会话备份/恢复时的 64 MiB runtime message 体积限制
-- 工具执行中点击停止后，工具卡片不再一直显示加载图标，「已取消」提示也移到工具卡片下方 (#21)
-- 询问用户/权限确认卡片的文本现在保留换行，多行时图标与首行对齐 (#23)
-- 文件编辑页窄屏布局下，右键删除文件时不再误把该文件重新打开 (#22)
+- 工具执行中点击停止后，工具卡片不再一直显示加载图标，「已取消」提示也移到工具卡片下方 ([#21](https://github.com/maotoumao/Cebian/pull/21))
+- 询问用户/权限确认卡片的文本现在保留换行，多行时图标与首行对齐 ([#23](https://github.com/maotoumao/Cebian/pull/23))
+- 文件编辑页窄屏布局下，右键删除文件时不再误把该文件重新打开 ([#22](https://github.com/maotoumao/Cebian/pull/22))
 - 修复 AI 偶尔不读取页面、凭记忆编造链接就跳转的问题：现在要求链接地址必须来自页面真实 \`href\`、用户输入或工具结果，仅允许基于页面上可见样本的推导（如可见的 \`?page=2\` 翻到 \`?page=3\`），并在跳转失败时回退到重新读取页面
 - 修复「关于」页与更新提示里的安装指南链接指向失效旧地址的问题（现指向重构后的文档站安装页），并按界面语言正确区分简体 / 繁体 / 英文
 
 - Use the user-provided name for backup filenames
 - Avoid the 64 MiB runtime message limit on session backup and restore
-- Stop the tool card from spinning forever after cancelling a running tool, and move the "Cancelled" marker below the tool card (#21)
-- Preserve line breaks in ask-user and permission-prompt card text, and align the icon to the first line for multi-line text (#23)
+- Stop the tool card from spinning forever after cancelling a running tool, and move the "Cancelled" marker below the tool card ([#21](https://github.com/maotoumao/Cebian/pull/21))
+- Preserve line breaks in ask-user and permission-prompt card text, and align the icon to the first line for multi-line text ([#23](https://github.com/maotoumao/Cebian/pull/23))
 - Fixed the AI occasionally navigating to a URL invented from memory instead of reading the page: link addresses must now come from a real page \`href\`, user input, or a tool result, with derivation allowed only from a sample visible on the page (e.g. bumping a visible \`?page=2\` to \`?page=3\`), and a fallback to re-read the page when navigation fails
-- File editor: deleting a file from the right-click menu no longer spuriously reopens it in the compact (narrow) layout (#22)
+- File editor: deleting a file from the right-click menu no longer spuriously reopens it in the compact (narrow) layout ([#22](https://github.com/maotoumao/Cebian/pull/22))
 - Fixed the install-guide link in the About page and update notice pointing at a dead old URL (now points at the rebuilt docs site's installation page), and route it to the correct Simplified / Traditional Chinese / English variant per UI language
 
 ### 变更 / Changed
@@ -106,14 +106,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### 修复 / Fixed
 
-- 改用 compaction 感知的 LLM 视图，替换 maxRounds 滑动窗口 (#9)
+- 改用 compaction 感知的 LLM 视图，替换 maxRounds 滑动窗口 ([#9](https://github.com/maotoumao/Cebian/pull/9))
 - 连通性测试失败不再阻断 API key 保存
 - 自定义供应商改用 uuid 作为内部 id
 - 跟随系统主题时改用 SunMoon 图标
 - read_page 选择器输入清理杂散引号
 - 站点根路径不再出现可见的重定向页
 
-- Use a compaction-aware LLM view to replace the maxRounds sliding window (#9)
+- Use a compaction-aware LLM view to replace the maxRounds sliding window ([#9](https://github.com/maotoumao/Cebian/pull/9))
 - Connectivity test failure no longer blocks saving the API key
 - Custom providers use a uuid as their internal id
 - Use the SunMoon icon when following the system theme
