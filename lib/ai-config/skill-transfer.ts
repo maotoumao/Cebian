@@ -149,6 +149,8 @@ function assertSkillName(name: string): void {
 function assertPermissionsAllowed(permissions: string[]): void {
   for (const p of permissions) {
     if (p === 'page.executeJs') continue;
+    if (p === 'vfs.read' || p === 'vfs.write') continue;
+    if (p === 'bgFetch' || p.startsWith('bgFetch:')) continue;
     const m = /^chrome\.([a-zA-Z][a-zA-Z0-9]*)$/.exec(p);
     // hasOwnProperty guard: avoid accepting inherited names like
     // "chrome.constructor" or "chrome.toString" as legitimate permissions.
