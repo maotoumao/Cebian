@@ -132,3 +132,12 @@ export function base64ToBytes(b64: string): Uint8Array {
   for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
   return out;
 }
+
+/**
+ * 穷尽检查哨兵：放在判别联合 `switch` 的 `default` 分支，确保每个 `kind`
+ * 都被处理——漏掉一个分支时 `x` 不再收窄成 `never`，编译期即报错。
+ * 运行期真走到这里（外部传入越界数据）则抛错，避免静默吞掉。
+ */
+export function assertNever(x: never): never {
+  throw new Error(`Unexpected value: ${String(x)}`);
+}

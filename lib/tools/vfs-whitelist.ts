@@ -16,6 +16,7 @@
 
 import { normalizePath } from '@/lib/persistence/vfs';
 import { isValidSessionId } from '@/lib/utils';
+import { parsePermission } from './permissions';
 
 // ─── Method groups (white-list) ───
 
@@ -28,11 +29,6 @@ export const VFS_READ_METHODS = new Set([
 export const VFS_WRITE_METHODS = new Set([
   'writeFile', 'mkdir', 'unlink',
 ]);
-
-// ─── Permission strings (declared in SKILL.md metadata.permissions) ───
-
-export const VFS_PERM_READ = 'vfs.read';
-export const VFS_PERM_WRITE = 'vfs.write';
 
 // ─── Path security helpers ───
 
@@ -98,8 +94,9 @@ export function isVfsCallAllowed(method: string, permissions: string[]): boolean
   if (typeof method !== 'string') return false;
   if (FORBIDDEN_PARTS.has(method)) return false;
   if (method.includes('.')) return false;
-  const hasWrite = permissions.includes(VFS_PERM_WRITE);
-  const hasRead = hasWrite || permissions.includes(VFS_PERM_READ);
+  // 认 token 统一走沙箱能力词汇（lib/tools/permissions），不在这里重复比字符串。
+  const hasWrite = permissions.some((p) => parsePermission(p)?.kind === 'vfsWrite');
+  const hasRead = hasWrite || permissions.some((p) => parsePermission(p)?.kind === 'vfsRead');
   if (VFS_READ_METHODS.has(method)) return hasRead;
   if (VFS_WRITE_METHODS.has(method)) return hasWrite;
   return false;

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { closeDialog, showConfirm } from '@/lib/ui/dialog';
 import { t } from '@/lib/i18n';
+import { classifyPermission } from '@/lib/tools/permissions';
 import {
   importSkillPackage,
   SkillPackageError,
@@ -34,14 +35,6 @@ function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/** Visual classification of a permission string for the badge variant. */
-function classifyPermission(perm: string): 'sensitive' | 'normal' {
-  // `page.executeJs` and any `chrome.<ns>` permission can run code or read
-  // user state, so they get the destructive badge to match how the agent
-  // sandbox treats them at runtime.
-  return perm === 'page.executeJs' || perm.startsWith('chrome.') ? 'sensitive' : 'normal';
 }
 
 function PreviewItem({ item }: { item: SkillImportPreviewItem }) {

@@ -13,6 +13,7 @@ import { decodeBinaryArgs, decodeBinary, encodeBinary } from '@/lib/ipc/sandbox-
 import type { MatchPattern } from './url-pattern';
 import { parseBgFetchPatterns } from './url-pattern';
 import { handleBgFetch } from './bg-fetch';
+import { parsePermission } from './permissions';
 
 // ─── Pending run requests ───
 
@@ -348,7 +349,10 @@ export async function runInSandbox(
   // 计算 vfsRoot —— 只有在显式声明了 vfs.* 时才有意义。
   // 校验失败（无效 sessionId / 无效 skill）直接抛，否则错误会延迟到 skill 调用
   // vfs.* 时才暴露，调试更难。
-  const wantsVfs = permissions.includes('vfs.read') || permissions.includes('vfs.write');
+  const wantsVfs = permissions.some((p) => {
+    const kind = parsePermission(p)?.kind;
+    return kind === 'vfsRead' || kind === 'vfsWrite';
+  });
   const vfsRoot = wantsVfs ? sessionSkillRoot(sessionId, skill) : null;
 
   // 同理：解析 bgFetch patterns；malformed pattern 立即抛。

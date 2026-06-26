@@ -47,7 +47,7 @@ import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { vfs, normalizePath, isJunkPath, isSafeRelPath } from '@/lib/persistence/vfs';
 import { CEBIAN_SKILLS_DIR, SKILL_ENTRY_FILE } from '@/lib/persistence/vfs-paths';
 import { parseFrontmatter } from '@/lib/content/frontmatter';
-import { CHROME_API_WHITELIST } from '@/lib/tools/chrome-api-whitelist';
+import { isPermissionAllowed } from '@/lib/tools/permissions';
 import { clearSkillGrant } from './skill-grants';
 
 // ─── Limits ───
@@ -148,14 +148,9 @@ function assertSkillName(name: string): void {
 /** Validate every declared permission against the runtime whitelist. */
 function assertPermissionsAllowed(permissions: string[]): void {
   for (const p of permissions) {
-    if (p === 'page.executeJs') continue;
-    if (p === 'vfs.read' || p === 'vfs.write') continue;
-    if (p === 'bgFetch' || p.startsWith('bgFetch:')) continue;
-    const m = /^chrome\.([a-zA-Z][a-zA-Z0-9]*)$/.exec(p);
-    // hasOwnProperty guard: avoid accepting inherited names like
-    // "chrome.constructor" or "chrome.toString" as legitimate permissions.
-    if (m && Object.prototype.hasOwnProperty.call(CHROME_API_WHITELIST, m[1])) continue;
-    throw new SkillPackageError('unsupportedPermission', p);
+    if (!isPermissionAllowed(p)) {
+      throw new SkillPackageError('unsupportedPermission', p);
+    }
   }
 }
 

@@ -5,6 +5,7 @@
  */
 
 import { encodeBinary, encodeBinaryArgs, decodeBinary } from '@/lib/ipc/sandbox-binary';
+import { parsePermission } from '@/lib/tools/permissions';
 
 // ─── Message types (shared with sandbox-rpc.ts) ───
 
@@ -110,10 +111,13 @@ const pendingCalls = new Map<string, { resolve: (v: unknown) => void; reject: (e
 // ─── Chrome API Proxy ───
 
 function createChromeProxy(permissions: string[], requestId: string): Record<string, unknown> {
-  const chromePerms = permissions.filter(p => p.startsWith('chrome.'));
-  if (chromePerms.length === 0) return {};
-
-  const allowedNamespaces = new Set(chromePerms.map(p => p.replace(/^chrome\./, '')));
+  // 认 token 统一走沙箱能力词汇（lib/tools/permissions），不在这里重复比字符串。
+  const allowedNamespaces = new Set<string>();
+  for (const p of permissions) {
+    const perm = parsePermission(p);
+    if (perm?.kind === 'chrome') allowedNamespaces.add(perm.namespace);
+  }
+  if (allowedNamespaces.size === 0) return {};
 
   return new Proxy({} as Record<string, unknown>, {
     get(_target, ns: string) {
@@ -184,8 +188,8 @@ function createVfsProxy(
   vfsRoot: string | null,
   requestId: string,
 ): Record<string, unknown> | undefined {
-  const hasRead = permissions.includes('vfs.read');
-  const hasWrite = permissions.includes('vfs.write');
+  const hasRead = permissions.some(p => parsePermission(p)?.kind === 'vfsRead');
+  const hasWrite = permissions.some(p => parsePermission(p)?.kind === 'vfsWrite');
   if (!hasRead && !hasWrite) return undefined;
   // sandbox-rpc 一侧保证：声明了任一 vfs 权限 → vfsRoot 必有值。
   // 走到这里还是 null 说明上游 wiring 坏了，与其静默返回 undefined
@@ -306,7 +310,7 @@ function createBgFetch(
   permissions: string[],
   requestId: string,
 ): ((url: string, init?: unknown) => Promise<BgFetchResponseShape>) | undefined {
-  const hasBgFetch = permissions.some(p => p === 'bgFetch' || p.startsWith('bgFetch:'));
+  const hasBgFetch = permissions.some(p => parsePermission(p)?.kind === 'bgFetch');
   if (!hasBgFetch) return undefined;
 
   return (url: string, init?: unknown): Promise<BgFetchResponseShape> => {
@@ -352,12 +356,12 @@ async function executeScript(req: RunRequest): Promise<unknown> {
 
   // Chrome API proxy (only declared namespaces)
   const chromeProxy = createChromeProxy(permissions, req.id);
-  if (Object.keys(chromeProxy).length > 0 || permissions.some(p => p.startsWith('chrome.'))) {
+  if (Object.keys(chromeProxy).length > 0 || permissions.some(p => parsePermission(p)?.kind === 'chrome')) {
     globals.chrome = chromeProxy;
   }
 
   // executeInPage function (if page.executeJs permission declared)
-  if (permissions.includes('page.executeJs')) {
+  if (permissions.some(p => parsePermission(p)?.kind === 'pageExecuteJs')) {
     globals.executeInPage = createPageExec(req.id, tabId);
   }
 

@@ -21,6 +21,8 @@
  * match-pattern 也不区分这些，path 通配已经够灵活。
  */
 
+import { parsePermission } from './permissions';
+
 const ALLOWED_SCHEMES = new Set(['*', 'http', 'https']);
 
 /** 合法 host 形态：`*` / `[*.]label[.label...]`。label 允许字母数字、连字符。 */
@@ -137,17 +139,18 @@ export function matchUrl(url: URL, pattern: MatchPattern): boolean {
  * 错误消息里包含原始权限字符串，便于 skill 作者定位。
  */
 export function parseBgFetchPatterns(permissions: readonly string[]): MatchPattern[] | null {
-  const bgFetchPerms = permissions.filter(p => p === 'bgFetch' || p.startsWith('bgFetch:'));
-  if (bgFetchPerms.length === 0) return null;
-
   const patterns: MatchPattern[] = [];
-  for (const perm of bgFetchPerms) {
-    const patternStr = perm === 'bgFetch' ? '*://*/*' : perm.slice('bgFetch:'.length);
+  for (const p of permissions) {
+    // 认 token 统一走沙箱能力词汇（lib/tools/permissions），不在这里重复比字符串。
+    const perm = parsePermission(p);
+    if (perm?.kind !== 'bgFetch') continue;
+    // 裸 bgFetch（pattern 缺省）等价 `*://*\/*`，覆盖任意 http(s) URL。
+    const patternStr = perm.pattern ?? '*://*/*';
     try {
       patterns.push(parseMatchPattern(patternStr));
     } catch (err) {
-      throw new Error(`Invalid bgFetch permission "${perm}": ${(err as Error).message}`);
+      throw new Error(`Invalid bgFetch permission "${p}": ${(err as Error).message}`);
     }
   }
-  return patterns;
+  return patterns.length === 0 ? null : patterns;
 }

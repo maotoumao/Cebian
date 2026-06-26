@@ -19,6 +19,9 @@ import type {
   BeforeToolCallResult,
 } from '@earendil-works/pi-agent-core';
 import { t } from '@/lib/i18n';
+import { assertNever } from '@/lib/utils';
+import { parsePermission } from '@/lib/tools/permissions';
+import { CHROME_API_WHITELIST } from '@/lib/tools/chrome-api-whitelist';
 
 // ─── 决策与请求载荷 ───
 
@@ -104,57 +107,61 @@ function isPermissionRequest(
 // ─── 权限 token → 人话解释 ───
 
 /**
- * 把单个权限 token 渲染成给用户看的人话解释。词汇表是固定的（与运行时
- * 白名单 `lib/tools/chrome-api-whitelist.ts` 对齐），未知 token 原样回显，
- * 至少让用户看到 token 本身而不是被吞掉。
+ * 11 个 chrome.* 白名单 namespace 各自的 i18n key。类型 `Record<keyof typeof
+ * CHROME_API_WHITELIST, string>` 把它锚定到白名单（唯一真值源）——白名单新增
+ * namespace 却忘了在此补文案，会**编译失败**，而不是静默掉进 fallback。
+ */
+const CHROME_NS_I18N = {
+  tabs: 'chat.permission.perm.chromeTabs',
+  windows: 'chat.permission.perm.chromeWindows',
+  alarms: 'chat.permission.perm.chromeAlarms',
+  webNavigation: 'chat.permission.perm.chromeWebNavigation',
+  bookmarks: 'chat.permission.perm.chromeBookmarks',
+  history: 'chat.permission.perm.chromeHistory',
+  cookies: 'chat.permission.perm.chromeCookies',
+  topSites: 'chat.permission.perm.chromeTopSites',
+  sessions: 'chat.permission.perm.chromeSessions',
+  downloads: 'chat.permission.perm.chromeDownloads',
+  notifications: 'chat.permission.perm.chromeNotifications',
+} as const satisfies Record<keyof typeof CHROME_API_WHITELIST, string>;
+
+/**
+ * 把单个权限 token 渲染成给用户看的人话解释。词汇与解析统一走
+ * `lib/tools/permissions.ts`（沙箱能力词汇），本函数只负责「判别联合 → i18n」。
+ * 无法解析的 token（malformed / 未知）原样回显，至少让用户看到 token 本身。
+ *
+ * switch 用穷尽检查（assertNever）：将来新增一种权限 kind 必须在此补人话，
+ * 漏掉则编译失败。chrome 分支查 `CHROME_NS_I18N`（白名单驱动），白名单外的
+ * namespace 走带占位的 fallback。
  *
  * 在 UI 渲染时调用——i18n 实时生效，不在后台冻结成字符串。
  */
 function describePermission(permission: string): string {
-  if (permission === 'bgFetch') return t('chat.permission.perm.bgFetchAny');
-  if (permission.startsWith('bgFetch:')) {
-    const pattern = permission.slice('bgFetch:'.length);
-    // 空 pattern（`bgFetch:`）是 malformed token，落到末尾原样回显而非伪装成
-    // 一条「作用域为空」的说明，让用户看到异常 token 本身。
-    if (pattern) return t('chat.permission.perm.bgFetchPattern', [pattern]);
-  }
-  if (permission === 'page.executeJs') return t('chat.permission.perm.pageExecuteJs');
-  if (permission === 'vfs.read') return t('chat.permission.perm.vfsRead');
-  if (permission === 'vfs.write') return t('chat.permission.perm.vfsWrite');
+  const perm = parsePermission(permission);
+  if (!perm) return permission;
 
-  const chromeMatch = /^chrome\.([a-zA-Z][a-zA-Z0-9]*)$/.exec(permission);
-  if (chromeMatch) return describeChromeNamespace(chromeMatch[1]);
-
-  return permission;
-}
-
-/** 11 个 chrome.* 白名单 namespace 的专属说明；其余走 fallback。 */
-function describeChromeNamespace(ns: string): string {
-  switch (ns) {
-    case 'tabs':
-      return t('chat.permission.perm.chromeTabs');
-    case 'windows':
-      return t('chat.permission.perm.chromeWindows');
-    case 'alarms':
-      return t('chat.permission.perm.chromeAlarms');
-    case 'webNavigation':
-      return t('chat.permission.perm.chromeWebNavigation');
-    case 'bookmarks':
-      return t('chat.permission.perm.chromeBookmarks');
-    case 'history':
-      return t('chat.permission.perm.chromeHistory');
-    case 'cookies':
-      return t('chat.permission.perm.chromeCookies');
-    case 'topSites':
-      return t('chat.permission.perm.chromeTopSites');
-    case 'sessions':
-      return t('chat.permission.perm.chromeSessions');
-    case 'downloads':
-      return t('chat.permission.perm.chromeDownloads');
-    case 'notifications':
-      return t('chat.permission.perm.chromeNotifications');
+  switch (perm.kind) {
+    case 'pageExecuteJs':
+      return t('chat.permission.perm.pageExecuteJs');
+    case 'vfsRead':
+      return t('chat.permission.perm.vfsRead');
+    case 'vfsWrite':
+      return t('chat.permission.perm.vfsWrite');
+    case 'bgFetch':
+      return perm.pattern
+        ? t('chat.permission.perm.bgFetchPattern', [perm.pattern])
+        : t('chat.permission.perm.bgFetchAny');
+    case 'chrome': {
+      // parsePermission 只校验 token **形状**，不查白名单成员资格——形状合法的
+      // `chrome.foo` / 继承名 `chrome.toString` 都能走到这里。hasOwnProperty 同时
+      // 完成两件事：区分「已配文案的 namespace」与 fallback，并挡掉继承属性脏数据。
+      if (Object.prototype.hasOwnProperty.call(CHROME_NS_I18N, perm.namespace)) {
+        return t(CHROME_NS_I18N[perm.namespace as keyof typeof CHROME_API_WHITELIST]);
+      }
+      return t('chat.permission.perm.chromeFallback', [perm.namespace]);
+    }
     default:
-      return t('chat.permission.perm.chromeFallback', [ns]);
+      return assertNever(perm);
   }
 }
 

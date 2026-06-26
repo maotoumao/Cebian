@@ -8,7 +8,10 @@
 // Only APIs whose permission is declared in manifest are included.
 // To add new namespaces, also add the permission in wxt.config.ts.
 
-export const CHROME_API_WHITELIST: Record<string, Set<string>> = {
+// 用 `satisfies` 而非显式标注，保留字面量 key 联合（`'tabs' | 'cookies' | ...`），
+// 让 `keyof typeof CHROME_API_WHITELIST` 能驱动其它映射的穷尽检查（见
+// `lib/agent/tool-permissions.ts` 的 CHROME_NS_I18N）。
+export const CHROME_API_WHITELIST = {
   tabs: new Set([
     'query', 'get', 'create', 'update', 'remove', 'reload',
     'captureVisibleTab', 'duplicate', 'move', 'group', 'ungroup',
@@ -26,7 +29,7 @@ export const CHROME_API_WHITELIST: Record<string, Set<string>> = {
   sessions: new Set(['getRecentlyClosed', 'getDevices', 'restore']),
   downloads: new Set(['search', 'pause', 'resume', 'cancel', 'download']),
   notifications: new Set(['create', 'update', 'clear', 'getAll', 'getPermissionLevel']),
-};
+} satisfies Record<string, Set<string>>;
 
 /** Parts that must never appear in method paths (prototype pollution guard) */
 const FORBIDDEN_PATH_PARTS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -42,5 +45,9 @@ export function isChromeCallAllowed(namespace: string, method: string): boolean 
   // Flat method names only (no dots for non-help namespaces)
   if (method.includes('.')) return false;
 
-  return CHROME_API_WHITELIST[namespace]?.has(method) ?? false;
+  // own-property 守卫：namespace 是任意 string，没有这层 `toString` / `valueOf`
+  // 这类继承名会取到 Object.prototype 上的函数，后续 `.has` 直接抛错。守卫后再
+  // 用字面量 key 索引（satisfies 保留的字面量 key 联合）。
+  if (!Object.prototype.hasOwnProperty.call(CHROME_API_WHITELIST, namespace)) return false;
+  return CHROME_API_WHITELIST[namespace as keyof typeof CHROME_API_WHITELIST].has(method);
 }

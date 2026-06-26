@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { asString, isValidSessionId } from '@/lib/utils';
+import { asString, isValidSessionId, assertNever } from '@/lib/utils';
 
 describe('asString', () => {
   it('是字符串 → 原样返回（含空串）', () => {
@@ -31,5 +31,12 @@ describe('isValidSessionId', () => {
     expect(isValidSessionId(`${UUID}/..`)).toBe(false);
     expect(isValidSessionId(null)).toBe(false);
     expect(isValidSessionId(123)).toBe(false);
+  });
+});
+
+describe('assertNever', () => {
+  it('运行期被调用 → 抛错并带上越界值', () => {
+    // 绕过类型检查模拟外部传入的越界数据。
+    expect(() => assertNever('oops' as never)).toThrow('Unexpected value: oops');
   });
 });
