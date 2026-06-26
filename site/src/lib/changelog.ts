@@ -61,11 +61,19 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** 渲染条目内的 inline markdown：`code`、(#编号) → issue 链接。 */
+/** 渲染条目内的 inline markdown：`code`、Markdown 链接、裸 (#NNN) → HTML。 */
 function renderInline(text: string): string {
   let t = text.replace(/\\`/g, '`'); // 还原源文件里被转义的反引号
   t = esc(t);
+  // inline code
   t = t.replace(/`([^`]+)`/g, (_m, code) => `<code>${code}</code>`);
+  // Markdown 链接 [label](url)：#NNN / @user 加 cl-ref 样式，其余正常链接
+  t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, (_m, label, url) => {
+    const isMeta = /^#\d+$/.test(label) || label.startsWith('@');
+    const cls = isMeta ? ' class="cl-ref"' : '';
+    return `<a${cls} href="${url}" target="_blank" rel="noopener">${label}</a>`;
+  });
+  // 兼容旧格式裸 (#NNN)
   t = t.replace(/\(#(\d+)\)/g, (_m, n) => ` <a class="cl-ref" href="${GH}/issues/${n}" target="_blank" rel="noopener">#${n}</a>`);
   return t;
 }
