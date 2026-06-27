@@ -2,7 +2,7 @@
 // Import this file once in the sidepanel to enable rendering ask_user blocks.
 
 import { uiToolRegistry, type InteractiveToolComponentProps } from './ui-registry';
-import type { AskUserRequest } from './ask-user';
+import type { AskUserRequest, AskUserResponse } from './ask-user';
 import { AskUserBlock } from '@/components/chat/Message';
 import { TOOL_ASK_USER } from '@/lib/tools/names';
 
@@ -16,11 +16,9 @@ function AskUserToolComponent({
 }: InteractiveToolComponentProps<AskUserRequest>) {
   return (
     <AskUserBlock
-      question={args.question}
-      options={args.options}
-      allowFreeText={args.allow_free_text ?? true}
+      request={args}
       answered={!isPending && !!toolResult}
-      onSelect={isPending ? onResolve : undefined}
+      onResolve={isPending && onResolve ? (response: AskUserResponse) => onResolve(response as any) : undefined}
     />
   );
 }

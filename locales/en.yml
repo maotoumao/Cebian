@@ -410,6 +410,18 @@ chat:
     autoStoppedTime: "Recording auto-stopped: time limit reached"
   askUser:
     placeholder: "Type a reply…"
+  form:
+    title: "Form"
+    submit: "Submit"
+    required: "This field is required"
+    selectPlaceholder: "Select…"
+    recommended: "Recommended"
+    # $1 = min, $2 = max
+    selectRange: "Select $1-$2 options"
+    # $1 = min
+    minSelect: "Select at least $1 option(s)"
+    # $1 = max
+    maxSelect: "Select at most $1 option(s)"
   permission:
     # Permission prompt shown before a skill script runs. $1 = skill name, $2 = script path
     title: "Skill $1 wants to run $2"
@@ -569,6 +581,7 @@ tools:
   executeJs: "Running script"
   screenshot: "Taking page screenshot"
   askUser: "Waiting for user reply"
+  presentForm: "Collecting user input"
   pdf:
     info: "Reading PDF metadata"
     # $1 = page range (e.g. "1-10") or the literal "all pages"

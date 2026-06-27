@@ -10,6 +10,8 @@ import { RECORDING_MIME } from '@/lib/agent/attachments';
 import { t } from '@/lib/i18n';
 import { describePermission } from '@/lib/agent/tool-permissions';
 import { downloadFile, formatDuration, formatCharCount } from '@/lib/utils';
+import { FormBlock } from '@/components/chat/FormBlock';
+import { normalizeRequest } from '@/lib/tools/ask-user';
 import type { Message } from '@earendil-works/pi-ai';
 
 /* ─── User Message ─── */
@@ -290,25 +292,66 @@ function PromptOptionButton({
 
 /* ─── Ask User Block (interactive tool UI) ─── */
 export function AskUserBlock({
-  question,
-  options,
-  allowFreeText = true,
+  request,
   answered,
-  onSelect,
+  onResolve,
 }: {
-  question: string;
-  options?: { label: string; description?: string }[];
-  allowFreeText?: boolean;
+  request: import('@/lib/tools/ask-user').AskUserRequest;
   answered?: boolean;
-  onSelect?: (text: string) => void;
+  onResolve?: (response: import('@/lib/tools/ask-user').AskUserResponse) => void;
+}) {
+  // Normalize: the raw tool arguments may be in legacy format ({ question, options })
+  // rather than the new internal format ({ questions: [...] }).
+  const normalized = normalizeRequest(request as Record<string, unknown>);
+  const fields = normalized.questions;
+
+  // Mode A: compact single-question mode (no title, single field)
+  if (fields.length === 1 && !request.title && !request.description) {
+    return (
+      <AskUserCompactBlock
+        field={fields[0]}
+        answered={answered}
+        onResolve={onResolve}
+      />
+    );
+  }
+
+  // Mode B: multi-field form
+  return (
+    <FormBlock
+      request={normalized}
+      answered={!!answered}
+      onResolve={onResolve}
+    />
+  );
+}
+
+/* ─── Ask User Compact Block (mode A: single question) ─── */
+
+function AskUserCompactBlock({
+  field,
+  answered,
+  onResolve,
+}: {
+  field: import('@/lib/tools/ask-user').AskUserQuestion;
+  answered?: boolean;
+  onResolve?: (response: import('@/lib/tools/ask-user').AskUserResponse) => void;
 }) {
   const [freeText, setFreeText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const question = field.question;
+  const options = field.options;
+  const allowFreeText = field.allow_free_text ?? (options == null || options.length === 0);
+  const type = field.type ?? (options && options.length > 0 ? 'single_select' : 'text');
 
   const handleFreeTextSubmit = () => {
     if (!freeText.trim()) return;
-    onSelect?.(freeText.trim());
+    onResolve?.({ answers: { [field.id]: { value: freeText.trim() } } });
     setFreeText('');
+  };
+
+  const handleOptionSelect = (opt: { label: string; value: string }) => {
+    onResolve?.({ answers: { [field.id]: { value: opt.value } } });
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -327,11 +370,9 @@ export function AskUserBlock({
 
       {/* Option buttons */}
       {(() => {
-        // Defensive: model may stream partial JSON or return wrong type (string / object).
-        // Only render when options is a real array of objects with a label.
         const safeOptions = Array.isArray(options)
-          ? options.filter((o): o is { label: string; description?: string } =>
-              !!o && typeof o === 'object' && typeof (o as { label?: unknown }).label === 'string'
+          ? options.filter((o): o is NonNullable<typeof options>[number] =>
+              !!o && typeof o === 'object' && typeof o.label === 'string'
             )
           : [];
         if (safeOptions.length === 0) return null;
@@ -339,11 +380,11 @@ export function AskUserBlock({
           <div className="flex flex-wrap gap-2 mt-2.5">
             {safeOptions.map((opt, i) => (
               <PromptOptionButton
-                key={`${i}-${opt.label}`}
+                key={`${i}-${opt.value ?? opt.label}`}
                 label={opt.label}
                 description={opt.description}
-                disabled={!onSelect}
-                onClick={onSelect ? () => onSelect(opt.label) : undefined}
+                disabled={!onResolve}
+                onClick={onResolve ? () => handleOptionSelect(opt) : undefined}
               />
             ))}
           </div>
@@ -351,14 +392,14 @@ export function AskUserBlock({
       })()}
 
       {/* Free text input */}
-      {allowFreeText && onSelect && (
+      {allowFreeText && onResolve && (
         <div className="flex items-end gap-1.5 mt-2.5">
           <textarea
             ref={textareaRef}
             value={freeText}
             onChange={(e) => setFreeText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={t('chat.askUser.placeholder')}
+            placeholder={field.placeholder || t('chat.askUser.placeholder')}
             rows={1}
             className="flex-1 resize-none bg-background border border-border rounded-md px-2.5 py-1.5 text-xs leading-relaxed placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
           />

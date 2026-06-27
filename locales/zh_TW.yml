@@ -406,6 +406,18 @@ chat:
     autoStoppedTime: "錄製已自動停止：達到時長上限"
   askUser:
     placeholder: "輸入回覆…"
+  form:
+    title: "表單"
+    submit: "提交"
+    required: "此項為必填"
+    selectPlaceholder: "請選擇…"
+    recommended: "推薦"
+    # $1 = min, $2 = max
+    selectRange: "請選擇 $1-$2 個選項"
+    # $1 = min
+    minSelect: "請至少選擇 $1 個選項"
+    # $1 = max
+    maxSelect: "最多選擇 $1 個選項"
   permission:
     # 技能腳本執行前的授權提示。$1 = 技能名，$2 = 腳本路徑
     title: "技能 $1 想要執行 $2"
@@ -556,6 +568,7 @@ tools:
   executeJs: "正在執行腳本"
   screenshot: "正在擷取頁面螢幕截圖"
   askUser: "等待使用者回覆"
+  presentForm: "收集使用者輸入"
   pdf:
     info: "正在讀取 PDF 資訊"
     # $1 = 頁碼範圍（如 "1-10"）或字面量 "all pages"

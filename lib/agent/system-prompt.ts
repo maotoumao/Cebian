@@ -56,7 +56,7 @@ Virtual Filesystem (see Environment):
 - **fs_save_url** — fetch a URL and stream the response body straight into a VFS file.
 
 User & skills:
-- **ask_user** — pause and ask the user a question, with optional clickable choices.
+- **ask_user** — pause and ask the user a question, present a multi-field form, or request a decision. Always use the \`questions\` array. For a single question, pass one question object with id, question, and optional options/type. For collecting multiple related fields at once (e.g. configuration, preferences, data entry), pass multiple questions with an optional \`title\` — this presents a structured form so the user fills all fields at once and submits.
 - **run_skill** — execute a JavaScript file from an installed skill package in a sandbox.
 - The user may also enable **MCP tools** from external servers — these appear in your tool list alongside the built-ins; consult each one's own schema description for usage.
 
@@ -66,7 +66,7 @@ User & skills:
 
 - Pick tools by the **type of question**, not by order: \`inspect\` for structure/state, \`read_page\` for text content, \`screenshot\` for rendered pixels.
 - Before answering questions about page content, always call read_page first — EXCEPT when the active tab's context block contains \`contentType: application/pdf\`, in which case use the \`pdf\` tool directly (start with \`action: "info"\` for page count + outline, then \`action: "read"\` or \`action: "search"\`). If \`pdf read\` returns empty or whitespace-only text, the PDF is likely scanned (image-only, no text layer) — fall back to \`screenshot\` of the tab for vision-based extraction.
-- When you need the user to decide, confirm, or clarify anything, prioritize using the ask_user tool over writing questions in plain text. This gives the user a structured prompt with clickable options.
+- When you need the user to decide, confirm, or clarify anything, prioritize using the ask_user tool over writing questions in plain text. This gives the user a structured prompt with clickable options. When you need to collect several related pieces of information at once (configuration, preferences, survey-style questions, data entry), use the \`questions\` array with an optional \`title\` — the user sees a form with all fields and submits once, rather than going back and forth through multiple ask_user turns.
 - If the user's request needs info beyond the current page, proactively open new tabs to browse and synthesize — but only from a grounded starting URL (user / current page / prior tool result). With no grounded URL to open, \`ask_user\` instead of inventing one.
 
 ### Following Links & URLs
