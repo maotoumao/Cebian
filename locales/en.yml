@@ -422,6 +422,16 @@ chat:
     minSelect: "Select at least $1 option(s)"
     # $1 = max
     maxSelect: "Select at most $1 option(s)"
+  wizard:
+    step: "Step"
+    # $1 = current, $2 = total
+    stepOf: "$1 / $2"
+    prev: "Previous"
+    next: "Next"
+    skip: "Skip"
+    review: "Review"
+    reviewDesc: "Review your answers before submitting."
+    notFilled: "Not filled"
   permission:
     # Permission prompt shown before a skill script runs. $1 = skill name, $2 = script path
     title: "Skill $1 wants to run $2"

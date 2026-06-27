@@ -418,6 +418,16 @@ chat:
     minSelect: "請至少選擇 $1 個選項"
     # $1 = max
     maxSelect: "最多選擇 $1 個選項"
+  wizard:
+    step: "步驟"
+    # $1 = current, $2 = total
+    stepOf: "$1 / $2"
+    prev: "上一步"
+    next: "下一步"
+    skip: "跳過"
+    review: "確認"
+    reviewDesc: "提交前請檢查您的答案。"
+    notFilled: "未填寫"
   permission:
     # 技能腳本執行前的授權提示。$1 = 技能名，$2 = 腳本路徑
     title: "技能 $1 想要執行 $2"

@@ -11,6 +11,7 @@ import { t } from '@/lib/i18n';
 import { describePermission } from '@/lib/agent/tool-permissions';
 import { downloadFile, formatDuration, formatCharCount } from '@/lib/utils';
 import { FormBlock } from '@/components/chat/FormBlock';
+import { WizardBlock } from '@/components/chat/WizardBlock';
 import { normalizeRequest } from '@/lib/tools/ask-user';
 import type { Message } from '@earendil-works/pi-ai';
 
@@ -305,12 +306,23 @@ export function AskUserBlock({
   const normalized = normalizeRequest(request as Record<string, unknown>);
   const fields = normalized.questions;
 
-  // Mode A: compact single-question mode (no title, single field)
-  if (fields.length === 1 && !request.title && !request.description) {
+  // Mode A: compact single-question mode (no title, single field, no pagination)
+  if (fields.length === 1 && !normalized.title && !normalized.description && !normalized.pagination) {
     return (
       <AskUserCompactBlock
         field={fields[0]}
         answered={answered}
+        onResolve={onResolve}
+      />
+    );
+  }
+
+  // Mode C: wizard mode (pagination configured)
+  if (normalized.pagination?.type === 'wizard') {
+    return (
+      <WizardBlock
+        request={normalized}
+        answered={!!answered}
         onResolve={onResolve}
       />
     );

@@ -93,6 +93,23 @@ const AskUserQuestion = Type.Object({
       description: 'Maximum number of selections. Only meaningful for multi_select.',
     }),
   ),
+
+  // ── Wizard pagination ──
+  step: Type.Optional(
+    Type.Number({
+      description:
+        'Assigns this question to a specific step/page in wizard mode. ' +
+        '1-based. Questions without step are grouped in step 1 by default. ' +
+        'Only meaningful when pagination.type is "wizard".',
+    }),
+  ),
+  step_title: Type.Optional(
+    Type.String({
+      description:
+        'Title shown for this step in the wizard progress indicator. ' +
+        'Questions in the same step should share the same step_title.',
+    }),
+  ),
 });
 
 // ─── Top-level parameters (new, multi-field schema) ───
@@ -118,6 +135,34 @@ const AskUserNewParams = Type.Object({
       description: 'Submit button text. Defaults to "Submit" per locale.',
     }),
   ),
+
+  // ── Wizard pagination ──
+  pagination: Type.Optional(
+    Type.Object({
+      type: Type.Literal('wizard', {
+        description: 'Pagination style. Currently only "wizard" is supported.',
+      }),
+      show_progress: Type.Optional(
+        Type.Boolean({
+          description:
+            'Whether to show a step progress indicator. Defaults to true.',
+        }),
+      ),
+      allow_skip: Type.Optional(
+        Type.Boolean({
+          description:
+            'Whether users can skip non-required steps. Defaults to false.',
+        }),
+      ),
+      allow_review: Type.Optional(
+        Type.Boolean({
+          description:
+            'Whether to show a final review step before submit. Defaults to true.',
+        }),
+      ),
+    }),
+  ),
+
   questions: Type.Array(AskUserQuestion, {
     minItems: 1,
     description:
@@ -250,9 +295,10 @@ const ASK_USER_META = {
     'Ask the user questions, present a form, or request a decision. ' +
     'Always use the `questions` array. ' +
     'For a single simple question, pass one question object with id, question, and optional options/type. ' +
-    'For collecting multiple related fields at once (e.g. configuration, preferences, ' +
-    'data entry), pass multiple questions with an optional `title` — this presents ' +
-    'a structured form so the user can fill all fields at once. ' +
+    'For collecting multiple related fields at once (e.g. configuration), ' +
+    'pass multiple questions with an optional `title` — this presents a form. ' +
+    'For multi-step workflows (e.g. setup wizards), add `pagination: { type: "wizard" }` ' +
+    'and assign each question a `step` number plus a `step_title`. ' +
     'Prioritize this tool over writing questions in plain text — ' +
     'it gives the user a structured prompt. Provide clear options when possible.',
   parameters: AskUserNewParams,
