@@ -7,8 +7,8 @@
 /** 备份包格式版本。bump 意味着 unpack 需要迁移或拒绝旧包。 */
 export const BACKUP_FORMAT_VERSION = 1;
 
-/** 用户可见的四个备份分类（见需求文档 §2）。 */
-export type BackupCategory = 'sessions' | 'settings' | 'skillsPrompts' | 'credentials';
+/** 用户可见的备份分类。 */
+export type BackupCategory = 'sessions' | 'settings' | 'skillsPrompts' | 'credentials' | 'memories';
 
 /** 恢复语义：merge = 只增不减；replace = 清空后照搬。 */
 export type RestoreStrategy = 'merge' | 'replace';
@@ -54,12 +54,19 @@ export interface SkillsPromptsCategorySummary {
   fileCount?: number;
 }
 
+/** 「跨对话记忆」分类摘要。 */
+export interface MemoriesCategorySummary {
+  included: boolean;
+  fileCount?: number;
+}
+
 /** manifest 的 categories 块：各分类是否包含 + 条目数（无敏感值）。 */
 export interface BackupCategorySummaries {
   sessions: SessionsCategorySummary;
   settings: SettingsCategorySummary;
   credentials: CredentialsCategorySummary;
   skillsPrompts: SkillsPromptsCategorySummary;
+  memories: MemoriesCategorySummary;
 }
 
 /** 一个 VFS 分类的归属：一组根目录前缀 + 该分类下的文件数。单根分类（如
@@ -76,9 +83,10 @@ export interface VfsRootGroup {
 export interface BackupVfsManifest {
   skillsPrompts?: VfsRootGroup;
   workspaces?: VfsRootGroup;
+  memories?: VfsRootGroup;
 }
 
-/** 备份包的明文 manifest（见需求文档 §8.3）。 */
+/** 备份包的明文 manifest。 */
 export interface BackupManifest {
   formatVersion: number;
   app: 'cebian';

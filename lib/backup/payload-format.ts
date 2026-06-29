@@ -5,7 +5,7 @@
 // VFS 源（sources/vfs.ts）只认路径前缀、不认分类，分类知识收敛在这里。
 
 import { normalizePath } from '@/lib/persistence/vfs';
-import { CEBIAN_SKILLS_DIR, CEBIAN_PROMPTS_DIR, WORKSPACES_ROOT } from '@/lib/persistence/vfs-paths';
+import { CEBIAN_SKILLS_DIR, CEBIAN_PROMPTS_DIR, CEBIAN_MEMORIES_DIR, WORKSPACES_ROOT } from '@/lib/persistence/vfs-paths';
 import { isValidSessionId } from '@/lib/utils';
 
 /** payload 内各分类数据的文件名（裸路径，archive 会再套 `payload/` 前缀）。 */
@@ -43,6 +43,9 @@ export const SKILLS_PROMPTS_ROOTS = [
   normalizePath(CEBIAN_SKILLS_DIR),
   normalizePath(CEBIAN_PROMPTS_DIR),
 ];
+
+/** 「跨对话记忆」分类对应的 VFS 绝对根目录。 */
+export const MEMORIES_ROOTS = [normalizePath(CEBIAN_MEMORIES_DIR)];
 
 /** 某个会话的工作区目录。采集工作区时按已备份会话 id 过滤，避免把已删会话残留的
  *  孤儿工作区也打进备份。 */

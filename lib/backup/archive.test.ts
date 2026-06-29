@@ -25,6 +25,7 @@ function baseManifest(): BackupManifest {
       settings: { included: true },
       credentials: { included: false },
       skillsPrompts: { included: true, fileCount: 1 },
+      memories: { included: false },
     },
   };
 }
@@ -186,6 +187,14 @@ describe('archive manifest 结构校验', () => {
     delete m.categories;
     const zip = zipSync({ 'manifest.json': strToU8(JSON.stringify(m)) });
     await expect(unpackArchive(zip)).rejects.toMatchObject({ code: 'invalid' });
+  });
+
+  it('旧备份缺 categories.memories → 兼容补成 included:false（不报错）', async () => {
+    const m = baseManifest() as unknown as Record<string, unknown>;
+    delete (m.categories as Record<string, unknown>).memories;
+    const zip = zipSync({ 'manifest.json': strToU8(JSON.stringify(m)) });
+    const manifest = readManifest(zip);
+    expect(manifest.categories.memories).toEqual({ included: false });
   });
 
   it('加密标记但 encryption 为空对象 → invalid（而非 wrongPassword）', async () => {

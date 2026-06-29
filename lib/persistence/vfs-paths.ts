@@ -13,5 +13,8 @@ export const CEBIAN_PROMPTS_DIR = '~/.cebian/prompts';
 /** Tilde-prefixed path to skills directory (used by scanner / agent). */
 export const CEBIAN_SKILLS_DIR = '~/.cebian/skills';
 
+/** 记忆系统根目录的 tilde 路径（scanner / agent / 设置页共用）。 */
+export const CEBIAN_MEMORIES_DIR = '~/.cebian/memories';
+
 /** Standard entry file for a skill package. */
 export const SKILL_ENTRY_FILE = 'SKILL.md';

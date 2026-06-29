@@ -1,12 +1,14 @@
 import { Agent, type AgentOptions, type AgentMessage, type AgentTool } from '@earendil-works/pi-agent-core';
 import type { Api, Model, Message } from '@earendil-works/pi-ai';
-import { providerCredentials, userInstructions as userInstructionsStorage, type OAuthCredential } from '@/lib/persistence/storage';
+import { providerCredentials, userInstructions as userInstructionsStorage, memorySettings, type OAuthCredential } from '@/lib/persistence/storage';
 import { getValidOAuthToken } from '@/lib/providers/oauth';
 import { DEFAULT_SYSTEM_PROMPT } from '@/lib/agent/system-prompt';
 import { isCompactionSummary } from '@/lib/agent/compaction';
 import { gatherPageContext } from '@/lib/agent/page-context';
 import { buildTextPrefix, type Attachment } from '@/lib/agent/attachments';
 import { scanSkillIndex, buildSkillsBlock } from '@/lib/ai-config/scanner';
+import { MEMORY_INSTRUCTIONS, memoryLimitationLine } from '@/lib/memory/prompt';
+import { scanMemoryIndex, buildMemoriesBlock, buildUserProfileBlock } from '@/lib/memory/index-scan';
 
 // ─── Provider credential resolution ───
 
@@ -85,11 +87,23 @@ function buildSystemPrompt(
 // 让分层在视觉上相邻。
 
 /**
+ * 组装本轮 user 消息里的记忆区：记忆关闭则空串；开启则拼常驻 <user_profile>
+ * 全文 + <memories> 索引。两段都可能为空（无 profile / 无其他记忆），由 composeUserMessage 守卫不注入。
+ * 每轮调用：scanMemoryIndex 命中缓存、开销≈0；记忆 / 日期不变则逐字节一致（缓存友好）。
+ */
+async function buildMemoriesContext(memoryEnabled: boolean): Promise<string> {
+  if (!memoryEnabled) return '';
+  // 常驻 <user_profile> 全文 + <memories> 索引（其余各类）。两段都可能为空，空串过滤。
+  const [profile, metas] = await Promise.all([buildUserProfileBlock(), scanMemoryIndex()]);
+  return [profile, buildMemoriesBlock(metas)].filter(Boolean).join('\n\n');
+}
+
+/**
  * 组装本轮要发给 agent 的「结构化用户消息」：reminder 占位段 + 附件文本前缀 +
  * `<context>`（日期 + 页面上下文）+ `<user-request>`（始终置末）。读 page context
  * 是 async，故本函数 async。
  */
-export async function composeUserMessage(text: string, attachments: Attachment[]): Promise<string> {
+export async function composeUserMessage(text: string, attachments: Attachment[], memoryEnabled: boolean): Promise<string> {
   const parts: string[] = [];
 
   // ① Tool/behavior reminders (placeholder)
@@ -109,7 +123,11 @@ export async function composeUserMessage(text: string, attachments: Attachment[]
   }
   parts.push(`<context>\n${ctxLines.join('\n')}\n</context>`);
 
-  // ④ User request (always last)
+  // ④ Memories: 记忆开启且非空时注入 <user_profile>常驻 + <memories>索引（数据，权威性低于 Critical Rules）。
+  const memoriesBlock = await buildMemoriesContext(memoryEnabled);
+  if (memoriesBlock) parts.push(memoriesBlock);
+
+  // ⑤ User request (always last)
   // TODO: user text is NOT sanitized — users are trusted; stripping structural tags would alter their intent.
   parts.push(`<user-request>\n${text.trim()}\n</user-request>`);
 
@@ -123,15 +141,23 @@ export async function composeUserMessage(text: string, attachments: Attachment[]
  * 出变化、击穿缓存一次（= 装/卸 skill 的实时性代价）。因此无需写「skills 是否变
  * 化」的 diff 逻辑。
  */
-export async function composeSystemPrompt(sessionId: string): Promise<string> {
+export async function composeSystemPrompt(sessionId: string, memoryEnabled?: boolean): Promise<string> {
   const [instructions, skillMetas] = await Promise.all([
     userInstructionsStorage.getValue(),
     scanSkillIndex(),
   ]);
+  // memoryEnabled 由调用方传入时复用其快照（让同一轮的 system / user 注入读同一个值）；
+  // 未传时（如初始建会话路径）自行读取。
+  const enabled = memoryEnabled ?? (await memorySettings.getValue()).enabled;
   const skillsBlock = buildSkillsBlock(skillMetas);
   // 「会话域 → 模板变量」的翻译层：本函数是唯一认识 session 概念、并把它映射成
   // 纯装配器 buildSystemPrompt 所需的 `{{KEY}}` 变量表的地方。新增占位符只改这里。
-  return buildSystemPrompt(instructions || '', skillsBlock, { SESSION_ID: sessionId });
+  // 记忆开启时填入指引段（前后加空行作分隔），关闭时为空串（base 逐字节回到原样）。
+  return buildSystemPrompt(instructions || '', skillsBlock, {
+    SESSION_ID: sessionId,
+    MEMORY_LIMITATION: memoryLimitationLine(enabled),
+    MEMORY_SECTION: enabled ? `\n${MEMORY_INSTRUCTIONS}\n` : '',
+  });
 }
 
 // ─── Agent factory ───

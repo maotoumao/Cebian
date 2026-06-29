@@ -7,6 +7,7 @@ import { ProvidersSection } from '@/components/settings/sections/ProvidersSectio
 import { InstructionsSection } from '@/components/settings/sections/InstructionsSection';
 import { PromptsSection } from '@/components/settings/sections/PromptsSection';
 import { SkillsSection } from '@/components/settings/sections/SkillsSection';
+import { MemorySection } from '@/components/settings/sections/MemorySection';
 import { MCPSection } from '@/components/settings/sections/MCPSection';
 import { BackupSection } from '@/components/settings/sections/BackupSection';
 import { StorageSection } from '@/components/settings/sections/StorageSection';
@@ -42,6 +43,7 @@ export function SettingsRoutes({ basePath, showBackButton = false, showOpenInTab
         <Route path="instructions" element={<InstructionsSection />} />
         <Route path="prompts/*" element={<PromptsSection />} />
         <Route path="skills/*" element={<SkillsSection />} />
+        <Route path="memory/*" element={<MemorySection />} />
         <Route path="mcp" element={<MCPSection />} />
         <Route path="backup" element={<BackupSection />} />
         <Route path="storage" element={<StorageSection />} />

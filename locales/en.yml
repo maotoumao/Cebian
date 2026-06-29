@@ -83,6 +83,7 @@ settings:
     instructions: "Instructions"
     prompts: "Prompts"
     skills: "Skills"
+    memory: "Memory"
     mcp: "MCP Servers"
     backup: "Backup & Restore"
     storage: "Filesystem"
@@ -139,6 +140,11 @@ settings:
       pageTitle: "Current page title"
       date: "Current date"
       clipboard: "Clipboard content"
+  memory:
+    title: "Memory"
+    enable: "Enable memory"
+    hint: "Cross-conversation memory. Off by default; when on, the assistant saves and recalls durable facts about you across chats."
+    newBody: "(Write the memory here)"
   skills:
     title: "Skills"
     newBody: "(Write your skill instructions here)"
@@ -247,13 +253,14 @@ settings:
       descriptionPlaceholder: "Optional description…"
       mode: "Backup mode"
       modeFull: "Full backup"
-      modeFullHint: "Sessions, settings, skills & prompts, and credentials"
+      modeFullHint: "Sessions, settings, skills & prompts, memory, and credentials"
       modePartial: "Partial backup"
       modePartialHint: "Choose what to include"
       catSessions: "Chat sessions"
       catWorkspaces: "Include workspace files"
       catSettings: "General settings"
       catSkillsPrompts: "Skills & prompts"
+      catMemories: "Memory"
       catCredentials: "Credentials"
       catCredentialsHint: "Includes API keys, OAuth tokens, etc."
       encrypt: "Encrypt backup"
@@ -281,6 +288,7 @@ settings:
       catSessions: "Chat sessions"
       catSettings: "General settings"
       catSkillsPrompts: "Skills & prompts"
+      catMemories: "Memory"
       catCredentials: "Credentials"
       apply: "Restore"
       confirmReplaceTitle: "Replace local data?"
@@ -612,6 +620,10 @@ tools:
     searchContent: "Searching file content \"$1\""
     # $1 = destination path
     saveUrl: "Saving URL to $1"
+  memory:
+    save: "Saving memory"
+    recall: "Recalling memory"
+    forget: "Deleting memory"
   chromeApi:
     help: "Looking up Chrome API docs"
     # $1 = namespace, $2 = method

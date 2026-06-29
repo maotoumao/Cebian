@@ -79,6 +79,7 @@ settings:
     instructions: "指引"
     prompts: "提示词"
     skills: "技能"
+    memory: "记忆"
     mcp: "MCP 服务器"
     backup: "备份与恢复"
     storage: "文件系统"
@@ -135,6 +136,11 @@ settings:
       pageTitle: "当前页面标题"
       date: "当前日期"
       clipboard: "剪贴板内容"
+  memory:
+    title: "记忆"
+    enable: "启用记忆"
+    hint: "跨对话记忆，默认关闭。开启后助手会跨会话自动保存并调用关于你的长期信息。"
+    newBody: "（在此写记忆内容）"
   skills:
     title: "技能"
     newBody: "（在此处编写技能指令）"
@@ -243,13 +249,14 @@ settings:
       descriptionPlaceholder: "可选的描述信息…"
       mode: "备份模式"
       modeFull: "完整备份"
-      modeFullHint: "会话、设置、技能与提示词，以及密钥"
+      modeFullHint: "会话、设置、技能与提示词、记忆，以及密钥"
       modePartial: "部分备份"
       modePartialHint: "自定义选择要备份的内容"
       catSessions: "会话记录"
       catWorkspaces: "一并备份工作区文件"
       catSettings: "普通设置"
       catSkillsPrompts: "技能与提示词"
+      catMemories: "记忆"
       catCredentials: "密钥信息"
       catCredentialsHint: "包含 API Key、OAuth token 等"
       encrypt: "加密备份"
@@ -277,6 +284,7 @@ settings:
       catSessions: "会话记录"
       catSettings: "普通设置"
       catSkillsPrompts: "技能与提示词"
+      catMemories: "记忆"
       catCredentials: "密钥信息"
       apply: "恢复"
       confirmReplaceTitle: "替换本地数据？"
@@ -599,6 +607,10 @@ tools:
     searchContent: "正在搜索文件内容 \"$1\""
     # $1 = 目标路径
     saveUrl: "正在保存 URL 到 $1"
+  memory:
+    save: "保存记忆"
+    recall: "调取记忆"
+    forget: "删除记忆"
   chromeApi:
     help: "正在查询 Chrome API 文档"
     # $1 = namespace，$2 = method

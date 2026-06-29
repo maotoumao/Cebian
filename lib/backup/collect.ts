@@ -11,6 +11,7 @@ import {
   PAYLOAD_FILES,
   sessionFileKey,
   SKILLS_PROMPTS_ROOTS,
+  MEMORIES_ROOTS,
   workspaceRootForSession,
   vfsKeyToPath,
   isUnderAnyRoot,
@@ -46,6 +47,7 @@ export async function createBackup(options: BackupOptions): Promise<Uint8Array> 
   const wantCredentials = cats.has('credentials');
   const wantSessions = cats.has('sessions');
   const wantSkillsPrompts = cats.has('skillsPrompts');
+  const wantMemories = cats.has('memories');
   const wantWorkspaces = wantSessions && options.includeWorkspaces;
 
   const files: Record<string, Uint8Array> = {};
@@ -77,8 +79,10 @@ export async function createBackup(options: BackupOptions): Promise<Uint8Array> 
   // 会话残留的孤儿工作区也带进备份。
   const roots: string[] = [];
   if (wantSkillsPrompts) roots.push(...SKILLS_PROMPTS_ROOTS);
+  if (wantMemories) roots.push(...MEMORIES_ROOTS);
   if (wantWorkspaces) roots.push(...sessionIds.map(workspaceRootForSession));
   let skillsPromptsFileCount = 0;
+  let memoriesFileCount = 0;
   let workspacesFileCount = 0;
   if (roots.length > 0) {
     const { files: vfsFiles, index } = await collectVfs(roots);
@@ -87,6 +91,7 @@ export async function createBackup(options: BackupOptions): Promise<Uint8Array> 
       files[PAYLOAD_FILES.vfsIndex] = encoder.encode(JSON.stringify(index));
     }
     skillsPromptsFileCount = wantSkillsPrompts ? countUnder(vfsFiles, SKILLS_PROMPTS_ROOTS) : 0;
+    memoriesFileCount = wantMemories ? countUnder(vfsFiles, MEMORIES_ROOTS) : 0;
     workspacesFileCount = wantWorkspaces ? countUnder(vfsFiles, [WORKSPACES_ROOT]) : 0;
   }
 
@@ -104,10 +109,14 @@ export async function createBackup(options: BackupOptions): Promise<Uint8Array> 
       settings: { included: wantSettings },
       credentials: { included: wantCredentials },
       skillsPrompts: { included: wantSkillsPrompts, fileCount: skillsPromptsFileCount },
+      memories: { included: wantMemories, fileCount: memoriesFileCount },
     },
     vfs: {
       ...(wantSkillsPrompts
         ? { skillsPrompts: { roots: SKILLS_PROMPTS_ROOTS, fileCount: skillsPromptsFileCount } }
+        : {}),
+      ...(wantMemories
+        ? { memories: { roots: MEMORIES_ROOTS, fileCount: memoriesFileCount } }
         : {}),
       ...(wantWorkspaces
         ? { workspaces: { roots: [WORKSPACES_ROOT], fileCount: workspacesFileCount } }

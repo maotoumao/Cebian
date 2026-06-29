@@ -206,3 +206,19 @@ export const webdavConfig = storage.defineItem<WebDavConfig | null>(
   'local:webdavConfig',
   { fallback: null },
 );
+
+// ─── 跨对话记忆（cross-conversation memory） ───
+
+/**
+ * 跨对话记忆系统的持久设置。Phase 1 仅 `enabled` 主开关；整理（organize）相关
+ * 字段在 Phase 2 扩展（WXT 存储项有默认值兜底，加字段向后兼容）。
+ */
+export interface MemorySettings {
+  /** 记忆系统总开关。关闭时不注入记忆提示/索引、后续整理调度不运行；文件工具层不做硬拦截。默认 false（隐私优先）。 */
+  enabled: boolean;
+}
+
+export const memorySettings = storage.defineItem<MemorySettings>(
+  'local:memorySettings',
+  { fallback: { enabled: false } },
+);

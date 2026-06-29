@@ -58,6 +58,7 @@ import {
   compactionModel,
   lastSelectedThinkingLevel,
   userInstructions as userInstructionsStorage,
+  memorySettings,
   type ModelIdentity,
 } from '@/lib/persistence/storage';
 import { getMCPManager } from '@/lib/mcp/manager';
@@ -674,7 +675,10 @@ class AgentManager {
       }
     }
 
-    const enriched = await composeUserMessage(text, attachments);
+    // 本轮记忆开关的单一快照：同时喂给 user 消息注入与 system prompt 刷新，
+    // 保证一轮内两处读同一个值（原子门控，避免读到两个快照而前后不一致）。
+    const memoryEnabled = (await memorySettings.getValue()).enabled;
+    const enriched = await composeUserMessage(text, attachments, memoryEnabled);
 
     const images = extractImages(attachments);
 
@@ -689,7 +693,7 @@ class AgentManager {
     // turn — bail; `cancel()` already broadcast the authoritative end state.
     if (this.sessions.get(sessionId) !== managed) return;
 
-    const refreshedSystemPrompt = await composeSystemPrompt(sessionId);
+    const refreshedSystemPrompt = await composeSystemPrompt(sessionId, memoryEnabled);
     if (this.sessions.get(sessionId) !== managed) return;
     managed.agent.state.systemPrompt = refreshedSystemPrompt;
 

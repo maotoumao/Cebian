@@ -56,6 +56,7 @@ export function CreateBackupDialog({ open, onOpenChange, onConfirm }: CreateBack
   const [includeWorkspaces, setIncludeWorkspaces] = useState(true);
   const [settings, setSettings] = useState(true);
   const [skillsPrompts, setSkillsPrompts] = useState(true);
+  const [memories, setMemories] = useState(true);
   const [credentials, setCredentials] = useState(false);
   const [encrypt, setEncrypt] = useState(false);
   const [password, setPassword] = useState('');
@@ -70,6 +71,7 @@ export function CreateBackupDialog({ open, onOpenChange, onConfirm }: CreateBack
     setIncludeWorkspaces(true);
     setSettings(true);
     setSkillsPrompts(true);
+    setMemories(true);
     setCredentials(false);
     setEncrypt(false);
     setPassword('');
@@ -83,15 +85,16 @@ export function CreateBackupDialog({ open, onOpenChange, onConfirm }: CreateBack
         includeWorkspaces: true,
         settings: true,
         skillsPrompts: true,
+        memories: true,
         credentials: true,
       };
     }
-    return { sessions, includeWorkspaces, settings, skillsPrompts, credentials };
-  }, [mode, sessions, includeWorkspaces, settings, skillsPrompts, credentials]);
+    return { sessions, includeWorkspaces, settings, skillsPrompts, memories, credentials };
+  }, [mode, sessions, includeWorkspaces, settings, skillsPrompts, memories, credentials]);
 
   const hasCredentials = effective.credentials;
   const anySelected =
-    effective.sessions || effective.settings || effective.skillsPrompts || effective.credentials;
+    effective.sessions || effective.settings || effective.skillsPrompts || effective.memories || effective.credentials;
 
   // 名称非法：含禁用字符或超长。空名不算非法（confirm 会回退默认名）。“允许输入但
   // 标红”：不静默剔除字符，只提示并禁用确认，让用户自行修改。
@@ -102,6 +105,7 @@ export function CreateBackupDialog({ open, onOpenChange, onConfirm }: CreateBack
     if (effective.sessions) categories.push('sessions');
     if (effective.settings) categories.push('settings');
     if (effective.skillsPrompts) categories.push('skillsPrompts');
+    if (effective.memories) categories.push('memories');
     if (effective.credentials) categories.push('credentials');
 
     onConfirm({
@@ -185,6 +189,7 @@ export function CreateBackupDialog({ open, onOpenChange, onConfirm }: CreateBack
                 </div>
                 <CategoryRow checked={settings} onChange={setSettings} label={t('settings.backup.create.catSettings')} />
                 <CategoryRow checked={skillsPrompts} onChange={setSkillsPrompts} label={t('settings.backup.create.catSkillsPrompts')} />
+                <CategoryRow checked={memories} onChange={setMemories} label={t('settings.backup.create.catMemories')} />
                 <CategoryRow
                   checked={credentials}
                   onChange={setCredentials}

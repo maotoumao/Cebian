@@ -34,6 +34,7 @@ function includedCategories(manifest: BackupManifest): BackupCategory[] {
   if (c.sessions.included) out.push('sessions');
   if (c.settings.included) out.push('settings');
   if (c.skillsPrompts.included) out.push('skillsPrompts');
+  if (c.memories.included) out.push('memories');
   if (c.credentials.included) out.push('credentials');
   return out;
 }
@@ -42,6 +43,7 @@ const CATEGORY_LABEL: Record<BackupCategory, () => string> = {
   sessions: () => t('settings.backup.restore.catSessions'),
   settings: () => t('settings.backup.restore.catSettings'),
   skillsPrompts: () => t('settings.backup.restore.catSkillsPrompts'),
+  memories: () => t('settings.backup.restore.catMemories'),
   credentials: () => t('settings.backup.restore.catCredentials'),
 };
 
@@ -82,6 +84,7 @@ export function RestorePreviewDialog({ open, onOpenChange, manifest, onConfirm, 
     if (cat === 'sessions') return manifest.categories.sessions.count;
     // credentials 不展示数字：无统一且解耦的「条数」口径（见 CredentialsCategorySummary）。
     if (cat === 'skillsPrompts') return manifest.categories.skillsPrompts.fileCount;
+    if (cat === 'memories') return manifest.categories.memories.fileCount;
     return undefined;
   };
 

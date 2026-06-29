@@ -7,7 +7,7 @@ import { unpackArchive, readManifest, type BackupBundle } from './archive';
 import { restoreStorage, type StorageRestoreResult } from './sources/storage';
 import { restoreSessions, type ApplySessionsResult } from './sources/sessions';
 import { restoreVfs, type VfsRestoreResult } from './sources/vfs';
-import { PAYLOAD_FILES, sessionIdFromFileKey, SKILLS_PROMPTS_ROOTS } from './payload-format';
+import { PAYLOAD_FILES, sessionIdFromFileKey, SKILLS_PROMPTS_ROOTS, MEMORIES_ROOTS } from './payload-format';
 import { WORKSPACES_ROOT } from '@/lib/persistence/vfs-paths';
 import {
   BACKUP_FORMAT_VERSION,
@@ -155,6 +155,7 @@ export async function restoreBackup(
   // ─ vfs ─
   const roots: string[] = [];
   if (cats.has('skillsPrompts')) roots.push(...SKILLS_PROMPTS_ROOTS);
+  if (cats.has('memories')) roots.push(...MEMORIES_ROOTS);
   if (cats.has('sessions') && summaries.sessions.workspaces) {
     roots.push(WORKSPACES_ROOT);
   }

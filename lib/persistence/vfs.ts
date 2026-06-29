@@ -23,7 +23,7 @@ function pfs(): FS.PromisifiedFS {
 
 const DEFAULT_DIRS = [
   '/home', '/home/user', CEBIAN_HOME,
-  `${CEBIAN_HOME}/skills`, `${CEBIAN_HOME}/prompts`,
+  `${CEBIAN_HOME}/skills`, `${CEBIAN_HOME}/prompts`, `${CEBIAN_HOME}/memories`,
   WORKSPACES_ROOT,
 ];
 let _bootstrapPromise: Promise<void> | null = null;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { planVfsWrites, type VfsIndex } from '@/lib/backup/sources/vfs';
-import { VFS_PREFIX } from '@/lib/backup/payload-format';
+import { VFS_PREFIX, MEMORIES_ROOTS } from '@/lib/backup/payload-format';
 
 const SKILLS = '/home/user/.cebian/skills';
 const PROMPTS = '/home/user/.cebian/prompts';
@@ -35,6 +35,16 @@ describe('planVfsWrites — root 过滤', () => {
     const index: VfsIndex = { [keys[0]]: 1, [keys[1]]: 1 };
     const plan = planVfsWrites(keys, index, {}, NO_DIRS, [WORKSPACES], 'replace');
     expect(plan.toWrite).toEqual([k('/workspaces/a.txt')]);
+  });
+
+  it('memories 分类：MEMORIES_ROOTS 命中记忆文件、过滤无关文件', () => {
+    // MEMORIES_ROOTS 是 normalizePath('~/.cebian/memories') = /home/user/.cebian/memories。
+    const mem = k(`${MEMORIES_ROOTS[0]}/user_profile.md`);
+    const skill = k(`${SKILLS}/a/SKILL.md`);
+    const index: VfsIndex = { [mem]: 1, [skill]: 1 };
+    const plan = planVfsWrites([mem, skill], index, {}, NO_DIRS, MEMORIES_ROOTS, 'merge');
+    expect(plan.toWrite).toEqual([mem]);
+    expect(plan.toWrite).not.toContain(skill);
   });
 });
 

@@ -4,7 +4,7 @@
 // collect / restore 的职责。它消费 / 产出一个与数据来源无关的 BackupBundle：
 // manifest（明文）+ 一组 payload 文件（path → bytes）。
 //
-// 容器结构（见需求文档 §8）：根目录只放容器元信息，备份数据全部落在 `payload/`
+// 容器结构：根目录只放容器元信息，备份数据全部落在 `payload/`
 // 子目录下，二者物理隔离——这样用户 VFS 里任何文件名（含 `manifest.json` /
 // `payload.enc`，例如未来 workspace 跑 React 应用）都因为多了一层 `payload/`
 // 前缀而不可能和容器结构撞名。
@@ -171,6 +171,15 @@ function parseManifest(raw: Uint8Array): BackupManifest {
     if (!c || typeof c !== 'object' || typeof c.included !== 'boolean') {
       bad(`categories.${key}`);
     }
+  }
+  // memories 是后加的分类：旧备份（formatVersion 1、无此字段）缺省补成「未包含」，
+  // 保持向后兼容；若存在则校验 `included` 为 boolean。
+  const catsObj = cats as Record<string, unknown>;
+  const mem = catsObj.memories as Record<string, unknown> | undefined;
+  if (mem === undefined) {
+    catsObj.memories = { included: false };
+  } else if (typeof mem !== 'object' || typeof mem.included !== 'boolean') {
+    bad('categories.memories');
   }
 
   // 加密包必须带结构完整的 encryption 元信息（值的进一步校验在 crypto 解密时做）。

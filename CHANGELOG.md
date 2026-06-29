@@ -23,10 +23,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 文件浏览器现在把会话工作区目录（原本是一串 UUID）显示成「会话标题 · 日期」，并在进入某个工作区时于顶部展示该会话的标题与创建时间，让 AI 生成的文档更好找；设置新增「文件系统」一节，显示虚拟文件系统已用空间，并可一键打开文件浏览器 ([#26](https://github.com/maotoumao/Cebian/pull/26))
 - AI 现在可以用 ask_user 一次性弹出包含多道问题的表单：每题可设单选 / 多选 / 自由文本，并可把某个选项设为默认；用户左右翻页填写、在最后一题统一提交，替代以往多轮逐个提问 ([#28](https://github.com/maotoumao/Cebian/issues/28))
 - 新增「压缩模型」设置（设置 → 高级）：可单独指定上下文压缩（自动摘要过长对话）所用的模型，默认与对话模型相同，方便改用更小更省的模型来跑后台摘要 ([#40](https://github.com/maotoumao/Cebian/issues/40))
+- 新增跨对话记忆（设置 → 记忆，默认关闭）：开启后 AI 会在对话中自行把关于你的持久信息存成本地 Markdown 文件（如身份、长期偏好、常用资源），下次新对话自动带上相关记忆；核心档案（名字、职业、无障碍特征等）固定写入单个 `user_profile.md` 并每轮完整注入，其余按需读取；所有记忆在设置页完全可见、可编辑、可删除，并可单独纳入备份/恢复 ([#29](https://github.com/maotoumao/Cebian/issues/29))
 
 - The file browser now shows session workspace folders (previously raw UUIDs) as "conversation title · date", and displays the conversation's title and creation time at the top when you open a workspace, making AI-generated documents easier to find; Settings gains a "Filesystem" section that shows used space and opens the file browser in one click ([#26](https://github.com/maotoumao/Cebian/pull/26))
 - The AI can now use ask_user to present a single form containing multiple questions: each can be single-select, multi-select, and/or free text, with an option markable as the default; you page through them and submit on the last question, replacing the old one-question-at-a-time prompts ([#28](https://github.com/maotoumao/Cebian/issues/28))
 - Added a "Compaction model" setting (Settings → Advanced): you can pick a separate model for context compaction (auto-summarizing overly long conversations), defaulting to the conversation model, so a smaller and cheaper model can handle background summaries ([#40](https://github.com/maotoumao/Cebian/issues/40))
+- Added cross-conversation memory (Settings → Memory, off by default): once enabled, the AI saves durable facts about you as local Markdown files during chats (identity, long-term preferences, where your things live) and automatically brings the relevant ones into new conversations; core profile facts (name, role, accessibility, etc.) live in a single `user_profile.md` injected in full every turn, while the rest are read on demand; every memory is fully visible, editable, and deletable in Settings, and can be included separately in backup/restore ([#29](https://github.com/maotoumao/Cebian/issues/29))
 
 ### 变更 / Changed
 

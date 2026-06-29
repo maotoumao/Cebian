@@ -4,6 +4,8 @@
  */
 
 import { t } from '@/lib/i18n';
+import { normalizePath } from '@/lib/persistence/vfs';
+import { CEBIAN_MEMORIES_DIR } from '@/lib/persistence/vfs-paths';
 import {
   TOOL_ASK_USER,
   TOOL_EXECUTE_JS,
@@ -25,6 +27,9 @@ import {
   TOOL_RUN_SKILL,
   TOOL_CHROME_API,
 } from '@/lib/tools/names';
+
+/** 记忆根目录的归一形式（/home/user/.cebian/memories），供工具卡标签判定记忆操作。 */
+const MEMORY_ROOT = normalizePath(CEBIAN_MEMORIES_DIR);
 
 export function getToolLabel(name: string, args: Record<string, any> = {}): string {
   // MCP tools: name is `mcp__<slug>__<remoteToolName>`. Parse and prettify;
@@ -60,18 +65,22 @@ export function getToolLabel(name: string, args: Record<string, any> = {}): stri
       return getPdfLabel(args);
     case TOOL_ASK_USER:
       return t('tools.askUser');
-    case TOOL_FS_CREATE_FILE:
-      return t('tools.fs.createFile', [truncPath(args.path)]);
-    case TOOL_FS_EDIT_FILE:
-      return t('tools.fs.editFile', [truncPath(args.path)]);
+    case TOOL_FS_CREATE_FILE: {
+      return memoryName(args.path) !== null ? t('tools.memory.save') : t('tools.fs.createFile', [truncPath(args.path)]);
+    }
+    case TOOL_FS_EDIT_FILE: {
+      return memoryName(args.path) !== null ? t('tools.memory.save') : t('tools.fs.editFile', [truncPath(args.path)]);
+    }
     case TOOL_FS_MKDIR:
       return t('tools.fs.mkdir', [truncPath(args.path)]);
     case TOOL_FS_RENAME:
       return t('tools.fs.rename', [truncPath(args.old_path)]);
-    case TOOL_FS_DELETE:
-      return t('tools.fs.delete', [truncPath(args.path)]);
-    case TOOL_FS_READ_FILE:
-      return t('tools.fs.readFile', [truncPath(args.path)]);
+    case TOOL_FS_DELETE: {
+      return memoryName(args.path) !== null ? t('tools.memory.forget') : t('tools.fs.delete', [truncPath(args.path)]);
+    }
+    case TOOL_FS_READ_FILE: {
+      return memoryName(args.path) !== null ? t('tools.memory.recall') : t('tools.fs.readFile', [truncPath(args.path)]);
+    }
     case TOOL_FS_LIST:
       return t('tools.fs.list', [truncPath(args.path)]);
     case TOOL_FS_SEARCH:
@@ -95,7 +104,14 @@ function truncPath(p?: string): string {
   return p.length > 30 ? '...' + p.slice(-27) : p;
 }
 
-function getInteractLabel(args: Record<string, any>): string {
+/** 路径归一后落在记忆根下则返回其展示名（去 .md），否则 null。
+ *  先 normalizePath 再按边界比，避免 `/workspaces/x/.cebian/memories/` 误判与 `..` 逃逸。 */
+function memoryName(p?: string): string | null {
+  if (!p) return null;
+  const n = normalizePath(p);
+  if (n !== MEMORY_ROOT && !n.startsWith(MEMORY_ROOT + '/')) return null;
+  return (n.split('/').pop() ?? '').replace(/\.md$/, '');
+}function getInteractLabel(args: Record<string, any>): string {
   const target = args.selector
     ? ` ${args.selector}`
     : (args.x != null ? ` (${args.x}, ${args.y})` : '');
