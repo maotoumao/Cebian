@@ -4,10 +4,10 @@
 //   1. 恢复：清理上次崩溃残留（planRecovery）。
 //   2. 复制 live → staging，记录复制时刻 live 指纹 M0。
 //   3. 整理 agent 只在 staging 里干（作用域硬锁）。
-//   4. 机器校验整理结果（守 Phase 1 不变量），不过则丢弃。
+//   4. 机器校验整理结果（守记忆文件格式不变量），不过则丢弃。
 //   5. 提交门控：重扫 live 指纹；M_now ≠ M0（运行期间用户写了记忆）→ 丢弃（前台赢）。
 //   6. 提交：写 .committing 标记 → 用 staging 替换 live → 删标记 → 清 staging。
-//   7. 算文件级 diff + 一句话摘要，写入 memoryOrganizeState（UI 响应式读取）。
+//   7. 记下上次成功整理时间，写入 memoryOrganizeState（UI 响应式读取）。
 //
 // 并发正确性靠机制本身：live 全程不被整理碰；提交只在指纹完全没变时发生，故任何「已完成
 // 的并发写」都会让指纹变化而触发丢弃，零数据丢失。残留：提交步的 replaceLiveWithStaging
@@ -30,6 +30,7 @@ import {
   replaceLiveWithStaging,
 } from '@/lib/memory/staging-fs';
 import { liveChangedSince, planRecovery } from '@/lib/memory/organize-plan';
+import { shouldRunOrganize, countNewMemories } from '@/lib/memory/organize-schedule';
 import { validateOrganized } from '@/lib/memory/organize-validate';
 import { MEMORY_INDEX_FILE_CAPACITY } from '@/lib/memory/index-scan';
 import {
@@ -43,6 +44,7 @@ import {
 import { resolveModel } from '@/lib/providers/resolve-model';
 import { acquireKeepAlive, releaseKeepAlive } from './sw-keepalive';
 import { createOrganizeAgent } from './organize-agent';
+import { agentManager } from './agent-manager';
 
 const LIVE = CEBIAN_MEMORIES_DIR;
 const STAGING = CEBIAN_MEMORIES_STAGING_DIR;
@@ -140,7 +142,7 @@ async function runOrganizeAgent(model: Model<Api>, fileCount: number): Promise<b
  * 写入 memoryOrganizeState（独立结果态存储项；只有本 manager 写它，单飞行 → 读改写无竞态，
  * 也不会覆盖用户在 memorySettings 改的配置）：
  * - 提交成功 → 更 lastAttemptAt + lastRunAt。
- * - 未提交（冲突/校验不过/失败）→ 只更 lastAttemptAt（供 2b 退避）。
+ * - 未提交（冲突/校验不过/失败）→ 只更 lastAttemptAt（供退避调度）。
  */
 async function persistResult(opts: { committed: boolean }): Promise<void> {
   const cur = await memoryOrganizeState.getValue();
@@ -212,4 +214,43 @@ export async function runOrganize(): Promise<OrganizeOutcome> {
     organizing = false;
     releaseKeepAlive();
   }
+}
+
+// ─── 自动调度（chrome.alarms 周期检查） ───
+
+const ALARM_NAME = 'memory-organize-check';
+// 每 6 小时检查一次（检查廉价，满足条件才真整理、才花 token）。
+const CHECK_INTERVAL_MINUTES = 6 * 60;
+
+/**
+ * 周期检查「该不该自动整理」：记忆开 + auto 开 + 决策函数过（够久/够多/空闲/非退避）
+ * 才调 runOrganize。任一不满足即短路返回，不动 live。
+ */
+async function maybeAutoOrganize(): Promise<void> {
+  const settings = await memorySettings.getValue();
+  if (!settings.enabled) return;
+  const policy = resolveOrganizeSettings(settings);
+  if (!policy.auto) return;
+
+  const [state, manifest] = await Promise.all([
+    memoryOrganizeState.getValue(),
+    readDirManifest(LIVE),
+  ]);
+  const ok = shouldRunOrganize(policy, {
+    now: Date.now(),
+    lastRunAt: state.lastRunAt,
+    lastAttemptAt: state.lastAttemptAt,
+    newMemoryCount: countNewMemories(manifest, state.lastRunAt),
+    hasActiveSession: agentManager.hasActiveSession(),
+  });
+  if (ok) await runOrganize();
+}
+
+/** 注册自动整理的周期 alarm（仿 setupOAuthRefresh）。启动时调一次。 */
+export function setupOrganizeSchedule(): void {
+  chrome.alarms.create(ALARM_NAME, { periodInMinutes: CHECK_INTERVAL_MINUTES });
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name !== ALARM_NAME) return;
+    maybeAutoOrganize().catch((err) => console.warn('[organize] auto check failed:', err));
+  });
 }

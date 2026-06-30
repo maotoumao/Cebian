@@ -6,10 +6,10 @@ import {
   resolveOrganizeSettings,
 } from '@/lib/persistence/storage';
 
-// organize 配置的回填：Phase 1 只存 { enabled }，后续加了 organize 子结构。WXT 的 fallback
+// organize 配置的回填：早期只存 { enabled }，后续加了 organize 子结构。WXT 的 fallback
 // 只在 key 整体缺失时生效、不补「已存在但缺字段」的旧值，故读整理配置统一走
 // resolveOrganizeSettings。运行结果态另存 memoryOrganizeState（与用户配置分离，防读改写覆盖）。
-const DEFAULTS = { auto: false, intervalDays: 7, minNewMemories: 20 };
+const DEFAULTS = { auto: false, intervalDays: 14, minNewMemories: 30 };
 
 describe('resolveOrganizeSettings', () => {
   it('organize 缺失 → 全默认', () => {
@@ -19,8 +19,8 @@ describe('resolveOrganizeSettings', () => {
   it('organize 部分字段（仅 auto） → 缺的补默认、有的保留', () => {
     const r = resolveOrganizeSettings({ enabled: true, organize: { auto: true } as never });
     expect(r.auto).toBe(true);
-    expect(r.intervalDays).toBe(7);
-    expect(r.minNewMemories).toBe(20);
+    expect(r.intervalDays).toBe(14);
+    expect(r.minNewMemories).toBe(30);
   });
 
   it('organize 含 model 配置 → 一并保留', () => {
@@ -45,7 +45,7 @@ describe('memorySettings 存储项', () => {
     expect(resolveOrganizeSettings(v)).toEqual(DEFAULTS);
   });
 
-  it('Phase-1 旧值 { enabled } → 读出仍能规范化出 organize 默认（不炸）', async () => {
+  it('旧值 { enabled } → 读出仍能规范化出 organize 默认（不炸）', async () => {
     await fakeBrowser.storage.local.set({ memorySettings: { enabled: true } });
     const v = await memorySettings.getValue();
     expect(v.enabled).toBe(true);

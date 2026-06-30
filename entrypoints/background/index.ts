@@ -1,6 +1,6 @@
 import { setupOAuthRefresh } from './oauth-refresh';
 import { agentManager } from './agent-manager';
-import { runOrganize, recoverOrganizeOnStartup, isOrganizing } from './organize-manager';
+import { runOrganize, recoverOrganizeOnStartup, isOrganizing, setupOrganizeSchedule } from './organize-manager';
 import { sessionStore } from './session-store';
 import { recorder } from './recorder';
 import { seedDevStorage } from './dev-seed';
@@ -53,7 +53,8 @@ export default defineBackground(() => {
   void recoverOrganizeOnStartup().catch((err) =>
     console.warn('[organize] startup recovery failed:', err),
   );
-
+  // 自动整理调度：注册周期 alarm（检查廉价，满足够久/够多/空闲才真跑）。
+  setupOrganizeSchedule();
   // Dev-only: seed a custom provider from .env.local if configured.
   // No-op in production builds and when WXT_DEV_API_KEY is empty.
   void seedDevStorage().catch(err => console.warn('[dev-seed] failed:', err));

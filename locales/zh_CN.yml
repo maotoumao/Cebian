@@ -148,6 +148,10 @@ settings:
       running: "整理中…"
       model: "模型"
       followActive: "与对话模型相同"
+      auto: "自动整理"
+      autoHint: "积累到一定量后，在后台定期自动整理。"
+      intervalLabel: "最小间隔（天）"
+      thresholdLabel: "触发阈值（自上次整理后新增记忆条数）"
       # $1 = 上次整理时间
       lastRun: "上次整理 $1"
       toast:

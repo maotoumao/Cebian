@@ -18,6 +18,7 @@ import { useStorageItem } from '@/hooks/useStorageItem';
 import { useMemoryOrganize } from '@/hooks/useMemoryOrganize';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { SettingsOutletContext } from '@/components/settings/SettingsLayout';
 import { t } from '@/lib/i18n';
@@ -52,6 +53,12 @@ function OrganizeControls({
 
   const setModel = (model: ModelIdentity | undefined) =>
     setSettings({ ...settings, organize: { ...organize, model } });
+  const setAuto = (auto: boolean) =>
+    setSettings({ ...settings, organize: { ...organize, auto } });
+  const setIntervalDays = (intervalDays: number) =>
+    setSettings({ ...settings, organize: { ...organize, intervalDays } });
+  const setMinNewMemories = (minNewMemories: number) =>
+    setSettings({ ...settings, organize: { ...organize, minNewMemories } });
 
   return (
     <div className="mt-4 rounded-md border border-border p-3 space-y-2.5">
@@ -87,6 +94,66 @@ function OrganizeControls({
           }}
         />
       </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <Label htmlFor="memory-organize-auto" className="text-xs text-muted-foreground">
+            {t('settings.memory.organize.auto')}
+          </Label>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            {t('settings.memory.organize.autoHint')}
+          </p>
+        </div>
+        <Switch
+          id="memory-organize-auto"
+          checked={organize.auto}
+          onCheckedChange={setAuto}
+          className="shrink-0"
+        />
+      </div>
+
+      {organize.auto && (
+        <>
+          <div className="flex items-center justify-between gap-3">
+            <Label
+              htmlFor="memory-organize-interval"
+              className="text-xs text-muted-foreground shrink-0"
+            >
+              {t('settings.memory.organize.intervalLabel')}
+            </Label>
+            <Input
+              id="memory-organize-interval"
+              type="number"
+              min={0}
+              value={organize.intervalDays}
+              onChange={(e) => {
+                const n = Math.floor(Number(e.target.value));
+                if (Number.isFinite(n)) setIntervalDays(Math.max(0, n));
+              }}
+              className="h-8 w-20 text-xs"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <Label
+              htmlFor="memory-organize-threshold"
+              className="text-xs text-muted-foreground shrink-0"
+            >
+              {t('settings.memory.organize.thresholdLabel')}
+            </Label>
+            <Input
+              id="memory-organize-threshold"
+              type="number"
+              min={1}
+              value={organize.minNewMemories}
+              onChange={(e) => {
+                const n = Math.floor(Number(e.target.value));
+                if (Number.isFinite(n)) setMinNewMemories(Math.max(1, n));
+              }}
+              className="h-8 w-20 text-xs"
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }

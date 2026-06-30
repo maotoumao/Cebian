@@ -152,6 +152,10 @@ settings:
       running: "Organizing…"
       model: "Model"
       followActive: "Same as conversation model"
+      auto: "Auto organize"
+      autoHint: "Periodically tidy memory in the background once enough new notes pile up."
+      intervalLabel: "Min interval (days)"
+      thresholdLabel: "Trigger threshold (new notes since last organize)"
       # $1 = last run time
       lastRun: "Last organized $1"
       toast:

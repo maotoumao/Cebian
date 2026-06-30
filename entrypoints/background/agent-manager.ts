@@ -309,6 +309,11 @@ class AgentManager {
     }
   }
 
+  /** 是否有任一会话非 idle。供自动整理调度的 idle 门控：有活跃对话则不自动整理。 */
+  hasActiveSession(): boolean {
+    return [...this.sessions.values()].some((s) => s.phase !== 'idle');
+  }
+
   /**
    * 解析「本会话该用哪个模型」成 pi-ai 运行时 `Model`。读存储（凭据 + 自定义 provider）
    * 后委托纯函数 `resolveModel`。
