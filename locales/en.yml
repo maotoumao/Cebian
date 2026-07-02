@@ -121,8 +121,8 @@ settings:
   advanced:
     title: "Advanced"
     compaction:
-      label: "Compaction model"
-      hint: "Used to compact long conversations. Defaults to the conversation model."
+      label: "Context compaction model"
+      hint: "The model used to automatically compact overly long conversations. Defaults to the conversation model."
       followMain: "Same as conversation model"
   instructions:
     title: "Instructions"

@@ -117,8 +117,8 @@ settings:
   advanced:
     title: "高级"
     compaction:
-      label: "压缩模型"
-      hint: "用于压缩过长的对话，默认与对话模型相同。"
+      label: "上下文压缩模型"
+      hint: "对话过长时用来自动压缩历史的模型，默认与对话模型相同。"
       followMain: "与对话模型相同"
   instructions:
     title: "指引"

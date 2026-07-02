@@ -18,6 +18,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 变更 / Changed
+
+- 把「压缩模型」设置重命名为「上下文压缩模型」，并优化说明文案，让它更明确是指「对话过长时用来自动压缩历史的模型」
+
+- Renamed the "Compaction model" setting to "Context compaction model" and refined its description to make clear it's the model used to automatically compact overly long conversations
+
 ## 1.4.0 - 2026-06-30
 
 ### 新增 / Added
