@@ -41,7 +41,7 @@ So ————
 
 ## ✨ Overview
 
-Cebian is a Chrome extension that puts an AI assistant in the browser side panel. It can read the current page, pick elements, emulate mobile devices, attach files, and plug into external tools via MCP — letting you reach for AI without ever leaving the page you're on.
+Cebian is a Chrome extension that puts an AI assistant in the browser side panel. It can read the current page, pick elements, emulate mobile devices, attach files, remember durable facts about you across chats, and plug into external tools via MCP — letting you reach for AI without ever leaving the page you're on.
 
 > About the name: "Cebian" is just the pinyin of 侧边 (cè biān) — Chinese for "the side." Nothing fancier than that.
 
@@ -55,6 +55,7 @@ Cebian is a Chrome extension that puts an AI assistant in the browser side panel
 |  **📄 Page-aware**     | Grab the current URL, title, selected text, or any picked element as context; paste images and files                   |
 |  **⚡ Slash Prompts**  | Build a prompt library with template variables like `{{selected_text}}`, `{{page_url}}`, `{{clipboard}}`               |
 |     **🧩 Skills**     | Package multi-step workflows or domain knowledge into reusable Skills the AI can invoke on demand                      |
+|     **🧠 Memory**     | Optional cross-conversation memory: the AI saves durable facts about you as local Markdown files and recalls them in new chats — fully visible and editable, off by default |
 |     **🔌 MCP tools**   | Built-in Model Context Protocol client — drop in external tools and they just work                                     |
 |  **📱 Mobile emulation** | Toggle mobile-device emulation on the active tab to debug responsive pages                                           |
 |   **🔒 Privacy-first**   | All conversations, prompts, and files stay in your browser — nothing is uploaded to any server (honestly, just too lazy to maintain one :D)                          |
