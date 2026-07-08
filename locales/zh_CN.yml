@@ -71,6 +71,20 @@ common:
       1: "1 条消息"
       n: "$1 条消息"
 
+# ─── 页面注入 UI（悬浮球、划词工具条） ───
+pageActions:
+  ball:
+    tooltip: "打开或关闭 Cebian 侧边栏"
+  toolbar:
+    explain: "解释"
+    translate: "翻译"
+    summarize: "总结"
+  result:
+    loading: "思考中…"
+    error: "出错了，请重试。"
+    close: "关闭"
+    continue: "在侧边栏继续"
+
 # ─── 设置 ───
 settings:
   nav:
@@ -81,6 +95,7 @@ settings:
     skills: "技能"
     memory: "记忆"
     mcp: "MCP 服务器"
+    pageInteraction: "页面交互"
     backup: "备份与恢复"
     storage: "文件系统"
     advanced: "高级"
@@ -120,6 +135,22 @@ settings:
       label: "上下文压缩模型"
       hint: "对话过长时用来自动压缩历史的模型，默认与对话模型相同。"
       followMain: "与对话模型相同"
+  pageInteraction:
+    title: "页面交互"
+    ball:
+      label: "悬浮球"
+      hint: "在网页上显示一个贴边的悬浮球，单击可打开或关闭侧边栏。"
+    toolbar:
+      label: "划词工具条"
+      hint: "在网页上选中文本时，显示包含复制、解释、翻译的小工具条。"
+    model:
+      label: "工具条模型"
+      hint: "划词工具条的解释、翻译所用模型，通常小而省的模型就够，默认与对话模型相同。"
+      followMain: "与对话模型相同"
+    translate:
+      label: "翻译目标语言"
+      hint: "工具条翻译成的目标语言。"
+      auto: "跟随界面语言"
   instructions:
     title: "指引"
     label: "自定义指引"

@@ -11,6 +11,8 @@ import { useStorageItem } from '@/hooks/useStorageItem';
 import { useChangelogOnUpdate } from '@/hooks/useChangelogOnUpdate';
 import { themePreference } from '@/lib/persistence/storage';
 import { ChatPage } from './pages/chat';
+import { useSidePanelToggle } from './useSidePanelToggle';
+import { useSidePanelHandoff } from './useSidePanelHandoff';
 
 // Lazy-load Settings: pulls in CodeMirror, react-arborist, lightning-fs,
 // all provider/MCP forms, etc. — a large chunk that's only needed once
@@ -38,6 +40,16 @@ function App() {
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  // 参与悬浮球的 open/close toggle：上报开启态 + 订阅「自关」指令。
+  useSidePanelToggle();
+
+  // 「在侧边栏继续」交接：仅当 handoff 的 windowId 命中本窗口时跳转（多窗口不误跳）。
+  const goToSession = useCallback(
+    (sessionId: string) => navigate(`/chat/${sessionId}`),
+    [navigate],
+  );
+  useSidePanelHandoff(goToSession);
 
   // 记住最近访问过的聊天路由（/chat/new 或 /chat/:sessionId），供退出设置时回到原处。
   // 缺省 /chat/new 兜底首次进设置的情况。

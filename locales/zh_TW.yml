@@ -71,6 +71,20 @@ common:
       1: "1 則訊息"
       n: "$1 則訊息"
 
+# ─── 頁面注入 UI（懸浮球、劃詞工具列） ───
+pageActions:
+  ball:
+    tooltip: "開啟或關閉 Cebian 側邊欄"
+  toolbar:
+    explain: "解釋"
+    translate: "翻譯"
+    summarize: "總結"
+  result:
+    loading: "思考中…"
+    error: "出錯了，請重試。"
+    close: "關閉"
+    continue: "在側邊欄繼續"
+
 # ─── 設定 ───
 settings:
   nav:
@@ -81,6 +95,7 @@ settings:
     skills: "技能"
     memory: "記憶"
     mcp: "MCP 伺服器"
+    pageInteraction: "頁面互動"
     backup: "備份與復原"
     storage: "檔案系統"
     advanced: "進階"
@@ -120,6 +135,22 @@ settings:
       label: "上下文壓縮模型"
       hint: "對話過長時用來自動壓縮歷史的模型，預設與對話模型相同。"
       followMain: "與對話模型相同"
+  pageInteraction:
+    title: "頁面互動"
+    ball:
+      label: "懸浮球"
+      hint: "在網頁上顯示一個貼邊的懸浮球，單擊可開啟或關閉側邊欄。"
+    toolbar:
+      label: "劃詞工具列"
+      hint: "在網頁上選取文字時，顯示包含複製、解釋、翻譯的小工具列。"
+    model:
+      label: "工具列模型"
+      hint: "劃詞工具列的解釋、翻譯所用模型，通常小而省的模型就夠，預設與對話模型相同。"
+      followMain: "與對話模型相同"
+    translate:
+      label: "翻譯目標語言"
+      hint: "工具列翻譯成的目標語言。"
+      auto: "跟隨介面語言"
   instructions:
     title: "指引"
     label: "自訂指引"

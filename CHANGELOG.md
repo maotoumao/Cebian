@@ -18,6 +18,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 新增 / Added
+
+- 新增「页面交互」（设置 → 页面交互，默认开启）：在网页上注入一个贴边的悬浮球，单击即可打开 / 关闭侧边栏，还可拖拽移动、松手后吸附到最近一侧并记住位置；选中文本时弹出一个可拖拽的划词工具条，提供「复制 / 解释 / 翻译 / 总结」，解释、翻译、总结的结果就地流式显示，可一键复制、点击外部关闭，或「在侧边栏继续」把这次问答固化成正式对话接着深聊；AI 处理时会带上页面标题与选区周边的少量上下文以提高准确度；工具条用的 AI 可单独配置（默认跟随对话模型，方便换用更小更省的模型），翻译目标语言可选（默认跟随界面语言）；悬浮球与工具条都能分别关闭，取词 / 录制进行时自动隐藏以免干扰 ([#19](https://github.com/maotoumao/Cebian/issues/19))
+
+- Added "Page interaction" (Settings → Page interaction, on by default): injects an edge-docked floating ball on web pages that opens/closes the sidebar with a click and can be dragged around — it snaps to the nearest side and remembers where you put it; selecting text pops up a draggable mini toolbar with Copy / Explain / Translate / Summarize, where Explain, Translate and Summarize stream their result inline — you can copy it, click outside to dismiss, or "Continue in sidebar" to turn the exchange into a full conversation and keep going; a little surrounding context (page title and text around the selection) is sent along to improve accuracy; the toolbar's AI is separately configurable (defaults to the conversation model, handy for a smaller, cheaper one) and the translation target language is selectable (defaults to your interface language); the ball and toolbar can each be turned off and auto-hide while element-picking or recording is in progress ([#19](https://github.com/maotoumao/Cebian/issues/19))
+
 ### 变更 / Changed
 
 - 把「压缩模型」设置重命名为「上下文压缩模型」，并优化说明文案，让它更明确是指「对话过长时用来自动压缩历史的模型」

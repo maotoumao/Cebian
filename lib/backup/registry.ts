@@ -23,6 +23,9 @@ import {
   pendingChangelogVersion,
   memorySettings,
   memoryOrganizeState,
+  pageInteractionSettings,
+  floatingBallPosition,
+  pendingSidePanelHandoff,
   type MCPServerConfig,
   type ProviderCredentials,
   type WebDavConfig,
@@ -253,6 +256,12 @@ export const BACKUP_REGISTRY: BackupEntry<any>[] = [
   // 记忆系统设置（仅开关，无密钥）。merge 恢复时保留本地开关状态（无 fillMissing）。
   entry({ item: memorySettings, storageClass: 'settings' }),
   entry({ item: memoryOrganizeState, storageClass: 'exclude' }),
+  // 页面交互设置（悬浮球 / 划词工具条开关 + 工具条模型 + 翻译目标；无密钥）。
+  entry({ item: pageInteractionSettings, storageClass: 'settings' }),
+  // 悬浮球位置（设备本地 UI 状态）。
+  entry({ item: floatingBallPosition, storageClass: 'exclude' }),
+  // 「在侧边栏继续」的一次性交接标记（派生，备份无意义）。
+  entry({ item: pendingSidePanelHandoff, storageClass: 'exclude' }),
   entry({ item: settingsFilePanelWidth, storageClass: 'exclude' }),
   entry({ item: lastSettingsSection, storageClass: 'exclude' }),
   entry({ item: updateNoticeState, storageClass: 'exclude' }),

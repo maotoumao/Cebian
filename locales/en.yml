@@ -75,6 +75,20 @@ common:
       1: "1 message"
       n: "$1 messages"
 
+# ─── In-page injected UI (floating ball, selection toolbar) ───
+pageActions:
+  ball:
+    tooltip: "Open or close the Cebian sidebar"
+  toolbar:
+    explain: "Explain"
+    translate: "Translate"
+    summarize: "Summarize"
+  result:
+    loading: "Thinking…"
+    error: "Something went wrong. Please try again."
+    close: "Close"
+    continue: "Continue in sidebar"
+
 # ─── Settings hub ───
 settings:
   nav:
@@ -85,6 +99,7 @@ settings:
     skills: "Skills"
     memory: "Memory"
     mcp: "MCP Servers"
+    pageInteraction: "Page interaction"
     backup: "Backup & Restore"
     storage: "Filesystem"
     advanced: "Advanced"
@@ -124,6 +139,22 @@ settings:
       label: "Context compaction model"
       hint: "The model used to automatically compact overly long conversations. Defaults to the conversation model."
       followMain: "Same as conversation model"
+  pageInteraction:
+    title: "Page interaction"
+    ball:
+      label: "Floating ball"
+      hint: "Show a pinned ball on web pages; click it to open or close the sidebar."
+    toolbar:
+      label: "Selection toolbar"
+      hint: "When you select text on a page, show a small toolbar with Copy, Explain and Translate."
+    model:
+      label: "Toolbar model"
+      hint: "The model used by the toolbar's Explain and Translate. A small, cheap model is usually enough. Defaults to the conversation model."
+      followMain: "Same as conversation model"
+    translate:
+      label: "Translation target language"
+      hint: "The language the toolbar translates into."
+      auto: "Follow interface language"
   instructions:
     title: "Instructions"
     label: "Custom instructions"

@@ -63,6 +63,7 @@ permission  # standalone user-permission entrypoint (entrypoints/user-permission
 dialogs     # modal dialogs
 errors      # toast / inline error messages
 agent       # agent-runtime user-facing strings
+pageActions # in-page injected UI (floating ball, selection toolbar)
 
 # Flat top-level keys (manifest exception, see "Manifest localization"):
 # extName, extDescription, actionTitle

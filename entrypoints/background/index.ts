@@ -6,6 +6,9 @@ import { recorder } from './recorder';
 import { seedDevStorage } from './dev-seed';
 import { registerBackupHandler } from './backup-handler';
 import { getMCPManager } from '@/lib/mcp/manager';
+import { setupPageActions } from '@/lib/page-actions/manager';
+import { runPageActionStream, materializeHandoff } from './page-action-runner';
+import { SUPPRESS_KIND } from '@/lib/page-actions/types';
 import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage } from '@/lib/ipc/protocol';
 import { isRecorderRuntimeMessage, RECORDER_MSG_KIND, type RecorderControlMessage } from '@/lib/recorder/protocol';
 import { isInjectablePage } from '@/lib/browser/tab-actions';
@@ -47,6 +50,13 @@ export default defineBackground(() => {
 
   // 注册备份 IPC 响应器（会话采集 / 写回；Dexie 唯一写者经此转发）。
   registerBackupHandler();
+
+  // 注册页面交互（悬浮球 / 划词工具条）的 runtime 消息处理器。
+  setupPageActions({
+    runStream: runPageActionStream,
+    materializeHandoff,
+    onContentPresent: handleContentPresent,
+  });
 
   // 启动崩溃恢复：清理上次未收尾的整理。尽早触发；runOrganize 会 await 同一记忆化 promise，
   // 故整理流程不会与恢复重叠。其余记忆读取不强制等待它（崩溃恢复罕见、且 redoCommit 幂等）。
@@ -152,6 +162,34 @@ export default defineBackground(() => {
     }
   }
   recorder.onStatusChange(broadcastRecorderStatus);
+
+  // 录制进行中时抑制被观察 tab 的页面交互 UI（悬浮球 / 工具条），避免误点击与录制噪声。
+  // （取词 picker 由内容脚本自行观察 DOM，不走这里。）
+  let suppressedRecorderTab: number | null = null;
+  /** 把抑制目标切到 `tabId`（null = 无）：先给旧 tab 发 off，再给新 tab 发 on。 */
+  function setRecorderSuppress(tabId: number | null): void {
+    if (suppressedRecorderTab === tabId) return;
+    if (suppressedRecorderTab != null) {
+      void chrome.tabs
+        .sendMessage(suppressedRecorderTab, { kind: SUPPRESS_KIND, on: false })
+        .catch(() => {});
+    }
+    suppressedRecorderTab = tabId;
+    if (tabId != null) {
+      void chrome.tabs.sendMessage(tabId, { kind: SUPPRESS_KIND, on: true }).catch(() => {});
+    }
+  }
+  recorder.onStatusChange(() => {
+    const isRecording = recorder.getStatus().isRecording;
+    const tabId = recorder.getObservedTabId();
+    setRecorderSuppress(isRecording && typeof tabId === 'number' ? tabId : null);
+  });
+  /** 内容脚本挂载回报：若该 tab 正在被录制，把 on 重推一次（应对录制中途导航）。 */
+  function handleContentPresent(tabId: number): void {
+    if (recorder.getStatus().isRecording && tabId === recorder.getObservedTabId()) {
+      void chrome.tabs.sendMessage(tabId, { kind: SUPPRESS_KIND, on: true }).catch(() => {});
+    }
+  }
 
   // Forward finalized recordings to whichever port owned the recording.
   // Both manual `stop()` and the cap-trigger `autoStop()` fan out through

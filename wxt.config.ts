@@ -23,6 +23,11 @@ export default defineConfig({
     action: {
       default_title: '__MSG_actionTitle__',
     },
+    // 内容脚本注入的悬浮球 <img> 由页面渲染进程加载扩展资源，必须显式声明为
+    // web_accessible_resources，否则 Chrome 会拦截、图标渲染不出。
+    web_accessible_resources: [
+      { resources: ['icon/128.png'], matches: ['<all_urls>'] },
+    ],
     // Override the MV3 sandbox-page CSP. Chrome's default is restrictive
     // (`script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'self'`),
     // which would be fine for our existing skill executor — but MCP App

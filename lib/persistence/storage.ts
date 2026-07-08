@@ -270,3 +270,79 @@ export const memoryOrganizeState = storage.defineItem<MemoryOrganizeState>(
   'local:memoryOrganizeState',
   { fallback: {} },
 );
+
+// ─── 页面交互（悬浮球 + 划词工具条） ───
+
+/**
+ * 注入页面的交互功能设置：贴边悬浮球（单击拉起侧边栏）与划词工具条（复制 / 解释 /
+ * 翻译）。两块 UI 各有显示开关；工具条的 AI 单独配置，缺省回退对话主模型。
+ *
+ * `toolbarModel` 缺省（undefined）= 跟随主模型，语义同压缩模型的「跟随对话模型」。
+ * `translateTarget` 是翻译目标语言的 BCP-47 代码；空串 = 跟随界面语言（读取时由调用
+ * 方解析成具体语言），语义同「自动」。
+ */
+export interface PageInteractionSettings {
+  /** 悬浮球显示开关。默认 true */
+  showFloatingBall: boolean;
+  /** 划词工具条显示开关。默认 true */
+  showSelectionToolbar: boolean;
+  /** 工具条专用模型；缺省回退主模型 */
+  toolbarModel?: ModelIdentity;
+  /** 翻译目标语言 BCP-47 代码；空串 = 跟随界面语言 */
+  translateTarget: string;
+}
+
+/** 页面交互设置默认值（新装机 fallback + 旧装机字段回填共用单一真理源）。 */
+const DEFAULT_PAGE_INTERACTION: PageInteractionSettings = {
+  showFloatingBall: true,
+  showSelectionToolbar: true,
+  translateTarget: '',
+};
+
+/** 取规范的页面交互设置：补齐旧装机 / 部分写入缺失的字段。读设置的唯一入口。 */
+export function resolvePageInteractionSettings(
+  s: Partial<PageInteractionSettings> | undefined,
+): PageInteractionSettings {
+  return { ...DEFAULT_PAGE_INTERACTION, ...s };
+}
+
+export const pageInteractionSettings = storage.defineItem<PageInteractionSettings>(
+  'local:pageInteractionSettings',
+  { fallback: { ...DEFAULT_PAGE_INTERACTION } },
+);
+
+/**
+ * 悬浮球的位置（拖拽后记住）：贴哪侧边 + 垂直位置比例（0-1，相对视口高，跨
+ * 分辨率 / 缩放稳定）。设备本地 UI 状态，备份无意义（exclude）。
+ */
+export interface FloatingBallPosition {
+  side: 'left' | 'right';
+  topRatio: number;
+}
+
+/** 悬浮球默认位置（存储 fallback 与组件初值共用单一真理源）。 */
+export const DEFAULT_FLOATING_BALL_POSITION: FloatingBallPosition = {
+  side: 'right',
+  topRatio: 0.62,
+};
+
+export const floatingBallPosition = storage.defineItem<FloatingBallPosition>(
+  'local:floatingBallPosition',
+  { fallback: { ...DEFAULT_FLOATING_BALL_POSITION } },
+);
+
+/**
+ * 「在侧边栏继续」的交接标记：内容脚本点「继续」后，background 固化一条会话并把
+ * sessionId + 目标 windowId 写在此处；对应窗口的侧边栏（可能刚被打开）监听到且
+ * windowId 匹配时才跳转并清空——避免多窗口时其它面板误跳。派生一次性信号，
+ * 备份无意义（exclude）。`null` 表示无待跳转。
+ */
+export interface SidePanelHandoff {
+  sessionId: string;
+  windowId: number;
+}
+
+export const pendingSidePanelHandoff = storage.defineItem<SidePanelHandoff | null>(
+  'local:pendingSidePanelHandoff',
+  { fallback: null },
+);
