@@ -24,12 +24,13 @@ tools: ['search', 'fetch', 'runCommands', 'web']
 - 优先官方渠道：GitHub Releases / `CHANGELOG.md` / 官方迁移指南 / npm 页面。
 - 判断版本跳变性质：patch / minor / major（遵循 semver），跨越多个大版本时要把中间每个 major 的破坏性变更都覆盖到，不能只看最新一版。
 - 重点提取：**breaking changes、废弃 API、需要手动迁移的步骤、对等依赖（peerDependencies）要求**。
+- 特例 @earendil-works/pi-agent-core / pi-ai：变更日志在 pi monorepo 仓库内，**不在 npm release notes**——看 `packages/ai/CHANGELOG.md` 和 `packages/agent/CHANGELOG.md`（github.com/earendil-works/pi）。二者须锁步升到同一版本；深入调研这两个包时优先用 `/upgrade-pi` 指令。
 
 ### 3. 交叉验证（必做）
 每个结论至少要有两类独立来源相互印证，避免只信单一页面：
 - 来源交叉：GitHub Releases 与 CHANGELOG/官方文档说法是否一致。
 - 代码交叉：用代码搜索确认本项目**实际怎么用这个库**（用到的 API、入口、是否只是间接依赖），据此评估破坏性变更对本项目的**真实影响**——别人眼里的 breaking 在我们这儿可能根本没用到。
-- 生态交叉：注意 React 19、WXT、Tailwind v4 等关键依赖的 peer 兼容要求，别让单个升级破坏整体。
+- 生态交叉：注意 React 19、WXT、Tailwind v4 等关键依赖的 peer 兼容要求，别让单个升级破坏整体。特别地，`typebox` 与 pi（pi-ai / pi-agent-core）内部捆绑的 typebox 必须同版本——本项目精确 pin `typebox`（无 `^`）就是为此，**不要单独升 typebox**，它只能跟随 pi 一起动；升级前后都去 [pnpm-lock.yaml](../../pnpm-lock.yaml) 核对 pi 解析的 typebox 版本。
 - 遇到来源互相矛盾或信息不足，**如实标注「未确认」**，不要猜。
 
 ### 4. 分类结论
