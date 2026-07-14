@@ -9,7 +9,7 @@ import { showDialog } from '@/lib/ui/dialog';
 import { RECORDING_MIME } from '@/lib/agent/attachments';
 import { t } from '@/lib/i18n';
 import { describePermission } from '@/lib/agent/tool-permissions';
-import { downloadFile, formatDuration, formatCharCount } from '@/lib/utils';
+import { downloadFile, formatDuration, formatCompactCount } from '@/lib/utils';
 import type { Message } from '@earendil-works/pi-ai';
 
 /* ─── User Message ─── */
@@ -68,7 +68,7 @@ export function UserMessageBubble({ msg, children }: { msg?: Message; children?:
               key={`rec-${i}`}
               variant="outline"
               className="shrink-0 text-[0.65rem] font-mono gap-1 h-5 rounded pl-1 pr-1 text-amber-400 border-amber-400/20 bg-amber-400/5 cursor-pointer hover:bg-amber-400/10"
-              title={`${t('chat.attachments.recordingDownload')}\n${t('chat.attachments.recordingHover', [String(r.eventCount), formatCharCount(r.json.length)])}`}
+              title={`${t('chat.attachments.recordingDownload')}\n${t('chat.attachments.recordingHover', [String(r.eventCount), formatCompactCount(r.json.length)])}`}
               onClick={() => downloadFile(r.name, r.json, RECORDING_MIME)}
             >
               <Film className="size-2.5 shrink-0" />

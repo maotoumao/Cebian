@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { closeDialog, showConfirm } from '@/lib/ui/dialog';
 import { t } from '@/lib/i18n';
+import { formatBytes } from '@/lib/utils';
 import { classifyPermission } from '@/lib/tools/permissions';
 import {
   importSkillPackage,
@@ -28,13 +29,6 @@ interface SkillImportPreviewDialogProps {
   /** Called when an import attempt throws a `SkillPackageError` so the
    *  caller can surface a localized toast. The dialog still closes. */
   onError: (err: SkillPackageError | Error) => void;
-}
-
-/** Format a byte count as KB / MB with 1 decimal. */
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function PreviewItem({ item }: { item: SkillImportPreviewItem }) {

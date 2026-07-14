@@ -9,6 +9,7 @@ import { t } from '@/lib/i18n';
 import { CEBIAN_SKILLS_DIR, CEBIAN_PROMPTS_DIR } from '@/lib/persistence/vfs-paths';
 import { encodeRelPath, vfs } from '@/lib/persistence/vfs';
 import { isImageMime, mimeFromPath } from '@/lib/content/mime';
+import { formatBytes } from '@/lib/utils';
 
 /**
  * Minimal structural types for the hast (HTML AST) nodes react-markdown passes
@@ -168,13 +169,6 @@ function resolveVfsHref(href: string | undefined): string | undefined {
 
 /** 内联渲染上限。超过该值的图片改为渲染链接而非 <img>。 */
 const VFS_INLINE_IMAGE_MAX_BYTES = 30 * 1024 * 1024;
-
-/** 人类可读的文件大小，跟 lib/tools/fs-helpers 的实现保持一致。 */
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 /** 判断 markdown 给出的 src 是不是我们要接管的 VFS 路径形态。 */
 const VFS_HASH_PATH_RE = /^#\/(workspaces|home)\b\//;

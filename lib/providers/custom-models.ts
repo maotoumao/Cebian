@@ -20,12 +20,12 @@ export function customProviderId(provider: string): string {
   return provider.slice(CUSTOM_PREFIX.length);
 }
 
-const DEFAULT_CONTEXT_WINDOW = 128000;
-const DEFAULT_MAX_TOKENS = 0;
+export const DEFAULT_CONTEXT_WINDOW = 128000;
+export const DEFAULT_MAX_TOKENS = 0;
 
 /** Convert a CustomProviderConfig + CustomModelDef into a pi-ai Model object */
 export function toModel(config: CustomProviderConfig, model: CustomModelDef): Model<Api> {
-  return {
+  const base: Model<Api> = {
     id: model.modelId,
     name: model.name,
     api: 'openai-completions' as Api,
@@ -37,11 +37,36 @@ export function toModel(config: CustomProviderConfig, model: CustomModelDef): Mo
     contextWindow: model.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
     maxTokens: model.maxTokens ?? DEFAULT_MAX_TOKENS,
   };
+  // 用户自定义请求头并进 model.headers（pi-ai 会合并进请求头）；仅非空时附加
+  if (config.headers && Object.keys(config.headers).length > 0) {
+    base.headers = config.headers;
+  }
+  return base;
 }
 
 /** Get all Model objects for a custom provider */
 export function getCustomModels(config: CustomProviderConfig): Model<Api>[] {
   return config.models.map(m => toModel(config, m));
+}
+
+/**
+ * 重新拉取模型列表后按 modelId 合并：仍存在的模型保留既有配置（reasoning/image/
+ * contextWindow/maxTokens），新模型以默认值补入，远端已消失的移除；顺序跟随远端、
+ * 重复 id 只取首个。避免「自动获取」把用户设过的每模型配置整批冲掉
+ */
+export function mergeFetchedModels(
+  existing: CustomModelDef[],
+  fetchedIds: string[],
+): CustomModelDef[] {
+  const byId = new Map(existing.map(m => [m.modelId, m]));
+  const seen = new Set<string>();
+  const out: CustomModelDef[] = [];
+  for (const id of fetchedIds) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(byId.get(id) ?? { modelId: id, name: id, reasoning: false, image: false });
+  }
+  return out;
 }
 
 /** Find a custom provider config by provider key (e.g. "custom:deepseek") */
@@ -70,6 +95,7 @@ export function findCustomModel(
 export async function fetchRemoteModels(
   baseUrl: string,
   apiKey: string,
+  headers?: Record<string, string>,
 ): Promise<{ id: string; owned_by?: string }[]> {
   // Validate URL format
   let parsed: URL;
@@ -88,8 +114,12 @@ export async function fetchRemoteModels(
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
+    // 与运行时一致（apiKey 优先）：先铺自定义 header，apiKey 非空时再用它覆盖 authorization。
+    // key 统一小写（headerRowsToRecord 输出即小写），避免 Authorization/authorization 大小写重复
+    const requestHeaders: Record<string, string> = { ...(headers ?? {}) };
+    if (apiKey) requestHeaders['authorization'] = `Bearer ${apiKey}`;
     const res = await fetch(url, {
-      headers: apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {},
+      headers: requestHeaders,
       signal: controller.signal,
     });
 

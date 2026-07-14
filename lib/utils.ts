@@ -22,9 +22,9 @@ export function isValidSessionId(id: unknown): boolean {
   return typeof id === 'string' && SESSION_ID_RE.test(id);
 }
 
-/** Compact character-count formatter for UI tooltips: `999`, `1.2K`, `3.4M`.
- *  Drops trailing `.0` so `1000 → 1K`, not `1.0K`. Negatives are clamped to 0. */
-export function formatCharCount(n: number): string {
+/** UI 里的紧凑计数（字符数、token 数等）：`999`、`1.2K`、`3.4M`；丢掉末尾 `.0`
+ *  （`1000 → 1K` 而非 `1.0K`），负数夹到 0 */
+export function formatCompactCount(n: number): string {
   const v = Math.max(0, Math.floor(n));
   if (v < 1000) return String(v);
   const fmt = (x: number) => x.toFixed(1).replace(/\.0$/, '');
@@ -41,6 +41,14 @@ export function formatDuration(ms: number): string {
   const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
   if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
   return `${m}:${pad(s)}`;
+}
+
+/** 人类可读的字节大小：`512 B`、`2.3 KB`、`1.1 MB`（二进制单位，保留一位小数）；
+ *  统一入口，各组件不要再各写一份 */
+export function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /** Short random id for collision-tolerant uses (event ids, filename suffixes,

@@ -48,6 +48,8 @@ export interface CustomProviderConfig {
   name: string;
   baseUrl: string;
   models: CustomModelDef[];
+  /** 用户自定义请求头（可能含密钥，如 Authorization / api-key）；备份时整体视为密钥 */
+  headers?: Record<string, string>;
 }
 
 // ─── MCP servers ───

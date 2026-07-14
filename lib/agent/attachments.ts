@@ -163,13 +163,4 @@ export function extractImages(attachments: Attachment[]): ImageContent[] {
     .map(a => ({ type: 'image' as const, data: a.data, mimeType: a.mimeType }));
 }
 
-/**
- * Format file size for display (e.g. "2.3 KB", "1.1 MB").
- */
-export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 

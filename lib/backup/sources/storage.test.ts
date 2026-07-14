@@ -210,6 +210,51 @@ describe('restoreStorage — 混合 item 的密钥单独随 credentials 恢复',
   });
 });
 
+describe('customProviders headers 端到端（密钥进 credentials、不进 config）', () => {
+  const withHeaders: CustomProviderConfig = {
+    id: 'p-h',
+    name: 'With Headers',
+    baseUrl: 'https://p-h.example/v1',
+    models: [],
+    headers: { 'X-Api-Key': 'prov-header-secret' },
+  };
+
+  it('collect：headers 落 credentials，config 里的 safe provider 不含 headers 明文', async () => {
+    await customProviders.setValue([withHeaders]);
+    const { config, credentials } = await collectStorage({ settings: true, credentials: true });
+
+    const safe = config![SK.customProviders] as CustomProviderConfig[];
+    expect(safe[0].headers).toBeUndefined();
+    expect(JSON.stringify(config)).not.toContain('prov-header-secret');
+    expect(JSON.stringify(credentials![SK.customProviders])).toContain('prov-header-secret');
+  });
+
+  it('只选 settings：header 密钥不被序列化', async () => {
+    await customProviders.setValue([withHeaders]);
+    const out = await collectStorage({ settings: true, credentials: false });
+    expect(out.credentials).toBeUndefined();
+    expect(JSON.stringify(out.config)).not.toContain('prov-header-secret');
+  });
+
+  it('restore：config 里残留的 headers 被无条件剥离（不可信输入防线）', async () => {
+    const polluted: CustomProviderConfig = { ...withHeaders, headers: { 'X-Api-Key': 'leaked' } };
+    const data: CollectedStorage = { config: { [SK.customProviders]: [polluted] } };
+    await restoreStorage(data, { strategy: 'replace', settings: true, credentials: false });
+    const result = await customProviders.getValue();
+    expect(result[0].headers).toBeUndefined();
+  });
+
+  it('只选 credentials（replace）：header 密钥写进本地已有 provider', async () => {
+    await customProviders.setValue([{ ...withHeaders, headers: undefined }]);
+    const data: CollectedStorage = {
+      credentials: { [SK.customProviders]: { 'p-h': { headers: { 'X-Api-Key': 'restored' } } } },
+    };
+    await restoreStorage(data, { strategy: 'replace', settings: false, credentials: true });
+    const result = await customProviders.getValue();
+    expect(result[0].headers).toEqual({ 'X-Api-Key': 'restored' });
+  });
+});
+
 describe('restoreStorage — merge', () => {
   it('标量设置（无 fillMissing）merge 下保留本地、不写', async () => {
     await lastSelectedModel.setValue({ provider: 'local', modelId: 'm' });

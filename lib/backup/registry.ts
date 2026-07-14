@@ -155,10 +155,13 @@ export function restoreMcpSecrets(
     const sec = secret[s.id];
     if (!sec) return { ...s };
 
-    // headers：replace 覆盖；merge 仅本地无 headers 时补。
+    // headers：replace 覆盖；merge 仅本地无 headers 时补；空对象 {} 视为无（与
+    // restoreCustomProviderHeaders 一致）
     let headers = s.transport.headers;
-    if (sec.headers) {
-      headers = strategy === 'replace' ? sec.headers : headers ?? sec.headers;
+    const secHeaders = sec.headers;
+    if (secHeaders && Object.keys(secHeaders).length > 0) {
+      const localHasHeaders = headers != null && Object.keys(headers).length > 0;
+      headers = strategy === 'replace' || !localHasHeaders ? secHeaders : headers;
     }
     const transport = headers ? { ...s.transport, headers } : { ...s.transport };
 
@@ -170,6 +173,63 @@ export function restoreMcpSecrets(
     }
 
     return { ...s, transport, auth };
+  });
+}
+
+// ─── customProviders 的密钥拆分 / 重组 ───
+//
+// 与 mcpServers 同理：自定义 provider 的 headers 可承载 Authorization / api-key 等
+// 密钥，无法可靠区分敏感与否，整体视为密钥抽到 credentials 分类，绝不留在 config.json
+//（provider 的 API key 另存在 providerCredentials，不在此）
+
+/** 一个自定义 provider 抽离出的密钥 */
+export interface CustomProviderSecret {
+  /** 用户自定义 headers（整体视为密钥） */
+  headers?: Record<string, string>;
+}
+
+/** customProviders 抽离出的密钥部分：providerId → 该 provider 的密钥 */
+export type CustomProviderSecretMap = Record<string, CustomProviderSecret>;
+
+/**
+ * 把每个 provider 的自定义 headers 抽到 secret，safe 中移除 headers——避免任意 header
+ * 里的密钥泄进 config.json。返回全新对象，不改入参
+ */
+export function splitCustomProviderHeaders(
+  providers: CustomProviderConfig[],
+): { safe: CustomProviderConfig[]; secret: CustomProviderSecretMap } {
+  const secret: CustomProviderSecretMap = {};
+  const safe = providers.map((p) => {
+    const { headers, ...rest } = p;
+    if (headers && Object.keys(headers).length > 0) {
+      secret[p.id] = { headers };
+    }
+    return { ...rest };
+  });
+  return { safe, secret };
+}
+
+/**
+ * 把备份 secret 按策略写进本地完整的 customProviders 值。只作用于本地已存在的同 id
+ * provider。返回全新对象，不改入参
+ *
+ * - `replace`：覆盖本地该 provider 的 headers
+ * - `merge`：仅本地无 headers 时补
+ *
+ * 不新增本地不存在的 provider——secret 只携带密钥，重建完整 provider 属 settings 分类
+ */
+export function restoreCustomProviderHeaders(
+  local: CustomProviderConfig[],
+  secret: CustomProviderSecretMap,
+  strategy: RestoreStrategy,
+): CustomProviderConfig[] {
+  return local.map((p) => {
+    const secHeaders = secret[p.id]?.headers;
+    if (!secHeaders || Object.keys(secHeaders).length === 0) return { ...p };
+    // merge 仅在本地无 headers 时补；空对象 {} 视为无
+    const localHasHeaders = p.headers != null && Object.keys(p.headers).length > 0;
+    const headers = strategy === 'replace' || !localHasHeaders ? secHeaders : p.headers;
+    return { ...p, headers };
   });
 }
 
@@ -216,6 +276,10 @@ export const BACKUP_REGISTRY: BackupEntry<any>[] = [
   entry({
     item: customProviders,
     storageClass: 'settings',
+    // headers 可能含密钥，与 mcpServers 同理抽到 credentials 分类，不留在 config.json
+    splitSecret: (v: CustomProviderConfig[]) => splitCustomProviderHeaders(v),
+    restoreSecret: (local: CustomProviderConfig[], secret: unknown, strategy) =>
+      restoreCustomProviderHeaders(local, (secret ?? {}) as CustomProviderSecretMap, strategy),
     // 合并：按 provider id 补缺——本地已配置的 provider 保留本地，备份里本地没有
     // 的 provider 补入（其 API key 由 providerCredentials 的补缺一并恢复）。
     fillMissing: (local: CustomProviderConfig[], backup: CustomProviderConfig[]) =>

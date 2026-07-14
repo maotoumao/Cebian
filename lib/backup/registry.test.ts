@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import * as storageModule from '@/lib/persistence/storage';
-import type { MCPServerConfig } from '@/lib/persistence/storage';
+import type { MCPServerConfig, CustomProviderConfig } from '@/lib/persistence/storage';
 import {
   BACKUP_REGISTRY,
   registeredStorageKeys,
   splitMcpTokens,
   restoreMcpSecrets,
+  splitCustomProviderHeaders,
+  restoreCustomProviderHeaders,
 } from '@/lib/backup/registry';
 
 /** 判断一个导出是否是 WXT storage item（有 `key` 字符串与 `getValue` 方法）。 */
@@ -161,6 +163,18 @@ describe('mcpServers 密钥拆分 / 恢复', () => {
     });
   });
 
+  it('restoreSecret(merge) 本地 headers 为空对象 {} 视为无，仍从备份补入', () => {
+    const { secret } = splitMcpTokens(servers);
+    const local: MCPServerConfig[] = [
+      { ...servers[2], transport: { type: 'streamable-http', url: 'https://c.example/mcp', headers: {} } },
+    ];
+    const restored = restoreMcpSecrets(local, secret, 'merge');
+    expect(restored.find((s) => s.id === 'srv-headers')!.transport.headers).toEqual({
+      'X-Api-Key': 'header-secret',
+      Authorization: 'Bearer abc',
+    });
+  });
+
   it('restoreSecret 不新增本地不存在的 server（secret 不携带完整配置）', () => {
     const { secret } = splitMcpTokens(servers);
     // 本地只有 srv-bearer；secret 里的 srv-headers 不应被凭空变出来。
@@ -177,5 +191,66 @@ describe('mcpServers 密钥拆分 / 恢复', () => {
     const snapshot = JSON.stringify(safe);
     restoreMcpSecrets(safe, secret, 'replace');
     expect(JSON.stringify(safe)).toBe(snapshot);
+  });
+});
+
+describe('customProviders 密钥拆分 / 恢复', () => {
+  const providers: CustomProviderConfig[] = [
+    { id: 'p-plain', name: 'Plain', baseUrl: 'https://a.example/v1', models: [] },
+    {
+      id: 'p-headers',
+      name: 'With Headers',
+      baseUrl: 'https://b.example/v1',
+      models: [],
+      headers: { 'X-Api-Key': 'header-secret', Authorization: 'Bearer abc' },
+    },
+  ];
+
+  it('split 把自定义 headers 整体抽到 secret，safe 中移除', () => {
+    const { safe, secret } = splitCustomProviderHeaders(providers);
+    expect(secret['p-headers']).toEqual({
+      headers: { 'X-Api-Key': 'header-secret', Authorization: 'Bearer abc' },
+    });
+    expect(safe.find((p) => p.id === 'p-headers')!.headers).toBeUndefined();
+    expect(secret['p-plain']).toBeUndefined();
+  });
+
+  it('safe 中不残留任何明文 header 密钥', () => {
+    const { safe } = splitCustomProviderHeaders(providers);
+    const serialized = JSON.stringify(safe);
+    expect(serialized).not.toContain('header-secret');
+    expect(serialized).not.toContain('Bearer abc');
+  });
+
+  it('split 不修改入参、返回新引用', () => {
+    const { safe } = splitCustomProviderHeaders(providers);
+    expect(providers.find((p) => p.id === 'p-headers')!.headers).toEqual({
+      'X-Api-Key': 'header-secret',
+      Authorization: 'Bearer abc',
+    });
+    expect(safe[0]).not.toBe(providers[0]);
+  });
+
+  it('split → restoreSecret(replace) 往返还原', () => {
+    const { safe, secret } = splitCustomProviderHeaders(providers);
+    const restored = restoreCustomProviderHeaders(safe, secret, 'replace');
+    expect(restored).toEqual(providers);
+  });
+
+  it('restoreSecret(merge) 仅补本地缺失的 headers，本地已有则保留', () => {
+    const { secret } = splitCustomProviderHeaders(providers);
+    const local: CustomProviderConfig[] = [
+      { ...providers[1], headers: { 'X-Local': 'keep' } },
+    ];
+    const restored = restoreCustomProviderHeaders(local, secret, 'merge');
+    expect(restored.find((p) => p.id === 'p-headers')!.headers).toEqual({ 'X-Local': 'keep' });
+  });
+
+  it('restoreSecret 不新增本地不存在的 provider', () => {
+    const { secret } = splitCustomProviderHeaders(providers);
+    const local: CustomProviderConfig[] = [{ ...providers[0] }];
+    const restored = restoreCustomProviderHeaders(local, secret, 'replace');
+    expect(restored).toHaveLength(1);
+    expect(restored[0].id).toBe('p-plain');
   });
 });

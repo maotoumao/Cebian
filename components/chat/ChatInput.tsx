@@ -23,7 +23,7 @@ import { CEBIAN_PROMPTS_DIR } from '@/lib/persistence/vfs-paths';
 import {
   MAX_ATTACHMENT_COUNT, MAX_IMAGE_SIZE, MAX_TEXT_FILE_SIZE,
   RECORDING_MIME,
-  isImageFile, isTextFile, formatFileSize,
+  isImageFile, isTextFile,
   type Attachment,
 } from '@/lib/agent/attachments';
 import { recordingToAttachment } from '@/lib/recorder/to-attachment';
@@ -33,7 +33,7 @@ import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { appendTranscript, cleanTranscript } from '@/lib/speech/transcript';
 import { queryMicPermission, openMicPermissionPage, openSystemMicSettings } from '@/lib/speech/mic-permission';
 import { useMobileEmulation } from '@/hooks/useMobileEmulation';
-import { downloadFile, formatDuration, formatCharCount } from '@/lib/utils';
+import { downloadFile, formatDuration, formatCompactCount, formatBytes } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 import type { PromptDispatchResult } from '@/hooks/useBackgroundAgent';
 
@@ -717,7 +717,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           continue;
         }
         if (file.size > MAX_IMAGE_SIZE) {
-          toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_IMAGE_SIZE)]));
+          toast.error(t('chat.composer.fileTooLarge', [file.name, formatBytes(MAX_IMAGE_SIZE)]));
           continue;
         }
         const reader = new FileReader();
@@ -736,7 +736,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         reader.readAsDataURL(file);
       } else if (isTextFile(file.name)) {
         if (file.size > MAX_TEXT_FILE_SIZE) {
-          toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_TEXT_FILE_SIZE)]));
+          toast.error(t('chat.composer.fileTooLarge', [file.name, formatBytes(MAX_TEXT_FILE_SIZE)]));
           continue;
         }
         const reader = new FileReader();
@@ -794,7 +794,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
 
     for (const file of filesToProcess) {
       if (file.size > MAX_IMAGE_SIZE) {
-        toast.error(t('chat.composer.fileTooLarge', [file.name || 'image', formatFileSize(MAX_IMAGE_SIZE)]));
+        toast.error(t('chat.composer.fileTooLarge', [file.name || 'image', formatBytes(MAX_IMAGE_SIZE)]));
         continue;
       }
       const reader = new FileReader();
@@ -965,7 +965,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                       key={i}
                       variant="outline"
                       className="shrink-0 text-[0.65rem] font-mono gap-1 h-5 rounded pl-1 pr-0.5 text-amber-400 border-amber-400/20 bg-amber-400/5 hover:bg-amber-400/10"
-                      title={`${t('chat.attachments.recordingDownload')}\n${t('chat.attachments.recordingHover', [String(att.eventCount), formatCharCount(att.json.length)])}`}
+                      title={`${t('chat.attachments.recordingDownload')}\n${t('chat.attachments.recordingHover', [String(att.eventCount), formatCompactCount(att.json.length)])}`}
                     >
                       <button
                         className="flex items-center gap-1 cursor-pointer"

@@ -10,12 +10,7 @@ import { FolderOpen, Loader2 } from 'lucide-react';
 import { t } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { vfs } from '@/lib/persistence/vfs';
-
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
+import { formatBytes } from '@/lib/utils';
 
 function openFileBrowser(): void {
   const url = browser.runtime.getURL('/vfs.html' as never) + '#/workspaces';

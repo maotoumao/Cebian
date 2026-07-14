@@ -21,16 +21,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### 新增 / Added
 
 - 新增「页面交互」（设置 → 页面交互，默认开启）：在网页上注入一个贴边的悬浮球，单击即可打开 / 关闭侧边栏，还可拖拽移动、松手后吸附到最近一侧并记住位置；选中文本时弹出一个可拖拽的划词工具条，提供「复制 / 解释 / 翻译 / 总结」，解释、翻译、总结的结果就地流式显示，可一键复制、点击外部关闭，或「在侧边栏继续」把这次问答固化成正式对话接着深聊；AI 处理时会带上页面标题与选区周边的少量上下文以提高准确度；工具条用的 AI 可单独配置（默认跟随对话模型，方便换用更小更省的模型），翻译目标语言可选（默认跟随界面语言）；悬浮球与工具条都能分别关闭，取词 / 录制进行时自动隐藏以免干扰 ([#19](https://github.com/maotoumao/Cebian/issues/19))
+- 自定义 Provider 现在可为每个模型单独设置上下文窗口与最大输出 token：上下文窗口用于更准确地触发历史压缩，最大输出可限制单次回复长度，留空则各走默认 ([#41](https://github.com/maotoumao/Cebian/issues/41))
+- 自定义 Provider 新增「高级设置 → 自定义 Headers」，可为兼容 OpenAI 的接口附加任意请求头（如 Azure 的 `api-key`、各类网关的鉴权头）；用请求头鉴权时把 API Key 留空即可，且这些请求头会随备份加密保存、不写入明文配置 ([#41](https://github.com/maotoumao/Cebian/issues/41))
 
 - Added "Page interaction" (Settings → Page interaction, on by default): injects an edge-docked floating ball on web pages that opens/closes the sidebar with a click and can be dragged around — it snaps to the nearest side and remembers where you put it; selecting text pops up a draggable mini toolbar with Copy / Explain / Translate / Summarize, where Explain, Translate and Summarize stream their result inline — you can copy it, click outside to dismiss, or "Continue in sidebar" to turn the exchange into a full conversation and keep going; a little surrounding context (page title and text around the selection) is sent along to improve accuracy; the toolbar's AI is separately configurable (defaults to the conversation model, handy for a smaller, cheaper one) and the translation target language is selectable (defaults to your interface language); the ball and toolbar can each be turned off and auto-hide while element-picking or recording is in progress ([#19](https://github.com/maotoumao/Cebian/issues/19))
+- Custom (OpenAI-compatible) providers can now set a per-model context window and max output tokens: the context window drives when history gets compacted, and max output caps a single reply's length; leave either blank to use the defaults ([#41](https://github.com/maotoumao/Cebian/issues/41))
+- Custom providers gain "Advanced → Custom headers": attach arbitrary request headers to an OpenAI-compatible endpoint (e.g. Azure's `api-key` or a gateway's auth header); to authenticate via a header just leave the API Key empty, and these headers are saved encrypted with a backup rather than written to the plaintext config ([#41](https://github.com/maotoumao/Cebian/issues/41))
 
 ### 变更 / Changed
 
 - 把「压缩模型」设置重命名为「上下文压缩模型」，并优化说明文案，让它更明确是指「对话过长时用来自动压缩历史的模型」
 - 升级核心 AI 引擎 pi-ai / pi-agent-core 至 0.80.6，跟进上游模型目录更新（新增 GPT-5.6、Claude Sonnet 5 等可选模型）与新增更高的 `max` 思考档（对支持的模型可用），并带来一批服务商健壮性修复（长请求 token 上限、推理内容重放、重试判定、更清晰的错误信息等）
+- 优化自定义 Provider 的模型列表交互：手动添加模型改为「先点按钮再输入」，输入 Model ID 后回车或点「添加」即可（此前是常驻输入框，容易输入后忘记点加号而没保存）([#41](https://github.com/maotoumao/Cebian/issues/41))
 
 - Renamed the "Compaction model" setting to "Context compaction model" and refined its description to make clear it's the model used to automatically compact overly long conversations
 - Upgraded the core AI engine (pi-ai / pi-agent-core) to 0.80.6, picking up upstream model-catalog refreshes (new selectable models such as GPT-5.6 and Claude Sonnet 5), a new higher `max` thinking level (where the model supports it), and a batch of provider robustness fixes (context-aware max-token caps, reasoning replay, retry classification, clearer error messages, etc.)
+- Refined the model-list interaction for custom providers: adding a model manually is now "click to reveal, then type" — enter a Model ID and press Enter or click "Add" (previously an always-present input that was easy to fill in and then forget to click the plus) ([#41](https://github.com/maotoumao/Cebian/issues/41))
+
+### 修复 / Fixed
+
+- 自定义 Provider 点「自动获取」刷新模型列表时，不再清空你已为各模型设置的推理 / 多模态 / 上下文窗口等配置：仍存在的模型保留原设置，新模型补入，已消失的移除 ([#41](https://github.com/maotoumao/Cebian/issues/41))
+- 编辑已存在的 MCP Server 时，清空全部自定义请求头现在能正确保存为「无」（此前因浅合并会保留旧请求头）
+
+- Fixed refreshing a custom provider's model list via "Auto-fetch" wiping the per-model settings you had configured (reasoning / multimodal / context window, etc.): models still present keep their settings, new ones are added, and removed ones drop off ([#41](https://github.com/maotoumao/Cebian/issues/41))
+- Fixed clearing all custom request headers while editing an existing MCP server not taking effect — it now correctly saves as "no headers" (a shallow merge previously kept the old headers)
 
 ## 1.4.0 - 2026-06-30
 

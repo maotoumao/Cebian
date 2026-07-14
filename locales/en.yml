@@ -30,6 +30,11 @@ common:
   rename: "Rename"
   edit: "Edit"
   add: "Add"
+  headers:
+    keyPlaceholder: "Header name"
+    valuePlaceholder: "Header value"
+    add: "Add header"
+    remove: "Remove header"
   code: "Code"
   copy: "Copy"
   copied: "Copied"
@@ -281,10 +286,6 @@ settings:
       bearerToken: "Token"
       bearerTokenPlaceholder: "Paste bearer token"
       headers: "Custom headers"
-      headerKeyPlaceholder: "Header name (e.g. X-MCP-Toolsets)"
-      headerValuePlaceholder: "Header value"
-      addHeader: "Add header"
-      removeHeader: "Remove header"
   backup:
     title: "Backup & Restore"
     local:
@@ -626,7 +627,20 @@ provider:
     autoFetch: "Auto-fetch"
     reasoning: "Reasoning"
     image: "Multimodal"
+    # $1 = model id
+    modelSettingsFor: "Model settings for $1"
+    # $1 = model id
+    removeModel: "Remove $1"
+    contextWindow: "Context window"
+    contextWindowPlaceholder: "128000 (default)"
+    maxTokens: "Max output"
+    maxTokensPlaceholder: "0 (unlimited)"
+    tokensHint: "Blank uses defaults · context window sets when history is compacted, not a hard limit"
     manualModelPlaceholder: "Manual Model ID"
+    addManual: "Add model manually"
+    advanced: "Advanced"
+    headers: "Custom headers"
+    authOverrideHint: "You set both an API Key and an Authorization header; the API Key wins. To authenticate via the header, clear the API Key above."
     addCustom: "Add custom provider"
     fetchFailed: "Failed to fetch models, please add manually"
 

@@ -29,6 +29,11 @@ common:
   rename: "重新命名"
   edit: "編輯"
   add: "新增"
+  headers:
+    keyPlaceholder: "Header 名稱"
+    valuePlaceholder: "Header 值"
+    add: "新增 Header"
+    remove: "移除 Header"
   code: "代碼"
   copy: "複製"
   copied: "已複製"
@@ -277,10 +282,6 @@ settings:
       bearerToken: "Token"
       bearerTokenPlaceholder: "貼上 bearer token"
       headers: "自訂 Headers"
-      headerKeyPlaceholder: "Header 名稱（如 X-MCP-Toolsets）"
-      headerValuePlaceholder: "Header 值"
-      addHeader: "新增 Header"
-      removeHeader: "移除 Header"
   backup:
     title: "備份與復原"
     local:
@@ -613,7 +614,20 @@ provider:
     autoFetch: "自動擷取"
     reasoning: "推理"
     image: "多模態"
+    # $1 = 模型 ID
+    modelSettingsFor: "$1 的模型設定"
+    # $1 = 模型 ID
+    removeModel: "移除 $1"
+    contextWindow: "上下文視窗"
+    contextWindowPlaceholder: "128000（預設）"
+    maxTokens: "最大輸出"
+    maxTokensPlaceholder: "0（不限）"
+    tokensHint: "留空即用預設 · 上下文視窗決定何時壓縮歷史，並非硬上限"
     manualModelPlaceholder: "手動輸入 Model ID"
+    addManual: "手動新增模型"
+    advanced: "進階設定"
+    headers: "自訂 Headers"
+    authOverrideHint: "同時填了 API Key 與 Authorization 標頭，會優先使用 API Key。若要用該標頭驗證，請清空上面的 API Key。"
     addCustom: "新增自訂供應商"
     fetchFailed: "無法擷取模型清單，請手動新增"
 
