@@ -151,6 +151,9 @@ export const zh: Dict = {
       hint: '打开微信「扫一扫」对准二维码即可',
       viewLarge: '查看大图',
     },
+    sponsors: {
+      heading: '赞助者',
+    },
     followHeading: '关注作者',
     channels: {
       blog: '博客 catcat.work',

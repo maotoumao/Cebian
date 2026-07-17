@@ -123,6 +123,7 @@ export interface Dict {
     lead: string;
     kofi: { title: string; desc: string; cta: string };
     wechat: { title: string; desc: string; hint: string; viewLarge: string };
+    sponsors: { heading: string };
     followHeading: string;
     channels: {
       blog: string;

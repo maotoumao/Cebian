@@ -152,6 +152,9 @@ export const en: Dict = {
       hint: 'Open WeChat "Scan" and point it at the QR code',
       viewLarge: 'View full size',
     },
+    sponsors: {
+      heading: 'Sponsors',
+    },
     followHeading: 'Follow the author',
     channels: {
       blog: 'Blog catcat.work',

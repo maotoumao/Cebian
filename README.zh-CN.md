@@ -129,7 +129,12 @@ pnpm run dev:firefox
 
 ### 💝 Sponsors
 
-_假装这里有赞助。_
+<!-- 赞助者手动维护：加一位就复制一个 <td>（头像放 public/sponsor/avatars/<login>.png） -->
+<table>
+  <tr>
+    <td align="center"><a href="https://github.com/nameless-name" title="名もなき何もかも"><img src="./public/sponsor/avatars/nameless-name.png" width="72" height="72" alt="" /><br /><sub><b>名もなき何もかも</b></sub></a></td>
+  </tr>
+</table>
 
 ---
 

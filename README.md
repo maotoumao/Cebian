@@ -129,7 +129,12 @@ If this project has been helpful, you're welcome to buy me a coffee~
 
 ### 💝 Sponsors
 
-_Be the first._
+<!-- Sponsors: hand-maintained. To add one, copy a <td> (put the avatar at public/sponsor/avatars/<login>.png). -->
+<table>
+  <tr>
+    <td align="center"><a href="https://github.com/nameless-name" title="名もなき何もかも"><img src="./public/sponsor/avatars/nameless-name.png" width="72" height="72" alt="" /><br /><sub><b>名もなき何もかも</b></sub></a></td>
+  </tr>
+</table>
 
 ---
 

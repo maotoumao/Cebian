@@ -22,6 +22,16 @@ const channels = [
   { label: sp.channels.x, ...SOCIAL.x },
   { label: sp.channels.wechatPublic, ...SOCIAL.wechatPublic },
 ];
+
+// 头像本地托管于 site/public/sponsor/avatars
+const sponsors = [
+  {
+    name: '名もなき何もかも',
+    handle: 'nameless-name',
+    url: 'https://github.com/nameless-name',
+    avatar: '/sponsor/avatars/nameless-name.png',
+  },
+];
 ---
 <BaseLayout lang={lang} title={`${sp.title} — ${t.site.name}`} description={sp.lead} path="/sponsor">
   <section class="wrap sp">
@@ -68,6 +78,21 @@ const channels = [
       </article>
     </div>
 
+    {sponsors.length > 0 && (
+      <section class="sp-sponsors">
+        <h2>{sp.sponsors.heading}</h2>
+        <div class="sp-sponsor-grid">
+          {sponsors.map((s) => (
+            <a class="sp-sponsor" href={s.url} target="_blank" rel="noopener">
+              <img class="sp-sponsor-av" src={s.avatar} alt="" width="64" height="64" loading="lazy" />
+              <span class="sp-sponsor-name">{s.name}</span>
+              <span class="sp-sponsor-handle">@{s.handle}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+
     <!-- 关注作者 -->
     <section class="sp-follow">
       <h2>{sp.followHeading}</h2>
@@ -111,8 +136,19 @@ const channels = [
   .sp-link:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
   .sp-link svg { width: 16px; height: 16px; }
 
+  .sp-sponsors { margin-top: 18px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); padding: 24px 28px; }
+  .sp-sponsors h2 { font-size: 18px; font-weight: 700; }
+  .sp-sponsor-grid { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 18px; }
+  .sp-sponsor { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 92px; text-align: center; color: var(--ink); transition: transform .15s var(--ease); }
+  .sp-sponsor:hover { transform: translateY(-2px); }
+  .sp-sponsor-av { width: 64px; height: 64px; border-radius: 50%; border: 1px solid var(--line-2); background: var(--bg); }
+  .sp-sponsor-name { font-size: 13px; font-weight: 600; line-height: 1.3; }
+  .sp-sponsor-handle { font-size: 12px; color: var(--ink-subtle); }
+  .sp-sponsor:hover .sp-sponsor-name { color: var(--accent); }
+
   @media (prefers-reduced-motion: reduce) {
-    .sp-link:hover { transform: none; }
+    .sp-link:hover,
+    .sp-sponsor:hover { transform: none; }
   }
   @media (max-width: 760px) {
     .sp-grid { grid-template-columns: 1fr; }
