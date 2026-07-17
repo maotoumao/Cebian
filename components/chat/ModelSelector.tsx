@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getModels } from '@earendil-works/pi-ai/compat';
-import type { KnownProvider, Api, Model } from '@earendil-works/pi-ai';
+import { getModels, type BuiltinProvider } from '@earendil-works/pi-ai/compat';
+import type { Api, Model } from '@earendil-works/pi-ai';
 import { Check, ChevronDown, Settings } from 'lucide-react';
 
 import type { ModelIdentity, ProviderCredentials, CustomProviderConfig } from '@/lib/persistence/storage';
@@ -64,7 +64,7 @@ export function ModelSelector({
 
     // Built-in provider
     try {
-      const models = getModels(activeModel.provider as KnownProvider) as Model<Api>[];
+      const models = getModels(activeModel.provider as BuiltinProvider) as Model<Api>[];
       return models.find(m => m.id === activeModel.modelId)?.name ?? activeModel.modelId;
     } catch {
       return null;

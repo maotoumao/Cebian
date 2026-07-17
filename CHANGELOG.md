@@ -18,6 +18,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 变更 / Changed
+
+- 升级核心 AI 引擎 pi-ai / pi-agent-core 至 0.80.10，跟进上游模型目录更新（新增 Kimi K3 系列可选模型、调整 xAI/Grok 目录），并带来一批服务商健壮性修复（Kimi、Cloudflare、OpenAI Codex 等）
+
+- Upgraded the core AI engine (pi-ai / pi-agent-core) to 0.80.10, picking up upstream model-catalog refreshes (new selectable Kimi K3 models and an adjusted xAI/Grok catalog) and a batch of provider robustness fixes (Kimi, Cloudflare, OpenAI Codex, etc.)
+
 ### 修复 / Fixed
 
 - 录制结束后不再把完整录制内容（含页面 URL、输入值与操作轨迹）打印到浏览器控制台，避免敏感信息进入日志

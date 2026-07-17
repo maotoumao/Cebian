@@ -1,5 +1,5 @@
-import { getModels } from '@earendil-works/pi-ai/compat';
-import type { KnownProvider, Api, Model } from '@earendil-works/pi-ai';
+import { getModels, type BuiltinProvider } from '@earendil-works/pi-ai/compat';
+import type { Api, Model } from '@earendil-works/pi-ai';
 import type { ProviderCredentials, CustomProviderConfig } from '@/lib/persistence/storage';
 import { isCustomProvider, getCustomModels, customProviderKey } from '@/lib/providers/custom-models';
 
@@ -43,7 +43,7 @@ export function listUsableModelGroups(
     if (isCustomProvider(provider)) continue;
     if (seen.has(provider)) continue;
     try {
-      const models = getModels(provider as KnownProvider) as Model<Api>[];
+      const models = getModels(provider as BuiltinProvider) as Model<Api>[];
       if (models.length > 0) {
         groups.push({ provider, label: provider, models });
       }

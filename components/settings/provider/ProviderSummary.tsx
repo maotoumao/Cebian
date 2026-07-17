@@ -1,5 +1,5 @@
-import { getModels } from '@earendil-works/pi-ai/compat';
-import type { KnownProvider, Api, Model } from '@earendil-works/pi-ai';
+import { getModels, type BuiltinProvider } from '@earendil-works/pi-ai/compat';
+import type { Api, Model } from '@earendil-works/pi-ai';
 import type { ProviderCredential, CustomProviderConfig } from '@/lib/persistence/storage';
 import { isCustomProvider, findCustomProvider, getCustomModels } from '@/lib/providers/custom-models';
 import { t } from '@/lib/i18n';
@@ -22,7 +22,7 @@ export function ProviderSummary({ provider, credential, customProviders }: Provi
     }
   } else {
     try {
-      models = getModels(provider as KnownProvider) as Model<Api>[];
+      models = getModels(provider as BuiltinProvider) as Model<Api>[];
     } catch {
       // unknown provider
     }

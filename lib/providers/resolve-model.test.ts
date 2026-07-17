@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getModels } from '@earendil-works/pi-ai/compat';
-import type { KnownProvider, Api, Model } from '@earendil-works/pi-ai';
+import { getModels, type BuiltinProvider } from '@earendil-works/pi-ai/compat';
+import type { Api, Model } from '@earendil-works/pi-ai';
 import { resolveModel } from '@/lib/providers/resolve-model';
 import { customProviderKey } from '@/lib/providers/custom-models';
 import type {
@@ -14,9 +14,9 @@ const NO_CUSTOM: CustomProviderConfig[] = [];
 
 /** 从 pi-ai 真实目录里取某 provider 的第一个 modelId；目录为空则返回 undefined，
  *  让对应用例跳过断言（避免随 pi-ai 版本演进而脆断）。 */
-function firstModelId(provider: string): string | undefined {
+function firstModelId(provider: BuiltinProvider): string | undefined {
   try {
-    const models = getModels(provider as KnownProvider) as Model<Api>[];
+    const models = getModels(provider) as Model<Api>[];
     return models[0]?.id;
   } catch {
     return undefined;

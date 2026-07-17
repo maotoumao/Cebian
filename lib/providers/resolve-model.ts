@@ -1,5 +1,5 @@
-import type { Api, KnownProvider, Model } from '@earendil-works/pi-ai';
-import { getModels } from '@earendil-works/pi-ai/compat';
+import type { Api, Model } from '@earendil-works/pi-ai';
+import { getModels, type BuiltinProvider } from '@earendil-works/pi-ai/compat';
 import type {
   ModelIdentity,
   ProviderCredentials,
@@ -30,7 +30,7 @@ export function resolveModel(
     model = findCustomModel(customProviders, identity.provider, identity.modelId) ?? undefined;
   } else {
     try {
-      const models = getModels(identity.provider as KnownProvider) as Model<Api>[];
+      const models = getModels(identity.provider as BuiltinProvider) as Model<Api>[];
       model = models.find((m) => m.id === identity.modelId);
     } catch {
       return null;
