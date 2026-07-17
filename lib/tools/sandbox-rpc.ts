@@ -13,7 +13,7 @@ import { decodeBinaryArgs, decodeBinary, encodeBinary } from '@/lib/ipc/sandbox-
 import type { MatchPattern } from './url-pattern';
 import { parseBgFetchPatterns } from './url-pattern';
 import { handleBgFetch } from './bg-fetch';
-import { parsePermission } from './permissions';
+import { parsePermission, grantsChromeNamespace, grantsPageExec } from './permissions';
 
 // ─── Pending run requests ───
 
@@ -31,6 +31,9 @@ interface PendingRun {
   /** AbortController for in-flight bgFetch calls; aborted when the run
    *  times out or otherwise tears down. */
   abortCtrl: AbortController;
+  /** 权威 tabId：run_skill 启动时后台记录。executeInPage 只用它，不信任
+   *  sandbox 消息自带的 tabId（可伪造） */
+  tabId: number | undefined;
 }
 
 const pendingRuns = new Map<string, PendingRun>();
@@ -89,6 +92,16 @@ async function handleChromeCall(msg: {
   let error: string | undefined;
 
   try {
+    // 反查权威 run —— sandbox envelope 不可信。run 结束 / 超时后 pendingRuns
+    // 已删除，缺失即视为失效或重放，直接拒
+    const pending = pendingRuns.get(msg.id);
+    if (!pending) {
+      throw new Error('chrome call has no matching pending run (timed out or replayed)');
+    }
+    // 该 run 必须显式声明了 chrome.<namespace>，不能只靠全局方法白名单
+    if (!grantsChromeNamespace(pending.permissions, msg.namespace)) {
+      throw new Error(`chrome.${msg.namespace} not allowed (skill did not declare this permission)`);
+    }
     if (!isChromeCallAllowed(msg.namespace, msg.method)) {
       throw new Error(`Chrome API call not allowed: chrome.${msg.namespace}.${msg.method}`);
     }
@@ -117,16 +130,26 @@ async function handleChromeCall(msg: {
 }
 
 async function handlePageExec(msg: {
+  // wire 仍带 tabId，但后台只信任 pending.tabId（下方反查），不读 msg.tabId
   id: string; callId: string; code: string; tabId?: number;
 }): Promise<void> {
   let resultText: string | undefined;
   let error: string | undefined;
 
   try {
-    if (msg.tabId == null) {
+    // 反查权威 run —— 缺失即失效 / 重放，直接拒
+    const pending = pendingRuns.get(msg.id);
+    if (!pending) {
+      throw new Error('page exec has no matching pending run (timed out or replayed)');
+    }
+    if (!grantsPageExec(pending.permissions)) {
+      throw new Error('executeInPage not allowed (requires page.executeJs permission)');
+    }
+    // 只用后台记录的权威 tabId；sandbox 消息自带的 msg.tabId 可伪造，忽略
+    if (pending.tabId == null) {
       throw new Error('executeInPage requires a tabId. Re-invoke run_skill with an explicit tabId parameter (read it from the [Active Tab] block in the context).');
     }
-    resultText = await executeViaDebugger(msg.tabId, msg.code);
+    resultText = await executeViaDebugger(pending.tabId, msg.code);
   } catch (err) {
     error = (err as Error).message;
   }
@@ -371,6 +394,7 @@ export async function runInSandbox(
     pendingRuns.set(id, {
       resolve, reject, timeoutId,
       vfsRoot, permissions, bgFetchPatterns, abortCtrl,
+      tabId,
     });
   });
 

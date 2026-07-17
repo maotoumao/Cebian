@@ -3,6 +3,8 @@ import {
   parsePermission,
   isPermissionAllowed,
   classifyPermission,
+  grantsChromeNamespace,
+  grantsPageExec,
   type Permission,
 } from '@/lib/tools/permissions';
 
@@ -99,5 +101,23 @@ describe('穷尽守卫 — 每个 kind 都被分类覆盖', () => {
       expect(perm?.kind).toBe(kind);
       expect(['sensitive', 'normal']).toContain(classifyPermission(raw));
     }
+  });
+});
+
+describe('grantsChromeNamespace / grantsPageExec — per-run 能力反查', () => {
+  it('grantsChromeNamespace 按 run 声明的 chrome.<ns> 判定', () => {
+    expect(grantsChromeNamespace(['chrome.tabs'], 'tabs')).toBe(true);
+    expect(grantsChromeNamespace(['chrome.cookies', 'vfs.read'], 'cookies')).toBe(true);
+    // 声明了别的 namespace 不代表授予本 namespace
+    expect(grantsChromeNamespace(['chrome.tabs'], 'cookies')).toBe(false);
+    // 完全没声明 chrome.* —— 即使 namespace 在全局白名单里也不授予
+    expect(grantsChromeNamespace(['vfs.read', 'page.executeJs'], 'tabs')).toBe(false);
+    expect(grantsChromeNamespace([], 'tabs')).toBe(false);
+  });
+
+  it('grantsPageExec 只认 page.executeJs', () => {
+    expect(grantsPageExec(['page.executeJs'])).toBe(true);
+    expect(grantsPageExec(['vfs.read', 'chrome.tabs'])).toBe(false);
+    expect(grantsPageExec([])).toBe(false);
   });
 });

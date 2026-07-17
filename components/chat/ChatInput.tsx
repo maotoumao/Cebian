@@ -344,15 +344,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   // sees the new chip before dispatching `onSend`.
   useEffect(() => {
     return recorderChannel.subscribeSession((session) => {
-      console.log('[recorder] session finalized', {
-        eventCount: session.events.length,
-        durationMs: session.durationMs,
-        truncated: session.truncated,
-        windowId: session.windowId,
-        startedAt: session.startedAt,
-        endedAt: session.endedAt,
-        session,
-      });
       const current = attachmentsRef.current;
       if (current.length >= MAX_ATTACHMENT_COUNT) {
         toast.warning(t('chat.composer.maxAttachments', [MAX_ATTACHMENT_COUNT]));

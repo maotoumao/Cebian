@@ -106,7 +106,26 @@ function classifyPermission(raw: string): 'sensitive' | 'normal' {
   }
 }
 
+// ─── Per-run 能力反查（后台 sandbox RPC handler 用） ───
+
+/**
+ * 该 run 的权限是否授予 `chrome.<namespace>`——声明 `chrome.<ns>` 即授予该
+ * namespace 下所有白名单方法（方法级白名单由 `isChromeCallAllowed` 另行把关）。
+ * handler 用它按权威 permissions 反查，不信任 sandbox 消息自称的能力
+ */
+function grantsChromeNamespace(permissions: string[], namespace: string): boolean {
+  return permissions.some((p) => {
+    const perm = parsePermission(p);
+    return perm?.kind === 'chrome' && perm.namespace === namespace;
+  });
+}
+
+/** 该 run 的权限是否授予 page.executeJs（executeInPage 能力开关） */
+function grantsPageExec(permissions: string[]): boolean {
+  return permissions.some((p) => parsePermission(p)?.kind === 'pageExecuteJs');
+}
+
 // ─── Public API ───
 
 export type { Permission };
-export { parsePermission, isPermissionAllowed, classifyPermission };
+export { parsePermission, isPermissionAllowed, classifyPermission, grantsChromeNamespace, grantsPageExec };

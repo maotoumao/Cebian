@@ -103,6 +103,9 @@ const ASK_USER_META = {
     'a free-form text field (`allow_free_text`). The result is JSON: ' +
     '`{ answers: { <id>: { selected, free_text, skipped } } }`.',
   parameters: AskUserParameters,
+  // interactive-bridge 每个工具只有一个 pending 槽位：同一轮里并发两个 ask_user
+  // 后者会取消前者。声明 sequential 让 pi-agent-core 逐个执行，避免互相顶掉
+  executionMode: 'sequential',
 } as const;
 
 // ─── Factory: creates a session-specific ask_user tool + bridge ───

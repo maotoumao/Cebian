@@ -92,9 +92,34 @@ export function EditorPanel({ filePath, rootPath, isDark, enableTemplateVars = f
     }
   }, []);
 
+  // ─── 切换文件时按值落盘上一个文件的待存内容（防抖可能还没触发） ───
+  // flush() 不能复用：它的 `path === filePathRef.current` 守卫在切换后已不成立
+  // （filePathRef 已指向新文件），会拦下对旧文件的写入。这里按快照直接写
+  const flushSnapshot = useCallback(async (path: string, content: string, saved: string): Promise<void> => {
+    if (content === saved) return;
+    // 若该路径已被改名 / 删除（filePath 变化来自重命名而非用户切走），不要用
+    // writeFile 把它重新创建出来（会凭空出一个幽灵旧文件）；此时放弃这次快照落盘
+    if (!(await vfs.exists(path))) return;
+    try {
+      await vfs.writeFile(path, content);
+      onSaveRef.current?.();
+    } catch (err) {
+      console.error('[EditorPanel] flush-on-switch failed', err);
+      toast.error(t('settings.editor.saveFailed'), {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }, []);
+
   // ─── Load file whenever filePath changes. Flush previous on switch. ───
   useEffect(() => {
-    // Flush any pending debounce for the previous file before loading the new one.
+    // 切走前先把上一个文件的待存改动落盘：防抖可能还没触发，此刻 refs 仍是上一个
+    // 文件的 path/body/saved（新文件的加载尚未更新 state）
+    const prevPath = loadedPathRef.current;
+    if (prevPath) {
+      void flushSnapshot(prevPath, bodyRef.current, savedRef.current);
+    }
+    // 取消上一个文件尚未触发的防抖（已被上面的快照落盘替代）
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
@@ -133,7 +158,7 @@ export function EditorPanel({ filePath, rootPath, isDark, enableTemplateVars = f
     })();
 
     return () => { cancelled = true; };
-  }, [filePath]);
+  }, [filePath, flushSnapshot]);
 
   // ─── Debounced auto-save on body change. ───
   useEffect(() => {
