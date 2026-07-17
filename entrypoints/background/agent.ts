@@ -1,9 +1,10 @@
 import { Agent, type AgentOptions, type AgentMessage, type AgentTool } from '@earendil-works/pi-agent-core';
 import type { Api, Model, Message } from '@earendil-works/pi-ai';
-import { providerCredentials, userInstructions as userInstructionsStorage, memorySettings, type OAuthCredential } from '@/lib/persistence/storage';
+import { providerCredentials, userInstructions as userInstructionsStorage, memorySettings, type OAuthCredential, type ThinkingLevel } from '@/lib/persistence/storage';
 import { getValidOAuthToken } from '@/lib/providers/oauth';
 import { DEFAULT_SYSTEM_PROMPT } from '@/lib/agent/system-prompt';
 import { isCompactionSummary } from '@/lib/agent/compaction';
+import { sanitizeAgentMessages } from '@/lib/agent/message-helpers';
 import { gatherPageContext } from '@/lib/agent/page-context';
 import { buildTextPrefix, type Attachment } from '@/lib/agent/attachments';
 import { scanSkillIndex, buildSkillsBlock } from '@/lib/ai-config/scanner';
@@ -171,7 +172,7 @@ export interface CreateAgentOptions {
    * 覆盖」的双读双设。
    */
   systemPrompt: string;
-  thinkingLevel: 'off' | 'minimal' | 'low' | 'medium' | 'high';
+  thinkingLevel: ThinkingLevel;
   messages?: AgentMessage[];
   /** Session-specific tools array (includes per-session ask_user). */
   tools: AgentTool<any>[];
@@ -208,7 +209,10 @@ export function createCebianAgent(options: CreateAgentOptions): Agent {
     // 类型一律过滤掉，只保留 user / assistant / toolResult。
     convertToLlm: (msgs: AgentMessage[]): Message[] => {
       const out: Message[] = [];
-      for (const m of msgs) {
+      // 送入 pi 前把消息整形回类型契约（null text/thinking/name → ''）。否则 pi 的 token
+      // 估算器（clampMaxTokensToContext）对 assistant 块无保护地取 .length，一旦历史里有
+      // 这类坏消息就会整轮抛「reading 'length'」（issue #43）
+      for (const m of sanitizeAgentMessages(msgs)) {
         if (isCompactionSummary(m)) {
           out.push({
             role: 'user',

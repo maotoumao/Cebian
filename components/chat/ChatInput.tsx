@@ -12,8 +12,8 @@ import { RecordButton } from '@/components/chat/RecordButton';
 import { MicButton } from '@/components/chat/MicButton';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { providerCredentials, customProviders as customProvidersStorage, type ThinkingLevel, type ModelIdentity } from '@/lib/persistence/storage';
-import { getModel } from '@earendil-works/pi-ai/compat';
-import { isCustomProvider, findCustomModel } from '@/lib/providers/custom-models';
+import { getSupportedThinkingLevels, clampThinkingLevel } from '@earendil-works/pi-ai';
+import { resolveModel } from '@/lib/providers/resolve-model';
 import { startElementPicker, cancelElementPicker } from '@/lib/browser/element-picker';
 import { scanPrompts, type PromptMeta } from '@/lib/ai-config/scanner';
 import { replaceTemplateVars, gatherTemplateVars } from '@/lib/ai-config/template';
@@ -95,37 +95,27 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   const [providers] = useStorageItem(providerCredentials, {});
   const [customProviderList] = useStorageItem(customProvidersStorage, []);
 
-  const isReasoningModel = useMemo(() => {
-    if (!currentModel) return false;
+  // 当前模型解析成 pi-ai Model（内置 + 自定义统一走 resolveModel）。是否支持图片 /
+  // 支持哪些思考档 等能力派生共用这一次解析，避免多份内联解析各自漂移
+  const resolvedModel = useMemo(
+    () => (currentModel ? resolveModel(currentModel, providers, customProviderList) : null),
+    [currentModel, providers, customProviderList],
+  );
 
-    if (isCustomProvider(currentModel.provider)) {
-      return findCustomModel(customProviderList, currentModel.provider, currentModel.modelId)?.reasoning ?? false;
-    }
+  // 当前模型支持的思考档：pi 按模型 thinkingLevelMap 推导（非推理模型只返回 ['off']），
+  // 多于一档可选时才显示选择器。存的档位可能超出当前模型上限（切到弱模型）→ 夹进支持集
+  // 仅供高亮显示、不改全局偏好（切回强模型仍恢复）；后台派发时对同一模型做同样的 clamp，
+  // 故显示与实际发出一致
+  const thinkingLevels = useMemo(
+    () => (resolvedModel ? getSupportedThinkingLevels(resolvedModel) : []),
+    [resolvedModel],
+  );
+  const displayThinkingLevel = resolvedModel
+    ? clampThinkingLevel(resolvedModel, currentThinkingLevel)
+    : currentThinkingLevel;
 
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- modelId is dynamic, pi-ai expects string literal
-      return (getModel as any)(currentModel.provider, currentModel.modelId)?.reasoning ?? false;
-    } catch {
-      return false;
-    }
-  }, [currentModel, customProviderList]);
-
-  // 当前模型是否支持图片（多模态/VLM）输入。统一读 pi-ai Model.input 是否包含 'image'：
-  // 自定义模型的 input 由 toModel 根据 image 字段生成，内置模型由 getModel 提供。
-  const supportsImage = useMemo(() => {
-    if (!currentModel) return false;
-
-    if (isCustomProvider(currentModel.provider)) {
-      return findCustomModel(customProviderList, currentModel.provider, currentModel.modelId)?.input?.includes('image') ?? false;
-    }
-
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- modelId is dynamic, pi-ai expects string literal
-      return (getModel as any)(currentModel.provider, currentModel.modelId)?.input?.includes('image') ?? false;
-    } catch {
-      return false;
-    }
-  }, [currentModel, customProviderList]);
+  // 当前模型是否支持图片（多模态/VLM）输入：读 pi-ai Model.input 是否含 'image'
+  const supportsImage = resolvedModel?.input?.includes('image') ?? false;
 
   // 异步图片生产者（截图 await、FileReader.onload）可能在用户切换到纯文本
   // 模型之后才回调，用 ref 同步读取最新的 supportsImage，避免迟到的图片被追加。
@@ -1032,9 +1022,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
               onSelect={handleModelSelect}
               showAddModels
             />
-            {isReasoningModel && (
+            {thinkingLevels.length > 1 && (
               <ThinkingLevelSelector
-                level={currentThinkingLevel}
+                level={displayThinkingLevel}
+                levels={thinkingLevels}
                 onSelect={handleThinkingSelect}
               />
             )}

@@ -523,6 +523,8 @@ chat:
       low: "Low"
       medium: "Medium"
       high: "High"
+      xhigh: "Extra High"
+      max: "Max"
   tool:
     args: "Arguments"
     result: "Result"

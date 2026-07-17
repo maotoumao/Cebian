@@ -7,27 +7,33 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { t } from '@/lib/i18n';
 
-// Pairs each level with a getLabel() resolver so locale changes work
-// at render time. See SectionNav for the same pattern + rationale.
-const THINKING_LEVELS = [
-  { value: 'off', getLabel: () => t('chat.thinking.levels.off') },
-  { value: 'minimal', getLabel: () => t('chat.thinking.levels.minimal') },
-  { value: 'low', getLabel: () => t('chat.thinking.levels.low') },
-  { value: 'medium', getLabel: () => t('chat.thinking.levels.medium') },
-  { value: 'high', getLabel: () => t('chat.thinking.levels.high') },
-] as const satisfies readonly { value: ThinkingLevel; getLabel: () => string }[];
+// 全 7 档的 label 解析器：用 getLabel() 而非静态串，让运行时切语言即时生效（见 SectionNav）
+// Record<ThinkingLevel> 保证穷举——pi 未来加档位这里会编译报错，提示补文案
+const LEVEL_LABELS: Record<ThinkingLevel, () => string> = {
+  off: () => t('chat.thinking.levels.off'),
+  minimal: () => t('chat.thinking.levels.minimal'),
+  low: () => t('chat.thinking.levels.low'),
+  medium: () => t('chat.thinking.levels.medium'),
+  high: () => t('chat.thinking.levels.high'),
+  xhigh: () => t('chat.thinking.levels.xhigh'),
+  max: () => t('chat.thinking.levels.max'),
+};
 
 interface ThinkingLevelSelectorProps {
+  /** 当前档位（应为 levels 之一，由父级夹好） */
   level: ThinkingLevel;
+  /** 当前模型支持的档位子集，按强度升序；只渲染这些 */
+  levels: ThinkingLevel[];
   onSelect: (level: ThinkingLevel) => void;
 }
 
 export function ThinkingLevelSelector({
   level,
+  levels,
   onSelect,
 }: ThinkingLevelSelectorProps) {
   const [open, setOpen] = useState(false);
-  const currentLabel = THINKING_LEVELS.find(l => l.value === level)?.getLabel() ?? level;
+  const currentLabel = LEVEL_LABELS[level]();
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -39,24 +45,24 @@ export function ThinkingLevelSelector({
       </PopoverTrigger>
       <PopoverContent className="w-36 p-1" align="start">
         <div className="flex flex-col gap-0.5">
-          {THINKING_LEVELS.map(item => (
+          {levels.map((value) => (
             <button
-              key={item.value}
+              key={value}
               className={cn(
                 'flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none',
                 'hover:bg-accent hover:text-accent-foreground',
-                level === item.value && 'bg-accent/50',
+                level === value && 'bg-accent/50',
               )}
               onClick={() => {
-                onSelect(item.value);
+                onSelect(value);
                 setOpen(false);
               }}
             >
-              {item.getLabel()}
+              {LEVEL_LABELS[value]()}
               <Check
                 className={cn(
                   'ml-auto size-4',
-                  level === item.value ? 'opacity-100' : 'opacity-0',
+                  level === value ? 'opacity-100' : 'opacity-0',
                 )}
               />
             </button>

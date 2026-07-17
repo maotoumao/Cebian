@@ -19,6 +19,7 @@ import {
   shouldCompact,
 } from '@earendil-works/pi-agent-core';
 import type { Api, AssistantMessage, Model } from '@earendil-works/pi-ai';
+import { clampThinkingLevel } from '@earendil-works/pi-ai';
 import { createCebianAgent, resolveProviderApiKey, composeUserMessage, composeSystemPrompt } from './agent';
 import {
   COMPACTION_SETTINGS,
@@ -50,7 +51,7 @@ import {
 } from '@/lib/agent/tool-permissions';
 import type { ServerMessage, TurnSettings } from '@/lib/ipc/protocol';
 import type { SessionRecord } from '@/lib/persistence/db';
-import { truncateForRetry } from '@/lib/agent/message-helpers';
+import { truncateForRetry, sanitizeAgentMessages } from '@/lib/agent/message-helpers';
 import {
   providerCredentials,
   customProviders as customProvidersStorage,
@@ -60,6 +61,7 @@ import {
   userInstructions as userInstructionsStorage,
   memorySettings,
   type ModelIdentity,
+  type ThinkingLevel,
 } from '@/lib/persistence/storage';
 import { getMCPManager } from '@/lib/mcp/manager';
 import { resolveModel } from '@/lib/providers/resolve-model';
@@ -398,6 +400,7 @@ class AgentManager {
   private async createAgent(sessionId: string): Promise<ManagedSession> {
     // 会话行 = 本会话模型 / 思考档的真相来源。
     const existingSession = await sessionStore.load(sessionId);
+    // sessionStore.load 已把历史整形回类型契约（issue #43），此处拿到的即干净数据
     const messages: AgentMessage[] = existingSession?.messages ?? [];
     const sessionCreated = !!existingSession;
 
@@ -431,10 +434,12 @@ class AgentManager {
     // 产出逐字节一致。
     const systemPrompt = await composeSystemPrompt(sessionId);
 
+    // 档位夹到该模型支持范围：off→强制思考模型取最低支持档、超限档取上限、未知值兜底，
+    // 保证实际发出的 effective 档与 ChatInput 的 displayThinkingLevel 一致
     const agent = createCebianAgent({
       model: resolved.model,
       systemPrompt,
-      thinkingLevel: (thinkingLvl || 'medium') as any,
+      thinkingLevel: clampThinkingLevel(resolved.model, (thinkingLvl || 'medium') as ThinkingLevel),
       messages,
       tools: sessionTools,
       beforeToolCall,
@@ -653,9 +658,6 @@ class AgentManager {
         ? `${turn.model.provider}/${turn.model.modelId}`
         : null;
       const modelChanged = turnKey != null && turnKey !== managed.modelKey;
-      const thinkingChanged =
-        turn.thinkingLevel != null &&
-        turn.thinkingLevel !== managed.agent.state.thinkingLevel;
       if (modelChanged) {
         // 就地刷新活 agent。与 retry 不同，这里没有 resume/cancel 窗口：换字段是同步
         // 赋值，下面正常派发会触发 agent_start，故不进 preparing、不挂 controller。
@@ -667,15 +669,24 @@ class AgentManager {
         managed.agent.state.model = resolved.model;
         managed.modelKey = turnKey!;
       }
+      // 思考档：把 turn 携带的原始偏好对（可能刚换的）当前模型夹成 effective 档，只有
+      // effective 变了才更新 + 落库。这样「只换模型、档位没跟着换但新模型不支持现档」也会
+      // 重夹（如切到强制思考模型，off→最低支持档）；而原始 'max' 在只到 'high' 的模型上夹成
+      // 'high' 不算变化，避免每轮空写。落库写已夹的 effective 档；原始高档偏好留在全局种子，
+      // 各读取点（createAgent / seedTurnFromSession）都会再按模型 clamp
+      const nextThinking = turn.thinkingLevel != null
+        ? clampThinkingLevel(managed.agent.state.model, turn.thinkingLevel)
+        : null;
+      const thinkingChanged = nextThinking != null && nextThinking !== managed.agent.state.thinkingLevel;
       if (thinkingChanged) {
-        managed.agent.state.thinkingLevel = turn.thinkingLevel as any;
+        managed.agent.state.thinkingLevel = nextThinking!;
       }
       // 落库到会话行——会话行是真相来源。只写变了的字段；全都没变则不调 updateSettings。
       if (managed.sessionCreated && (modelChanged || thinkingChanged)) {
         await sessionStore.updateSettings(sessionId, {
           provider: modelChanged ? turn.model!.provider : undefined,
           model: modelChanged ? turn.model!.modelId : undefined,
-          thinkingLevel: thinkingChanged ? turn.thinkingLevel : undefined,
+          thinkingLevel: thinkingChanged ? managed.agent.state.thinkingLevel : undefined,
         });
       }
     }
@@ -786,7 +797,11 @@ class AgentManager {
     if (!COMPACTION_SETTINGS.enabled) return false;
 
     const { sessionId } = managed;
-    const messages = managed.agent.state.messages;
+    // 估算 / 切点 / 摘要 / 回写都基于这份消息：先整形回类型契约（null text/thinking/name
+    // → ''），否则 estimateContextTokens / findCompactionCutPoint 对 assistant 块取 .length
+    // 会崩（issue #43）。copy-on-write：无坏数据时返回同一引用、零分配（仅一次线性扫描）；
+    // 有坏数据时顺带把治好的版本随摘要回写进 state
+    const messages = sanitizeAgentMessages(managed.agent.state.messages);
     const model = managed.agent.state.model;
 
     // token 估算：优先读最后一条 assistant 的真实 usage，尾部按 char/4 估算。
@@ -1043,9 +1058,6 @@ class AgentManager {
         ? `${turn.model.provider}/${turn.model.modelId}`
         : null;
       const modelChanged = turnKey != null && turnKey !== managed.modelKey;
-      const thinkingChanged =
-        turn?.thinkingLevel != null &&
-        turn.thinkingLevel !== managed.agent.state.thinkingLevel;
       const resolved = modelChanged ? await this.resolveSessionModel(turn!.model) : null;
       if (modelChanged && !resolved) throw new Error('No model selected or model not found');
 
@@ -1067,15 +1079,22 @@ class AgentManager {
         managed.agent.state.model = resolved.model;
         managed.modelKey = turnKey!;
       }
+      // 思考档：把 turn 携带的原始偏好对（可能刚换的）当前模型夹成 effective 档，只有
+      // effective 变了才更新 + 落库——覆盖「只换模型、现档不被新模型支持」的情形，并避免
+      // 原始档 vs 夹后档的每轮空写
+      const nextThinking = turn?.thinkingLevel != null
+        ? clampThinkingLevel(managed.agent.state.model, turn.thinkingLevel)
+        : null;
+      const thinkingChanged = nextThinking != null && nextThinking !== managed.agent.state.thinkingLevel;
       if (thinkingChanged) {
-        managed.agent.state.thinkingLevel = turn!.thinkingLevel as any;
+        managed.agent.state.thinkingLevel = nextThinking!;
       }
       // 落库到会话行——会话行是真相来源。只写变了的字段。
       if (managed.sessionCreated && (modelChanged || thinkingChanged)) {
         await sessionStore.updateSettings(sessionId, {
           provider: modelChanged ? turn!.model!.provider : undefined,
           model: modelChanged ? turn!.model!.modelId : undefined,
-          thinkingLevel: thinkingChanged ? turn!.thinkingLevel : undefined,
+          thinkingLevel: thinkingChanged ? managed.agent.state.thinkingLevel : undefined,
         });
       }
 

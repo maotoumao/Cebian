@@ -76,8 +76,11 @@ export async function refreshOAuthCredential(
 // ─── Copilot base URL（同步，供 resolve-model 注入 model.baseUrl） ───
 
 export function getCopilotBaseUrl(cred: OAuthCredential): string {
-  const domain = cred.extra?.enterpriseUrl
-    ? (normalizeDomain(cred.extra.enterpriseUrl as string) ?? undefined)
+  // extra 是 Record<string, unknown>，enterpriseUrl 只在确为字符串时才归一化——
+  // 防一条非法凭据把同步的 baseUrl 推导（继而 resolveModel / 渲染）拖崩
+  const enterpriseUrl = cred.extra?.enterpriseUrl;
+  const domain = typeof enterpriseUrl === 'string'
+    ? (normalizeDomain(enterpriseUrl) ?? undefined)
     : undefined;
   return getGitHubCopilotBaseUrl(cred.accessToken, domain);
 }

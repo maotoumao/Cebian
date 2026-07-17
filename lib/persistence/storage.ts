@@ -1,4 +1,7 @@
 import { storage } from '#imports';
+// 合法档位由 pi 定义（运行时消费方），Cebian 只持久化其中一个值 → 直接复用其类型，
+// 避免与 pi-agent-core 的定义漂移（compaction / agent state 早已用其 7 档 off~max）
+import type { ThinkingLevel } from '@earendil-works/pi-agent-core';
 
 // ─── Provider credential types ───
 
@@ -105,7 +108,7 @@ export const mcpServers = storage.defineItem<MCPServerConfig[]>(
 
 // ─── Thinking level ───
 
-export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high';
+export type { ThinkingLevel };
 
 // ─── Storage items (WXT defineItem) ───
 
