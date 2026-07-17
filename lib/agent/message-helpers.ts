@@ -141,3 +141,72 @@ export function truncateForRetry<M extends { role: string }>(messages: M[]): M[]
   }
   return null;
 }
+
+// ─── 消息形态规整（类型契约兜底）───
+
+/** 把单个内容块里为 null / undefined 的字符串字段兜成空串；块无需矫正时原样返回同一引用 */
+function sanitizeBlock(block: unknown): unknown {
+  if (!block || typeof block !== 'object') return block;
+  const b = block as Record<string, unknown>;
+  // text / thinking / name 在 pi 类型里都是 string；个别 provider 返回或旧数据可能落成
+  // null，`== null` 同时覆盖 null 与 undefined
+  if (b.type === 'text' && b.text == null) return { ...b, text: '' };
+  if (b.type === 'thinking' && b.thinking == null) return { ...b, thinking: '' };
+  if (b.type === 'toolCall' && b.name == null) return { ...b, name: '' };
+  return block;
+}
+
+/** 矫正一个内容块数组；无改动时原样返回同一引用，只复制受影响的块 */
+function sanitizeBlocks(blocks: unknown[]): unknown[] {
+  let out: unknown[] | null = null;
+  for (let i = 0; i < blocks.length; i++) {
+    const original = blocks[i];
+    const fixed = sanitizeBlock(original);
+    if (fixed !== original && out === null) out = blocks.slice(0, i);
+    if (out !== null) out.push(fixed);
+  }
+  return out ?? blocks;
+}
+
+/** 矫正一条消息；无改动时原样返回同一引用 */
+function sanitizeMessage(msg: AgentMessage): AgentMessage {
+  // 仅标准 Message 角色带 content；compactionSummary 等自定义消息无 content 字段，跳过，
+  // 避免给它们凭空塞一个 content
+  if (msg.role !== 'user' && msg.role !== 'assistant' && msg.role !== 'toolResult') {
+    return msg;
+  }
+  const content: unknown = (msg as Message).content;
+  // 顶层 content 缺失 → 空数组（对齐 pi transformMessages 的规整）
+  if (content == null) {
+    return { ...msg, content: [] } as AgentMessage;
+  }
+  // 字符串 content（常见于 user 消息）无嵌套块，原样返回
+  if (!Array.isArray(content)) {
+    return msg;
+  }
+  const fixed = sanitizeBlocks(content);
+  return fixed === content ? msg : ({ ...msg, content: fixed } as AgentMessage);
+}
+
+/**
+ * 把消息整形回 pi 的类型契约后再送入 pi。个别 provider 返回 / 旧会话数据可能让
+ * assistant 内容块的 `text` / `thinking` / `name` 落成 `null`，而 pi 的 token 估算器
+ * （`clampMaxTokensToContext` → `estimateMessageTokens`）对这些字段无保护地取 `.length`，
+ * 一旦命中就整轮抛「Cannot read properties of null (reading 'length')」，把对话卡死
+ * （issue #43）。上游把这类归为「调用方违反类型契约」不予修复（earendil-works/pi
+ * #6568 等），故在此把 null / undefined 兜成空串，顶层缺失的 content 兜成空数组。
+ *
+ * copy-on-write：整条数组 / 消息 / 块在无需矫正时一律返回同一引用，仅在实际需要矫正时
+ * 才复制受影响的那一层，因此热路径（每轮 convertToLlm）在常态下零分配、只做一次扫描。
+ * 纯函数、不改动入参
+ */
+export function sanitizeAgentMessages(messages: AgentMessage[]): AgentMessage[] {
+  let out: AgentMessage[] | null = null;
+  for (let i = 0; i < messages.length; i++) {
+    const original = messages[i];
+    const fixed = sanitizeMessage(original);
+    if (fixed !== original && out === null) out = messages.slice(0, i);
+    if (out !== null) out.push(fixed);
+  }
+  return out ?? messages;
+}

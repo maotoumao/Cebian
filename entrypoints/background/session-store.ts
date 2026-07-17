@@ -15,6 +15,7 @@ import { planSessionWrites } from '@/lib/backup/sources/sessions';
 import type { RestoreStrategy } from '@/lib/backup/types';
 import type { ApplySessionsResult } from '@/lib/backup/sources/sessions';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
+import { sanitizeAgentMessages } from '@/lib/agent/message-helpers';
 
 class SessionStore {
   private writers = new Map<string, ThrottledSessionWriter>();
@@ -24,7 +25,19 @@ class SessionStore {
   }
 
   async load(id: string): Promise<SessionRecord | undefined> {
-    return getSession(id);
+    const record = await getSession(id);
+    if (!record) return record;
+    // 唯一的加载边界：把历史整形回类型契约（null text/thinking/name → ''），一处同时
+    // 覆盖 agent 水合、UI 冷加载广播与其它 load 消费者，避免 pi 的 token 估算器取 .length
+    // 整轮崩（issue #43），并让渲染层拿到干净数据。copy-on-write：干净时零分配
+    const messages = sanitizeAgentMessages(record.messages);
+    if (messages === record.messages) return record;
+    // 坏消息的产生源尚未定位（issue #43）：命中即打一条带 id + 条数的日志，便于回查现物
+    const healed = messages.reduce((n, m, i) => n + (m !== record.messages[i] ? 1 : 0), 0);
+    console.warn(
+      `[session-store] session ${id}: healed ${healed} malformed message(s) on load — invalid null/undefined field(s) in history (issue #43)`,
+    );
+    return { ...record, messages };
   }
 
   async list(): Promise<Omit<SessionRecord, 'messages'>[]> {
