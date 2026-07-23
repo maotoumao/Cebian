@@ -156,6 +156,9 @@ settings:
       label: "翻譯目標語言"
       hint: "工具列翻譯成的目標語言。"
       auto: "跟隨介面語言"
+    pronunciation:
+      label: "顯示讀音"
+      hint: "翻譯結果中顯示原文和譯文的讀音（中文顯示拼音，英文顯示音標等）。"
   instructions:
     title: "指引"
     label: "自訂指引"

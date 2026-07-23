@@ -171,6 +171,23 @@ export function PageInteractionSection() {
           />
         </div>
       </div>
+
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0 space-y-1">
+          <Label htmlFor="page-show-pronunciation" className="text-sm">
+            {t('settings.pageInteraction.pronunciation.label')}
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            {t('settings.pageInteraction.pronunciation.hint')}
+          </p>
+        </div>
+        <Switch
+          id="page-show-pronunciation"
+          checked={settings.showPronunciation}
+          onCheckedChange={(v) => patch({ showPronunciation: v })}
+          className="shrink-0"
+        />
+      </div>
     </div>
   );
 }

@@ -39,7 +39,10 @@ function languageName(code: string): string {
 function resolveParams(actionId: PageActionId, settings: PageInteractionSettings): PageActionParams {
   const uiLang = chrome.i18n.getUILanguage();
   if (actionId === 'translate') {
-    return { target: languageName(settings.translateTarget || uiLang) };
+    return {
+      target: languageName(settings.translateTarget || uiLang),
+      pronunciation: settings.showPronunciation,
+    };
   }
   return { lang: languageName(uiLang) };
 }

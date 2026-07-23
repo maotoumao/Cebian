@@ -23,6 +23,12 @@ function str(params: PageActionParams, key: string, fallback: string): string {
   return typeof v === 'string' && v ? v : fallback;
 }
 
+/** 从参数中取布尔值；缺省 / 类型不对时回退 fallback。 */
+function bool(params: PageActionParams, key: string, fallback: boolean): boolean {
+  const v = params[key];
+  return typeof v === 'boolean' ? v : fallback;
+}
+
 /** 若带有界上下文（页面标题 + 选区周边），拼成一段「仅供消歧的参考」附在 system 末尾。
  *  只进 system、不进 user turn，故「在侧边栏继续」固化的历史里 user 消息仍是干净意图。 */
 function contextBlock(params: PageActionParams): string {
@@ -39,10 +45,35 @@ const TRANSLATE: PageActionDef = {
   id: 'translate',
   renderSystemPrompt: (p) => {
     const target = str(p, 'target', 'English');
+    const showPronunciation = bool(p, 'pronunciation', false);
+
+    if (!showPronunciation) {
+      return (
+        `You are a professional translator. Translate the user's text into ${target}. ` +
+        'Preserve the original meaning and tone. ' +
+        'Output only the translated text as plain text — no markdown, explanations, notes, or surrounding quotes.' +
+        contextBlock(p)
+      );
+    }
+
+    // 开启读音时，要求模型按固定 4 行格式输出：原文 → 原文读音 → 译文 → 译文读音。
+    // 长文本（超过 2 句）跳过读音，只输出译文，避免大段注音无意义。
     return (
       `You are a professional translator. Translate the user's text into ${target}. ` +
-      'Preserve the original meaning and tone. ' +
-      'Output only the translated text as plain text — no markdown, explanations, notes, or surrounding quotes.' +
+      'Preserve the original meaning and tone.\n\n' +
+      'Output format — follow strictly, plain text only, no markdown, no labels, no extra content:\n' +
+      'Line 1: the original text (copy exactly)\n' +
+      'Line 2: pronunciation of the original text\n' +
+      'Line 3: the translated text\n' +
+      'Line 4: pronunciation of the translated text\n\n' +
+      'Pronunciation rules:\n' +
+      '- Chinese text → Pinyin with tone marks (e.g., nǐ hǎo)\n' +
+      '- English text → IPA phonetic notation in slashes (e.g., /həˈloʊ/)\n' +
+      '- Japanese text → Romaji (e.g., konnichiwa)\n' +
+      '- Korean text → Revised Romanization (e.g., annyeonghaseyo)\n' +
+      '- Other languages → use the most common phonetic notation for that language\n\n' +
+      'If the text is a long paragraph (more than 2 sentences), skip pronunciation entirely ' +
+      'and output only the translated text as plain prose.' +
       contextBlock(p)
     );
   },

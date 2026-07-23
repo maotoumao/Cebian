@@ -295,6 +295,8 @@ export interface PageInteractionSettings {
   toolbarModel?: ModelIdentity;
   /** 翻译目标语言 BCP-47 代码；空串 = 跟随界面语言 */
   translateTarget: string;
+  /** 翻译时是否显示原文和译文的读音（拼音/音标）。默认 true */
+  showPronunciation: boolean;
 }
 
 /** 页面交互设置默认值（新装机 fallback + 旧装机字段回填共用单一真理源）。 */
@@ -302,6 +304,7 @@ const DEFAULT_PAGE_INTERACTION: PageInteractionSettings = {
   showFloatingBall: true,
   showSelectionToolbar: true,
   translateTarget: '',
+  showPronunciation: true,
 };
 
 /** 取规范的页面交互设置：补齐旧装机 / 部分写入缺失的字段。读设置的唯一入口。 */

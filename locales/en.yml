@@ -160,6 +160,9 @@ settings:
       label: "Translation target language"
       hint: "The language the toolbar translates into."
       auto: "Follow interface language"
+    pronunciation:
+      label: "Show pronunciation"
+      hint: "Display phonetic reading (Pinyin for Chinese, IPA for English, etc.) alongside translation results."
   instructions:
     title: "Instructions"
     label: "Custom instructions"
