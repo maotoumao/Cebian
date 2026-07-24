@@ -1,5 +1,6 @@
 import { Agent, type AgentOptions, type AgentMessage, type AgentTool } from '@earendil-works/pi-agent-core';
 import type { Api, Model, Message } from '@earendil-works/pi-ai';
+import { streamSimple } from '@earendil-works/pi-ai/compat';
 import { providerCredentials, userInstructions as userInstructionsStorage, memorySettings, type OAuthCredential, type ThinkingLevel } from '@/lib/persistence/storage';
 import { getValidOAuthToken } from '@/lib/providers/oauth';
 import { DEFAULT_SYSTEM_PROMPT } from '@/lib/agent/system-prompt';
@@ -246,6 +247,11 @@ export function createCebianAgent(options: CreateAgentOptions): Agent {
       if (lastSummaryIdx < 0) return msgs;
       return msgs.slice(lastSummaryIdx);
     },
+
+    // 发送 LLM 请求的 stream 函数。pi 0.81 起 streamFn 必填（内置默认回退被移除），
+    // 复用 compat 的 streamSimple：按 model.api 解析内置 provider，行为等价旧默认，
+    // apiKey 仍由下面的 getApiKey 动态解析
+    streamFn: streamSimple,
 
     // Dynamic API key resolution (handles OAuth token refresh)
     getApiKey: (provider: string): Promise<string | undefined> =>
