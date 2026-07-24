@@ -68,7 +68,7 @@ Cebian is a Chrome extension that puts an AI assistant in the browser side panel
 
 |   Tool   | Version |
 | :------: | :-----: |
-| Node.js  |  >= 20  |
+| Node.js  |  >= 22  |
 |   pnpm   |  latest |
 
 ### Quick start

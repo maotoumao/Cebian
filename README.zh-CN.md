@@ -68,7 +68,7 @@ Cebian 是一个运行在 Chrome 侧边栏里的 AI agent。它能读取你当�
 
 |   依赖   |  版本  |
 | :------: | :----: |
-| Node.js  | >= 20  |
+| Node.js  | >= 22  |
 |   pnpm   | latest |
 
 ### 快速开始
