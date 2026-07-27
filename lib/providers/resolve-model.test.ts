@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getModels, type BuiltinProvider } from '@earendil-works/pi-ai/compat';
+import { getBuiltinModels, type BuiltinProvider } from '@earendil-works/pi-ai/providers/all';
 import type { Api, Model } from '@earendil-works/pi-ai';
 import { resolveModel } from '@/lib/providers/resolve-model';
 import { customProviderKey } from '@/lib/providers/custom-models';
@@ -16,7 +16,7 @@ const NO_CUSTOM: CustomProviderConfig[] = [];
  *  让对应用例跳过断言（避免随 pi-ai 版本演进而脆断）。 */
 function firstModelId(provider: BuiltinProvider): string | undefined {
   try {
-    const models = getModels(provider) as Model<Api>[];
+    const models = getBuiltinModels(provider) as Model<Api>[];
     return models[0]?.id;
   } catch {
     return undefined;

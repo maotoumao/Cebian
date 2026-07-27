@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { Eye, EyeOff, Unplug, Save } from "lucide-react";
-import { getModels, complete, type BuiltinProvider } from "@earendil-works/pi-ai/compat";
+import { complete } from "@earendil-works/pi-ai/compat";
+import { getBuiltinModels, type BuiltinProvider } from "@earendil-works/pi-ai/providers/all";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -42,7 +43,7 @@ export function ProviderApiKeyItem({
 
   const cheapestModel = useMemo(() => {
     try {
-      const models = modelsProp ?? (isCustomProvider(provider) ? [] : (getModels(provider as BuiltinProvider) as Model<Api>[]));
+      const models = modelsProp ?? (isCustomProvider(provider) ? [] : (getBuiltinModels(provider as BuiltinProvider) as Model<Api>[]));
       if (models.length === 0) return undefined;
 
       return models.reduce((min, m) =>

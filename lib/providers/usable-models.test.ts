@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getModels, type BuiltinProvider } from '@earendil-works/pi-ai/compat';
+import { getBuiltinModels, type BuiltinProvider } from '@earendil-works/pi-ai/providers/all';
 import type { Api, Model } from '@earendil-works/pi-ai';
 import { listUsableModelGroups, hasUsableModel } from '@/lib/providers/usable-models';
 import { customProviderKey } from '@/lib/providers/custom-models';
@@ -14,7 +14,7 @@ const NO_CUSTOM: CustomProviderConfig[] = [];
 /** pi-ai 目录里有模型的内置 provider；目录为空则返回 undefined，让相关用例跳过断言。 */
 function builtinWithModels(provider: BuiltinProvider): boolean {
   try {
-    return (getModels(provider) as Model<Api>[]).length > 0;
+    return (getBuiltinModels(provider) as Model<Api>[]).length > 0;
   } catch {
     return false;
   }
