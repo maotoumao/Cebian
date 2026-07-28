@@ -4,7 +4,7 @@
 //   1. Content script ↔ background: chrome.runtime.sendMessage with the
 //      `RecorderRuntimeMessage` shapes below. The background filters by
 //      `kind === 'cebian_recorder'` to ignore unrelated runtime messages.
-//   2. Sidepanel ↔ background: piggybacks on the existing AGENT_PORT_NAME
+//   2. Sidepanel ↔ background: piggybacks on the existing CLIENT_PORT
 //      via the new variants added to `lib/ipc/protocol.ts`.
 
 import type { RecordedEventWithoutBase } from './types';

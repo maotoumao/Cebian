@@ -3,7 +3,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
-import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage, type SessionMeta, type TurnSettings } from '@/lib/ipc/protocol';
+import { CLIENT_PORT, type ClientMessage, type ServerMessage, type SessionMeta, type TurnSettings } from '@/lib/ipc/protocol';
 import type { SessionRecord } from '@/lib/persistence/db';
 import type { Attachment } from '@/lib/agent/attachments';
 import type { PermissionRequest } from '@/lib/agent/tool-permissions';
@@ -290,7 +290,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
 
       let port: chrome.runtime.Port;
       try {
-        port = chrome.runtime.connect({ name: AGENT_PORT_NAME });
+        port = chrome.runtime.connect({ name: CLIENT_PORT });
       } catch {
         scheduleRetry();
         return;

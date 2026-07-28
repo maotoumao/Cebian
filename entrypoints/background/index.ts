@@ -9,7 +9,7 @@ import { getMCPManager } from '@/lib/mcp/manager';
 import { setupPageActions } from '@/lib/page-actions/manager';
 import { runPageActionStream, materializeHandoff } from './page-actions/runner';
 import { SUPPRESS_KIND } from '@/lib/page-actions/types';
-import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage } from '@/lib/ipc/protocol';
+import { CLIENT_PORT, type ClientMessage, type ServerMessage } from '@/lib/ipc/protocol';
 import { isRecorderRuntimeMessage, RECORDER_MSG_KIND, type RecorderControlMessage } from '@/lib/recorder/protocol';
 import { isInjectablePage } from '@/lib/browser/tab-actions';
 import { vfs } from '@/lib/persistence/vfs';
@@ -309,7 +309,7 @@ export default defineBackground(() => {
   });
 
   chrome.runtime.onConnect.addListener((port) => {
-    if (port.name !== AGENT_PORT_NAME) return;
+    if (port.name !== CLIENT_PORT) return;
 
     ports.set(port, { subscribedSession: null, instanceId: null });
     safePost(port, { type: 'connected' });

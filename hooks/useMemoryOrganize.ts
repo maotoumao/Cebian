@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { toast } from 'sonner';
-import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage } from '@/lib/ipc/protocol';
+import { CLIENT_PORT, type ClientMessage, type ServerMessage } from '@/lib/ipc/protocol';
 import { t } from '@/lib/i18n';
 
 /** 按整理结果弹 toast——空转 / 冲突 / 失败都给明确反馈，避免「点一下闪一下」没动静。
@@ -49,7 +49,7 @@ export function useMemoryOrganize(onOrganized?: () => void): {
   onOrganizedRef.current = onOrganized;
 
   useEffect(() => {
-    const port = chrome.runtime.connect({ name: AGENT_PORT_NAME });
+    const port = chrome.runtime.connect({ name: CLIENT_PORT });
     portRef.current = port;
     const onMessage = (msg: ServerMessage) => {
       if (msg.type !== 'memory_organize_state') return;

@@ -1,4 +1,21 @@
-// Port communication protocol: Client (sidepanel) ↔ Server (background)
+// Client ↔ background 的端口通信协议。
+// Client = 一个 UI 实例（侧边栏，或独立标签页里打开的同一套界面）。
+//
+// ─── 什么走端口、什么走 sendMessage ───
+//
+// 端口（Port）≈ WebSocket：需要 background 主动推送 / 实时同步时用。
+// sendMessage ≈ HTTP：一次性问答用。
+//
+// 约定：一个 UI 实例只开一条端口，同一上下文里的其它域走 channel shim 复用它
+// （见 lib/mcp/sidepanel-channel.ts、lib/recorder/sidepanel-channel.ts）。
+// 现状有例外：HistoryPanel 为 session_list / session_delete 各开一条一次性端口，待收口。
+//
+// 注意 `chrome.runtime.sendMessage` 不是寻址投递：它送达发送方之外的所有扩展上下文
+// （background 与已打开的扩展页面；要定向到内容脚本得用 chrome.tabs.sendMessage）。
+// 所有监听器都会被调用，只有第一个应答的算数——所以每个 handler 必须先判别消息是不是
+// 自己的，不是就既不应答也不返回 promise，把机会让给别人。单条消息另有 ~64MiB 上限：
+// 备份的恢复因此改成分块传输，采集则改为页面侧直读 Dexie、消息只发一个无 payload 的
+// flush 信号（issue #14）。
 
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { SessionRecord } from '@/lib/persistence/db';
@@ -10,7 +27,17 @@ import type { PermissionRequest } from '@/lib/agent/tool-permissions';
 
 // ─── Port name ───
 
-export const AGENT_PORT_NAME = 'cebian-agent';
+/**
+ * UI 实例 ↔ background 的长连接端口名。
+ *
+ * 按**端点**命名而非按载荷命名：这条连接同时承载会话、录制、记忆整理、MCP
+ * 资源四个域，叫 "agent" 只说中其中一个。与同文件的 ClientMessage / ServerMessage
+ * 共用一套词汇。
+ *
+ * 同名不等于同一条：`chrome.runtime.connect` 每次调用都新建一个 Port，name 仅供
+ * 接收端辨认。复用靠调用方自己共享同一个 Port 对象。
+ */
+export const CLIENT_PORT = 'cebian-client';
 
 /**
  * 一次发送 / 重试所携带的「本轮要用的模型 + 思考档」。属于该会话的选择，由发起的

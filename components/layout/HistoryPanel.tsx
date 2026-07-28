@@ -8,7 +8,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage, type SessionMeta } from '@/lib/ipc/protocol';
+import { CLIENT_PORT, type ClientMessage, type ServerMessage, type SessionMeta } from '@/lib/ipc/protocol';
 import { showConfirm } from '@/lib/ui/dialog';
 import { t } from '@/lib/i18n';
 
@@ -87,7 +87,7 @@ export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }
   useEffect(() => {
     if (!open) return;
     setLoading(true);
-    const port = chrome.runtime.connect({ name: AGENT_PORT_NAME });
+    const port = chrome.runtime.connect({ name: CLIENT_PORT });
     let settled = false;
     const finish = () => {
       if (settled) return;
@@ -135,7 +135,7 @@ export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }
       setSessions(prev => prev.filter(s => s.id !== id));
       onDeleteSession?.(id);
       // Send delete to background (handles DB + agent cleanup)
-      const port = chrome.runtime.connect({ name: AGENT_PORT_NAME });
+      const port = chrome.runtime.connect({ name: CLIENT_PORT });
       const onMessage = (msg: ServerMessage) => {
         if (msg.type === 'session_deleted' && msg.sessionId === id) {
           port.onMessage.removeListener(onMessage);
