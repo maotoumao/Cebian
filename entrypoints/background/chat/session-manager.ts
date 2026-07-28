@@ -1,5 +1,5 @@
 // 会话管理器（background 单例）——把 agent 绑到一个持久化的对话会话上。
-// 持有 `Map<sessionId, ManagedSession>`，每个会话有自己的 Agent + SessionToolContext（每会话隔离）。
+// 持有 `Map<sessionId, AgentSession>`，每个会话有自己的 Agent + SessionToolContext（每会话隔离）。
 //
 // TODO(架构重构): 当前这个类同时承担了「会话编排 + 消息同步/落库 + 广播 + 单个
 // agent 生命周期」四种职责，已接近上帝类（prompt/retry/cancel/maybeCompact 都几百行）。
@@ -72,13 +72,13 @@ import { acquireKeepAlive, releaseKeepAlive } from '../lifecycle/keepalive';
 // ─── Types ───
 
 /**
- * Lifecycle phase of a managed session.
+ * Lifecycle phase of an `AgentSession`.
  *
  * - `idle`: agent exists but is not running — waiting for next prompt/retry.
  *   This is the initial state and the resting state after `agent_end`.
  * - `preparing`: a `retry()` has been accepted and the session is doing async
  *   preparation before the agent resumes streaming — refreshing
- *   model / instructions / messages off storage. The `ManagedSession`
+ *   model / instructions / messages off storage. The `AgentSession`
  *   entry stays in `sessions` throughout this phase so external operations
  *   (notably `cancel`) can still reach it. This phase only ever moves forward
  *   to `running` (via the `agent_start` event) or back to `idle` (on
@@ -100,7 +100,7 @@ import { acquireKeepAlive, releaseKeepAlive } from '../lifecycle/keepalive';
  *  made `cancel()` silently no-op when it raced the preparation window — that
  * is exactly the bug this phase machine fixes.
  */
-type ManagedPhase = 'idle' | 'preparing' | 'running' | 'compacting';
+type AgentPhase = 'idle' | 'preparing' | 'running' | 'compacting';
 
 /**
  * 注册了执行前授权门禁的工具策略（ToolGate）集合。policy 对象本身是
@@ -112,11 +112,11 @@ type ManagedPhase = 'idle' | 'preparing' | 'running' | 'compacting';
  */
 const PERMISSION_GATES: ToolGate[] = [runSkillGate];
 
-interface ManagedSession {
+interface AgentSession {
   agent: Agent;
   sessionId: string;
   sessionCreated: boolean;
-  phase: ManagedPhase;
+  phase: AgentPhase;
   /**
    * Set while `phase === 'preparing'`. `cancel()` aborts this signal to
    * interrupt a retry's async preparation; the retry path checks `signal.aborted`
@@ -150,9 +150,9 @@ type BroadcastFn = (sessionId: string, msg: ServerMessage) => void;
 // ─── Session Manager ───
 
 class SessionManager {
-  private sessions = new Map<string, ManagedSession>();
+  private sessions = new Map<string, AgentSession>();
   /** Guards against concurrent getOrCreateAgent calls for the same session. */
-  private creating = new Map<string, Promise<ManagedSession>>();
+  private creating = new Map<string, Promise<AgentSession>>();
   private broadcast: BroadcastFn = () => {};
   /** True iff we're currently holding a SW keep-alive token. Tracked so
    *  acquire/release stay balanced even across error paths. */
@@ -171,8 +171,8 @@ class SessionManager {
     }
   }
 
-  private getPendingToolSnapshot(managed: ManagedSession): { toolName: string; toolCallId: string; args: any }[] {
-    return managed.toolCtx.getPendingRequests().map(({ toolName, pending }) => ({
+  private getPendingToolSnapshot(agentSession: AgentSession): { toolName: string; toolCallId: string; args: any }[] {
+    return agentSession.toolCtx.getPendingRequests().map(({ toolName, pending }) => ({
       toolName,
       toolCallId: pending.toolCallId,
       args: pending.request,
@@ -180,8 +180,8 @@ class SessionManager {
   }
 
   /** Snapshot of the session's in-flight permission prompt (0 or 1). */
-  private getPendingPermissions(managed: ManagedSession): PermissionRequest[] {
-    const pending = managed.permissionBridge.getPending();
+  private getPendingPermissions(agentSession: AgentSession): PermissionRequest[] {
+    const pending = agentSession.permissionBridge.getPending();
     return pending ? [pending.request] : [];
   }
 
@@ -191,16 +191,37 @@ class SessionManager {
    * plus the live `pendingPermissions` set in one shot — mirroring how
    * `maybeCompact` delivers an inserted `compactionSummary`.
    */
-  private broadcastSessionSnapshot(managed: ManagedSession): void {
-    this.broadcast(managed.sessionId, {
+  private broadcastSessionSnapshot(agentSession: AgentSession): void {
+    this.broadcast(agentSession.sessionId, {
       type: 'session_state',
-      sessionId: managed.sessionId,
-      messages: [...managed.agent.state.messages],
-      isRunning: managed.phase !== 'idle',
-      isCompacting: managed.phase === 'compacting',
-      pendingTools: this.getPendingToolSnapshot(managed),
-      pendingPermissions: this.getPendingPermissions(managed),
+      sessionId: agentSession.sessionId,
+      messages: [...agentSession.agent.state.messages],
+      isRunning: agentSession.phase !== 'idle',
+      isCompacting: agentSession.phase === 'compacting',
+      pendingTools: this.getPendingToolSnapshot(agentSession),
+      pendingPermissions: this.getPendingPermissions(agentSession),
     });
+  }
+
+  /**
+   * 落库本会话的消息——**写会话 transcript 的唯一入口**。全类每一处 transcript
+   * 变更都经此，使将来把存储换成会话树（entry 追加）时只需改这一处。
+   *
+   * 只在构造本会话时确实读到了会话行（`sessionCreated`）才写。底层走
+   * `db.sessions.update()`，行不存在时它是静默 no-op，故这个守卫不是为了防凭空
+   * 造行，而是为了不对「已知没有行」的会话发起无用的节流写（它会建一个永远写不
+   * 进去的 writer）。
+   *
+   * 只管「排写」：刷盘（`flush`）与广播留在各调用点——它们的策略确有差异
+   *（压缩成功路径 flush 失败即抛，取消路径则警告并继续），而排写这一步完全同质。
+   *
+   * @returns 是否真的排了写。调用方据此决定要不要紧跟着 flush：没排写就别 flush，
+   *          避免去刷一个不属于本次变更的遗留 writer。
+   */
+  private persist(agentSession: AgentSession, messages: AgentMessage[]): boolean {
+    if (!agentSession.sessionCreated) return false;
+    sessionStore.scheduleWrite(agentSession.sessionId, messages);
+    return true;
   }
 
   /**
@@ -224,14 +245,14 @@ class SessionManager {
     request: PermissionRequest,
     signal?: AbortSignal,
   ): Promise<PermissionDecision> {
-    const managed = this.sessions.get(sessionId);
+    const agentSession = this.sessions.get(sessionId);
     // No live session (shouldn't happen — gate fires only for a live agent),
     // fail closed as dismissed so the tool does not execute.
-    if (!managed) return 'dismissed';
+    if (!agentSession) return 'dismissed';
 
     // ① 插入 pending 卡片消息（setter 赋值，与 compaction 同款）。
-    managed.agent.state.messages = [
-      ...managed.agent.state.messages,
+    agentSession.agent.state.messages = [
+      ...agentSession.agent.state.messages,
       createPermissionRequestMessage(request),
     ];
 
@@ -239,11 +260,9 @@ class SessionManager {
     // 这样紧接着的 broadcast 才能在 pendingPermissions 里带上本次请求。若先广播
     // 再 request，那一帧 pendingPermissions 会是空的，UI 会把刚插入的卡片误判为
     // 已失效（失效判定 = toolCallId 不在活 pending 快照里）。
-    const decisionPromise = managed.permissionBridge.request(request.toolCallId, request, signal);
-    if (managed.sessionCreated) {
-      sessionStore.scheduleWrite(sessionId, [...managed.agent.state.messages]);
-    }
-    this.broadcastSessionSnapshot(managed);
+    const decisionPromise = agentSession.permissionBridge.request(request.toolCallId, request, signal);
+    this.persist(agentSession, [...agentSession.agent.state.messages]);
+    this.broadcastSessionSnapshot(agentSession);
 
     // ③ 等用户在卡片上点击（或被取消 / abort）。
     const result = await decisionPromise;
@@ -251,18 +270,16 @@ class SessionManager {
       result === INTERACTIVE_CANCELLED ? 'dismissed' : result;
 
     // 会话在等待期间被销毁 / 替换：放弃回写与广播，避免复活已删会话行。
-    if (this.sessions.get(sessionId) !== managed) return decision;
+    if (this.sessions.get(sessionId) !== agentSession) return decision;
 
     // ④ 把最终决策回写到那条 pending 卡片上（按 toolCallId 定位）。
-    managed.agent.state.messages = managed.agent.state.messages.map((m) =>
+    agentSession.agent.state.messages = agentSession.agent.state.messages.map((m) =>
       isPermissionRequest(m) && m.toolCallId === request.toolCallId
         ? { ...m, decision }
         : m,
     );
-    if (managed.sessionCreated) {
-      sessionStore.scheduleWrite(sessionId, [...managed.agent.state.messages]);
-    }
-    this.broadcastSessionSnapshot(managed);
+    this.persist(agentSession, [...agentSession.agent.state.messages]);
+    this.broadcastSessionSnapshot(agentSession);
 
     return decision;
   }
@@ -278,12 +295,12 @@ class SessionManager {
   private async refreshAllSessionTools(): Promise<void> {
     if (this.sessions.size === 0) return;
     await Promise.allSettled(
-      Array.from(this.sessions.values()).map(async (managed) => {
+      Array.from(this.sessions.values()).map(async (agentSession) => {
         try {
-          const tools = await buildSessionToolArray(managed.toolCtx);
-          managed.agent.state.tools = tools;
+          const tools = await buildSessionToolArray(agentSession.toolCtx);
+          agentSession.agent.state.tools = tools;
         } catch (err) {
-          console.warn(`[mcp] failed to refresh tools for session ${managed.sessionId}:`, err);
+          console.warn(`[mcp] failed to refresh tools for session ${agentSession.sessionId}:`, err);
         }
       }),
     );
@@ -369,8 +386,8 @@ class SessionManager {
     return { model: fallback, apiKey: await resolveProviderApiKey(fallback.provider) };
   }
 
-  /** Get or create a managed agent for a session */
-  private async getOrCreateAgent(sessionId: string): Promise<ManagedSession> {
+  /** Get or create the `AgentSession` for a session id */
+  private async getOrCreateAgent(sessionId: string): Promise<AgentSession> {
     const existing = this.sessions.get(sessionId);
     if (existing) return existing;
 
@@ -381,15 +398,15 @@ class SessionManager {
     const promise = this.createAgent(sessionId);
     this.creating.set(sessionId, promise);
     try {
-      const managed = await promise;
-      return managed;
+      const agentSession = await promise;
+      return agentSession;
     } finally {
       this.creating.delete(sessionId);
     }
   }
 
   /**
-   * 创建并安装一个 managed 会话（每会话仅一次，由 `getOrCreateAgent` 的 `creating`
+   * 创建并安装一个 `AgentSession`（每会话仅一次，由 `getOrCreateAgent` 的 `creating`
    * 去重守卫）。流程：加载会话行（本会话模型 / 思考档的真相来源）→ 解析模型 →
    * 造每会话独立工具 + 授权 bridge → 一次成形 systemPrompt → 构造 Agent → wire 订阅
    * → 入 map。
@@ -398,7 +415,7 @@ class SessionManager {
    * 携带的选择），已有会话的行带它自己存的选择。in-place 的 retry / 切模型路径复用活
    * agent，不走这里。
    */
-  private async createAgent(sessionId: string): Promise<ManagedSession> {
+  private async createAgent(sessionId: string): Promise<AgentSession> {
     // 会话行 = 本会话模型 / 思考档的真相来源。
     const existingSession = await sessionStore.load(sessionId);
     // sessionStore.load 已把历史整形回类型契约（issue #43），此处拿到的即干净数据
@@ -422,8 +439,8 @@ class SessionManager {
 
     // 工具执行前授权门禁：每会话一个独立 bridge；用它构造绑定到本会话
     // `requestPermissionDecision` 的 beforeToolCall 闭包。requestDecision 在
-    // gate 真正触发时才按 sessionId 反查 managed（那时一定已入 map），因此
-    // 这里不构成与 agent/managed 的循环依赖。
+    // gate 真正触发时才按 sessionId 反查 `AgentSession`（那时一定已入 map），因此
+    // 这里不构成与 agent / AgentSession 的循环依赖。
     const permissionBridge = createInteractiveBridge<PermissionRequest, PermissionDecision>();
     const beforeToolCall = createPermissionGate(
       PERMISSION_GATES,
@@ -446,7 +463,7 @@ class SessionManager {
       beforeToolCall,
     });
 
-    const managed: ManagedSession = {
+    const agentSession: AgentSession = {
       agent,
       sessionId,
       sessionCreated,
@@ -456,13 +473,13 @@ class SessionManager {
       permissionBridge,
       unsubscribeAgent: () => {},
     };
-    this.wireSubscriptions(managed);
-    this.sessions.set(sessionId, managed);
-    return managed;
+    this.wireSubscriptions(agentSession);
+    this.sessions.set(sessionId, agentSession);
+    return agentSession;
   }
 
   /**
-   * Wire agent + toolCtx event subscriptions into a managed session.
+   * Wire agent + toolCtx event subscriptions into an `AgentSession`.
    *
    * Only ever called once per entry, from `createAgent` — the in-place
    * retry / model-switch paths reuse the live agent and toolCtx, so there is
@@ -472,35 +489,35 @@ class SessionManager {
    * for it. The agent listener does keep `unsubscribeAgent` because teardown
    * detaches it explicitly before disposing.
    *
-   * The subscription callbacks close over `managed`, so the agent / toolCtx
+   * The subscription callbacks close over `agentSession`, so the agent / toolCtx
    * fields stay reachable as the object's own properties — there is no stale
    * closure problem.
    */
-  private wireSubscriptions(managed: ManagedSession): void {
-    managed.unsubscribeAgent = managed.agent.subscribe(async (event: AgentEvent) => {
-      await this.handleAgentEvent(managed, event);
+  private wireSubscriptions(agentSession: AgentSession): void {
+    agentSession.unsubscribeAgent = agentSession.agent.subscribe(async (event: AgentEvent) => {
+      await this.handleAgentEvent(agentSession, event);
     });
-    managed.toolCtx.subscribe((toolName, pending) => {
+    agentSession.toolCtx.subscribe((toolName, pending) => {
       if (pending) {
-        this.broadcast(managed.sessionId, {
+        this.broadcast(agentSession.sessionId, {
           type: 'tool_pending',
-          sessionId: managed.sessionId,
+          sessionId: agentSession.sessionId,
           toolName,
           toolCallId: pending.toolCallId,
           args: pending.request,
         });
       } else {
-        this.broadcast(managed.sessionId, {
+        this.broadcast(agentSession.sessionId, {
           type: 'tool_resolved',
-          sessionId: managed.sessionId,
+          sessionId: agentSession.sessionId,
           toolName,
         });
       }
     });
   }
 
-  private async handleAgentEvent(managed: ManagedSession, event: AgentEvent): Promise<void> {
-    const { sessionId, agent } = managed;
+  private async handleAgentEvent(agentSession: AgentSession, event: AgentEvent): Promise<void> {
+    const { sessionId, agent } = agentSession;
 
     switch (event.type) {
       case 'agent_start':
@@ -513,12 +530,12 @@ class SessionManager {
         // 状态机硬约束：进入 running 的唯一入口就是本事件，且只能从
         // preparing / idle 前进（preparing → running 单向不可逆）。其他
         // 任何地方不准手动置 running；这里断言锁死方向。
-        if (managed.phase !== 'preparing' && managed.phase !== 'idle') {
+        if (agentSession.phase !== 'preparing' && agentSession.phase !== 'idle') {
           console.warn(
-            `[session-manager] agent_start from unexpected phase '${managed.phase}' for ${sessionId}`,
+            `[session-manager] agent_start from unexpected phase '${agentSession.phase}' for ${sessionId}`,
           );
         }
-        managed.phase = 'running';
+        agentSession.phase = 'running';
         this.broadcast(sessionId, { type: 'agent_start', sessionId });
         this.updateKeepAlive();
         break;
@@ -536,20 +553,18 @@ class SessionManager {
       case 'message_end': {
         const messages = [...agent.state.messages];
         this.broadcast(sessionId, { type: 'message_end', sessionId, messages });
-        if (managed.sessionCreated) {
-          sessionStore.scheduleWrite(sessionId, messages);
-        }
+        this.persist(agentSession, messages);
         break;
       }
 
       case 'agent_end': {
-        managed.phase = 'idle';
+        agentSession.phase = 'idle';
         this.updateKeepAlive();
         // Cancel any pending interactive tools on this session
-        managed.toolCtx.cancelAll();
+        agentSession.toolCtx.cancelAll();
         // 同理取消在途的授权请求（→ dismissed），否则 run 结束后 gate 还在
         // await 一个永不到来的点击。
-        managed.permissionBridge.cancel();
+        agentSession.permissionBridge.cancel();
         const messages = [...agent.state.messages];
         this.broadcast(sessionId, { type: 'agent_end', sessionId, messages });
         // Persist final state before flushing. Normally the trailing
@@ -562,9 +577,7 @@ class SessionManager {
         // next cold-load. The scheduler is idempotent for unchanged
         // content so this is safe to call unconditionally on every
         // agent_end.
-        if (managed.sessionCreated) {
-          sessionStore.scheduleWrite(sessionId, messages);
-        }
+        this.persist(agentSession, messages);
         await sessionStore.flush(sessionId);
         break;
       }
@@ -589,7 +602,7 @@ class SessionManager {
     //
     // Detection: not in the live sessions map AND no DB record. The DB record
     // we write here is what getOrCreateAgent's sessionStore.load() will find,
-    // so `managed.sessionCreated` is set to true by createAgent() naturally,
+    // so `agentSession.sessionCreated` is set to true by createAgent() naturally,
     // and we don't need a second persist-and-broadcast inside this method.
     if (!this.sessions.has(sessionId)) {
       const existing = await sessionStore.load(sessionId);
@@ -636,9 +649,9 @@ class SessionManager {
       }
     }
 
-    const managed = await this.getOrCreateAgent(sessionId);
+    const agentSession = await this.getOrCreateAgent(sessionId);
 
-    if (managed.phase === 'preparing' || managed.phase === 'compacting') {
+    if (agentSession.phase === 'preparing' || agentSession.phase === 'compacting') {
       // A retry's preparation OR a compaction is already in flight for this
       // session. The UI gates the composer to prevent concurrent prompts,
       // but a stale or out-of-order IPC could still arrive — dispatching a
@@ -646,7 +659,7 @@ class SessionManager {
       // corrupt the phase machine. Silently dropping matches `retry()`'s
       // phase-guard pattern; the in-flight work's broadcasts reconcile every
       // subscribed window to the correct state.
-      console.debug('[session-manager] prompt: phase busy, ignored', sessionId, managed.phase);
+      console.debug('[session-manager] prompt: phase busy, ignored', sessionId, agentSession.phase);
       return;
     }
 
@@ -658,7 +671,7 @@ class SessionManager {
       const turnKey = turn.model
         ? `${turn.model.provider}/${turn.model.modelId}`
         : null;
-      const modelChanged = turnKey != null && turnKey !== managed.modelKey;
+      const modelChanged = turnKey != null && turnKey !== agentSession.modelKey;
       if (modelChanged) {
         // 就地刷新活 agent。与 retry 不同，这里没有 resume/cancel 窗口：换字段是同步
         // 赋值，下面正常派发会触发 agent_start，故不进 preparing、不挂 controller。
@@ -667,8 +680,8 @@ class SessionManager {
         // throw，与 createAgent / retry 三路一致地诚实报错。
         const resolved = await this.resolveSessionModel(turn.model);
         if (!resolved) throw new Error('No model selected or model not found');
-        managed.agent.state.model = resolved.model;
-        managed.modelKey = turnKey!;
+        agentSession.agent.state.model = resolved.model;
+        agentSession.modelKey = turnKey!;
       }
       // 思考档：把 turn 携带的原始偏好对（可能刚换的）当前模型夹成 effective 档，只有
       // effective 变了才更新 + 落库。这样「只换模型、档位没跟着换但新模型不支持现档」也会
@@ -676,18 +689,18 @@ class SessionManager {
       // 'high' 不算变化，避免每轮空写。落库写已夹的 effective 档；原始高档偏好留在全局种子，
       // 各读取点（createAgent / seedTurnFromSession）都会再按模型 clamp
       const nextThinking = turn.thinkingLevel != null
-        ? clampThinkingLevel(managed.agent.state.model, turn.thinkingLevel)
+        ? clampThinkingLevel(agentSession.agent.state.model, turn.thinkingLevel)
         : null;
-      const thinkingChanged = nextThinking != null && nextThinking !== managed.agent.state.thinkingLevel;
+      const thinkingChanged = nextThinking != null && nextThinking !== agentSession.agent.state.thinkingLevel;
       if (thinkingChanged) {
-        managed.agent.state.thinkingLevel = nextThinking!;
+        agentSession.agent.state.thinkingLevel = nextThinking!;
       }
       // 落库到会话行——会话行是真相来源。只写变了的字段；全都没变则不调 updateSettings。
-      if (managed.sessionCreated && (modelChanged || thinkingChanged)) {
+      if (agentSession.sessionCreated && (modelChanged || thinkingChanged)) {
         await sessionStore.updateSettings(sessionId, {
           provider: modelChanged ? turn.model!.provider : undefined,
           model: modelChanged ? turn.model!.modelId : undefined,
-          thinkingLevel: thinkingChanged ? managed.agent.state.thinkingLevel : undefined,
+          thinkingLevel: thinkingChanged ? agentSession.agent.state.thinkingLevel : undefined,
         });
       }
     }
@@ -703,23 +716,23 @@ class SessionManager {
     // below runs while `phase === 'idle'` (model resolve, settings reads,
     // `composeUserMessage` — the latter can be slow for image
     // attachments). A `cancel()` landing in that window takes its idle
-    // teardown branch (abort + dispose + `sessions.delete`), leaving `managed`
+    // teardown branch (abort + dispose + `sessions.delete`), leaving `agentSession`
     // detached. Dispatching now would steer/prompt a disposed agent, waste an
     // API call, and let `maybeCompact`'s persist resurrect the deleted row.
     // If the entry is gone (or was replaced), the user already stopped this
     // turn — bail; `cancel()` already broadcast the authoritative end state.
-    if (this.sessions.get(sessionId) !== managed) return;
+    if (this.sessions.get(sessionId) !== agentSession) return;
 
     const refreshedSystemPrompt = await composeSystemPrompt(sessionId, memoryEnabled);
-    if (this.sessions.get(sessionId) !== managed) return;
-    managed.agent.state.systemPrompt = refreshedSystemPrompt;
+    if (this.sessions.get(sessionId) !== agentSession) return;
+    agentSession.agent.state.systemPrompt = refreshedSystemPrompt;
 
     // If any interactive tool OR a permission prompt is pending, the agent is
     // paused waiting for the user — steer the new message into the loop and
     // cancel the pending prompt instead of starting a fresh turn. A cancelled
     // permission prompt surfaces as `dismissed` (implicit non-grant), which
     // blocks the gated tool; the steered message then drives the next turn.
-    if (managed.toolCtx.hasPending() || managed.permissionBridge.getPending()) {
+    if (agentSession.toolCtx.hasPending() || agentSession.permissionBridge.getPending()) {
       const content: any[] = [{ type: 'text', text: enriched }];
       if (images.length > 0) content.push(...images);
       const userMessage: AgentMessage = {
@@ -728,9 +741,9 @@ class SessionManager {
         timestamp: Date.now(),
       } as AgentMessage;
       // Enqueue BEFORE cancelling so getSteeringMessages() sees it when the loop drains.
-      managed.agent.steer(userMessage);
-      managed.toolCtx.cancelAll();
-      managed.permissionBridge.cancel();
+      agentSession.agent.steer(userMessage);
+      agentSession.toolCtx.cancelAll();
+      agentSession.permissionBridge.cancel();
     } else {
       // 构造本轮「待投递」的用户消息，形状对齐 steering 分支。压缩成功路径不会
       // 用它（由 agent.prompt() 自行 append 真实用户消息），它只用于压缩期间的
@@ -751,11 +764,11 @@ class SessionManager {
       // start-of-turn step. Returns true iff the compaction was cancelled
       // mid-flight, in which case the user's stop click means we abandon this
       // turn and don't dispatch to the model.
-      if (managed.phase === 'idle') {
-        const cancelled = await this.maybeCompact(managed, pendingUserMessage);
+      if (agentSession.phase === 'idle') {
+        const cancelled = await this.maybeCompact(agentSession, pendingUserMessage);
         if (cancelled) return;
       }
-      await managed.agent.prompt(enriched, images.length > 0 ? images : undefined);
+      await agentSession.agent.prompt(enriched, images.length > 0 ? images : undefined);
     }
   }
 
@@ -794,16 +807,16 @@ class SessionManager {
    * @returns `true` iff the compaction was cancelled and the caller should
    *          abandon the turn; `false` otherwise (no-op skip or success).
    */
-  private async maybeCompact(managed: ManagedSession, pendingUserMessage: AgentMessage): Promise<boolean> {
+  private async maybeCompact(agentSession: AgentSession, pendingUserMessage: AgentMessage): Promise<boolean> {
     if (!COMPACTION_SETTINGS.enabled) return false;
 
-    const { sessionId } = managed;
+    const { sessionId } = agentSession;
     // 估算 / 切点 / 摘要 / 回写都基于这份消息：先整形回类型契约（null text/thinking/name
     // → ''），否则 estimateContextTokens / findCompactionCutPoint 对 assistant 块取 .length
     // 会崩（issue #43）。copy-on-write：无坏数据时返回同一引用、零分配（仅一次线性扫描）；
     // 有坏数据时顺带把治好的版本随摘要回写进 state
-    const messages = sanitizeAgentMessages(managed.agent.state.messages);
-    const model = managed.agent.state.model;
+    const messages = sanitizeAgentMessages(agentSession.agent.state.messages);
+    const model = agentSession.agent.state.model;
 
     // token 估算：优先读最后一条 assistant 的真实 usage，尾部按 char/4 估算。
     const { tokens } = estimateContextTokens(messages);
@@ -832,9 +845,9 @@ class SessionManager {
     // 这一步在「任何 await 之前」同步完成，把可取消的忙碌态原子地占住——否则在
     // 解析 apiKey 的 await 窗口里若发生 cancel，会落进 idle 分支拆掉会话，导致
     // 本方法事后往已删除的会话写入并广播（评审指出的竞态）。
-    managed.phase = 'compacting';
-    managed.compactionController = new AbortController();
-    const signal = managed.compactionController.signal;
+    agentSession.phase = 'compacting';
+    agentSession.compactionController = new AbortController();
+    const signal = agentSession.compactionController.signal;
     this.updateKeepAlive();
     this.broadcast(sessionId, {
       type: 'session_state',
@@ -851,7 +864,7 @@ class SessionManager {
       // 解析压缩模型：配置了专用小模型且凭证可用就用它，否则回退主模型（静默）。
       const { model: compactModel, apiKey } = await this.resolveCompactionModel(model);
       // 取消优先：解析期间被 cancel，丢弃压缩并让调用方放弃本轮。
-      if (signal.aborted) return await this.commitCompactionCancel(managed, pendingUserMessage);
+      if (signal.aborted) return await this.commitCompactionCancel(agentSession, pendingUserMessage);
       // 无凭证无法发起独立的摘要请求，本轮裸发、下一轮再尝试压缩（不致 400：
       // transformContext 仍会带上已有的最后一条摘要）。
       if (!apiKey) return false;
@@ -868,11 +881,11 @@ class SessionManager {
         apiKey,
         previousSummary,
         signal,
-        thinkingLevel: managed.agent.state.thinkingLevel,
+        thinkingLevel: agentSession.agent.state.thinkingLevel,
       });
 
       // 取消：丢弃这次压缩，不插摘要，并通知调用方放弃本轮发送。
-      if (signal.aborted) return await this.commitCompactionCancel(managed, pendingUserMessage);
+      if (signal.aborted) return await this.commitCompactionCancel(agentSession, pendingUserMessage);
 
       if (summary) {
         // 在切点首条 user 之前插入摘要（不变式：摘要紧贴 user turn-start，
@@ -882,9 +895,8 @@ class SessionManager {
           createCompactionSummaryMessage(summary, tokens),
           ...messages.slice(cut),
         ];
-        managed.agent.state.messages = updated;
-        if (managed.sessionCreated) {
-          sessionStore.scheduleWrite(sessionId, updated);
+        agentSession.agent.state.messages = updated;
+        if (this.persist(agentSession, updated)) {
           await sessionStore.flush(sessionId);
         }
         this.broadcast(sessionId, {
@@ -902,10 +914,10 @@ class SessionManager {
       // 照常发送。findCompactionCutPoint 的 turn-start 对齐保证不会 400。
       return false;
     } finally {
-      managed.compactionController = undefined;
+      agentSession.compactionController = undefined;
       // 若仍停在 compacting（未被其他路径推进），复位回 idle。
-      if (managed.phase === 'compacting') {
-        managed.phase = 'idle';
+      if (agentSession.phase === 'compacting') {
+        agentSession.phase = 'idle';
         this.updateKeepAlive();
       }
     }
@@ -926,23 +938,22 @@ class SessionManager {
    * @returns 恒为 `true` —— 调用方据此放弃本轮发送。
    */
   private async commitCompactionCancel(
-    managed: ManagedSession,
+    agentSession: AgentSession,
     pendingUserMessage: AgentMessage,
   ): Promise<true> {
-    const { sessionId } = managed;
+    const { sessionId } = agentSession;
     // destroySession 先 abort 再从 map 移除；命中这里说明是销毁而非用户取消，静默退出。
     if (!this.sessions.has(sessionId)) return true;
 
     const finalMessages: AgentMessage[] = [
-      ...managed.agent.state.messages,
+      ...agentSession.agent.state.messages,
       pendingUserMessage,
-      this.buildAbortedMarker(managed),
+      this.buildAbortedMarker(agentSession),
     ];
     // 同步内存态，否则下一轮 prompt 会基于缺这两条的旧 state 续写并覆盖 DB。
-    managed.agent.state.messages = finalMessages;
+    agentSession.agent.state.messages = finalMessages;
 
-    if (managed.sessionCreated) {
-      sessionStore.scheduleWrite(sessionId, finalMessages);
+    if (this.persist(agentSession, finalMessages)) {
       try {
         await sessionStore.flush(sessionId);
       } catch (err) {
@@ -1005,28 +1016,28 @@ class SessionManager {
     // synchronous phase check below. JavaScript's microtask semantics
     // guarantee one of them flips phase to 'preparing' before any other
     // awakened microtask reads it — so we don't need a separate mutex.
-    const managed = await this.getOrCreateAgent(sessionId);
+    const agentSession = await this.getOrCreateAgent(sessionId);
 
-    if (managed.phase !== 'idle') {
+    if (agentSession.phase !== 'idle') {
       // Concurrent retry already in flight (`preparing`) or agent currently
       // streaming (`running`). Silent no-op so the duplicate window doesn't
       // see a misleading toast — the in-flight run's broadcasts reconcile
       // every subscribed window to the correct state.
-      console.debug('[session-manager] retry: phase not idle, ignored', sessionId, managed.phase);
+      console.debug('[session-manager] retry: phase not idle, ignored', sessionId, agentSession.phase);
       return;
     }
 
     // Take the preparing slot synchronously, BEFORE any further await. A
     // concurrent retry that wakes up after our await(s) below will hit the
     // phase guard above and bail.
-    managed.phase = 'preparing';
-    managed.prepareController = new AbortController();
-    const signal = managed.prepareController.signal;
+    agentSession.phase = 'preparing';
+    agentSession.prepareController = new AbortController();
+    const signal = agentSession.prepareController.signal;
     this.updateKeepAlive();
     let busySnapshot: AgentMessage[] | null = null;
 
     try {
-      const messages = [...managed.agent.state.messages];
+      const messages = [...agentSession.agent.state.messages];
       const truncated = truncateForRetry(messages);
       if (!truncated) {
         // The UI only shows retry on the latest assistant turn, which by
@@ -1040,14 +1051,13 @@ class SessionManager {
         sessionId,
         messages: truncated,
         isRunning: true,
-        pendingTools: this.getPendingToolSnapshot(managed),
+        pendingTools: this.getPendingToolSnapshot(agentSession),
       });
 
       // Persist truncation BEFORE continue. An SW restart mid-run must not
       // resurrect the failed turn from disk. `flush` collapses the
       // throttler's pending timer and writes immediately.
-      if (managed.sessionCreated) {
-        sessionStore.scheduleWrite(sessionId, truncated);
+      if (this.persist(agentSession, truncated)) {
         await sessionStore.flush(sessionId);
       }
 
@@ -1058,7 +1068,7 @@ class SessionManager {
       const turnKey = turn?.model
         ? `${turn.model.provider}/${turn.model.modelId}`
         : null;
-      const modelChanged = turnKey != null && turnKey !== managed.modelKey;
+      const modelChanged = turnKey != null && turnKey !== agentSession.modelKey;
       const resolved = modelChanged ? await this.resolveSessionModel(turn!.model) : null;
       if (modelChanged && !resolved) throw new Error('No model selected or model not found');
 
@@ -1066,36 +1076,36 @@ class SessionManager {
       // async settings load, both BEFORE we mutate the agent. Commit an
       // aborted marker and bail; the live agent is left untouched.
       if (signal.aborted) {
-        await this.commitRetryCancel(managed, truncated);
+        await this.commitRetryCancel(agentSession, truncated);
         return;
       }
 
       // Apply the refreshed state onto the live agent. `cancelAll` defensively
       // drops any stale pending interactive request (the UI hides retry while
       // a tool is pending, but a late port message could still arrive).
-      managed.toolCtx.cancelAll();
-      managed.permissionBridge.cancel();
-      managed.agent.state.messages = truncated;
+      agentSession.toolCtx.cancelAll();
+      agentSession.permissionBridge.cancel();
+      agentSession.agent.state.messages = truncated;
       if (resolved) {
-        managed.agent.state.model = resolved.model;
-        managed.modelKey = turnKey!;
+        agentSession.agent.state.model = resolved.model;
+        agentSession.modelKey = turnKey!;
       }
       // 思考档：把 turn 携带的原始偏好对（可能刚换的）当前模型夹成 effective 档，只有
       // effective 变了才更新 + 落库——覆盖「只换模型、现档不被新模型支持」的情形，并避免
       // 原始档 vs 夹后档的每轮空写
       const nextThinking = turn?.thinkingLevel != null
-        ? clampThinkingLevel(managed.agent.state.model, turn.thinkingLevel)
+        ? clampThinkingLevel(agentSession.agent.state.model, turn.thinkingLevel)
         : null;
-      const thinkingChanged = nextThinking != null && nextThinking !== managed.agent.state.thinkingLevel;
+      const thinkingChanged = nextThinking != null && nextThinking !== agentSession.agent.state.thinkingLevel;
       if (thinkingChanged) {
-        managed.agent.state.thinkingLevel = nextThinking!;
+        agentSession.agent.state.thinkingLevel = nextThinking!;
       }
       // 落库到会话行——会话行是真相来源。只写变了的字段。
-      if (managed.sessionCreated && (modelChanged || thinkingChanged)) {
+      if (agentSession.sessionCreated && (modelChanged || thinkingChanged)) {
         await sessionStore.updateSettings(sessionId, {
           provider: modelChanged ? turn!.model!.provider : undefined,
           model: modelChanged ? turn!.model!.modelId : undefined,
-          thinkingLevel: thinkingChanged ? managed.agent.state.thinkingLevel : undefined,
+          thinkingLevel: thinkingChanged ? agentSession.agent.state.thinkingLevel : undefined,
         });
       }
 
@@ -1107,15 +1117,15 @@ class SessionManager {
         sessionId,
         messages: truncated,
         isRunning: true,
-        pendingTools: this.getPendingToolSnapshot(managed),
+        pendingTools: this.getPendingToolSnapshot(agentSession),
       });
 
       // Resume the agent loop against the truncated transcript (last message
       // is user). Fires `agent_start` which flips phase to 'running';
       // subsequent `agent_end` flips it back to 'idle'.
-      await managed.agent.continue();
+      await agentSession.agent.continue();
     } catch (err) {
-      // In-place refresh never tears down the agent, so the managed entry
+      // In-place refresh never tears down the agent, so the `AgentSession` entry
       // stays consistent — there is no half-built zombie to evict (contrast
       // the old rebuild path, which had to delete the entry on failure).
       //
@@ -1127,11 +1137,11 @@ class SessionManager {
       // Guarded on `phase === 'preparing'`: once `continue()` has fired
       // `agent_start` (phase `running`), the `agent_end` path owns state +
       // broadcast and we must not clobber a marker it may have appended.
-      if (busySnapshot && managed.phase === 'preparing') {
-        managed.agent.state.messages = busySnapshot;
-        this.broadcast(managed.sessionId, {
+      if (busySnapshot && agentSession.phase === 'preparing') {
+        agentSession.agent.state.messages = busySnapshot;
+        this.broadcast(agentSession.sessionId, {
           type: 'session_state',
-          sessionId: managed.sessionId,
+          sessionId: agentSession.sessionId,
           messages: busySnapshot,
           isRunning: false,
           pendingTools: [],
@@ -1139,14 +1149,14 @@ class SessionManager {
       }
       throw err;
     } finally {
-      managed.prepareController = undefined;
+      agentSession.prepareController = undefined;
       // If the success path ran, agent_start already flipped phase to
       // 'running' (and agent_end will later flip to 'idle'). If we threw, or
       // bailed via `commitRetryCancel` on abort, phase is still 'preparing' —
       // reset it to 'idle' so the next retry can proceed. The agent is never
-      // torn down, so the managed entry is always live here.
-      if (managed.phase === 'preparing') {
-        managed.phase = 'idle';
+      // torn down, so the `AgentSession` entry is always live here.
+      if (agentSession.phase === 'preparing') {
+        agentSession.phase = 'idle';
         this.updateKeepAlive();
       }
     }
@@ -1167,34 +1177,33 @@ class SessionManager {
    * and the UI needs only one rendering rule for "this turn was cancelled".
    */
   private async commitRetryCancel(
-    managed: ManagedSession,
+    agentSession: AgentSession,
     truncated: AgentMessage[],
   ): Promise<void> {
     // destroySession aborts `prepareController` then removes the entry; if we
     // reached here because of that (not a user cancel), bail without
     // persist/broadcast so we don't resurrect a just-deleted session row.
     // Mirrors `commitCompactionCancel`'s guard.
-    if (!this.sessions.has(managed.sessionId)) return;
+    if (!this.sessions.has(agentSession.sessionId)) return;
 
     const finalMessages: AgentMessage[] = [
       ...truncated,
-      this.buildAbortedMarker(managed),
+      this.buildAbortedMarker(agentSession),
     ];
-    managed.agent.state.messages = finalMessages;
-    if (managed.sessionCreated) {
-      sessionStore.scheduleWrite(managed.sessionId, finalMessages);
+    agentSession.agent.state.messages = finalMessages;
+    if (this.persist(agentSession, finalMessages)) {
       try {
-        await sessionStore.flush(managed.sessionId);
+        await sessionStore.flush(agentSession.sessionId);
       } catch (err) {
         console.warn(
-          `[session-manager] flush on retry cancel failed for ${managed.sessionId}:`,
+          `[session-manager] flush on retry cancel failed for ${agentSession.sessionId}:`,
           err,
         );
       }
     }
-    this.broadcast(managed.sessionId, {
+    this.broadcast(agentSession.sessionId, {
       type: 'session_state',
-      sessionId: managed.sessionId,
+      sessionId: agentSession.sessionId,
       messages: finalMessages,
       isRunning: false,
       pendingTools: [],
@@ -1214,8 +1223,8 @@ class SessionManager {
    * just-installed new agent without needing async model resolution.
    * `usage` is zeroed since no tokens were spent.
    */
-  private buildAbortedMarker(managed: ManagedSession): AssistantMessage {
-    const model = managed.agent.state.model;
+  private buildAbortedMarker(agentSession: AgentSession): AssistantMessage {
+    const model = agentSession.agent.state.model;
     const marker: AssistantMessage = {
       role: 'assistant',
       content: [{ type: 'text', text: '' }],
@@ -1263,7 +1272,7 @@ class SessionManager {
    *   agent already finished still acts as a session-close (matches
    *   pre-redesign behavior).
    *
-   * No-op if no managed entry exists — the session has nothing to cancel
+   * No-op if no `AgentSession` entry exists — the session has nothing to cancel
    * (either never started or already cleaned up).
    *
    * Flushes the throttled session writer BEFORE removing the agent from
@@ -1272,19 +1281,19 @@ class SessionManager {
    * DB row — never an interleaved half-flushed snapshot.
    */
   async cancel(sessionId: string): Promise<void> {
-    const managed = this.sessions.get(sessionId);
-    if (!managed) return;
+    const agentSession = this.sessions.get(sessionId);
+    if (!agentSession) return;
 
-    if (managed.phase === 'preparing') {
+    if (agentSession.phase === 'preparing') {
       // Signal the preparation to bail at its checkpoint, AND stop the agent
       // if it has already entered `continue()`. Cleanup and broadcast are
       // retry()'s responsibility — see method JSDoc.
-      managed.prepareController?.abort();
-      managed.agent.abort();
+      agentSession.prepareController?.abort();
+      agentSession.agent.abort();
       return;
     }
 
-    if (managed.phase === 'compacting') {
+    if (agentSession.phase === 'compacting') {
       // A pre-turn compaction is running. Abort the in-flight
       // `generateSummary`; `maybeCompact()` detects the abort and routes to
       // `commitCompactionCancel()`, which commits the pending user message +
@@ -1293,7 +1302,7 @@ class SessionManager {
       // yet, so there's nothing to `agent.abort()`. Cleanup and broadcast are
       // the owning method's responsibility — mirrors the `preparing` split
       // where cancel only signals.
-      managed.compactionController?.abort();
+      agentSession.compactionController?.abort();
       return;
     }
 
@@ -1305,13 +1314,13 @@ class SessionManager {
     // click on an already-finished agent) would write back identical
     // content and bump `updatedAt`, reordering the session in the history
     // list with no real change.
-    const preLen = managed.agent.state.messages.length;
-    managed.agent.abort();
-    managed.unsubscribeAgent();
-    managed.toolCtx.dispose();
+    const preLen = agentSession.agent.state.messages.length;
+    agentSession.agent.abort();
+    agentSession.unsubscribeAgent();
+    agentSession.toolCtx.dispose();
     // 显式取消在途授权请求。abort() 的 signal 通常已让 bridge.request 解析，
     // 这里再 cancel 一次是幂等的兜底（bridge 内部有 pendingResolve 守卫）。
-    managed.permissionBridge.cancel();
+    agentSession.permissionBridge.cancel();
     // Wait for the agent's lifecycle to actually settle. `waitForIdle()`
     // resolves to `Promise.resolve()` when there's no active run (idle
     // branch falls through cheaply) and otherwise waits for
@@ -1329,7 +1338,7 @@ class SessionManager {
     // bare `[user]` transcript, and the late-arriving marker would land
     // on an orphan agent reference — silently lost. `waitForIdle()` is
     // the API pi-agent-core exposes precisely for this synchronization.
-    await managed.agent.waitForIdle();
+    await agentSession.agent.waitForIdle();
     // Drain any throttler write scheduled by trailing message_end events
     // from the just-aborted run.
     try {
@@ -1340,9 +1349,8 @@ class SessionManager {
     // Snapshot post-abort state. If pi-agent-core appended the marker,
     // length increased by one; if not (idle branch / no active run),
     // length is unchanged and we skip the redundant write.
-    const finalMessages = [...managed.agent.state.messages];
-    if (managed.sessionCreated && finalMessages.length !== preLen) {
-      sessionStore.scheduleWrite(sessionId, finalMessages);
+    const finalMessages = [...agentSession.agent.state.messages];
+    if (finalMessages.length !== preLen && this.persist(agentSession, finalMessages)) {
       try {
         await sessionStore.flush(sessionId);
       } catch (err) {
@@ -1362,16 +1370,16 @@ class SessionManager {
 
   /** Resolve an interactive tool's pending request */
   resolveTool(sessionId: string, toolName: string, response: any): void {
-    const managed = this.sessions.get(sessionId);
+    const agentSession = this.sessions.get(sessionId);
     // ctx subscription handles broadcasting tool_resolved
-    managed?.toolCtx.resolve(toolName, response);
+    agentSession?.toolCtx.resolve(toolName, response);
   }
 
   /** Cancel a specific interactive tool */
   cancelTool(sessionId: string, toolName: string): void {
-    const managed = this.sessions.get(sessionId);
+    const agentSession = this.sessions.get(sessionId);
     // ctx subscription handles broadcasting tool_resolved
-    managed?.toolCtx.cancel(toolName);
+    agentSession?.toolCtx.cancel(toolName);
   }
 
   /**
@@ -1387,11 +1395,11 @@ class SessionManager {
     toolCallId: string,
     decision: 'once' | 'always' | 'denied',
   ): void {
-    const managed = this.sessions.get(sessionId);
-    if (!managed) return;
-    const pending = managed.permissionBridge.getPending();
+    const agentSession = this.sessions.get(sessionId);
+    if (!agentSession) return;
+    const pending = agentSession.permissionBridge.getPending();
     if (!pending || pending.toolCallId !== toolCallId) return; // stale / mismatched
-    managed.permissionBridge.resolve(decision);
+    agentSession.permissionBridge.resolve(decision);
   }
 
   /** Get current state for a session (for reconnecting clients).
@@ -1408,33 +1416,33 @@ class SessionManager {
     pendingTools: { toolName: string; toolCallId: string; args: any }[];
     pendingPermissions: PermissionRequest[];
   } | null {
-    const managed = this.sessions.get(sessionId);
-    if (!managed) return null;
+    const agentSession = this.sessions.get(sessionId);
+    if (!agentSession) return null;
     return {
-      messages: [...managed.agent.state.messages],
-      isRunning: managed.phase !== 'idle',
-      isCompacting: managed.phase === 'compacting',
-      pendingTools: this.getPendingToolSnapshot(managed),
-      pendingPermissions: this.getPendingPermissions(managed),
+      messages: [...agentSession.agent.state.messages],
+      isRunning: agentSession.phase !== 'idle',
+      isCompacting: agentSession.phase === 'compacting',
+      pendingTools: this.getPendingToolSnapshot(agentSession),
+      pendingPermissions: this.getPendingPermissions(agentSession),
     };
   }
 
-  /** Destroy a managed session entirely */
+  /** Destroy an `AgentSession` entirely */
   destroySession(sessionId: string): void {
-    const managed = this.sessions.get(sessionId);
-    if (managed) {
+    const agentSession = this.sessions.get(sessionId);
+    if (agentSession) {
       // Abort in-flight async tails so they can't resurrect a just-deleted
       // session row. Both the compaction path (`maybeCompact` →
       // `commitCompactionCancel`) and the retry preparing path (`retry` →
       // `commitRetryCancel`) check their controller's `signal.aborted` after
       // each await and bail via an entry-presence guard before persisting or
       // broadcasting.
-      managed.compactionController?.abort();
-      managed.prepareController?.abort();
-      managed.unsubscribeAgent();
-      managed.toolCtx.dispose();
-      managed.permissionBridge.cancel();
-      managed.agent.abort();
+      agentSession.compactionController?.abort();
+      agentSession.prepareController?.abort();
+      agentSession.unsubscribeAgent();
+      agentSession.toolCtx.dispose();
+      agentSession.permissionBridge.cancel();
+      agentSession.agent.abort();
       this.sessions.delete(sessionId);
       this.updateKeepAlive();
     }
