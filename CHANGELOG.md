@@ -29,11 +29,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### 修复 / Fixed
 
 - 录制结束后不再把完整录制内容（含页面 URL、输入值与操作轨迹）打印到浏览器控制台，避免敏感信息进入日志
+- 加固了页面内容注入提示词结构的防护：网页标题、URL、页面元信息与选中文本中伪造的 `<memories>`、`<user_profile>` 结构标签此前不会被清除，可能让 AI 把网页伪造的内容误当作你的记忆或个人档案；现在会一并剥除
 - 修复 AI 在同一轮里连续弹出两个提问表单时、后一个会顶掉前一个的问题；现在这类提问会依次逐个进行
 - 修复在设置的文件编辑器里切换文件时、上一个文件在自动保存间隔内的未保存改动会丢失的问题；现在切走前会先把待存内容落盘
 - 修复部分对话反复报错「Cannot read properties of null (reading 'length')」、导致无法继续发送的问题：个别模型返回或旧版本遗留的历史消息可能带上非法的空字段，现在会在发送前自动规整，不再整轮崩溃 ([#43](https://github.com/maotoumao/Cebian/issues/43))
 
 - A finished recording no longer dumps its full contents (page URLs, typed values, and action traces) to the browser console, keeping sensitive data out of logs
+- Hardened the defense against web pages injecting prompt structure: forged `<memories>` and `<user_profile>` tags in page titles, URLs, page metadata, and selected text were previously left intact, which could make the assistant treat page-supplied content as your memories or profile; they are now stripped as well
 - Fixed a case where the assistant popping up two question forms in the same turn would cancel the first; such prompts now run one at a time
 - Fixed unsaved edits to the previous file being lost when switching files in the settings file editor within the auto-save window; pending changes are now flushed before switching away
 - Fixed conversations repeatedly failing to send with "Cannot read properties of null (reading 'length')": certain model responses or history left over from older versions could carry an invalid empty field on a message, which is now normalized before sending so the turn no longer crashes ([#43](https://github.com/maotoumao/Cebian/issues/43))
