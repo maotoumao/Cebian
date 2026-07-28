@@ -1,5 +1,5 @@
 // 整理 agent 的「作用域锁」纯逻辑——把它的所有 fs 操作限制在 staging 副本目录内。
-// beforeToolCall gate（entrypoints/background/organize-agent.ts）用这两个纯函数做判断；
+// beforeToolCall gate（entrypoints/background/memory/organize-agent.ts）用这两个纯函数做判断；
 // 抽到 lib 便于单测安全边界（../ 逃逸、相邻同名前缀、rename 双路径）。
 
 import { normalizePath } from '@/lib/persistence/vfs';

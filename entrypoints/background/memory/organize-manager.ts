@@ -42,9 +42,9 @@ import {
   customProviders,
 } from '@/lib/persistence/storage';
 import { resolveModel } from '@/lib/providers/resolve-model';
-import { acquireKeepAlive, releaseKeepAlive } from './lifecycle/keepalive';
+import { acquireKeepAlive, releaseKeepAlive } from '../lifecycle/keepalive';
 import { createOrganizeAgent } from './organize-agent';
-import { sessionManager } from './chat/session-manager';
+import { sessionManager } from '../chat/session-manager';
 
 const LIVE = CEBIAN_MEMORIES_DIR;
 const STAGING = CEBIAN_MEMORIES_STAGING_DIR;

@@ -35,7 +35,7 @@ import type {
   RecordedSession,
   TabEvent,
 } from '@/lib/recorder/types';
-import { acquireKeepAlive, releaseKeepAlive } from './lifecycle/keepalive';
+import { acquireKeepAlive, releaseKeepAlive } from '../lifecycle/keepalive';
 import { randomId } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────

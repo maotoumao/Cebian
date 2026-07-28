@@ -1,6 +1,6 @@
-// 临时整理 agent 的工厂（背景层编排，故住在 entrypoints/background/——createCebianAgent
-// 在 agent/factory.ts，lib/ 不可反向 import 它）。即用即弃、不登记为 session：跑完
-// agent_end 由编排层（organize manager）丢弃。
+// 临时整理 agent 的工厂（背景层编排，故住在 entrypoints/background/memory/——
+// createCebianAgent 在 background 的 agent/factory.ts，lib/ 不可反向 import 它）。
+// 即用即弃、不登记为 session：跑完 agent_end 由编排层（organize-manager）丢弃。
 //
 // 安全：作用域由 beforeToolCall 硬锁在 staging 副本目录，整理 agent 连 live 记忆都碰不到；
 // 工具集只给「读 + 在 staging 内改」的最小 fs 集（无 save_url / run_skill / 浏览器 / MCP）。
@@ -11,7 +11,7 @@ import type {
   BeforeToolCallResult,
 } from '@earendil-works/pi-agent-core';
 import type { Api, Model } from '@earendil-works/pi-ai';
-import { createCebianAgent } from './agent/factory';
+import { createCebianAgent } from '../agent/factory';
 import { fsListTool } from '@/lib/tools/fs-list';
 import { fsReadFileTool } from '@/lib/tools/fs-read-file';
 import { fsCreateFileTool } from '@/lib/tools/fs-create-file';
