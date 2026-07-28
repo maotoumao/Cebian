@@ -5,9 +5,10 @@ Cebian 的重构与待办追踪。**已完成的条目在下一次相关工作�
 
 ---
 
-## 🔴 当前阻塞：`ipc/port-registry.ts` 的会话路由归属
+## 🔴 待改：会话路由不该住在 `ipc/port-registry.ts`
 
-**状态**：子任务 6 的代码已写完但**未提交**，等这个决定。
+**状态**：子任务 6 已提交（传输层抽取本身是对的），但 `subscription` 字段留在了传输层 ——
+这一处**已判定为错**，是下一个动作。
 
 ### 问题
 
@@ -75,7 +76,7 @@ chat/session-store.ts        数据层，可被其它能力 import
 | 4 | `AgentSession` 正名 + `persist()` 落库唯一入口 | ✅ `561ce23` |
 | 5 | `recorder/` `memory/` `page-actions/` 各自成夹 | ✅ `a0a6d68` |
 | A | `AGENT_PORT_NAME` → `CLIENT_PORT` + 端口/sendMessage 判据 | ✅ `3eb55bb` |
-| 6 | `ipc/port-registry.ts` | 🔴 待上面的决定 |
+| 6 | `ipc/port-registry.ts` | ✅ 传输层已抽出；会话路由归属见顶部待改项 |
 | 7 | `ipc/client-router.ts` 注册制 + 各域 `client-handlers.ts` + `mcp-bridge.ts` + 编排下沉 + 穷尽性测试 | ⬜ |
 | 8 | `recorder/content-bridge.ts` + `port-relay.ts` 抽出 | ⬜ |
 | 9 | 收口：`index.ts` 瘦身校验、depcruise 新规则、注释路径修正 | ⬜ |

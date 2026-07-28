@@ -9,11 +9,23 @@ import { getMCPManager } from '@/lib/mcp/manager';
 import { setupPageActions } from '@/lib/page-actions/manager';
 import { runPageActionStream, materializeHandoff } from './page-actions/runner';
 import { SUPPRESS_KIND } from '@/lib/page-actions/types';
-import { CLIENT_PORT, type ClientMessage, type ServerMessage } from '@/lib/ipc/protocol';
+import { type ClientMessage, type ServerMessage } from '@/lib/ipc/protocol';
 import { isRecorderRuntimeMessage, RECORDER_MSG_KIND, type RecorderControlMessage } from '@/lib/recorder/protocol';
 import { isInjectablePage } from '@/lib/browser/tab-actions';
 import { vfs } from '@/lib/persistence/vfs';
 import { setupUpdateNotice } from './lifecycle/update-notice';
+import {
+  setupPortRegistry,
+  onPortConnect,
+  onPortDisconnect,
+  post,
+  broadcast,
+  broadcastAll,
+  getPortState,
+  hasSubscriber,
+  setSubscription,
+  setInstanceId,
+} from './ipc/port-registry';
 import { isValidSessionId } from '@/lib/utils';
 
 /**
@@ -61,9 +73,9 @@ export default defineBackground(() => {
   void seedDevStorage().catch(err => console.warn('[dev-seed] failed:', err));
 
   // ─── Port management ───
-
-  /** All connected ports and the session each is subscribed to. */
-  const ports = new Map<chrome.runtime.Port, { subscribedSession: string | null; instanceId: string | null }>();
+  //
+  // 连接表、投递与连接生命周期在 `ipc/port-registry.ts`（纯传输）。这里只剩下
+  // 域相关的接线：grace-cancel（chat）、录制首帧与断连丢弃（recorder）、消息路由。
 
   /**
    * Pending grace cancels keyed by sessionId. When the last subscriber
@@ -79,11 +91,10 @@ export default defineBackground(() => {
     if (existing) clearTimeout(existing);
     const timer = setTimeout(() => {
       graceTimers.delete(sessionId);
-      // Defensive: ports map is the source of truth. In a single-threaded
+      // Defensive: the port registry is the source of truth. In a single-threaded
       // SW runtime `clearTimeout` reliably cancels a pending timer, so this
       // check normally always passes — but it costs nothing to verify.
-      const stillNoSubscriber = ![...ports.values()].some(s => s.subscribedSession === sessionId);
-      if (stillNoSubscriber) {
+      if (!hasSubscriber(sessionId)) {
         sessionManager.cancel(sessionId).catch(err =>
           console.warn(`[grace-cancel] agent cancel failed for ${sessionId}:`, err),
         );
@@ -100,38 +111,7 @@ export default defineBackground(() => {
     }
   }
 
-  /**
-   * Post to one port, swallowing the "disconnected port" error.
-   *
-   * Chrome throws when you `postMessage` to a port whose other side has
-   * closed (sidepanel closed mid-flight, tab navigated away, SW idle
-   * suspension on the far end). For our use — sending status updates and
-   * RPC replies — the right behaviour is "best effort, don't escalate".
-   * Every BG → sidepanel post in this file goes through here so the
-   * behaviour is uniform and one inline `try/catch` doesn't drift away
-   * from another over time.
-   */
-  function safePost(port: chrome.runtime.Port, msg: ServerMessage): void {
-    try { port.postMessage(msg); } catch { /* port disconnected */ }
-  }
-
-  /** Send a message to all ports subscribed to a given session. */
-  function broadcast(sessionId: string, msg: ServerMessage): void {
-    for (const [port, state] of ports) {
-      if (state.subscribedSession === sessionId) {
-        safePost(port, msg);
-      }
-    }
-  }
-
   sessionManager.setBroadcast(broadcast);
-
-  /** Post a global (non-session-scoped) message to every connected port. */
-  function broadcastAll(msg: ServerMessage): void {
-    for (const [port] of ports) {
-      safePost(port, msg);
-    }
-  }
 
   // ─── Recorder broadcast ───
 
@@ -148,9 +128,7 @@ export default defineBackground(() => {
       initiatorInstanceId: status.initiatorInstanceId,
       activeWindowId: status.activeWindowId,
     };
-    for (const [port] of ports) {
-      safePost(port, msg);
-    }
+    broadcastAll(msg);
   }
   recorder.onStatusChange(broadcastRecorderStatus);
 
@@ -308,18 +286,13 @@ export default defineBackground(() => {
     return false;
   });
 
-  chrome.runtime.onConnect.addListener((port) => {
-    if (port.name !== CLIENT_PORT) return;
-
-    ports.set(port, { subscribedSession: null, instanceId: null });
-    safePost(port, { type: 'connected' });
-
+  onPortConnect((port) => {
     // Sync recorder state to the new port. Without this, a sidepanel that
     // opens during an active recording (or reconnects after a brief SW
     // suspension) would display "idle" until the next event triggers a
     // broadcast.
     const recStatus = recorder.getStatus();
-    safePost(port, {
+    post(port, {
       type: 'recorder_status',
       isRecording: recStatus.isRecording,
       startedAt: recStatus.startedAt,
@@ -334,50 +307,45 @@ export default defineBackground(() => {
         await handleClientMessage(port, msg);
       } catch (err: any) {
         const sessionId = 'sessionId' in msg ? msg.sessionId : null;
-        safePost(port, {
+        post(port, {
           type: 'error',
           sessionId,
           error: err.message ?? String(err),
         });
       }
     });
+  });
 
-    port.onDisconnect.addListener(() => {
-      const disconnectedState = ports.get(port);
-      const sessionId = disconnectedState?.subscribedSession;
-      ports.delete(port);
+  onPortDisconnect((port, last) => {
+    const sessionId = last.subscription;
 
-      // If no other port is subscribed to this session, schedule a grace
-      // cancel instead of killing the agent immediately. This lets the user
-      // briefly close the sidepanel without aborting an in-flight response.
-      if (sessionId) {
-        const hasOtherSubscriber = [...ports.values()].some(s => s.subscribedSession === sessionId);
-        if (!hasOtherSubscriber) {
-          scheduleGraceCancel(sessionId);
-        }
-      }
+    // If no other port is subscribed to this session, schedule a grace
+    // cancel instead of killing the agent immediately. This lets the user
+    // briefly close the sidepanel without aborting an in-flight response.
+    if (sessionId && !hasSubscriber(sessionId)) {
+      scheduleGraceCancel(sessionId);
+    }
 
-      // Recording is owned by a single sidepanel/tab instance (identified
-      // by its port). When that exact port disconnects — sidepanel closed,
-      // standalone tab closed — drop the in-flight recording immediately.
-      // The recorder's keep-alive prevents SW suspension from triggering
-      // a false-positive disconnect, so this branch only fires on a real
-      // user action. Also drains any pending auto-stopped session so it
-      // doesn't leak.
-      if (recorder.getInitiatorPort() === port) {
-        void recorder.stop({ discard: true })
-          .catch(err => console.warn('[recorder] discard-on-disconnect failed:', err));
-      }
-    });
+    // Recording is owned by a single sidepanel/tab instance (identified
+    // by its port). When that exact port disconnects — sidepanel closed,
+    // standalone tab closed — drop the in-flight recording immediately.
+    // The recorder's keep-alive prevents SW suspension from triggering
+    // a false-positive disconnect, so this branch only fires on a real
+    // user action. Also drains any pending auto-stopped session so it
+    // doesn't leak.
+    if (recorder.getInitiatorPort() === port) {
+      void recorder.stop({ discard: true })
+        .catch(err => console.warn('[recorder] discard-on-disconnect failed:', err));
+    }
   });
 
   async function handleClientMessage(port: chrome.runtime.Port, msg: ClientMessage): Promise<void> {
-    const state = ports.get(port);
+    const state = getPortState(port);
     if (!state) return;
 
     switch (msg.type) {
       case 'subscribe': {
-        state.subscribedSession = msg.sessionId;
+        setSubscription(port, msg.sessionId);
         // A new subscriber arrived — cancel any pending grace timer for this
         // session so we don't kill an agent that's about to be observed again.
         cancelGrace(msg.sessionId);
@@ -389,12 +357,12 @@ export default defineBackground(() => {
           const session = await sessionStore.load(msg.sessionId);
           // Re-snapshot AFTER the await: during the DB load the agent could
           // have emitted message_update / agent_end and broadcast() already
-          // forwarded those to this port (we set subscribedSession above).
+          // forwarded those to this port (we set the subscription above).
           // Posting an older snapshot here would regress the hook's
           // `messages` state.
           const fresh = sessionManager.getSessionState(msg.sessionId);
           if (fresh) {
-            safePost(port, {
+            post(port, {
               type: 'session_state',
               sessionId: msg.sessionId,
               title: session?.title ?? '',
@@ -410,7 +378,7 @@ export default defineBackground(() => {
           } else {
             // Agent finished during the await — fall through to DB-based
             // session_loaded using the row we already loaded.
-            safePost(port, {
+            post(port, {
               type: 'session_loaded',
               sessionId: msg.sessionId,
               session: session ?? null,
@@ -420,14 +388,14 @@ export default defineBackground(() => {
           // Agent not running — load from DB
           const session = await sessionStore.load(msg.sessionId);
           if (session) {
-            safePost(port, {
+            post(port, {
               type: 'session_loaded',
               sessionId: msg.sessionId,
               session,
             });
           } else {
             // Session not found in DB
-            safePost(port, {
+            post(port, {
               type: 'session_loaded',
               sessionId: msg.sessionId,
               session: null,
@@ -438,12 +406,12 @@ export default defineBackground(() => {
       }
 
       case 'unsubscribe':
-        state.subscribedSession = null;
+        setSubscription(port, null);
         break;
 
       case 'prompt': {
         const sessionId = msg.sessionId ?? crypto.randomUUID();
-        state.subscribedSession = sessionId;
+        setSubscription(port, sessionId);
         // Start the agent (async — events will be broadcast).
         // For new sessions, sessionManager.prompt() persists the session and
         // broadcasts 'session_created' before starting, so the client can
@@ -454,7 +422,7 @@ export default defineBackground(() => {
           model: msg.model,
           thinkingLevel: msg.thinkingLevel,
         }).catch((err) => {
-          safePost(port, {
+          post(port, {
             type: 'error',
             sessionId,
             error: err.message ?? String(err),
@@ -476,13 +444,13 @@ export default defineBackground(() => {
         // ServerMessage just like `prompt` so the sidepanel can surface
         // "no user message found" / "agent already running" / model setup
         // failures consistently.
-        state.subscribedSession = msg.sessionId;
+        setSubscription(port, msg.sessionId);
         // 同 prompt：透传本轮重试携带的 model / thinkingLevel 作 override。
         sessionManager.retry(msg.sessionId, {
           model: msg.model,
           thinkingLevel: msg.thinkingLevel,
         }).catch((err) => {
-          safePost(port, {
+          post(port, {
             type: 'error',
             sessionId: msg.sessionId,
             error: err.message ?? String(err),
@@ -505,7 +473,7 @@ export default defineBackground(() => {
 
       case 'memory_organize_query':
         // 仅回发起端口当前运行态（不带 outcome → UI 不会误弹 toast）。
-        safePost(port, { type: 'memory_organize_state', running: isOrganizing() });
+        post(port, { type: 'memory_organize_state', running: isOrganizing() });
         break;
 
       case 'memory_organize': {
@@ -544,7 +512,7 @@ export default defineBackground(() => {
           ...s,
           isRunning: sessionManager.getSessionState(s.id)?.isRunning === true,
         }));
-        safePost(port, {
+        post(port, {
           type: 'session_list_result',
           sessions: annotated,
         });
@@ -578,12 +546,10 @@ export default defineBackground(() => {
         await sessionStore.delete(msg.sessionId);
         sessionManager.destroySession(msg.sessionId);
         // Broadcast deletion to all connected ports
-        for (const [p] of ports) {
-          safePost(p, {
-            type: 'session_deleted',
-            sessionId: msg.sessionId,
-          });
-        }
+        broadcastAll({
+          type: 'session_deleted',
+          sessionId: msg.sessionId,
+        });
         break;
       }
 
@@ -592,7 +558,7 @@ export default defineBackground(() => {
         if (instanceId == null) {
           // Sidepanel never sent its instanceId — reject so we never start
           // a recording we couldn't gate stop() on later.
-          safePost(port, {
+          post(port, {
             type: 'recorder_start_rejected',
             reason: 'before_hello',
           });
@@ -603,7 +569,7 @@ export default defineBackground(() => {
           // Another instance already owns the recording. Tell the
           // requesting client so it can toast "another window is
           // recording" instead of silently doing nothing.
-          safePost(port, {
+          post(port, {
             type: 'recorder_start_rejected',
             reason: 'busy',
           });
@@ -634,7 +600,7 @@ export default defineBackground(() => {
         // rejection toast.
         const ownerNow = recorder.getInitiatorPort();
         if (ownerNow != null && ownerNow !== port) {
-          safePost(port, {
+          post(port, {
             type: 'recorder_start_rejected',
             reason: 'busy',
           });
@@ -661,7 +627,7 @@ export default defineBackground(() => {
         // First message after connect: the sidepanel tells us its unique
         // per-instance id. Used to gate recorder_start/stop and to
         // distinguish 'owned' vs 'foreign' on the client.
-        state.instanceId = msg.instanceId;
+        setInstanceId(port, msg.instanceId);
         break;
       }
 
@@ -679,7 +645,7 @@ export default defineBackground(() => {
           // MCPManager would mask both cases.
           const enabled = await manager.getEnabledServers();
           if (!enabled.some(s => s.id === serverId)) {
-            safePost(port, {
+            post(port, {
               type: 'mcp_resource_result',
               requestId,
               error: {
@@ -690,7 +656,7 @@ export default defineBackground(() => {
             break;
           }
           const result = await manager.readResource(serverId, uri);
-          safePost(port, { type: 'mcp_resource_result', requestId, result });
+          post(port, { type: 'mcp_resource_result', requestId, result });
         } catch (err: any) {
           const message = err?.message ?? String(err);
           // Re-map the narrow race where the user disables / removes the
@@ -701,7 +667,7 @@ export default defineBackground(() => {
           const isServerGone =
             message.startsWith('MCP server disabled:') ||
             message.startsWith('MCP server not registered:');
-          safePost(port, {
+          post(port, {
             type: 'mcp_resource_result',
             requestId,
             error: {
@@ -739,4 +705,8 @@ export default defineBackground(() => {
     }
     return false;
   });
+
+  // 最后一步：所有 onPortConnect / onPortDisconnect 订阅者都已注册，现在才开始受理
+  // 连接。先开订阅、再开门，杜绝早到的连接漏掉域首帧。
+  setupPortRegistry();
 });
