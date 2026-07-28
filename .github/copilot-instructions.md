@@ -85,7 +85,7 @@ The current concept/capability folders and their boundaries:
 
 | Folder | Concept / capability | Import boundary |
 | --- | --- | --- |
-| `agent/` | conversation runtime (attachments, message parsing, compaction, page-context, tool-permissions, system-prompt) | — |
+| `agent/` | conversation runtime (attachments, message parsing, compaction, tool-permissions) | — |
 | `providers/` | AI provider connectivity (oauth, custom-models, registry) | — |
 | `ipc/` | cross-context messaging (protocol, instance-id, sandbox-binary) | — |
 | `persistence/` | data-at-rest (db, vfs, storage, vfs-paths) | platform: IndexedDB / chrome.storage |

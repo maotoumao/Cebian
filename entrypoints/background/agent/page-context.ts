@@ -1,6 +1,10 @@
 // ─── Page context gathering ───
 // Collects browser tab info + active page metadata + user selection.
 // Returns plain text lines; the caller wraps them in a <context> block.
+//
+// 住在 background 而非 lib/：要用 chrome.windows / tabs / scripting，只能在特权上下文
+// 跑；且唯一消费方是同目录的 `prompt-composer.ts`（产出的就是提示词形状的文本，
+// 不是通用的浏览器能力）。
 
 import { isLikelyPdfUrl } from '@/lib/tools/pdf';
 

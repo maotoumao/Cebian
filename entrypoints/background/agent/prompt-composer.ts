@@ -8,8 +8,8 @@
 // 造 Agent 实例本身在同目录的 `factory.ts` —— 它只接收本文件产出的成形字符串。
 
 import { userInstructions as userInstructionsStorage, memorySettings } from '@/lib/persistence/storage';
-import { DEFAULT_SYSTEM_PROMPT } from '@/lib/agent/system-prompt';
-import { gatherPageContext } from '@/lib/agent/page-context';
+import { DEFAULT_SYSTEM_PROMPT } from './system-prompt';
+import { gatherPageContext } from './page-context';
 import { buildTextPrefix, type Attachment } from '@/lib/agent/attachments';
 import { scanSkillIndex, buildSkillsBlock } from '@/lib/ai-config/scanner';
 import { MEMORY_INSTRUCTIONS, memoryLimitationLine } from '@/lib/memory/prompt';
