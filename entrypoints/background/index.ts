@@ -1,9 +1,9 @@
-import { setupOAuthRefresh } from './oauth-refresh';
+import { setupOAuthRefresh } from './providers/oauth-refresh';
 import { agentManager } from './agent-manager';
 import { runOrganize, recoverOrganizeOnStartup, isOrganizing, setupOrganizeSchedule } from './organize-manager';
 import { sessionStore } from './session-store';
 import { recorder } from './recorder';
-import { seedDevStorage } from './dev-seed';
+import { seedDevStorage } from './providers/dev-seed';
 import { registerBackupHandler } from './backup-handler';
 import { getMCPManager } from '@/lib/mcp/manager';
 import { setupPageActions } from '@/lib/page-actions/manager';
@@ -13,7 +13,7 @@ import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage } from '@/lib/i
 import { isRecorderRuntimeMessage, RECORDER_MSG_KIND, type RecorderControlMessage } from '@/lib/recorder/protocol';
 import { isInjectablePage } from '@/lib/browser/tab-actions';
 import { vfs } from '@/lib/persistence/vfs';
-import { pendingChangelogVersion } from '@/lib/persistence/storage';
+import { setupUpdateNotice } from './lifecycle/update-notice';
 import { isValidSessionId } from '@/lib/utils';
 
 /**
@@ -36,17 +36,8 @@ export default defineBackground(() => {
 
   setupOAuthRefresh();
 
-  // 扩展升级后记下新版本号，供侧边栏下次打开时弹出更新日志（不在此直接
-  // 开标签，避免商店版后台静默更新时在用户未授意下弹页）。`previousVersion`
-  // 等于当前版时跳过，挡掉 dev 热重载触发的同版本 onInstalled。
-  chrome.runtime.onInstalled.addListener(({ reason, previousVersion }) => {
-    if (reason !== 'update') return;
-    const current = chrome.runtime.getManifest().version;
-    if (previousVersion === current) return;
-    void pendingChangelogVersion.setValue(current).catch((err) =>
-      console.warn('[onInstalled] failed to record changelog version:', err),
-    );
-  });
+  // 扩展升级后记下新版本号，供侧边栏下次打开时弹出更新日志。
+  setupUpdateNotice();
 
   // 注册备份 IPC 响应器（会话采集 / 写回；Dexie 唯一写者经此转发）。
   registerBackupHandler();

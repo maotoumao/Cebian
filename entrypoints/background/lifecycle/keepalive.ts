@@ -31,7 +31,7 @@ export function acquireKeepAlive(): void {
  *  bugs are visible in dev. */
 export function releaseKeepAlive(): void {
   if (refCount === 0) {
-    console.warn('[sw-keepalive] release without matching acquire');
+    console.warn('[keepalive] release without matching acquire');
     return;
   }
   refCount--;

@@ -42,7 +42,7 @@ import {
   customProviders,
 } from '@/lib/persistence/storage';
 import { resolveModel } from '@/lib/providers/resolve-model';
-import { acquireKeepAlive, releaseKeepAlive } from './sw-keepalive';
+import { acquireKeepAlive, releaseKeepAlive } from './lifecycle/keepalive';
 import { createOrganizeAgent } from './organize-agent';
 import { agentManager } from './agent-manager';
 

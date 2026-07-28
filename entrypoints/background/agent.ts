@@ -1,8 +1,8 @@
 import { Agent, type AgentOptions, type AgentMessage, type AgentTool } from '@earendil-works/pi-agent-core';
 import type { Api, Model, Message } from '@earendil-works/pi-ai';
 import { streamSimple } from '@earendil-works/pi-ai/compat';
-import { providerCredentials, userInstructions as userInstructionsStorage, memorySettings, type OAuthCredential, type ThinkingLevel } from '@/lib/persistence/storage';
-import { getValidOAuthToken } from '@/lib/providers/oauth';
+import { userInstructions as userInstructionsStorage, memorySettings, type ThinkingLevel } from '@/lib/persistence/storage';
+import { resolveProviderApiKey } from './providers/credentials';
 import { DEFAULT_SYSTEM_PROMPT } from '@/lib/agent/system-prompt';
 import { isCompactionSummary } from '@/lib/agent/compaction';
 import { sanitizeAgentMessages } from '@/lib/agent/message-helpers';
@@ -11,34 +11,6 @@ import { buildTextPrefix, type Attachment } from '@/lib/agent/attachments';
 import { scanSkillIndex, buildSkillsBlock } from '@/lib/ai-config/scanner';
 import { MEMORY_INSTRUCTIONS, memoryLimitationLine } from '@/lib/memory/prompt';
 import { scanMemoryIndex, buildMemoriesBlock, buildUserProfileBlock } from '@/lib/memory/index-scan';
-
-// ─── Provider credential resolution ───
-
-/**
- * 解析某个 provider 的有效 API key：`apiKey` 凭证直接返回；`oauth` 凭证走
- * `getValidOAuthToken`（含自动刷新）。供 agent 的 `getApiKey` 与压缩流程
- * （agent-manager 的独立 `generateSummary` 调用）共用，避免两处复制凭证解析逻辑。
- */
-export async function resolveProviderApiKey(
-  provider: string,
-): Promise<string | undefined> {
-  try {
-    const creds = await providerCredentials.getValue();
-    const cred = creds[provider];
-    if (!cred) return undefined;
-
-    if (cred.authType === 'apiKey') {
-      return cred.apiKey;
-    }
-
-    if (cred.authType === 'oauth') {
-      return getValidOAuthToken(provider, cred as OAuthCredential);
-    }
-  } catch (err) {
-    console.error(`[Agent] Failed to get API key for ${provider}:`, err);
-  }
-  return undefined;
-}
 
 // ─── System prompt builder ───
 

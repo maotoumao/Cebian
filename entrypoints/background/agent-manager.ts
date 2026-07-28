@@ -20,7 +20,8 @@ import {
 } from '@earendil-works/pi-agent-core';
 import type { Api, AssistantMessage, Model } from '@earendil-works/pi-ai';
 import { clampThinkingLevel } from '@earendil-works/pi-ai';
-import { createCebianAgent, resolveProviderApiKey, composeUserMessage, composeSystemPrompt } from './agent';
+import { createCebianAgent, composeUserMessage, composeSystemPrompt } from './agent';
+import { resolveProviderApiKey } from './providers/credentials';
 import {
   COMPACTION_SETTINGS,
   findCompactionCutPoint,
@@ -66,7 +67,7 @@ import {
 import { getMCPManager } from '@/lib/mcp/manager';
 import { resolveModel } from '@/lib/providers/resolve-model';
 import { t } from '@/lib/i18n';
-import { acquireKeepAlive, releaseKeepAlive } from './sw-keepalive';
+import { acquireKeepAlive, releaseKeepAlive } from './lifecycle/keepalive';
 
 // ─── Types ───
 
@@ -296,7 +297,7 @@ class AgentManager {
    * phase='preparing' but no actual work in flight, since phase is in-memory
    * state.
    *
-   * Uses the shared ref-counted helper in `sw-keepalive.ts` so multiple
+   * Uses the shared ref-counted helper in `lifecycle/keepalive.ts` so multiple
    * subsystems (agent runs, active recordings, ...) coexist without
    * stomping each other.
    */

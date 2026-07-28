@@ -60,7 +60,7 @@ export interface CustomProviderConfig {
 /**
  * Authentication strategy for an MCP server.
  * v1 only ships `none` and `bearer`. The discriminated union leaves room for
- * `oauth2` (using lib/oauth.ts + entrypoints/background/oauth-refresh.ts) and
+ * `oauth2` (using lib/providers/oauth/ + entrypoints/background/providers/oauth-refresh.ts) and
  * `custom` without breaking existing records.
  */
 export type MCPAuthConfig =

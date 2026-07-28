@@ -21,7 +21,7 @@
 // (closing the surface = ending the recording session).
 //
 // While `status === 'recording'` the recorder holds a SW keep-alive token
-// (see `sw-keepalive.ts`) so a long quiet recording doesn't get terminated
+// (see `lifecycle/keepalive.ts`) so a long quiet recording doesn't get terminated
 // by Chrome's 30 s service-worker idle timeout — which would otherwise
 // look like a spurious port disconnect and discard the in-flight session.
 
@@ -35,7 +35,7 @@ import type {
   RecordedSession,
   TabEvent,
 } from '@/lib/recorder/types';
-import { acquireKeepAlive, releaseKeepAlive } from './sw-keepalive';
+import { acquireKeepAlive, releaseKeepAlive } from './lifecycle/keepalive';
 import { randomId } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -695,7 +695,7 @@ class Recorder {
 
   // ─── SW keep-alive ───────────────────────────────────────────────
 
-  /** Acquire / release wrappers around the shared `sw-keepalive` ref count.
+  /** Acquire / release wrappers around the shared `lifecycle/keepalive` ref count.
    *  We track ownership locally with `keepAliveHeld` so paired calls remain
    *  balanced even if `start()` / `stop()` are called in unexpected orders
    *  (e.g. start while already recording is a no-op and must NOT acquire). */
