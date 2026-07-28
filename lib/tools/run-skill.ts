@@ -167,7 +167,7 @@ async function resolveSkillRun(
   return { permissions, code };
 }
 
-// ─── Permission gate (registered into agent-manager's PERMISSION_GATES) ───
+// ─── Permission gate (registered into session-manager's PERMISSION_GATES) ───
 
 /**
  * run_skill 的执行前授权策略。由通用门禁在 `beforeToolCall` 调用——

@@ -1,7 +1,7 @@
 // SessionToolContext: unified manager for all per-session interactive tool bridges.
-// Agent-manager interacts with this single interface, regardless of how many
+// The session manager interacts with this single interface, regardless of how many
 // interactive tools exist. Adding a new interactive tool requires zero changes
-// to agent-manager — only register it here via ctx.register().
+// to the session manager — only register it here via ctx.register().
 
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { InteractiveBridge, PendingRequest } from './interactive-bridge';
@@ -31,7 +31,7 @@ export class SessionToolContext {
    * Register an interactive tool's bridge AND its AgentTool instance.
    * The tool is included in `getInteractiveTools()` so callers (e.g. the
    * session tool array builder) can compose it without naming individual
-   * tools — keeping agent-manager unaware of which interactive tools exist.
+   * tools — keeping the session manager unaware of which interactive tools exist.
    */
   register(
     toolName: string,

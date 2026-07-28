@@ -1,15 +1,14 @@
-// Background Agent Manager — singleton that manages Agent instances.
-// Each session gets its own Agent + SessionToolContext (per-session isolation).
+// 会话管理器（background 单例）——把 agent 绑到一个持久化的对话会话上。
+// 持有 `Map<sessionId, ManagedSession>`，每个会话有自己的 Agent + SessionToolContext（每会话隔离）。
 //
 // TODO(架构重构): 当前这个类同时承担了「会话编排 + 消息同步/落库 + 广播 + 单个
 // agent 生命周期」四种职责，已接近上帝类（prompt/retry/cancel/maybeCompact 都几百行）。
-// 计划拆成两层：
-//   - SessionManager（单例）：Map<id, AgentSession>、creating 去重、keep-alive、
-//     MCP 订阅、DB gating（sessionCreated + scheduleWrite + flush）、广播注入。
-//   - AgentSession（每会话一个实例）：持有 agent + toolCtx + phase + controllers，
-//     负责单会话的 prompt/retry/cancel/compaction，通过回调把「该落库了」告诉上层。
+// 计划把「单次 agent 运行的生命周期」（agent + toolCtx + phase + controllers，以及
+// 单次运行的 prompt/retry/cancel/compaction）抽成独立的 `AgentRun`，本类只留下跨会话
+// 的编排：creating 去重、keep-alive、MCP 订阅、DB gating、广播注入。
+// （不叫 AgentSession：与本文件里的「会话」概念撞词。）
 // 前置条件：先完成 rebuilding 简化（retry 原地复用活 agent，退役 rebuilding phase），
-// 让 AgentSession 生命周期变干净后再拆，避免「边拆边改逻辑」。详见讨论记录。
+// 让单次运行的生命周期变干净后再拆，避免「边拆边改逻辑」。详见讨论记录。
 
 import {
   Agent,
@@ -20,9 +19,9 @@ import {
 } from '@earendil-works/pi-agent-core';
 import type { Api, AssistantMessage, Model } from '@earendil-works/pi-ai';
 import { clampThinkingLevel } from '@earendil-works/pi-ai';
-import { createCebianAgent } from './agent/factory';
-import { composeUserMessage, composeSystemPrompt } from './agent/prompt-composer';
-import { resolveProviderApiKey } from './providers/credentials';
+import { createCebianAgent } from '../agent/factory';
+import { composeUserMessage, composeSystemPrompt } from '../agent/prompt-composer';
+import { resolveProviderApiKey } from '../providers/credentials';
 import {
   COMPACTION_SETTINGS,
   findCompactionCutPoint,
@@ -68,7 +67,7 @@ import {
 import { getMCPManager } from '@/lib/mcp/manager';
 import { resolveModel } from '@/lib/providers/resolve-model';
 import { t } from '@/lib/i18n';
-import { acquireKeepAlive, releaseKeepAlive } from './lifecycle/keepalive';
+import { acquireKeepAlive, releaseKeepAlive } from '../lifecycle/keepalive';
 
 // ─── Types ───
 
@@ -148,9 +147,9 @@ interface ManagedSession {
 
 type BroadcastFn = (sessionId: string, msg: ServerMessage) => void;
 
-// ─── Agent Manager ───
+// ─── Session Manager ───
 
-class AgentManager {
+class SessionManager {
   private sessions = new Map<string, ManagedSession>();
   /** Guards against concurrent getOrCreateAgent calls for the same session. */
   private creating = new Map<string, Promise<ManagedSession>>();
@@ -516,7 +515,7 @@ class AgentManager {
         // 任何地方不准手动置 running；这里断言锁死方向。
         if (managed.phase !== 'preparing' && managed.phase !== 'idle') {
           console.warn(
-            `[agent-manager] agent_start from unexpected phase '${managed.phase}' for ${sessionId}`,
+            `[session-manager] agent_start from unexpected phase '${managed.phase}' for ${sessionId}`,
           );
         }
         managed.phase = 'running';
@@ -647,7 +646,7 @@ class AgentManager {
       // corrupt the phase machine. Silently dropping matches `retry()`'s
       // phase-guard pattern; the in-flight work's broadcasts reconcile every
       // subscribed window to the correct state.
-      console.debug('[agent-manager] prompt: phase busy, ignored', sessionId, managed.phase);
+      console.debug('[session-manager] prompt: phase busy, ignored', sessionId, managed.phase);
       return;
     }
 
@@ -947,7 +946,7 @@ class AgentManager {
       try {
         await sessionStore.flush(sessionId);
       } catch (err) {
-        console.warn(`[agent-manager] flush on compaction cancel failed for ${sessionId}:`, err);
+        console.warn(`[session-manager] flush on compaction cancel failed for ${sessionId}:`, err);
         // 继续广播——DB 落后可恢复，不该把停止按钮卡在界面上。
       }
     }
@@ -1013,7 +1012,7 @@ class AgentManager {
       // streaming (`running`). Silent no-op so the duplicate window doesn't
       // see a misleading toast — the in-flight run's broadcasts reconcile
       // every subscribed window to the correct state.
-      console.debug('[agent-manager] retry: phase not idle, ignored', sessionId, managed.phase);
+      console.debug('[session-manager] retry: phase not idle, ignored', sessionId, managed.phase);
       return;
     }
 
@@ -1188,7 +1187,7 @@ class AgentManager {
         await sessionStore.flush(managed.sessionId);
       } catch (err) {
         console.warn(
-          `[agent-manager] flush on retry cancel failed for ${managed.sessionId}:`,
+          `[session-manager] flush on retry cancel failed for ${managed.sessionId}:`,
           err,
         );
       }
@@ -1336,7 +1335,7 @@ class AgentManager {
     try {
       await sessionStore.flush(sessionId);
     } catch (err) {
-      console.warn(`[agent-manager] flush on cancel failed for ${sessionId}:`, err);
+      console.warn(`[session-manager] flush on cancel failed for ${sessionId}:`, err);
     }
     // Snapshot post-abort state. If pi-agent-core appended the marker,
     // length increased by one; if not (idle branch / no active run),
@@ -1347,7 +1346,7 @@ class AgentManager {
       try {
         await sessionStore.flush(sessionId);
       } catch (err) {
-        console.warn(`[agent-manager] post-abort persist failed for ${sessionId}:`, err);
+        console.warn(`[session-manager] post-abort persist failed for ${sessionId}:`, err);
         // Continue to broadcast anyway — DB lag is recoverable.
       }
     }
@@ -1442,4 +1441,4 @@ class AgentManager {
   }
 }
 
-export const agentManager = new AgentManager();
+export const sessionManager = new SessionManager();

@@ -86,8 +86,8 @@ function pathTouchesSkills(p: string): boolean {
 
 // Module-level side effect: subscribe once when this module is first
 // imported. scanner.ts is imported eagerly via background/agent/prompt-composer.ts
-// transitively agent-manager.ts) and background/index.ts, so the listener
-// is wired during SW boot before any tool runs.
+// (reached transitively from background/chat/session-manager.ts) and
+// background/index.ts, so the listener is wired during SW boot before any tool runs.
 //
 // Cross-context invalidation also flows through this listener: a UI write
 // to ~/.cebian/skills/ is broadcast via chrome.runtime by vfs.emitChange,

@@ -1,10 +1,10 @@
 import { setupOAuthRefresh } from './providers/oauth-refresh';
-import { agentManager } from './agent-manager';
+import { sessionManager } from './chat/session-manager';
 import { runOrganize, recoverOrganizeOnStartup, isOrganizing, setupOrganizeSchedule } from './organize-manager';
-import { sessionStore } from './session-store';
+import { sessionStore } from './chat/session-store';
 import { recorder } from './recorder';
 import { seedDevStorage } from './providers/dev-seed';
-import { registerBackupHandler } from './backup-handler';
+import { registerBackupHandler } from './chat/backup-handler';
 import { getMCPManager } from '@/lib/mcp/manager';
 import { setupPageActions } from '@/lib/page-actions/manager';
 import { runPageActionStream, materializeHandoff } from './page-action-runner';
@@ -21,7 +21,7 @@ import { isValidSessionId } from '@/lib/utils';
  * is cancelled. Lets the user close the sidepanel briefly (switch tabs,
  * copy text, navigate away) without killing an in-flight response.
  *
- * The agent's keepalive (`AgentManager.updateKeepAlive`) prevents the SW
+ * The agent's keepalive (`SessionManager.updateKeepAlive`) prevents the SW
  * from being terminated while `isRunning === true`, so the timer is
  * guaranteed to fire as long as the agent is still working.
  */
@@ -84,7 +84,7 @@ export default defineBackground(() => {
       // check normally always passes — but it costs nothing to verify.
       const stillNoSubscriber = ![...ports.values()].some(s => s.subscribedSession === sessionId);
       if (stillNoSubscriber) {
-        agentManager.cancel(sessionId).catch(err =>
+        sessionManager.cancel(sessionId).catch(err =>
           console.warn(`[grace-cancel] agent cancel failed for ${sessionId}:`, err),
         );
       }
@@ -124,7 +124,7 @@ export default defineBackground(() => {
     }
   }
 
-  agentManager.setBroadcast(broadcast);
+  sessionManager.setBroadcast(broadcast);
 
   /** Post a global (non-session-scoped) message to every connected port. */
   function broadcastAll(msg: ServerMessage): void {
@@ -382,7 +382,7 @@ export default defineBackground(() => {
         // session so we don't kill an agent that's about to be observed again.
         cancelGrace(msg.sessionId);
         // Send current agent state if the agent is running for this session
-        if (agentManager.getSessionState(msg.sessionId)) {
+        if (sessionManager.getSessionState(msg.sessionId)) {
           // Title isn't part of the in-memory agent state — load it from DB
           // so the subscriber's header can show the session title even when
           // (re)subscribing mid-stream.
@@ -392,7 +392,7 @@ export default defineBackground(() => {
           // forwarded those to this port (we set subscribedSession above).
           // Posting an older snapshot here would regress the hook's
           // `messages` state.
-          const fresh = agentManager.getSessionState(msg.sessionId);
+          const fresh = sessionManager.getSessionState(msg.sessionId);
           if (fresh) {
             safePost(port, {
               type: 'session_state',
@@ -445,12 +445,12 @@ export default defineBackground(() => {
         const sessionId = msg.sessionId ?? crypto.randomUUID();
         state.subscribedSession = sessionId;
         // Start the agent (async — events will be broadcast).
-        // For new sessions, agentManager.prompt() persists the session and
+        // For new sessions, sessionManager.prompt() persists the session and
         // broadcasts 'session_created' before starting, so the client can
         // navigate to /chat/<id> immediately.
         // model / thinkingLevel 是本轮携带的「该会话所用模型 / 思考档」，透传给
         // prompt() 作 override（B1：会话行是真相，全局仅作新对话种子）。
-        agentManager.prompt(sessionId, msg.text, msg.attachments, {
+        sessionManager.prompt(sessionId, msg.text, msg.attachments, {
           model: msg.model,
           thinkingLevel: msg.thinkingLevel,
         }).catch((err) => {
@@ -466,7 +466,7 @@ export default defineBackground(() => {
       case 'cancel':
         // User-initiated cancel — immediate, no grace period.
         cancelGrace(msg.sessionId);
-        agentManager.cancel(msg.sessionId).catch(err =>
+        sessionManager.cancel(msg.sessionId).catch(err =>
           console.warn(`[cancel] agent cancel failed for ${msg.sessionId}:`, err),
         );
         break;
@@ -478,7 +478,7 @@ export default defineBackground(() => {
         // failures consistently.
         state.subscribedSession = msg.sessionId;
         // 同 prompt：透传本轮重试携带的 model / thinkingLevel 作 override。
-        agentManager.retry(msg.sessionId, {
+        sessionManager.retry(msg.sessionId, {
           model: msg.model,
           thinkingLevel: msg.thinkingLevel,
         }).catch((err) => {
@@ -492,15 +492,15 @@ export default defineBackground(() => {
       }
 
       case 'resolve_tool':
-        agentManager.resolveTool(msg.sessionId, msg.toolName, msg.response);
+        sessionManager.resolveTool(msg.sessionId, msg.toolName, msg.response);
         break;
 
       case 'cancel_tool':
-        agentManager.cancelTool(msg.sessionId, msg.toolName);
+        sessionManager.cancelTool(msg.sessionId, msg.toolName);
         break;
 
       case 'resolve_permission':
-        agentManager.resolvePermission(msg.sessionId, msg.toolCallId, msg.decision);
+        sessionManager.resolvePermission(msg.sessionId, msg.toolCallId, msg.decision);
         break;
 
       case 'memory_organize_query':
@@ -542,7 +542,7 @@ export default defineBackground(() => {
         // for sessions whose agent is currently mid-stream in the background.
         const annotated = sessions.map(s => ({
           ...s,
-          isRunning: agentManager.getSessionState(s.id)?.isRunning === true,
+          isRunning: sessionManager.getSessionState(s.id)?.isRunning === true,
         }));
         safePost(port, {
           type: 'session_list_result',
@@ -576,7 +576,7 @@ export default defineBackground(() => {
           console.warn(`[session_delete] failed to remove workspace ${workspacePath}:`, err);
         }
         await sessionStore.delete(msg.sessionId);
-        agentManager.destroySession(msg.sessionId);
+        sessionManager.destroySession(msg.sessionId);
         // Broadcast deletion to all connected ports
         for (const [p] of ports) {
           safePost(p, {

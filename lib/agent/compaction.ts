@@ -1,5 +1,5 @@
 // 上下文压缩（compaction）领域模块：集中存放压缩消息类型、切点计算与摘要生成，
-// 使压缩特性自包含。具体的「何时压缩 / 插入摘要 / 状态广播」编排在 agent-manager。
+// 使压缩特性自包含。具体的「何时压缩 / 插入摘要 / 状态广播」编排在 session-manager。
 
 import type { Api, Model, Models } from '@earendil-works/pi-ai';
 import {
@@ -21,7 +21,7 @@ import {
  * Cebian 的压缩配置（④：写死默认 + 留配置位）。当前直接对齐 pi 的
  * `DEFAULT_COMPACTION_SETTINGS`，集中成一个常量而非散落的 magic number：
  * 将来要做成用户可调设置项时，只需把这里改成读 storage，编排层
- * （agent-manager）无需改动。
+ * （session-manager）无需改动。
  *
  * - `enabled`：压缩总开关。
  * - `reserveTokens`：为摘要提示词与输出预留的 token，同时作为 `shouldCompact`
@@ -145,7 +145,7 @@ export interface CompactionTarget {
  * 配置的压缩目标可用（解析成功且凭证可用）就返回它，否则返回 null
  * 表示「回退主模型」。
  *
- * 纯函数——读配置、解析 model、取 key 这些 IO 留在调用方（agent-manager 的
+ * 纯函数——读配置、解析 model、取 key 这些 IO 留在调用方（session-manager 的
  * `resolveCompactionModel`），这里只做「配置是否可用」的判定，便于独立单测。
  */
 export function usableCompactionTarget(
@@ -210,7 +210,7 @@ async function modelsForSummary(model: Model<Api>, apiKey: string): Promise<Mode
  * 生成一段压缩摘要：底层复用 pi 的 `generateSummary`（内部处理摘要提示词与
  * previousSummary 滚动合并），在其上叠加「失败重试一次」。
  *
- * 返回摘要文本；两次尝试都失败返回 null。调用方（agent-manager）据此走「不带
+ * 返回摘要文本；两次尝试都失败返回 null。调用方（session-manager）据此走「不带
  * 摘要的 turn-start 截断」回退，并在后续轮次再次尝试压缩。
  *
  * 取消语义：每次尝试前检查 signal，已 abort 则直接返回 null 不再重试；若

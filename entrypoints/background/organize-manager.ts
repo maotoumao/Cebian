@@ -44,7 +44,7 @@ import {
 import { resolveModel } from '@/lib/providers/resolve-model';
 import { acquireKeepAlive, releaseKeepAlive } from './lifecycle/keepalive';
 import { createOrganizeAgent } from './organize-agent';
-import { agentManager } from './agent-manager';
+import { sessionManager } from './chat/session-manager';
 
 const LIVE = CEBIAN_MEMORIES_DIR;
 const STAGING = CEBIAN_MEMORIES_STAGING_DIR;
@@ -241,7 +241,7 @@ async function maybeAutoOrganize(): Promise<void> {
     lastRunAt: state.lastRunAt,
     lastAttemptAt: state.lastAttemptAt,
     newMemoryCount: countNewMemories(manifest, state.lastRunAt),
-    hasActiveSession: agentManager.hasActiveSession(),
+    hasActiveSession: sessionManager.hasActiveSession(),
   });
   if (ok) await runOrganize();
 }

@@ -12,7 +12,7 @@ import { getCopilotBaseUrl } from '@/lib/providers/oauth';
  * 把一个模型身份（provider key + modelId）解析成可用的 pi-ai 运行时 `Model`。
  *
  * 纯函数：所有外部状态（凭据、自定义 provider 列表）都作参数传入，不读存储、不碰
- * 平台 API，因此可独立单测。读存储 + 全局兜底那一层留给调用方（见 agent-manager 的
+ * 平台 API，因此可独立单测。读存储 + 全局兜底那一层留给调用方（见 session-manager 的
  * `resolveSessionModel`）。
  *
  * 解析不出（未知内置 provider / 自定义模型查无 / modelId 不存在）时返回 null，由调用

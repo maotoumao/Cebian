@@ -5,7 +5,7 @@
 // （background 是 Dexie 唯一写者），lib 不反向 import entrypoints。经 setupPageActions
 // 注入回 lib 的端口编排（DI，保持 lib/page-actions 概念内聚且无 entrypoint 依赖）。
 //
-// 「短暂调用」：直接调 pi-ai 流式，不走 agent-manager、不建 session、不落库。
+// 「短暂调用」：直接调 pi-ai 流式，不走 session-manager、不建 session、不落库。
 
 import { stream } from '@earendil-works/pi-ai/compat';
 import type { Api, Model, UserMessage, AssistantMessage } from '@earendil-works/pi-ai';
@@ -23,7 +23,7 @@ import type { SessionRecord } from '@/lib/persistence/db';
 import { getPageAction, type PageActionParams } from '@/lib/page-actions/actions';
 import type { PageActionId, PageActionRequest } from '@/lib/page-actions/types';
 import { resolveProviderApiKey } from './providers/credentials';
-import { sessionStore } from './session-store';
+import { sessionStore } from './chat/session-store';
 
 /** 语言代码 → 英文语言名（供提示词用，稳健且模型易懂）；失败回退代码本身。 */
 function languageName(code: string): string {

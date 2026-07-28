@@ -15,7 +15,7 @@ export const AGENT_PORT_NAME = 'cebian-agent';
 /**
  * 一次发送 / 重试所携带的「本轮要用的模型 + 思考档」。属于该会话的选择，由发起的
  * sidepanel 随 prompt / retry 消息带给后台（而非后台读全局）。两字段都可选：缺省时
- * 后台回退到会话行 / 全局种子（向后兼容）。prompt / retry 协议消息与 agent-manager
+ * 后台回退到会话行 / 全局种子（向后兼容）。prompt / retry 协议消息与 session-manager
  * 的 override 参数、hook 的 turn 参数共用此形状，避免一个概念多份近似类型。
  */
 export interface TurnSettings {

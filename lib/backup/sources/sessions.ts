@@ -7,11 +7,11 @@
 // 个无 payload 的 flush 信号让它落库，避免漏掉最新几条。
 //
 // 但 background service worker 是 Dexie 的**唯一写者**（见
-// entrypoints/background/session-store.ts，消除多 sidepanel 并发写冲突 + 保证替换
+// entrypoints/background/chat/session-store.ts，消除多 sidepanel 并发写冲突 + 保证替换
 // 模式「清空后写入」的事务原子性）。所以恢复（写）仍必须经 background。为避免写回时
 // 同样撞 64MiB，恢复改成分块协议：页面按序列化字节预算把 records 切批，逐批
 // CHUNK 发给 background 累积进一个按 token 隔离的缓冲，最后 COMMIT 一次性在单事务里
-// 写入。背景侧响应器在 entrypoints/background/backup-handler.ts；实际写库决策
+// 写入。背景侧响应器在 entrypoints/background/chat/backup-handler.ts；实际写库决策
 // （planSessionWrites）也在本文件、在 background 中由 SessionStore.applyAll 调用。
 //
 // 走 chrome.runtime.sendMessage（非 agent port，那是另一条专用通道）。会话记录是

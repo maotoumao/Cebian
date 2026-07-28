@@ -1,4 +1,4 @@
-// Hook: connects sidepanel to background agent manager via chrome.runtime Port.
+// Hook: connects sidepanel to the background session manager via chrome.runtime Port.
 // Replaces useAgentLifecycle + useSessionManager.
 
 import { useState, useRef, useEffect, useCallback } from 'react';

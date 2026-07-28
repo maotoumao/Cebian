@@ -2,13 +2,13 @@
 // 需要用户显式授权」这一横切特性。
 //
 // 一个自包含的 agent 横切域模块，被 `agent/factory.ts`（注入 beforeToolCall + 过滤
-// permissionRequest 消息）和 `agent-manager.ts`（bridge / 广播 / 落库编排）共用。
+// permissionRequest 消息）和 `chat/session-manager.ts`（bridge / 广播 / 落库编排）共用。
 //
 // 关键设计：本模块**完全不认识** skill / grant / bridge / 广播等具体机制。
 // - 「某个工具是否需要授权、要展示什么、如何持久化授权」由 `ToolGate` 抽象，
 //   具体实现（如 run_skill 的 policy）留在各自的工具文件里。
 // - 「如何向用户征求决策」由注入的 `RequestDecisionFn` 抽象，真正的
-//   插入消息 / 弹卡片 / 等待 / 回写 / 广播在 agent-manager 一侧实现。
+//   插入消息 / 弹卡片 / 等待 / 回写 / 广播在 session-manager 一侧实现。
 // 这样未来要给 chrome_api / execute_js 等加执行前授权，只需新增一个 ToolGate
 // 注册进数组，本模块零改动。
 //
@@ -199,7 +199,7 @@ interface ToolGate {
 }
 
 /**
- * 向用户征求一次授权决策。由编排层（agent-manager）注入：真正的实现会
+ * 向用户征求一次授权决策。由编排层（session-manager）注入：真正的实现会
  * 插入 permissionRequest 消息 → 广播 pending → await 用户在卡片上的点击 →
  * 回写消息 decision → 广播 resolved，最后把决策返回这里。必须 honor signal
  * （用户点停止 / 该会话被销毁时应尽快以某个终态结束）。
