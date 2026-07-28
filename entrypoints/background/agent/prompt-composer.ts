@@ -1,18 +1,21 @@
-import { Agent, type AgentOptions, type AgentMessage, type AgentTool } from '@earendil-works/pi-agent-core';
-import type { Api, Model, Message } from '@earendil-works/pi-ai';
-import { streamSimple } from '@earendil-works/pi-ai/compat';
-import { userInstructions as userInstructionsStorage, memorySettings, type ThinkingLevel } from '@/lib/persistence/storage';
-import { resolveProviderApiKey } from './providers/credentials';
+// 组装喂给 agent 的两类文本输入：会话的 systemPrompt（base + skills + 用户指令），
+// 以及每轮的结构化 user 消息（附件前缀 + 页面上下文 + 记忆 + 用户原文）。
+//
+// 分两层，同处本文件让分层在视觉上相邻：
+//   build*   —— 给定零件拼字符串，纯同步，不认识 session / VFS / scanner；
+//   compose* —— 先读 async 上下文（存储 / skills 扫描 / 页面状态），再委托 build*。
+//
+// 造 Agent 实例本身在同目录的 `factory.ts` —— 它只接收本文件产出的成形字符串。
+
+import { userInstructions as userInstructionsStorage, memorySettings } from '@/lib/persistence/storage';
 import { DEFAULT_SYSTEM_PROMPT } from '@/lib/agent/system-prompt';
-import { isCompactionSummary } from '@/lib/agent/compaction';
-import { sanitizeAgentMessages } from '@/lib/agent/message-helpers';
 import { gatherPageContext } from '@/lib/agent/page-context';
 import { buildTextPrefix, type Attachment } from '@/lib/agent/attachments';
 import { scanSkillIndex, buildSkillsBlock } from '@/lib/ai-config/scanner';
 import { MEMORY_INSTRUCTIONS, memoryLimitationLine } from '@/lib/memory/prompt';
 import { scanMemoryIndex, buildMemoriesBlock, buildUserProfileBlock } from '@/lib/memory/index-scan';
 
-// ─── System prompt builder ───
+// ─── build 层（纯拼接） ───
 
 /**
  * 构造 agent 的 systemPrompt：基础提示词（按 `variables` 替换其中的 `{{KEY}}`
@@ -53,13 +56,6 @@ function buildSystemPrompt(
   return parts.join('\n\n');
 }
 
-// ─── Context composers ───
-//
-// 「compose 层」：先读 async 上下文（page context / skills / instructions），再组装
-// 成发给 agent 的字符串。与纯拼接的 `buildSystemPrompt`（build 层）分工对照——
-// build* 给定零件拼字符串、纯同步；compose* 负责取数据再委托 build*。两者同处本文件，
-// 让分层在视觉上相邻。
-
 /**
  * 组装本轮 user 消息里的记忆区：记忆关闭则空串；开启则拼常驻 <user_profile>
  * 全文 + <memories> 索引。两段都可能为空（无 profile / 无其他记忆），由 composeUserMessage 守卫不注入。
@@ -72,12 +68,14 @@ async function buildMemoriesContext(memoryEnabled: boolean): Promise<string> {
   return [profile, buildMemoriesBlock(metas)].filter(Boolean).join('\n\n');
 }
 
+// ─── compose 层（取数据后委托 build） ───
+
 /**
  * 组装本轮要发给 agent 的「结构化用户消息」：reminder 占位段 + 附件文本前缀 +
  * `<context>`（日期 + 页面上下文）+ `<user-request>`（始终置末）。读 page context
  * 是 async，故本函数 async。
  */
-export async function composeUserMessage(text: string, attachments: Attachment[], memoryEnabled: boolean): Promise<string> {
+async function composeUserMessage(text: string, attachments: Attachment[], memoryEnabled: boolean): Promise<string> {
   const parts: string[] = [];
 
   // ① Tool/behavior reminders (placeholder)
@@ -115,7 +113,7 @@ export async function composeUserMessage(text: string, attachments: Attachment[]
  * 出变化、击穿缓存一次（= 装/卸 skill 的实时性代价）。因此无需写「skills 是否变
  * 化」的 diff 逻辑。
  */
-export async function composeSystemPrompt(sessionId: string, memoryEnabled?: boolean): Promise<string> {
+async function composeSystemPrompt(sessionId: string, memoryEnabled?: boolean): Promise<string> {
   const [instructions, skillMetas] = await Promise.all([
     userInstructionsStorage.getValue(),
     scanSkillIndex(),
@@ -134,106 +132,6 @@ export async function composeSystemPrompt(sessionId: string, memoryEnabled?: boo
   });
 }
 
-// ─── Agent factory ───
+// ─── 公开 API ───
 
-export interface CreateAgentOptions {
-  model: Model<Api>;
-  /**
-   * 完整成形的 systemPrompt（base + skills + user-instructions 已拼好）。由调用方
-   * 经同文件导出的 `composeSystemPrompt`（其内委托纯函数 `buildSystemPrompt`）
-   * 组装后传入——本工厂不再自行拼接，避免「先拼一版、马上被含 skills 的版本
-   * 覆盖」的双读双设。
-   */
-  systemPrompt: string;
-  thinkingLevel: ThinkingLevel;
-  messages?: AgentMessage[];
-  /** Session-specific tools array (includes per-session ask_user). */
-  tools: AgentTool<any>[];
-  /**
-   * Optional pre-execution gate. pi-agent-core calls it after a tool's args
-   * are validated and before `execute()`; returning `{ block: true, reason }`
-   * blocks the call and emits an error tool result. Used to require user
-   * authorization before certain tools run (see `lib/agent/tool-permissions.ts`).
-   */
-  beforeToolCall?: AgentOptions['beforeToolCall'];
-}
-
-export function createCebianAgent(options: CreateAgentOptions): Agent {
-  const {
-    model,
-    systemPrompt,
-    thinkingLevel,
-    messages = [],
-    tools: agentTools,
-    beforeToolCall,
-  } = options;
-
-  const agentOptions: AgentOptions = {
-    initialState: {
-      systemPrompt,
-      model,
-      thinkingLevel,
-      tools: agentTools,
-      messages,
-    },
-
-    // 把 AgentMessage 转换为发给 LLM 的 Message。compactionSummary 降级成一条
-    // user 消息（用 <summary> 包裹 + 一句「仅供参考、勿直接回应」），其余自定义
-    // 类型一律过滤掉，只保留 user / assistant / toolResult。
-    convertToLlm: (msgs: AgentMessage[]): Message[] => {
-      const out: Message[] = [];
-      // 送入 pi 前把消息整形回类型契约（null text/thinking/name → ''）。否则 pi 的 token
-      // 估算器（clampMaxTokensToContext）对 assistant 块无保护地取 .length，一旦历史里有
-      // 这类坏消息就会整轮抛「reading 'length'」（issue #43）
-      for (const m of sanitizeAgentMessages(msgs)) {
-        if (isCompactionSummary(m)) {
-          out.push({
-            role: 'user',
-            content:
-              `<summary>\n${m.summary}\n</summary>\n\n` +
-              'The block above is a compressed summary of earlier conversation, ' +
-              'provided for context only. Do not respond to it directly; ' +
-              'continue with the messages that follow.',
-            timestamp: m.timestamp,
-          });
-          continue;
-        }
-        if (['user', 'assistant', 'toolResult'].includes((m as Message).role)) {
-          out.push(m as Message);
-        }
-      }
-      return out;
-    },
-
-    // 上下文窗口管理：若存在压缩摘要，则只把「最后一条摘要 + 其后的全部消息」
-    // 送给 LLM——摘要之前的历史已被该摘要覆盖，无需再发。state.messages 仍保留
-    // 完整历史（无损），此处只是 LLM 边界的视图变换，不写回 state。
-    transformContext: async (msgs: AgentMessage[]): Promise<AgentMessage[]> => {
-      let lastSummaryIdx = -1;
-      for (let i = msgs.length - 1; i >= 0; i--) {
-        if (isCompactionSummary(msgs[i])) {
-          lastSummaryIdx = i;
-          break;
-        }
-      }
-      if (lastSummaryIdx < 0) return msgs;
-      return msgs.slice(lastSummaryIdx);
-    },
-
-    // 发送 LLM 请求的 stream 函数。pi 0.81 起 streamFn 必填（内置默认回退被移除），
-    // 复用 compat 的 streamSimple：按 model.api 解析内置 provider，行为等价旧默认，
-    // apiKey 仍由下面的 getApiKey 动态解析
-    streamFn: streamSimple,
-
-    // Dynamic API key resolution (handles OAuth token refresh)
-    getApiKey: (provider: string): Promise<string | undefined> =>
-      resolveProviderApiKey(provider),
-
-    // 工具执行前授权门禁（可选）。permissionRequest 自定义消息无需在
-    // convertToLlm 里特判——上面的 user/assistant/toolResult 白名单已把它
-    // 连同其它自定义类型一并过滤，不会发给 provider。
-    beforeToolCall,
-  };
-
-  return new Agent(agentOptions);
-}
+export { composeSystemPrompt, composeUserMessage };

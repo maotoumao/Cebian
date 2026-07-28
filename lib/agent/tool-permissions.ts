@@ -1,7 +1,7 @@
 // 工具权限门禁（tool permission gate）领域模块：集中存放「某些工具在执行前
 // 需要用户显式授权」这一横切特性。
 //
-// 一个自包含的 agent 横切域模块，被 `agent.ts`（注入 beforeToolCall + 过滤
+// 一个自包含的 agent 横切域模块，被 `agent/factory.ts`（注入 beforeToolCall + 过滤
 // permissionRequest 消息）和 `agent-manager.ts`（bridge / 广播 / 落库编排）共用。
 //
 // 关键设计：本模块**完全不认识** skill / grant / bridge / 广播等具体机制。

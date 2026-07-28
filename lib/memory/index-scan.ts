@@ -63,8 +63,8 @@ function pathTouchesMemories(p: string): boolean {
   return p === MEMORIES_ROOT || p.startsWith(MEMORIES_ROOT + '/');
 }
 
-// 模块级副作用：首次 import 时订阅一次。index-scan 会被 background/agent.ts 经
-// composeUserMessage 间接 import，故监听器在 SW 启动早期、任何工具运行前就已挂上。
+// 模块级副作用：首次 import 时订阅一次。index-scan 会被 background/agent/prompt-composer.ts
+// 经 composeUserMessage 间接 import，故监听器在 SW 启动早期、任何工具运行前就已挂上。
 // 跨上下文失效同理：UI 写 ~/.cebian/memories/ 经 chrome.runtime 广播 → SW 的 vfs
 // 桥本地重放 → 此监听器触发 → SW 内存缓存与磁盘同步。
 vfs.onChange((event) => {

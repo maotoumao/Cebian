@@ -85,7 +85,7 @@ function pathTouchesSkills(p: string): boolean {
 }
 
 // Module-level side effect: subscribe once when this module is first
-// imported. scanner.ts is imported eagerly via background/agent.ts (and
+// imported. scanner.ts is imported eagerly via background/agent/prompt-composer.ts
 // transitively agent-manager.ts) and background/index.ts, so the listener
 // is wired during SW boot before any tool runs.
 //

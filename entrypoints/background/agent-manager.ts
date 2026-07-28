@@ -20,7 +20,8 @@ import {
 } from '@earendil-works/pi-agent-core';
 import type { Api, AssistantMessage, Model } from '@earendil-works/pi-ai';
 import { clampThinkingLevel } from '@earendil-works/pi-ai';
-import { createCebianAgent, composeUserMessage, composeSystemPrompt } from './agent';
+import { createCebianAgent } from './agent/factory';
+import { composeUserMessage, composeSystemPrompt } from './agent/prompt-composer';
 import { resolveProviderApiKey } from './providers/credentials';
 import {
   COMPACTION_SETTINGS,
