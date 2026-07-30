@@ -77,31 +77,39 @@ chat/session-store.ts        数据层，可被其它能力 import
 抽之前要逐个论证语义，别一刀切：`materializeHandoff` 的顺序反转和 `resolveActionModel`
 的 throw 都是有意的，「对齐」不等于「统一」。
 
-### 2. `applyAll` 的 `ThrottledSessionWriter` 泄漏
-
-`chat/session-store.ts` 的 `cancel()` 与 `applyAll()` 都会 flush 但**不销毁** `writers` map 里的
-writer。replace 模式删掉会话行后 writer 仍留在表里。实测无害（此时 writer 是空的），但它
-证伪了「没有会话行就一定没有 writer」这条不变式，且是纯内存泄漏。
-修法：`applyAll` 清空/删除会话时调 `disposeWriter`。与上一条一起做。
-
-### 3. keepalive 覆盖缺口（**先验证再修**）
+### 2. keepalive 覆盖缺口
 
 keepalive 是按「有活干」引用计数，只有 `session-manager`（agent 运行）、`organize-manager`、
 `recorder` 三处 acquire。以下长操作**没有**：
 
 | 操作 | 期间有 chrome API 活动 | 风险 |
 |---|---|---|
-| **备份恢复 `applyAll`** | ❌ 一个大 Dexie 事务 | **最高** |
+| **备份恢复**（chunk 累积 + commit） | ❌ chunk 之间靠消息喂活，commit 是一个大 Dexie 事务 | 中 |
 | `mcp_read_resource` / `mcp_status` | 少 | 中 |
 | 划词流式 `runPageActionStream` | ✅ 每个 delta 都 postMessage | 低 |
 
-备份恢复若中途 SW 被回收，页面拿不到响应 → 恢复失败，而这是**替换模式下本地已清空**的时刻。
+**不是数据丢失** —— `applySessionsTransactional` 把 `clear()` + `bulkPut()` 放在同一个
+Dexie rw 事务里，SW 中途被杀会整体回滚，本地会话原样还在。真实后果是「恢复失败 +
+一条看不懂的错误」。
 
-**验证方法**：造一个大备份（几十个长会话），恢复过程中看 background 控制台是否出现
-`Cebian background started`（SW 重启）。坐实后在 `applyAll` 外包一层
-`acquireKeepAlive()` / `releaseKeepAlive()`（try/finally）。**是行为改动，单独提交。**
+真正的窗口比 `applyAll` 宽：恢复走分块协议，records 先累积在 `backup-handler.ts` 的
+`applyBuffers`（**SW 内存**），最后一条 commit 才落库。SW 若死在 chunk 阶段，缓冲整份
+没了 → commit 因「查无此 nonce 的缓冲」或「累计条数与 expectedCount 不符」而失败
+（后半段 chunk 可能唤醒 SW 并建出一个只含尾部记录的新缓冲）。
 
-### 4. 客户端端口收口（`lib/ipc/client-port.ts`）
+**修法**：keepalive 绑两处，都在恢复编排层（`backup-handler.ts`），`session-store.ts`
+不动 —— 数据层不该管操作的保活。
+
+1. **缓冲存活期**：`touchBuffer` 首次建缓冲时 `acquireKeepAlive()`，`dropBuffer` 里
+   `releaseKeepAlive()`。三条释放路径（commit / abort / TTL）全汇聚在 `dropBuffer`，不漏放。
+2. **commit 期**：commit handler 里单独 acquire、`finally` 里 release。
+   **不能省** —— `expectedCount === 0` 的空恢复没有缓冲，但 `applySessionsTransactional`
+   无条件先 `toArray()` 读整张会话表、replace 还要 `clear()`，本地会话多时同样是长事务。
+   引用计数天然处理两者的嵌套。
+
+**是行为改动，单独提交。加固性质、未观测到实际故障 → 不记 CHANGELOG。**
+
+### 3. 客户端端口收口（`lib/ipc/client-port.ts`）
 
 现状：一条承载四个域的连接被 `useBackgroundAgent`（一个**聊天** hook）拥有；
 `HistoryPanel` 还会为 `session_list` / `session_delete` 各开一条**用完即弃**的端口
@@ -120,7 +128,7 @@ background：entrypoints/background/ipc/port-registry.ts
 `useMemoryOrganize` 自己开端口**不算违规**（整理状态是推送、且独立设置页里没有别的端口
 可复用），只是设置页作为侧边栏路由打开时会多一条 —— shim 可支持「有 owned port 就复用」。
 
-### 5. 提示词信封标签的单一来源（2c-2）
+### 4. 提示词信封标签的单一来源（2c-2）
 
 `b7f1d6b` 只补了洞，没有防漂移。信封词汇表实际是**三方共用**：
 
@@ -138,7 +146,7 @@ background：entrypoints/background/ipc/port-registry.ts
 **触发条件**：等 `lib/` 侧「渲染信封」与「解析信封」这对分居的双胞胎合并之后再做，
 否则会把词汇表钉进即将移动的模块。
 
-### 6. pi 词汇表对齐
+### 5. pi 词汇表对齐
 
 Cebian 与 pi 的 coding-agent 架构同位（都是 agent-core 之上的应用层）。名字目前**错位**：
 
@@ -152,7 +160,7 @@ Cebian 与 pi 的 coding-agent 架构同位（都是 agent-core 之上的应用�
 **不在拆分那一刻之前改名** —— 现在的 `SessionManager` 同时兼任 runtime 与 session 两职，
 改成任一名字都是撒谎。
 
-### 7. `lib/agent/` 改名（用户暂缓）
+### 6. `lib/agent/` 改名（用户暂缓）
 
 搬走 `system-prompt` / `page-context` 后，`lib/agent/` 只剩 attachments / compaction /
 message-helpers / tool-permissions —— 四个都确有 UI + background 双边消费者。它们的共同

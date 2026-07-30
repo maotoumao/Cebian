@@ -107,6 +107,14 @@ class SessionStore {
       };
       return { clearAll: plan.clearAll, toPut: plan.toPut };
     });
+    // replace 模式清空了会话表：恢复前建的 writer 已无对应会话行，销毁掉——既回收内存，
+    // 也丢弃还卡在 timer / pending 里的旧写
+    //
+    // 恢复不强制暂停运行中的 agent（见上方已知限制），事务期间可能又有 scheduleWrite
+    // 落进来。丢弃而不是 flush 它是有意的：备份通常会重新插入同一批 sessionId，把旧内容
+    // 写回去就盖掉了刚恢复的消息。已经进入 `updateSessionMessages` 的那一笔取消不了，
+    // 仍受既有的 last-write-wins 限制
+    if (result.cleared) this.disposeAllWriters();
     return result;
   }
 
@@ -116,6 +124,11 @@ class SessionStore {
       writer.dispose();
       this.writers.delete(id);
     }
+  }
+
+  private disposeAllWriters(): void {
+    for (const writer of this.writers.values()) writer.dispose();
+    this.writers.clear();
   }
 }
 
