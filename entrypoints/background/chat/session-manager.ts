@@ -5,7 +5,7 @@
 // agent 生命周期」四种职责，已接近上帝类（prompt/retry/cancel/maybeCompact 都几百行）。
 // 计划把「单次 agent 运行的生命周期」（agent + toolCtx + phase + controllers，以及
 // 单次运行的 prompt/retry/cancel/compaction）抽成独立的 `AgentRun`，本类只留下跨会话
-// 的编排：creating 去重、keep-alive、MCP 订阅、DB gating、广播注入。
+// 的编排：creating 去重、keep-alive、MCP 订阅、DB gating、viewer 广播。
 // （不叫 AgentSession：与本文件里的「会话」概念撞词。）
 // 前置条件：先完成 rebuilding 简化（retry 原地复用活 agent，退役 rebuilding phase），
 // 让单次运行的生命周期变干净后再拆，避免「边拆边改逻辑」。详见讨论记录。
@@ -50,7 +50,7 @@ import {
   type PermissionDecision,
   type ToolGate,
 } from '@/lib/agent/tool-permissions';
-import type { ServerMessage, TurnSettings } from '@/lib/ipc/protocol';
+import type { TurnSettings } from '@/lib/ipc/protocol';
 import type { SessionRecord } from '@/lib/persistence/db';
 import { truncateForRetry, sanitizeAgentMessages } from '@/lib/agent/message-helpers';
 import {
@@ -68,6 +68,7 @@ import { getMCPManager } from '@/lib/mcp/manager';
 import { resolveModel } from '@/lib/providers/resolve-model';
 import { t } from '@/lib/i18n';
 import { acquireKeepAlive, releaseKeepAlive } from '../lifecycle/keepalive';
+import { broadcastToViewers } from './viewers';
 
 // ─── Types ───
 
@@ -145,23 +146,23 @@ interface AgentSession {
   unsubscribeAgent: () => void;
 }
 
-type BroadcastFn = (sessionId: string, msg: ServerMessage) => void;
-
 // ─── Session Manager ───
 
 class SessionManager {
   private sessions = new Map<string, AgentSession>();
   /** Guards against concurrent getOrCreateAgent calls for the same session. */
   private creating = new Map<string, Promise<AgentSession>>();
-  private broadcast: BroadcastFn = () => {};
   /** True iff we're currently holding a SW keep-alive token. Tracked so
    *  acquire/release stay balanced even across error paths. */
   private keepAliveHeld = false;
   /** Subscription to MCPManager change notifications; pushes refreshed tools into every live session. */
   private mcpUnsubscribe?: () => void;
 
-  setBroadcast(fn: BroadcastFn): void {
-    this.broadcast = fn;
+  /**
+   * 订阅 MCPManager 变更，把刷新后的工具集推给所有活跃会话。由 background 启动序列
+   * 调用一次；幂等
+   */
+  watchMCPTools(): void {
     // Subscribe to MCPManager so we react AFTER its internal entries map is
     // reconciled — avoids racing two independent storage watchers.
     if (!this.mcpUnsubscribe) {
@@ -192,7 +193,7 @@ class SessionManager {
    * `maybeCompact` delivers an inserted `compactionSummary`.
    */
   private broadcastSessionSnapshot(agentSession: AgentSession): void {
-    this.broadcast(agentSession.sessionId, {
+    broadcastToViewers(agentSession.sessionId, {
       type: 'session_state',
       sessionId: agentSession.sessionId,
       messages: [...agentSession.agent.state.messages],
@@ -499,7 +500,7 @@ class SessionManager {
     });
     agentSession.toolCtx.subscribe((toolName, pending) => {
       if (pending) {
-        this.broadcast(agentSession.sessionId, {
+        broadcastToViewers(agentSession.sessionId, {
           type: 'tool_pending',
           sessionId: agentSession.sessionId,
           toolName,
@@ -507,7 +508,7 @@ class SessionManager {
           args: pending.request,
         });
       } else {
-        this.broadcast(agentSession.sessionId, {
+        broadcastToViewers(agentSession.sessionId, {
           type: 'tool_resolved',
           sessionId: agentSession.sessionId,
           toolName,
@@ -536,13 +537,13 @@ class SessionManager {
           );
         }
         agentSession.phase = 'running';
-        this.broadcast(sessionId, { type: 'agent_start', sessionId });
+        broadcastToViewers(sessionId, { type: 'agent_start', sessionId });
         this.updateKeepAlive();
         break;
 
       case 'message_update':
         if (event.message.role === 'assistant') {
-          this.broadcast(sessionId, {
+          broadcastToViewers(sessionId, {
             type: 'message_update',
             sessionId,
             message: event.message,
@@ -552,7 +553,7 @@ class SessionManager {
 
       case 'message_end': {
         const messages = [...agent.state.messages];
-        this.broadcast(sessionId, { type: 'message_end', sessionId, messages });
+        broadcastToViewers(sessionId, { type: 'message_end', sessionId, messages });
         this.persist(agentSession, messages);
         break;
       }
@@ -566,13 +567,13 @@ class SessionManager {
         // await 一个永不到来的点击。
         agentSession.permissionBridge.cancel();
         const messages = [...agent.state.messages];
-        this.broadcast(sessionId, { type: 'agent_end', sessionId, messages });
+        broadcastToViewers(sessionId, { type: 'agent_end', sessionId, messages });
         // Persist final state before flushing. Normally the trailing
         // `message_end` already scheduled a write with the same content,
         // but pi-agent-core's `handleRunFailure` (abort/error path) appends
         // a synthetic assistant marker straight to `state.messages` and
         // fires `agent_end` without a preceding `message_end` — so without
-        // this schedule the marker reaches subscribed clients via the
+        // this schedule the marker reaches the session's viewers via the
         // broadcast above but never lands in DB, and disappears on the
         // next cold-load. The scheduler is idempotent for unchanged
         // content so this is safe to call unconditionally on every
@@ -635,7 +636,7 @@ class SessionManager {
         };
         try {
           await sessionStore.create(session);
-          this.broadcast(sessionId, {
+          broadcastToViewers(sessionId, {
             type: 'session_created',
             sessionId,
             title: session.title,
@@ -658,7 +659,7 @@ class SessionManager {
       // fresh turn now would race the in-flight `continue()` / compaction and
       // corrupt the phase machine. Silently dropping matches `retry()`'s
       // phase-guard pattern; the in-flight work's broadcasts reconcile every
-      // subscribed window to the correct state.
+      // viewing window to the correct state.
       console.debug('[session-manager] prompt: phase busy, ignored', sessionId, agentSession.phase);
       return;
     }
@@ -849,7 +850,7 @@ class SessionManager {
     agentSession.compactionController = new AbortController();
     const signal = agentSession.compactionController.signal;
     this.updateKeepAlive();
-    this.broadcast(sessionId, {
+    broadcastToViewers(sessionId, {
       type: 'session_state',
       sessionId,
       // 带上待投递的用户消息，压缩期间用户气泡保持可见（前端 session_state 全量
@@ -899,7 +900,7 @@ class SessionManager {
         if (this.persist(agentSession, updated)) {
           await sessionStore.flush(sessionId);
         }
-        this.broadcast(sessionId, {
+        broadcastToViewers(sessionId, {
           type: 'session_state',
           sessionId,
           // 同样带上待投递的用户消息，避免摘要插入后到 agent.prompt() 之间
@@ -962,7 +963,7 @@ class SessionManager {
       }
     }
 
-    this.broadcast(sessionId, {
+    broadcastToViewers(sessionId, {
       type: 'session_state',
       sessionId,
       messages: finalMessages,
@@ -1022,7 +1023,7 @@ class SessionManager {
       // Concurrent retry already in flight (`preparing`) or agent currently
       // streaming (`running`). Silent no-op so the duplicate window doesn't
       // see a misleading toast — the in-flight run's broadcasts reconcile
-      // every subscribed window to the correct state.
+      // every viewing window to the correct state.
       console.debug('[session-manager] retry: phase not idle, ignored', sessionId, agentSession.phase);
       return;
     }
@@ -1046,7 +1047,7 @@ class SessionManager {
         throw new Error('No user message found to retry');
       }
       busySnapshot = truncated;
-      this.broadcast(sessionId, {
+      broadcastToViewers(sessionId, {
         type: 'session_state',
         sessionId,
         messages: truncated,
@@ -1112,7 +1113,7 @@ class SessionManager {
       // Re-broadcast busy. `continue()` is invoked on the very next line and
       // fires `agent_start` on entry, so the agent IS effectively running.
       // Broadcasting `false` here would flicker the composer back on.
-      this.broadcast(sessionId, {
+      broadcastToViewers(sessionId, {
         type: 'session_state',
         sessionId,
         messages: truncated,
@@ -1139,7 +1140,7 @@ class SessionManager {
       // broadcast and we must not clobber a marker it may have appended.
       if (busySnapshot && agentSession.phase === 'preparing') {
         agentSession.agent.state.messages = busySnapshot;
-        this.broadcast(agentSession.sessionId, {
+        broadcastToViewers(agentSession.sessionId, {
           type: 'session_state',
           sessionId: agentSession.sessionId,
           messages: busySnapshot,
@@ -1201,7 +1202,7 @@ class SessionManager {
         );
       }
     }
-    this.broadcast(agentSession.sessionId, {
+    broadcastToViewers(agentSession.sessionId, {
       type: 'session_state',
       sessionId: agentSession.sessionId,
       messages: finalMessages,
@@ -1361,7 +1362,7 @@ class SessionManager {
     this.sessions.delete(sessionId);
     this.updateKeepAlive();
     // Ensure client knows the agent stopped (abort may not fire agent_end)
-    this.broadcast(sessionId, {
+    broadcastToViewers(sessionId, {
       type: 'agent_end',
       sessionId,
       messages: finalMessages,

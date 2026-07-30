@@ -19,18 +19,16 @@ import {
   onPortConnect,
   onPortDisconnect,
   post,
-  broadcast,
   broadcastAll,
   getPortState,
-  hasSubscriber,
-  setSubscription,
   setInstanceId,
 } from './ipc/port-registry';
+import { setViewing, stopViewing, hasViewer } from './chat/viewers';
 import { isValidSessionId } from '@/lib/utils';
 
 /**
- * Grace period after the last subscribed port disconnects before the agent
- * is cancelled. Lets the user close the sidepanel briefly (switch tabs,
+ * Grace period after the last viewer of a session disconnects before the
+ * agent is cancelled. Lets the user close the sidepanel briefly (switch tabs,
  * copy text, navigate away) without killing an in-flight response.
  *
  * The agent's keepalive (`SessionManager.updateKeepAlive`) prevents the SW
@@ -68,17 +66,21 @@ export default defineBackground(() => {
   );
   // 自动整理调度：注册周期 alarm（检查廉价，满足够久/够多/空闲才真跑）。
   setupOrganizeSchedule();
+  // 订阅 MCP 服务端变更，把刷新后的工具集推给所有活跃会话。
+  sessionManager.watchMCPTools();
+
   // Dev-only: seed a custom provider from .env.local if configured.
   // No-op in production builds and when WXT_DEV_API_KEY is empty.
   void seedDevStorage().catch(err => console.warn('[dev-seed] failed:', err));
 
   // ─── Port management ───
   //
-  // 连接表、投递与连接生命周期在 `ipc/port-registry.ts`（纯传输）。这里只剩下
-  // 域相关的接线：grace-cancel（chat）、录制首帧与断连丢弃（recorder）、消息路由。
+  // 连接表、投递与连接生命周期在 `ipc/port-registry.ts`（纯传输）；「哪个窗口正在看哪个
+  // 会话」在 `chat/viewers.ts`（chat 域路由）。这里只剩下域相关的接线：grace-cancel
+  // （chat）、录制首帧与断连丢弃（recorder）、消息路由。
 
   /**
-   * Pending grace cancels keyed by sessionId. When the last subscriber
+   * Pending grace cancels keyed by sessionId. When the last viewer
    * disconnects we don't cancel the agent immediately — we schedule a
    * cancel `AGENT_GRACE_PERIOD_MS` later so a quick reconnect (user closes
    * then reopens the sidepanel) keeps the stream alive.
@@ -91,10 +93,10 @@ export default defineBackground(() => {
     if (existing) clearTimeout(existing);
     const timer = setTimeout(() => {
       graceTimers.delete(sessionId);
-      // Defensive: the port registry is the source of truth. In a single-threaded
+      // Defensive: the viewer table is the source of truth. In a single-threaded
       // SW runtime `clearTimeout` reliably cancels a pending timer, so this
       // check normally always passes — but it costs nothing to verify.
-      if (!hasSubscriber(sessionId)) {
+      if (!hasViewer(sessionId)) {
         sessionManager.cancel(sessionId).catch(err =>
           console.warn(`[grace-cancel] agent cancel failed for ${sessionId}:`, err),
         );
@@ -110,8 +112,6 @@ export default defineBackground(() => {
       graceTimers.delete(sessionId);
     }
   }
-
-  sessionManager.setBroadcast(broadcast);
 
   // ─── Recorder broadcast ───
 
@@ -316,13 +316,13 @@ export default defineBackground(() => {
     });
   });
 
-  onPortDisconnect((port, last) => {
-    const sessionId = last.subscription;
+  onPortDisconnect((port) => {
+    const sessionId = stopViewing(port);
 
-    // If no other port is subscribed to this session, schedule a grace
+    // If no other window is viewing this session, schedule a grace
     // cancel instead of killing the agent immediately. This lets the user
     // briefly close the sidepanel without aborting an in-flight response.
-    if (sessionId && !hasSubscriber(sessionId)) {
+    if (sessionId && !hasViewer(sessionId)) {
       scheduleGraceCancel(sessionId);
     }
 
@@ -345,20 +345,20 @@ export default defineBackground(() => {
 
     switch (msg.type) {
       case 'subscribe': {
-        setSubscription(port, msg.sessionId);
-        // A new subscriber arrived — cancel any pending grace timer for this
+        setViewing(port, msg.sessionId);
+        // A new viewer arrived — cancel any pending grace timer for this
         // session so we don't kill an agent that's about to be observed again.
         cancelGrace(msg.sessionId);
         // Send current agent state if the agent is running for this session
         if (sessionManager.getSessionState(msg.sessionId)) {
           // Title isn't part of the in-memory agent state — load it from DB
-          // so the subscriber's header can show the session title even when
+          // so the new viewer's header can show the session title even when
           // (re)subscribing mid-stream.
           const session = await sessionStore.load(msg.sessionId);
           // Re-snapshot AFTER the await: during the DB load the agent could
-          // have emitted message_update / agent_end and broadcast() already
-          // forwarded those to this port (we set the subscription above).
-          // Posting an older snapshot here would regress the hook's
+          // have emitted message_update / agent_end and broadcastToViewers()
+          // already forwarded those to this port (we registered it as a viewer
+          // above). Posting an older snapshot here would regress the hook's
           // `messages` state.
           const fresh = sessionManager.getSessionState(msg.sessionId);
           if (fresh) {
@@ -406,12 +406,12 @@ export default defineBackground(() => {
       }
 
       case 'unsubscribe':
-        setSubscription(port, null);
+        stopViewing(port);
         break;
 
       case 'prompt': {
         const sessionId = msg.sessionId ?? crypto.randomUUID();
-        setSubscription(port, sessionId);
+        setViewing(port, sessionId);
         // Start the agent (async — events will be broadcast).
         // For new sessions, sessionManager.prompt() persists the session and
         // broadcasts 'session_created' before starting, so the client can
@@ -444,7 +444,7 @@ export default defineBackground(() => {
         // ServerMessage just like `prompt` so the sidepanel can surface
         // "no user message found" / "agent already running" / model setup
         // failures consistently.
-        setSubscription(port, msg.sessionId);
+        setViewing(port, msg.sessionId);
         // 同 prompt：透传本轮重试携带的 model / thinkingLevel 作 override。
         sessionManager.retry(msg.sessionId, {
           model: msg.model,

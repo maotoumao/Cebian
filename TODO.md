@@ -5,51 +5,7 @@ Cebian 的重构与待办追踪。**已完成的条目在下一次相关工作�
 
 ---
 
-## 🔴 待改：会话路由不该住在 `ipc/port-registry.ts`
-
-**状态**：子任务 6 已提交（传输层抽取本身是对的），但 `subscription` 字段留在了传输层 ——
-这一处**已判定为错**，是下一个动作。
-
-### 问题
-
-`PortState.subscription`（一个泛型字符串，实际存 sessionId）放在传输层是错的：
-
-1. **它不是「订阅」** —— 至多一个值，永远是「这个窗口当前正在看的会话」。是路由目标，不是订阅集合。
-2. **用泛型字符串假装传输层不认识 session 是纸糊的抽象** —— 紧挨着的路由器写的就是
-   `case 'subscribe': setSubscription(port, msg.sessionId)`，而 `lib/ipc/protocol.ts` 的
-   `subscribe` / `unsubscribe` 消息本来就带 sessionId。
-3. **「谁在看这个会话」和「最后一个观察者走了要不要取消 agent」是同一件事**，且完全是
-   chat 域的事。传输层被迫存一个它不理解的字段、再把快照传回给 chat 用。
-
-### 为什么不能干脆去掉按会话路由
-
-`message_update` 发的是**当前累积的整条 assistant 消息**（非增量 delta），单条流的结构化
-克隆总量就是 O(n²)，再乘窗口数。客户端过滤那行 `if` 是免费的，**序列化 + IPC 传输**才是代价。
-所以按会话过滤必须保留。
-
-### 决定方案
-
-把按会话的路由移进 `chat/`：
-
-```
-ipc/port-registry.ts   连接表（含 instanceId）、post、broadcastAll、连接/断连事件
-chat/viewers.ts        Map<Port, sessionId>、broadcastToSession、hasViewer + grace-cancel
-```
-
-收益：
-- registry 里「意义在别处定义」的神秘字段消失
-- `onPortDisconnect` 不再需要传状态快照，签名从 `(port, last)` 简化为 `(port)`
-- registry 少 4 个导出（`subscription` 字段、`setSubscription`、`hasSubscriber`、`broadcast`）
-- `broadcastToSession` 只需遍历 chat 自己的 Map + 调 `post()`，registry 无需暴露端口迭代
-
-`instanceId` 留在 registry —— 它回答「连接对端是谁」，是连接自身的属性。
-
-已知代价：多一处 port-keyed 域状态 + 一次断连清理。可接受，因为只有 chat 需要，
-且那次断连清理本来就存在（grace-cancel 用同一个回调）。
-
----
-
-## 🟡 进行中：background 架构重构
+##  进行中：background 架构重构
 
 12 个平铺文件 → `index.ts` + 概念目录。规则：**background 根目录只放 `index.ts`，
 每个能力一个文件夹**（少一个「够不够两个文件」的判断分支）。
@@ -76,7 +32,8 @@ chat/session-store.ts        数据层，可被其它能力 import
 | 4 | `AgentSession` 正名 + `persist()` 落库唯一入口 | ✅ `561ce23` |
 | 5 | `recorder/` `memory/` `page-actions/` 各自成夹 | ✅ `a0a6d68` |
 | A | `AGENT_PORT_NAME` → `CLIENT_PORT` + 端口/sendMessage 判据 | ✅ `3eb55bb` |
-| 6 | `ipc/port-registry.ts` | ✅ 传输层已抽出；会话路由归属见顶部待改项 |
+| 6 | `ipc/port-registry.ts` 传输层抽出 | ✅ |
+| 6b | 会话路由下沉 `chat/viewers.ts`（`subscription` → viewer 词汇；删 `setBroadcast` 注入） | ✅ |
 | 7 | `ipc/client-router.ts` 注册制 + 各域 `client-handlers.ts` + `mcp-bridge.ts` + 编排下沉 + 穷尽性测试 | ⬜ |
 | 8 | `recorder/content-bridge.ts` + `port-relay.ts` 抽出 | ⬜ |
 | 9 | 收口：`index.ts` 瘦身校验、depcruise 新规则、注释路径修正 | ⬜ |
@@ -88,6 +45,9 @@ chat/session-store.ts        数据层，可被其它能力 import
 - 配穷尽性测试：枚举 `ClientMessage['type']` 断言全部有 handler，漏注册则 CI 红
 - 编排下沉：`session_delete` 的 VFS 清理进 chat、`recorder_start` 的窗口解析与所有权
   复检进 recorder、`memory_organize` 的广播编排进 memory
+- **grace-cancel 随 chat 的 case 一起下沉到 `chat/client-handlers.ts`** —— 它现在还留在
+  `index.ts`，因为 `chat/viewers.ts` 若自己调 `sessionManager.cancel()` 就会与
+  session-manager 成运行时环（depcruise `no-circular` 是 error）。handlers 层没这个问题
 - `mcp-bridge.ts`（单文件概念）承接 `mcp_status` + `mcp_read_resource`
 
 ### 新增能力时不要建 sendMessage 路由器
@@ -273,7 +233,8 @@ sessionsRoot })` 的 root 由调用方注入。要接入只需实现 `SessionSto
 **变化的那条消息**。代价是客户端要维护增量状态，且需要一个「漏帧后重同步」机制。
 
 **注意**：这也是「按会话路由必须保留」的原因 —— 若不按会话过滤，上面两笔开销都要
-乘以打开的窗口数。见文档顶部的阻塞项。
+乘以打开的窗口数。客户端多一行 `if` 过滤是免费的，**序列化 + IPC 传输**才是代价。
+路由本身住在 `chat/viewers.ts`。
 
 ### 注意
 
