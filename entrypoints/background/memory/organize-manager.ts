@@ -97,17 +97,35 @@ async function doRecover(): Promise<void> {
 
 // ─── 模型解析 ───
 
-/** 解析整理用模型：organize.model 优先，缺省回退全局 lastSelectedModel。无可用配置 → null。 */
-async function resolveOrganizeModel(): Promise<Model<Api> | null> {
+/**
+ * 解析整理用模型：organize.model 优先，全局 `lastSelectedModel` 兜底。
+ *
+ * 专用模型「配了但解析不出」（模型被删 / provider 被移除）时**也要回退到全局** —— 自动
+ * 整理是 alarm 静默任务，在这里返回 null 意味着整理永久停摆而用户收不到任何提示。与压缩
+ * （`resolveCompactionModel`）保持同一语义：warn 后降级，绝不因配错而彻底不干活。
+ *
+ * 两条都不可用才返回 null，由调用方报 `no-model`。
+ *
+ * 仅为同目录单测导出（静默降级路径出错时用户无感知，值得回归守卫），生产侧只有本文件调用
+ */
+export async function resolveOrganizeModel(): Promise<Model<Api> | null> {
   const [settings, globalModel, creds, customProvs] = await Promise.all([
     memorySettings.getValue(),
     lastSelectedModel.getValue(),
     providerCredentials.getValue(),
     customProviders.getValue(),
   ]);
-  const modelCfg = resolveOrganizeSettings(settings).model ?? globalModel;
-  if (!modelCfg) return null;
-  return resolveModel(modelCfg, creds, customProvs ?? []) ?? null;
+  const providers = customProvs ?? [];
+  const configured = resolveOrganizeSettings(settings).model;
+  if (configured) {
+    const model = resolveModel(configured, creds, providers);
+    if (model) return model;
+    console.warn(
+      '[organize] configured model cannot be resolved (possibly deleted), trying the global model instead',
+      configured,
+    );
+  }
+  return globalModel ? resolveModel(globalModel, creds, providers) : null;
 }
 
 // ─── 跑整理 agent 到结束，判断是否成功 ───

@@ -61,7 +61,7 @@ chat/session-store.ts        数据层，可被其它能力 import
 
 ## 🟢 待办（background 重构完成后）
 
-### 1. 模型解析的 5 处语义分歧（含 1 个已确认 bug）
+### 1. 模型解析的 5 处语义分歧
 
 | 站点 | 偏好顺序 | 何时回退 | 都失败时 | 查凭证 |
 |---|---|---|---|---|
@@ -69,14 +69,13 @@ chat/session-store.ts        数据层，可被其它能力 import
 | `resolveCompactionModel`（压缩） | 专用 → 主模型 | 缺失/解析失败/凭证不可用 | 用主模型 | ✓ |
 | `resolveActionModel`（划词流式） | 工具条 → 全局 | 缺失/解析失败 | throw | ✗ |
 | `materializeHandoff`（转侧边栏） | 全局 → 工具条（**有意反转**，非 bug） | 缺失/解析失败 | throw | ✗ |
-| `resolveOrganizeModel`（记忆整理） | 专用 → 全局 | **仅缺失时** | null | ✗ |
+| `resolveOrganizeModel`（记忆整理） | 专用 → 全局 | 缺失/解析失败 | null | ✗ |
 
-**已确认 bug**：`resolveOrganizeModel` 在「配了整理专用模型、但该模型后来被删 / provider
-被移除」时返回 null → `runOrganize` 永久 `skipped: no-model`。自动整理是 alarm 静默任务，
-**用户完全无感知**。compaction 在同样情况下会 warn 后回退主模型。
+要做的是**抽共享函数** = `refactor`，落点 `background/providers/`（是 provider 概念，
+不是 agent 概念）。
 
-**顺序不可颠倒**：① 先对齐语义 = `fix` 提交（用户可感知 → 记 CHANGELOG），含单测；
-② 再抽共享函数 = `refactor`，落点 `background/providers/`（是 provider 概念，不是 agent 概念）。
+抽之前要逐个论证语义，别一刀切：`materializeHandoff` 的顺序反转和 `resolveActionModel`
+的 throw 都是有意的，「对齐」不等于「统一」。
 
 ### 2. `applyAll` 的 `ThrottledSessionWriter` 泄漏
 
@@ -200,9 +199,9 @@ sessionsRoot })` 的 root 由调用方注入。要接入只需实现 `SessionSto
 树状历史导航的全部收益，且不碰并发语义。风险最高（不可逆）。
 
 **阶段 2 — 模型 / 凭证层对齐**
-5 处 `resolveXxxModel` 收敛成 `ModelRuntime` 等价物，产出 `Models` 集合；顺手修
-`resolveOrganizeModel` 的回退 bug；`lib/agent/compaction.ts` 的 `modelsForSummary`
-适配层随之删除（它存在的唯一原因就是填 0.80 的 API 不对称）。
+5 处 `resolveXxxModel` 收敛成 `ModelRuntime` 等价物，产出 `Models` 集合；
+`lib/agent/compaction.ts` 的 `modelsForSummary` 适配层随之删除（它存在的唯一原因就是
+填 0.80 的 API 不对称）。
 
 **阶段 3 — 运行时替换**
 `AgentSession` 从「手写 phase + `Agent`」换成「持有 `AgentHarness`」；授权门禁改接

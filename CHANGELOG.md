@@ -33,12 +33,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 修复 AI 在同一轮里连续弹出两个提问表单时、后一个会顶掉前一个的问题；现在这类提问会依次逐个进行
 - 修复在设置的文件编辑器里切换文件时、上一个文件在自动保存间隔内的未保存改动会丢失的问题；现在切走前会先把待存内容落盘
 - 修复部分对话反复报错「Cannot read properties of null (reading 'length')」、导致无法继续发送的问题：个别模型返回或旧版本遗留的历史消息可能带上非法的空字段，现在会在发送前自动规整，不再整轮崩溃 ([#43](https://github.com/maotoumao/Cebian/issues/43))
+- 修复记忆整理在「指定了整理专用模型、但该模型或其服务商后来被删除」时永久不再运行的问题；由于自动整理是后台静默任务，此前这种情况没有任何提示。现在会退回使用当前对话模型
 
 - A finished recording no longer dumps its full contents (page URLs, typed values, and action traces) to the browser console, keeping sensitive data out of logs
 - Hardened the defense against web pages injecting prompt structure: forged `<memories>` and `<user_profile>` tags in page titles, URLs, page metadata, and selected text were previously left intact, which could make the assistant treat page-supplied content as your memories or profile; they are now stripped as well
 - Fixed a case where the assistant popping up two question forms in the same turn would cancel the first; such prompts now run one at a time
 - Fixed unsaved edits to the previous file being lost when switching files in the settings file editor within the auto-save window; pending changes are now flushed before switching away
 - Fixed conversations repeatedly failing to send with "Cannot read properties of null (reading 'length')": certain model responses or history left over from older versions could carry an invalid empty field on a message, which is now normalized before sending so the turn no longer crashes ([#43](https://github.com/maotoumao/Cebian/issues/43))
+- Fixed memory organization silently never running again once its dedicated model — or that model's provider — had been deleted; because automatic organization is a background task, this failure was invisible. It now falls back to the current chat model
 
 ## 1.4.1 - 2026-07-14
 
