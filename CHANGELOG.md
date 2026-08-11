@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## 1.4.2 - 2026-08-11
+
 ### 变更 / Changed
 
 - 升级核心 AI 引擎 pi-ai / pi-agent-core 至 0.84.1，跟进上游模型目录更新（新增 Claude Opus 5、Kimi K3 系列与 Qwen Token Plan Individual 等可选模型，调整 xAI/Grok 目录，思考档位收窄为服务商已验证支持的档位），并带来一批服务商健壮性修复：OAuth 登录与刷新现在能正确响应取消且不会因请求卡住而长期占用凭证锁，工具参数的可空联合类型不再把 `null` 错转成其它值，同时修复 Anthropic 首个内容块丢失、Google / Gemini 工具调用回放、OpenAI Codex 跨账号复用连接等问题
