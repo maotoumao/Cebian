@@ -20,10 +20,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### 变更 / Changed
 
-- 升级核心 AI 引擎 pi-ai / pi-agent-core 至 0.82.1，跟进上游模型目录更新（新增 Claude Opus 5、Kimi K3 系列可选模型，调整 xAI/Grok 目录，思考档位收窄为服务商已验证支持的档位），并带来一批服务商健壮性修复（重试等待现在会立刻响应中止、DNS 故障自动重试、Kimi K3 思考格式与推理档校正、Cloudflare、OpenAI Codex 等）
+- 升级核心 AI 引擎 pi-ai / pi-agent-core 至 0.84.1，跟进上游模型目录更新（新增 Claude Opus 5、Kimi K3 系列与 Qwen Token Plan Individual 等可选模型，调整 xAI/Grok 目录，思考档位收窄为服务商已验证支持的档位），并带来一批服务商健壮性修复：OAuth 登录与刷新现在能正确响应取消且不会因请求卡住而长期占用凭证锁，工具参数的可空联合类型不再把 `null` 错转成其它值，同时修复 Anthropic 首个内容块丢失、Google / Gemini 工具调用回放、OpenAI Codex 跨账号复用连接等问题
 - 思考档选择器现在按当前模型动态显示它真正支持的档位：不支持的档位不再出现（如无法关闭思考的模型不再显示「关闭」），支持的模型会多出「极高 / 最大」两档；已选档位超过所换模型上限时会自动夹到该模型的可用档并按此发送，让显示与实际生效保持一致
 
-- Upgraded the core AI engine (pi-ai / pi-agent-core) to 0.82.1, picking up upstream model-catalog refreshes (new selectable Claude Opus 5 and Kimi K3 models, an adjusted xAI/Grok catalog, and thinking levels narrowed to those the provider has verified) and a batch of provider robustness fixes (retry waits now react to cancellation immediately, automatic retries on DNS failures, Kimi K3 thinking-format and reasoning-level corrections, Cloudflare, OpenAI Codex, etc.)
+- Upgraded the core AI engine (pi-ai / pi-agent-core) to 0.84.1, picking up upstream model-catalog refreshes (new selectable Claude Opus 5, Kimi K3, and Qwen Token Plan Individual models, an adjusted xAI/Grok catalog, and thinking levels narrowed to those the provider has verified) and a batch of provider robustness fixes: OAuth login and refresh now honor cancellation without stalled requests holding the credential lock indefinitely, nullable tool-argument unions no longer coerce `null` into another value, and Anthropic initial content blocks, Google/Gemini tool-call replay, and OpenAI Codex cross-account connection reuse are handled correctly
 - The thinking-level selector now adapts to the current model, showing only the levels it actually supports — unsupported ones no longer appear (e.g. a model that can't turn thinking off no longer shows "Off"), and models that support them gain "Extra High" and "Max"; a chosen level that exceeds a newly selected model's ceiling is clamped to that model's available range and sent accordingly, so what you see matches what runs
 
 ### 修复 / Fixed

@@ -9,7 +9,7 @@
 //   - 打开后再异步 getContexts 对账（关闭分支不对账，否则会把尚未真正关闭
 //     的面板重新观测成「开着」而回填；关闭的最终纠正交给侧边栏关闭前上报的 sidepanel_gone）
 
-import { browser } from 'wxt/browser';
+import { browser, type Browser } from 'wxt/browser';
 import {
   isPageActionMessage,
   isPageActionRequest,
@@ -86,7 +86,7 @@ function toggleSidePanel(windowId: number): void {
 /** 处理一条划词动作流式端口：收到请求后跑注入的 runner，chunk / done / error 经同端口
  *  回传；端口断开（用户关卡 / 换选区）即 abort。 */
 function handlePageActionPort(
-  port: chrome.runtime.Port,
+  port: Browser.runtime.Port,
   runStream: PageActionStreamRunner,
 ): void {
   const controller = new AbortController();

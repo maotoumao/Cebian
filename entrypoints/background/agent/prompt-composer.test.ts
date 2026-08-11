@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { fakeBrowser } from 'wxt/testing';
+import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { buildSkillsBlock } from '@/lib/ai-config/scanner';
 import { memorySettings, userInstructions } from '@/lib/persistence/storage';
 import { composeSystemPrompt } from './prompt-composer';

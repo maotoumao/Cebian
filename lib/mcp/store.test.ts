@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { fakeBrowser } from 'wxt/testing';
+import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { addMCPServer, updateMCPServer, getMCPServer } from '@/lib/mcp/store';
 import { formToInput } from '@/components/settings/mcp/MCPServerForm';
 

@@ -22,6 +22,13 @@ const OAUTH_BY_PROVIDER: Record<string, OAuthAuth> = {
   'openai-codex': codexOAuth,
 };
 
+const OAUTH_REFRESH_TIMEOUT_MS = 15_000;
+
+function boundedRefreshSignal(signal?: AbortSignal): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(OAUTH_REFRESH_TIMEOUT_MS);
+  return signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+}
+
 // ─── GitHub Copilot 登录（设备码） ───
 
 export interface GitHubCopilotCallbacks {
@@ -32,7 +39,7 @@ export interface GitHubCopilotCallbacks {
 
 export async function loginGitHubCopilot(callbacks: GitHubCopilotCallbacks): Promise<OAuthResult> {
   const cred = await copilotOAuth.login({
-    signal: callbacks.signal,
+    signal: callbacks.signal ?? new AbortController().signal,
     // Cebian 不暴露企业域名输入 → 固定空串走 github.com。
     prompt: async () => '',
     notify: (event) => {
@@ -51,7 +58,7 @@ export async function loginGitHubCopilot(callbacks: GitHubCopilotCallbacks): Pro
 
 export async function loginOpenAICodex(signal?: AbortSignal): Promise<OAuthResult> {
   const cred = await codexOAuth.login({
-    signal,
+    signal: signal ?? new AbortController().signal,
     prompt: async () => '',
     notify: () => {},
   });
@@ -63,11 +70,14 @@ export async function loginOpenAICodex(signal?: AbortSignal): Promise<OAuthResul
 export async function refreshOAuthCredential(
   provider: string,
   cred: OAuthCredential,
+  signal?: AbortSignal,
 ): Promise<OAuthCredential> {
   const oauth = OAUTH_BY_PROVIDER[provider];
   if (!oauth) throw new Error(t('errors.oauth.unknownProvider', [provider]));
   if (!cred.refreshToken) throw new Error(t('errors.oauth.missingRefreshTokenLocal'));
-  const refreshed = piToStoredCred(await oauth.refresh(storedToPiCred(cred)));
+  const refreshed = piToStoredCred(
+    await oauth.refresh(storedToPiCred(cred), boundedRefreshSignal(signal)),
+  );
   // 保留刷新前 extra 里的其它字段（刷新结果里的同名字段优先）。
   const extra = { ...cred.extra, ...refreshed.extra };
   return { ...refreshed, extra: Object.keys(extra).length > 0 ? extra : undefined };

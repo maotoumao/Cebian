@@ -93,8 +93,12 @@ function endpoints(domain: string) {
   };
 }
 
-async function fetchJson(url: string, init: RequestInit): Promise<Record<string, unknown>> {
-  const response = await fetch(url, init);
+async function fetchJson(
+  url: string,
+  init: RequestInit,
+  signal: AbortSignal,
+): Promise<Record<string, unknown>> {
+  const response = await fetch(url, { ...init, signal });
   if (!response.ok) {
     const text = await response.text().catch(() => '');
     throw new Error(`${response.status} ${response.statusText}: ${text}`);
@@ -102,9 +106,9 @@ async function fetchJson(url: string, init: RequestInit): Promise<Record<string,
   return (await response.json()) as Record<string, unknown>;
 }
 
-function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
+function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
+    if (signal.aborted) {
       reject(new Error(t('errors.oauth.cancelled')));
       return;
     }
@@ -113,10 +117,10 @@ function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
       reject(new Error(t('errors.oauth.cancelled')));
     };
     const timer = setTimeout(() => {
-      signal?.removeEventListener('abort', onAbort);
+      signal.removeEventListener('abort', onAbort);
       resolve();
     }, ms);
-    signal?.addEventListener('abort', onAbort, { once: true });
+    signal.addEventListener('abort', onAbort, { once: true });
   });
 }
 
@@ -128,7 +132,7 @@ interface DeviceCode {
   expiresInSeconds: number;
 }
 
-async function startDeviceFlow(domain: string): Promise<DeviceCode> {
+async function startDeviceFlow(domain: string, signal: AbortSignal): Promise<DeviceCode> {
   const data = await fetchJson(endpoints(domain).deviceCode, {
     method: 'POST',
     headers: {
@@ -137,7 +141,7 @@ async function startDeviceFlow(domain: string): Promise<DeviceCode> {
       'User-Agent': COPILOT_HEADERS['User-Agent'],
     },
     body: new URLSearchParams({ client_id: CLIENT_ID, scope: 'read:user' }),
-  });
+  }, signal);
   const deviceCode = data.device_code;
   const userCode = data.user_code;
   const verificationUri = data.verification_uri;
@@ -174,7 +178,7 @@ async function startDeviceFlow(domain: string): Promise<DeviceCode> {
 async function pollForGitHubAccessToken(
   domain: string,
   device: DeviceCode,
-  signal?: AbortSignal,
+  signal: AbortSignal,
 ): Promise<string> {
   const url = endpoints(domain).accessToken;
   const deadline = Date.now() + device.expiresInSeconds * 1000;
@@ -183,7 +187,7 @@ async function pollForGitHubAccessToken(
   await abortableSleep(Math.min(intervalMs, Math.max(0, deadline - Date.now())), signal);
 
   while (Date.now() < deadline) {
-    if (signal?.aborted) throw new Error(t('errors.oauth.cancelled'));
+    if (signal.aborted) throw new Error(t('errors.oauth.cancelled'));
     const raw = await fetchJson(url, {
       method: 'POST',
       headers: {
@@ -196,7 +200,7 @@ async function pollForGitHubAccessToken(
         device_code: device.deviceCode,
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
       }),
-    });
+    }, signal);
     if (typeof raw.access_token === 'string') return raw.access_token;
     const error = raw.error;
     if (error === 'authorization_pending') {
@@ -229,7 +233,8 @@ interface CopilotTokenSet {
 /** 用 GitHub refresh token 换取 Copilot API token（并算好带 5min 缓冲的过期时刻）。 */
 async function refreshCopilotToken(
   refreshToken: string,
-  enterpriseDomain?: string,
+  enterpriseDomain: string | undefined,
+  signal: AbortSignal,
 ): Promise<CopilotTokenSet> {
   const domain = enterpriseDomain || 'github.com';
   const raw = await fetchJson(endpoints(domain).copilotToken, {
@@ -238,7 +243,7 @@ async function refreshCopilotToken(
       Authorization: `Bearer ${refreshToken}`,
       ...COPILOT_HEADERS,
     },
-  });
+  }, signal);
   const token = raw.token;
   const expiresAt = raw.expires_at;
   if (typeof token !== 'string' || typeof expiresAt !== 'number') {
@@ -257,7 +262,11 @@ async function refreshCopilotToken(
  * 开启才能用）。模型 id 列表取自 pi 的静态目录 `GITHUB_COPILOT_MODELS`（与 upstream 一致）。
  * best-effort：任一模型开启失败都不阻断登录。
  */
-async function enableAllCopilotModels(token: string, enterpriseDomain?: string): Promise<void> {
+async function enableAllCopilotModels(
+  token: string,
+  enterpriseDomain: string | undefined,
+  signal: AbortSignal,
+): Promise<void> {
   const ids = Object.values(GITHUB_COPILOT_MODELS).map((model) => model.id);
   const baseUrl = getGitHubCopilotBaseUrl(token, enterpriseDomain);
   await Promise.all(
@@ -265,6 +274,7 @@ async function enableAllCopilotModels(token: string, enterpriseDomain?: string):
       try {
         await fetch(`${baseUrl}/models/${id}/policy`, {
           method: 'POST',
+          signal,
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
@@ -274,7 +284,8 @@ async function enableAllCopilotModels(token: string, enterpriseDomain?: string):
           },
           body: JSON.stringify({ state: 'enabled' }),
         });
-      } catch {
+      } catch (err) {
+        if (signal.aborted) throw err;
         // best-effort，忽略
       }
     }),
@@ -305,7 +316,7 @@ export const copilotOAuth: OAuthAuth = {
     if (trimmed && !enterpriseDomain) throw new Error('Invalid GitHub Enterprise URL/domain');
     const domain = enterpriseDomain ?? 'github.com';
 
-    const device = await startDeviceFlow(domain);
+    const device = await startDeviceFlow(domain, interaction.signal);
     interaction.notify({
       type: 'device_code',
       userCode: device.userCode,
@@ -315,14 +326,22 @@ export const copilotOAuth: OAuthAuth = {
     });
 
     const githubToken = await pollForGitHubAccessToken(domain, device, interaction.signal);
-    const tokens = await refreshCopilotToken(githubToken, enterpriseDomain ?? undefined);
+    const tokens = await refreshCopilotToken(
+      githubToken,
+      enterpriseDomain ?? undefined,
+      interaction.signal,
+    );
     interaction.notify({ type: 'progress', message: 'Enabling models...' });
-    await enableAllCopilotModels(tokens.access, enterpriseDomain ?? undefined);
+    await enableAllCopilotModels(tokens.access, enterpriseDomain ?? undefined, interaction.signal);
     return { type: 'oauth', ...tokens };
   },
 
-  async refresh(credential) {
-    const tokens = await refreshCopilotToken(credential.refresh, enterpriseDomainOf(credential));
+  async refresh(credential, signal) {
+    const tokens = await refreshCopilotToken(
+      credential.refresh,
+      enterpriseDomainOf(credential),
+      signal,
+    );
     return { type: 'oauth', ...tokens };
   },
 

@@ -38,11 +38,12 @@ async function generatePKCE(): Promise<{ verifier: string; challenge: string }> 
 
 function waitForRedirectUrl(
   urlPrefix: string,
-  signal?: AbortSignal,
+  tabId: number,
+  signal: AbortSignal,
   timeoutMs = 120000,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    if (signal?.aborted) {
+    if (signal.aborted) {
       reject(new Error(t('errors.oauth.cancelled')));
       return;
     }
@@ -50,14 +51,19 @@ function waitForRedirectUrl(
     const cleanup = () => {
       clearTimeout(timer);
       chrome.tabs.onUpdated.removeListener(listener);
+      signal.removeEventListener('abort', onAbort);
     };
 
-    const listener = (tabId: number, info: { url?: string }) => {
-      if (info.url?.startsWith(urlPrefix)) {
+    const listener = (updatedTabId: number, info: { url?: string }) => {
+      if (updatedTabId === tabId && info.url?.startsWith(urlPrefix)) {
         cleanup();
-        chrome.tabs.remove(tabId).catch(() => {});
         resolve(info.url);
       }
+    };
+
+    const onAbort = () => {
+      cleanup();
+      reject(new Error(t('errors.oauth.cancelled')));
     };
 
     const timer = setTimeout(() => {
@@ -66,15 +72,7 @@ function waitForRedirectUrl(
     }, timeoutMs);
 
     chrome.tabs.onUpdated.addListener(listener);
-
-    signal?.addEventListener(
-      'abort',
-      () => {
-        cleanup();
-        reject(new Error(t('errors.oauth.cancelled')));
-      },
-      { once: true },
-    );
+    signal.addEventListener('abort', onAbort, { once: true });
   });
 }
 
@@ -123,34 +121,40 @@ export const codexOAuth: OAuthAuth = {
     url.searchParams.set('state', state);
     url.searchParams.set('codex_cli_simplified_flow', 'true');
 
-    chrome.tabs.create({ url: url.toString() });
+    const tab = await chrome.tabs.create({ url: url.toString() });
+    if (typeof tab.id !== 'number') throw new Error('OAuth authorization tab has no id');
+    try {
+      const redirectUrl = await waitForRedirectUrl(REDIRECT_URI, tab.id, interaction.signal);
+      const params = new URL(redirectUrl).searchParams;
+      const code = params.get('code');
+      const returnedState = params.get('state');
+      if (!code) throw new Error(t('errors.oauth.noCode'));
+      if (returnedState !== state) throw new Error(t('errors.oauth.stateMismatch'));
 
-    const redirectUrl = await waitForRedirectUrl(REDIRECT_URI, interaction.signal);
-    const params = new URL(redirectUrl).searchParams;
-    const code = params.get('code');
-    const returnedState = params.get('state');
-    if (!code) throw new Error(t('errors.oauth.noCode'));
-    if (returnedState !== state) throw new Error(t('errors.oauth.stateMismatch'));
-
-    return readTokens(
-      await fetch(TOKEN_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          client_id: CLIENT_ID,
-          code,
-          code_verifier: verifier,
-          redirect_uri: REDIRECT_URI,
+      return readTokens(
+        await fetch(TOKEN_URL, {
+          method: 'POST',
+          signal: interaction.signal,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            client_id: CLIENT_ID,
+            code,
+            code_verifier: verifier,
+            redirect_uri: REDIRECT_URI,
+          }),
         }),
-      }),
-    );
+      );
+    } finally {
+      await chrome.tabs.remove(tab.id).catch(() => {});
+    }
   },
 
-  async refresh(credential) {
+  async refresh(credential, signal) {
     return readTokens(
       await fetch(TOKEN_URL, {
         method: 'POST',
+        signal,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
           grant_type: 'refresh_token',

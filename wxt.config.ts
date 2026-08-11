@@ -5,6 +5,12 @@ import path from 'node:path';
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ['@wxt-dev/module-react', '@wxt-dev/i18n/module'],
+  hooks: {
+    'prepare:tsconfig': (_wxt, { tsconfig }) => {
+      // 该选项会一次性要求全仓约 40 个文件重构，留待独立任务渐进启用。
+      tsconfig.compilerOptions.noUncheckedIndexedAccess = false;
+    },
+  },
   dev: {
     server: { port: 3210 },
   },

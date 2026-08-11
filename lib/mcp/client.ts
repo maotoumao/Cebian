@@ -2,7 +2,6 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 import type {
   jsonSchemaValidator,
   JsonSchemaType,
@@ -159,11 +158,7 @@ export class MCPClient {
       ? new SSEClientTransport(url, { requestInit })
       : new StreamableHTTPClientTransport(url, { requestInit });
     // Declare MCP Apps support so servers will attach `_meta.ui.resourceUri`
-    // to tools that ship an interactive view. SDK 1.29's `ClientCapabilities`
-    // type does not yet model the `extensions` key (added in newer spec
-    // drafts), but the client sends `capabilities` verbatim on the wire — so
-    // the cast at the call site is a typing escape, not a runtime hack. The
-    // literal itself stays structurally checked.
+    // to tools that ship an interactive view.
     const capabilities = {
       extensions: {
         [MCP_APPS_EXTENSION_ID]: { mimeTypes: [MCP_APPS_MIME_TYPE] },
@@ -172,7 +167,7 @@ export class MCPClient {
     this.client = new Client(
       { name: CLIENT_NAME, version: CLIENT_VERSION },
       {
-        capabilities: capabilities as ClientCapabilities,
+        capabilities,
         jsonSchemaValidator: typeboxSchemaValidator,
       },
     );
