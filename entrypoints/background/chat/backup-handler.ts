@@ -24,6 +24,7 @@ import {
   type ApplySessionsResult,
 } from '@/lib/backup/sources/sessions';
 import { toSessionRecord, isValidSessionLike, type SessionRecord, type SessionRecordLike } from '@/lib/persistence/db';
+import { acquireKeepAlive, releaseKeepAlive } from '../lifecycle/keepalive';
 
 /** 统一把异步结果包成响应信封发回，错误转成可读字符串（页面侧据此重新抛出）。 */
 function respond<T>(
@@ -61,6 +62,8 @@ interface ApplyBuffer {
 const APPLY_BUFFER_TTL_MS = 60_000;
 
 const applyBuffers = new Map<string, ApplyBuffer>();
+const committingNonces = new Set<string>();
+const consumedNonces = new Set<string>();
 
 /** 丢弃某 nonce 的缓冲并清掉其 TTL 计时器（commit 成功、abort、或超时时调用）。 */
 function dropBuffer(nonce: string): void {
@@ -68,6 +71,16 @@ function dropBuffer(nonce: string): void {
   if (!buf) return;
   clearTimeout(buf.timer);
   applyBuffers.delete(nonce);
+  releaseKeepAlive();
+}
+
+/** 原子取走待提交缓冲并停掉 TTL。缓冲持有的 keepalive token 由 commit 的 finally 释放。 */
+function takeBuffer(nonce: string): ApplyBuffer | undefined {
+  const buf = applyBuffers.get(nonce);
+  if (!buf) return undefined;
+  clearTimeout(buf.timer);
+  applyBuffers.delete(nonce);
+  return buf;
 }
 
 /** 取得（或新建）某 nonce 的缓冲，并重置其 TTL 计时器。每收到一个 chunk 都刷新存活窗口，
@@ -79,6 +92,7 @@ function touchBuffer(nonce: string): ApplyBuffer {
   } else {
     buf = { records: [], timer: undefined as unknown as ReturnType<typeof setTimeout> };
     applyBuffers.set(nonce, buf);
+    acquireKeepAlive();
   }
   buf.timer = setTimeout(() => dropBuffer(nonce), APPLY_BUFFER_TTL_MS);
   return buf;
@@ -121,6 +135,12 @@ export function registerBackupHandler(): void {
         if (!msg.records.every(isValidSessionLike)) {
           throw new Error('applyChunk: malformed session record in payload');
         }
+        if (committingNonces.has(msg.nonce)) {
+          throw new Error('applyChunk: nonce is already committing');
+        }
+        if (consumedNonces.has(msg.nonce)) {
+          throw new Error('applyChunk: nonce has already been consumed');
+        }
         const buf = touchBuffer(msg.nonce);
         for (const r of msg.records as SessionRecordLike[]) {
           buf.records.push(toSessionRecord(r));
@@ -139,9 +159,19 @@ export function registerBackupHandler(): void {
         if (typeof msg.expectedCount !== 'number' || !Number.isInteger(msg.expectedCount) || msg.expectedCount < 0) {
           throw new Error(`applyCommit: invalid expectedCount ${String(msg.expectedCount)}`);
         }
+        if (committingNonces.has(msg.nonce)) {
+          throw new Error('applyCommit: nonce is already committing');
+        }
+        if (consumedNonces.has(msg.nonce)) {
+          throw new Error('applyCommit: nonce has already been consumed');
+        }
         // 空恢复（expectedCount === 0）时页面不发任何 chunk，故无缓冲——这是合法的：
         // 替换模式下用空集 applyAll 会清空本地会话。非空却无缓冲才是错误（过期 / 已提交）。
-        const buf = applyBuffers.get(msg.nonce);
+        committingNonces.add(msg.nonce);
+        // SW 重启会自然清空集合；同一生命周期内永久保留，避免旧空 replace commit 被重放。
+        consumedNonces.add(msg.nonce);
+        const buf = takeBuffer(msg.nonce);
+        acquireKeepAlive();
         try {
           if (msg.strategy !== 'merge' && msg.strategy !== 'replace') {
             throw new Error(`applyCommit: invalid strategy ${String(msg.strategy)}`);
@@ -159,8 +189,11 @@ export function registerBackupHandler(): void {
           }
           return await sessionStore.applyAll(buf.records, msg.strategy);
         } finally {
-          // 仅在确有缓冲时清理（空恢复路径压根没建缓冲）。成功失败都丢弃。
-          if (buf) dropBuffer(msg.nonce);
+          // takeBuffer 已把缓冲移出共享表；这里只释放它持有的 token，不按 nonce 再查表，
+          // 避免误伤等待期间同名的新缓冲。
+          if (buf) releaseKeepAlive();
+          releaseKeepAlive();
+          committingNonces.delete(msg.nonce);
         }
       }, sendResponse);
     }
