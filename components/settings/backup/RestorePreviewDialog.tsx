@@ -8,7 +8,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup } from '@/components/ui/radio-group';
@@ -122,9 +122,8 @@ export function RestorePreviewDialog({ open, onOpenChange, manifest, onConfirm, 
           {needsPassword && (
             <div className="space-y-1.5">
               <Label htmlFor="restore-password" className="text-sm">{t('settings.backup.restore.passwordLabel')}</Label>
-              <Input
+              <PasswordInput
                 id="restore-password"
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={t('settings.backup.restore.passwordPlaceholder')}

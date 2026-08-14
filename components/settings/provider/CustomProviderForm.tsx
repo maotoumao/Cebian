@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Plus, Trash2, RefreshCw, Pencil, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -152,8 +153,7 @@ function ProviderFormBody({
 
       <div className="space-y-2">
         <Label className="text-xs">{t('provider.form.apiKeyOptional')}</Label>
-        <Input
-          type="password"
+        <PasswordInput
           value={fields.apiKey}
           onChange={e => onFieldChange({ apiKey: e.target.value })}
           placeholder={t('provider.form.apiKeyPlaceholder')}

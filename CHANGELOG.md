@@ -18,6 +18,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 新增 / Added
+
+- 所有密码类输入框新增显示 / 隐藏切换（眼睛图标），方便核对填入的内容：自定义 Provider 的 API Key、MCP 服务器的 Bearer Token、WebDAV 密码、备份加密与恢复密码
+
+- All password-style inputs gain a show/hide toggle (eye icon), making it easy to double-check what was entered: a custom provider's API Key, an MCP server's Bearer Token, the WebDAV password, and backup encryption/restore passwords
+
 ### 修复 / Fixed
 
 - 修复自定义 Provider 中勾选「推理模型」后，system prompt 以 `developer` 角色发送、导致通义千问等第三方 OpenAI 兼容 API 返回 400 的问题；现在自定义模型一律使用 `system` 角色（OpenAI 端点会自动为推理模型转换，行为不受影响） ([#46](https://github.com/maotoumao/Cebian/issues/46), [#57](https://github.com/maotoumao/Cebian/issues/57))

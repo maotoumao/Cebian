@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -211,8 +212,7 @@ export function CreateBackupDialog({ open, onOpenChange, onConfirm }: CreateBack
             </div>
             {encrypt && (
               <div className="space-y-1">
-                <Input
-                  type="password"
+                <PasswordInput
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={t('settings.backup.create.passwordPlaceholder')}

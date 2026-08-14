@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
-import { Eye, EyeOff, Unplug, Save } from "lucide-react";
+import { Unplug, Save } from "lucide-react";
 import { complete } from "@earendil-works/pi-ai/compat";
 import { getBuiltinModels, type BuiltinProvider } from "@earendil-works/pi-ai/providers/all";
 import type { Api, Model } from "@earendil-works/pi-ai";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +30,6 @@ export function ProviderApiKeyItem({
   onRemove,
 }: ProviderApiKeyItemProps) {
   const [key, setKey] = useState(credential?.apiKey ?? "");
-  const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // 凭据由 storage 异步加载，首次挂载时 credential 往往还是 undefined（useStorageItem
@@ -166,28 +165,12 @@ export function ProviderApiKeyItem({
       </div>
 
       <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Input
-            type={showKey ? "text" : "password"}
+        <div className="flex-1">
+          <PasswordInput
             value={key}
             onChange={(e) => setKey(e.target.value)}
             placeholder={t('provider.apiKey.placeholder')}
-            className="pr-8"
           />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            className="absolute right-1 top-1/2 -translate-y-1/2"
-            onClick={() => setShowKey(!showKey)}
-            tabIndex={-1}
-          >
-            {showKey ? (
-              <EyeOff className="size-3.5" />
-            ) : (
-              <Eye className="size-3.5" />
-            )}
-          </Button>
         </div>
 
         <Button

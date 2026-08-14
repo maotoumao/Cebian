@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -157,8 +158,7 @@ export function MCPFormBody({
       {values.authType === 'bearer' && (
         <div className="space-y-2">
           <Label className="text-xs">{t('settings.mcp.form.bearerToken')}</Label>
-          <Input
-            type="password"
+          <PasswordInput
             value={values.bearerToken}
             onChange={(e) => onChange({ bearerToken: e.target.value })}
             onKeyDown={onEnter}

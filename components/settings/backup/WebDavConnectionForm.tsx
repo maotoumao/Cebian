@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Loader2, PlugZap } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { testConnection, webdavErrorMessage, assertValidBaseUrl } from '@/lib/backup/webdav';
@@ -108,9 +109,8 @@ export function WebDavConnectionForm({ initial, onSave, onCancel }: WebDavConnec
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="webdav-pass" className="text-xs">{t('settings.backup.webdav.passwordLabel')}</Label>
-          <Input
+          <PasswordInput
             id="webdav-pass"
-            type="password"
             value={password}
             onChange={(e) => { setPassword(e.target.value); resetTest(); }}
             placeholder={t('settings.backup.webdav.passwordPlaceholder')}
