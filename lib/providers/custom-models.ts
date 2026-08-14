@@ -36,6 +36,10 @@ export function toModel(config: CustomProviderConfig, model: CustomModelDef): Mo
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: model.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
     maxTokens: model.maxTokens ?? DEFAULT_MAX_TOKENS,
+    // 自定义端点的 system prompt 一律用 system 角色：developer 角色只有 OpenAI 及其严格镜像
+    // 认识（OpenAI 收到 system 会自动为推理模型转换），第三方 OpenAI 兼容 API 普遍直接 400。
+    // pi-ai 的 getCompat 按字段覆盖，只设这一项不影响其余 compat 自动探测 (#46 #57)
+    compat: { supportsDeveloperRole: false },
   };
   // 用户自定义请求头并进 model.headers（pi-ai 会合并进请求头）；仅非空时附加
   if (config.headers && Object.keys(config.headers).length > 0) {

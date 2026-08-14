@@ -39,9 +39,16 @@ describe('mergeFetchedModels', () => {
   });
 });
 
-describe('toModel — headers', () => {
+describe('toModel', () => {
   const cfg: CustomProviderConfig = { id: 'p', name: 'P', baseUrl: 'https://x/v1', models: [] };
   const m: CustomModelDef = { modelId: 'm', name: 'm', reasoning: false };
+
+  it('默认禁用 developer 角色，避免第三方端点 400 (#46 #57)', () => {
+    expect(toModel(cfg, m).compat).toEqual({ supportsDeveloperRole: false });
+    expect(toModel(cfg, { ...m, reasoning: true }).compat).toEqual({
+      supportsDeveloperRole: false,
+    });
+  });
 
   it('provider 有 headers → 并入 model.headers', () => {
     expect(toModel({ ...cfg, headers: { 'X-A': '1' } }, m).headers).toEqual({ 'X-A': '1' });
