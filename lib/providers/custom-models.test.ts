@@ -43,11 +43,10 @@ describe('toModel', () => {
   const cfg: CustomProviderConfig = { id: 'p', name: 'P', baseUrl: 'https://x/v1', models: [] };
   const m: CustomModelDef = { modelId: 'm', name: 'm', reasoning: false };
 
-  it('默认禁用 developer 角色，避免第三方端点 400 (#46 #57)', () => {
-    expect(toModel(cfg, m).compat).toEqual({ supportsDeveloperRole: false });
-    expect(toModel(cfg, { ...m, reasoning: true }).compat).toEqual({
-      supportsDeveloperRole: false,
-    });
+  it('默认禁用 developer 角色并用 max_tokens 字段，避免第三方端点不兼容 (#46 #57 #54)', () => {
+    const expected = { supportsDeveloperRole: false, maxTokensField: 'max_tokens' };
+    expect(toModel(cfg, m).compat).toEqual(expected);
+    expect(toModel(cfg, { ...m, reasoning: true }).compat).toEqual(expected);
   });
 
   it('provider 有 headers → 并入 model.headers', () => {

@@ -36,10 +36,13 @@ export function toModel(config: CustomProviderConfig, model: CustomModelDef): Mo
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: model.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
     maxTokens: model.maxTokens ?? DEFAULT_MAX_TOKENS,
-    // 自定义端点的 system prompt 一律用 system 角色：developer 角色只有 OpenAI 及其严格镜像
-    // 认识（OpenAI 收到 system 会自动为推理模型转换），第三方 OpenAI 兼容 API 普遍直接 400。
-    // pi-ai 的 getCompat 按字段覆盖，只设这一项不影响其余 compat 自动探测 (#46 #57)
-    compat: { supportsDeveloperRole: false },
+    // 自定义端点面向第三方 OpenAI 兼容 API，pi-ai 对未知 host 的默认值按 OpenAI 本家倾斜，
+    // 这里逐项纠偏；getCompat 按字段覆盖，未列出的项不影响自动探测：
+    // - supportsDeveloperRole: developer 角色只有 OpenAI 及其严格镜像认识（OpenAI 收到
+    //   system 会自动为推理模型转换），第三方普遍直接 400，一律用 system (#46 #57)
+    // - maxTokensField: 第三方普遍只认原始的 max_tokens，发 max_completion_tokens 会被
+    //   静默忽略，导致「最大输出」设置不生效、被服务端默认上限截断 (#54)
+    compat: { supportsDeveloperRole: false, maxTokensField: 'max_tokens' },
   };
   // 用户自定义请求头并进 model.headers（pi-ai 会合并进请求头）；仅非空时附加
   if (config.headers && Object.keys(config.headers).length > 0) {

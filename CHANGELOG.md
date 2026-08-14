@@ -21,8 +21,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### 修复 / Fixed
 
 - 修复自定义 Provider 中勾选「推理模型」后，system prompt 以 `developer` 角色发送、导致通义千问等第三方 OpenAI 兼容 API 返回 400 的问题；现在自定义模型一律使用 `system` 角色（OpenAI 端点会自动为推理模型转换，行为不受影响） ([#46](https://github.com/maotoumao/Cebian/issues/46), [#57](https://github.com/maotoumao/Cebian/issues/57))
+- 修复自定义 Provider 的「最大输出 tokens」设置对硅基流动等第三方端点不生效的问题：此前该值以 `max_completion_tokens` 字段发送、被只认 `max_tokens` 的第三方静默忽略，回复会被服务端默认上限截断（表现为思考型模型只输出思考过程、没有正文）；现在自定义模型一律使用 `max_tokens` 字段 ([#54](https://github.com/maotoumao/Cebian/issues/54))
 
 - Fixed custom-provider models marked as "reasoning" sending the system prompt with the `developer` role, which made third-party OpenAI-compatible APIs such as Qwen return 400; custom models now always use the `system` role (OpenAI endpoints auto-convert it for reasoning models, so behavior there is unchanged) ([#46](https://github.com/maotoumao/Cebian/issues/46), [#57](https://github.com/maotoumao/Cebian/issues/57))
+- Fixed a custom provider's "max output tokens" setting having no effect on third-party endpoints such as SiliconFlow: the value was sent as `max_completion_tokens`, which providers that only understand `max_tokens` silently ignore, so replies got truncated at the server's default cap (visible as thinking models emitting only their thinking process and no answer); custom models now always send `max_tokens` ([#54](https://github.com/maotoumao/Cebian/issues/54))
 
 ## 1.4.2 - 2026-08-11
 
