@@ -5,23 +5,17 @@ import { recoverOrganizeOnStartup, setupOrganizeSchedule } from './memory/organi
 import { setupMemoryClientHandlers } from './memory/client-handlers';
 import { recorder } from './recorder/manager';
 import { setupRecorderClientHandlers } from './recorder/client-handlers';
+import { setupRecorderPortRelay } from './recorder/port-relay';
 import { setupMcpBridge } from './mcp/bridge';
 import { seedDevStorage } from './providers/dev-seed';
 import { registerBackupHandler } from './chat/backup-handler';
 import { setupPageActions } from '@/lib/page-actions/manager';
 import { runPageActionStream, materializeHandoff } from './page-actions/runner';
 import { SUPPRESS_KIND } from '@/lib/page-actions/types';
-import { type ServerMessage } from '@/lib/ipc/protocol';
 import { isRecorderRuntimeMessage, RECORDER_MSG_KIND, type RecorderControlMessage } from '@/lib/recorder/protocol';
 import { isInjectablePage } from '@/lib/browser/tab-actions';
 import { setupUpdateNotice } from './lifecycle/update-notice';
-import {
-  setupPortRegistry,
-  onPortConnect,
-  onPortDisconnect,
-  post,
-  broadcastAll,
-} from './ipc/port-registry';
+import { setupPortRegistry } from './ipc/port-registry';
 import { setupClientRouter } from './ipc/client-router';
 
 export default defineBackground(() => {
@@ -64,27 +58,9 @@ export default defineBackground(() => {
   //
   // 连接表、投递与连接生命周期在 `ipc/port-registry.ts`（纯传输）；消息分发在
   // `ipc/client-router.ts`（注册制查表）；「哪个窗口正在看哪个会话」与 grace-cancel
-  // 在 chat 域（`chat/viewers.ts` / `chat/client-handlers.ts`）。这里只剩下 recorder
-  // 的接线：首帧同步与断连丢弃（子任务 8 再下沉）。
-
-  // ─── Recorder broadcast ───
-
-  /** Send recorder_status to every connected port (recorder is a global,
-   *  per-instance concept, not session-scoped). */
-  function broadcastRecorderStatus(): void {
-    const status = recorder.getStatus();
-    const msg: ServerMessage = {
-      type: 'recorder_status',
-      isRecording: status.isRecording,
-      startedAt: status.startedAt,
-      eventCount: status.eventCount,
-      truncated: status.truncated,
-      initiatorInstanceId: status.initiatorInstanceId,
-      activeWindowId: status.activeWindowId,
-    };
-    broadcastAll(msg);
-  }
-  recorder.onStatusChange(broadcastRecorderStatus);
+  // 在 chat 域（`chat/viewers.ts` / `chat/client-handlers.ts`）；recorder 的 UI 端口
+  // 接线在 `recorder/port-relay.ts`。这里只剩下 recorder 面向内容脚本的接线
+  // （注入钩子 / 事件监听 / 抑制 —— 子任务 8 Task 2 再下沉）。
 
   // 录制进行中时抑制被观察 tab 的页面交互 UI（悬浮球 / 工具条），避免误点击与录制噪声。
   // （取词 picker 由内容脚本自行观察 DOM，不走这里。）
@@ -113,38 +89,6 @@ export default defineBackground(() => {
       void chrome.tabs.sendMessage(tabId, { kind: SUPPRESS_KIND, on: true }).catch(() => {});
     }
   }
-
-  // Forward finalized recordings to whichever port owned the recording.
-  // Both manual `stop()` and the cap-trigger `autoStop()` fan out through
-  // this single hook, so we never need to special-case auto-stop on the
-  // delivery side. We snapshot the initiator port BEFORE recorder.stop()
-  // clears it; by the time this fires, recorder state is already idle, so
-  // we capture the port via a closure on the start path instead.
-  let lastInitiatorPort: chrome.runtime.Port | null = null;
-  recorder.onStatusChange(() => {
-    // Track the current initiator while it exists so the session listener
-    // (which fires AFTER recorder clears it) still knows where to send.
-    const ip = recorder.getInitiatorPort();
-    if (ip) lastInitiatorPort = ip;
-  });
-  recorder.onRecordingFinished(session => {
-    const target = lastInitiatorPort;
-    lastInitiatorPort = null;
-    if (!target) {
-      console.warn('[recorder] session finalized but no initiator port to deliver to');
-      return;
-    }
-    try {
-      target.postMessage({
-        type: 'recorder_session',
-        session,
-      } satisfies ServerMessage);
-    } catch (err) {
-      // Port disconnected between recorder clear and our send. The session
-      // is lost — acceptable, the user closed the surface.
-      console.warn('[recorder] failed to deliver session:', err);
-    }
-  });
 
   // ─── Recorder attach/detach hooks ───
   //
@@ -240,36 +184,8 @@ export default defineBackground(() => {
     return false;
   });
 
-  onPortConnect((port) => {
-    // Sync recorder state to the new port. Without this, a sidepanel that
-    // opens during an active recording (or reconnects after a brief SW
-    // suspension) would display "idle" until the next event triggers a
-    // broadcast.
-    const recStatus = recorder.getStatus();
-    post(port, {
-      type: 'recorder_status',
-      isRecording: recStatus.isRecording,
-      startedAt: recStatus.startedAt,
-      eventCount: recStatus.eventCount,
-      truncated: recStatus.truncated,
-      initiatorInstanceId: recStatus.initiatorInstanceId,
-      activeWindowId: recStatus.activeWindowId,
-    });
-  });
-
-  onPortDisconnect((port) => {
-    // Recording is owned by a single sidepanel/tab instance (identified
-    // by its port). When that exact port disconnects — sidepanel closed,
-    // standalone tab closed — drop the in-flight recording immediately.
-    // The recorder's keep-alive prevents SW suspension from triggering
-    // a false-positive disconnect, so this branch only fires on a real
-    // user action. Also drains any pending auto-stopped session so it
-    // doesn't leak.
-    if (recorder.getInitiatorPort() === port) {
-      void recorder.stop({ discard: true })
-        .catch(err => console.warn('[recorder] discard-on-disconnect failed:', err));
-    }
-  });
+  // recorder 面向 UI 端口的接线（状态广播 / 首帧 / 成品投递 / 断连丢弃）。
+  setupRecorderPortRelay();
 
   // 注册制消息路由：各域 client-handlers 先注册进查表（必须同步、在受理连接之前），
   // 路由器最后启动 —— 它会校验注册表覆盖了 CLIENT_MESSAGE_TYPES 全集，漏调 setup 启动即炸。

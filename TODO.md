@@ -35,7 +35,7 @@ chat/session-store.ts        数据层，可被其它能力 import
 | 6 | `ipc/port-registry.ts` 传输层抽出 | ✅ |
 | 6b | 会话路由下沉 `chat/viewers.ts`（`subscription` → viewer 词汇；删 `setBroadcast` 注入） | ✅ |
 | 7 | `ipc/client-router.ts` 注册制 + 各域 `client-handlers.ts` + `mcp/bridge.ts` + 编排下沉 + 穷尽性测试 | ✅ |
-| 8 | `recorder/content-bridge.ts` + `port-relay.ts` 抽出 | ⬜ |
+| 8 | `recorder/content-bridge.ts` + `port-relay.ts` 抽出 | 🟡 port-relay ✅；content-bridge（注入钩子 / 事件监听 / 抑制三件套 → `setupRecorderContentBridge()` + 导出 `handleContentPresent`）待做 |
 | 9 | 收口：`index.ts` 瘦身校验、depcruise 新规则、注释路径修正 | ⬜ |
 
 ### 新增能力时不要建 sendMessage 路由器

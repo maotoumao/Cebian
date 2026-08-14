@@ -14,7 +14,7 @@
 //                              the finalized session through the
 //                              `onRecordingFinished` hook to whoever wired it)
 //
-// Sidepanel disconnect handling lives in `entrypoints/background/index.ts`:
+// Sidepanel disconnect handling lives in `recorder/port-relay.ts`:
 // when the initiator port disconnects (sidepanel/tab closed), the background
 // calls `recorder.stop({ discard: true })` immediately. There is no
 // auto-resume on reconnect — the user explicitly chose this behaviour
