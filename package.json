@@ -19,7 +19,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "depcruise": "depcruise entrypoints components hooks lib --config .dependency-cruiser.cjs",
-    "check": "wxt prepare && tsc --noEmit && node scripts/lint-i18n.mjs && vitest run",
+    "lint:agents": "node scripts/check-agent-config.mjs",
+    "check": "node scripts/check-agent-config.mjs && wxt prepare && tsc --noEmit && node scripts/lint-i18n.mjs && vitest run",
     "postinstall": "wxt prepare && simple-git-hooks"
   },
   "simple-git-hooks": {

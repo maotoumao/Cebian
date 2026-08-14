@@ -1,8 +1,8 @@
 # Cebian Development Rules
 
-These rules are the single source of truth for every AI coding agent working on this repo — GitHub Copilot, Claude Code, or anything else. `CLAUDE.md` and `.github/copilot-instructions.md` are pointers to this file; edit the rules here, never in a pointer.
+These rules are the single source of truth for every AI coding agent working on this repo — Claude Code, GitHub Copilot, Codex, or anything else. Claude Code imports this file through `CLAUDE.md`; Copilot and Codex discover it directly. Edit the rules here, never in a platform adapter.
 
-Shared agent assets live in `.claude/skills/` (discovered by both Claude Code and VS Code Copilot): reusable workflows are invoked as `/<skill-name>` — `/code-review`, `/cl`, `/start-task`, `/upgrade-pi`, `/upgrade-packages` — and reference material such as `i18n-naming` or `shadcn` loads on demand. Do not confuse this with the top-level `skills/` directory, which ships inside the extension as a product feature.
+Canonical Agent Skills live in `.agents/skills/`; `.claude/skills/` and `.github/skills/` contain platform adapters only. Invoke reusable workflows as `/<skill-name>` in Claude Code or Copilot and `$<skill-name>` in Codex. Reference skills such as `i18n-naming` and `shadcn` load on demand. Do not confuse these with the top-level `skills/` directory, which ships inside the extension as a product feature.
 
 ## Component & Dependency Reuse
 
@@ -33,7 +33,7 @@ Once a plan is approved, execution must follow this strict per-task gating cycle
 
 1. **Split into subtasks** — Break the approved plan into concrete, individually verifiable subtasks. Track them in your harness's todo/task list so progress is visible to the user.
 2. **One task at a time** — Mark exactly one subtask as `in-progress` and complete only that subtask before touching the next. Do not start subsequent tasks in the same turn.
-3. **Code review after each task** — Immediately after finishing a subtask's implementation, run the `/code-review` skill on the changes for that subtask alone (it runs as a dedicated review subagent). Address any issues it raises before proceeding. **If the review surfaces fixes, refactors, or design changes that go beyond the scope of the original approved plan** (e.g., extracting a new shared module, refactoring an unrelated file, changing an established pattern), **stop and confirm with the user before applying them** — present what the reviewer suggested, why, and the proposed change, then wait for explicit approval. Only purely in-scope fixes (bugs, dead code, typos within the subtask's own files) may be applied without re-confirmation.
+3. **Code review after each task** — Immediately after finishing a subtask's implementation, run the repository's `code-review` workflow in the dedicated read-only reviewer provided by the current harness. Review the changes for that subtask alone and address any issues it raises before proceeding. **If the review surfaces fixes, refactors, or design changes that go beyond the scope of the original approved plan** (e.g., extracting a new shared module, refactoring an unrelated file, changing an established pattern), **stop and confirm with the user before applying them** — present what the reviewer suggested, why, and the proposed change, then wait for explicit approval. Only purely in-scope fixes (bugs, dead code, typos within the subtask's own files) may be applied without re-confirmation.
 4. **Provide testing instructions** — After code review passes, give the user clear, concrete steps to manually verify the subtask (what to open, what to click, what to look for, what console output to expect, etc.). Then **stop and wait**.
 5. **Wait for test feedback** — Do not start the next subtask while the user is still testing or has open questions. Answer questions and fix issues they report on the current subtask first.
 6. **Wait for explicit approval** — Only after the user explicitly approves the current subtask (e.g., "approved", "next", "looks good", "passed") may you mark it completed and move on to the next subtask. Silence, acknowledgements, or unrelated messages are **not** approval.
@@ -150,10 +150,10 @@ The repo keeps one root `CHANGELOG.md` following Keep a Changelog + SemVer, bili
 
 **Bilingual layout / 双语排版** — 每个小节正文**先列全部中文条目，空一行，再列全部对应英文条目**（顺序一一对应），不要逐行中英并排、不用 `/` 在条目内分隔中英。小节标题用 `中文 / English`。
 
-**Release cut-over / 发版收口** — 在改 `package.json` 版本号的发版提交里，把 `## [Unreleased]` 重命名为 `## X.Y.Z - YYYY-MM-DD`，并在顶部补一个新的空 `## [Unreleased]`。这一步**由人/AI 手动完成**（可用 `/cl` prompt 辅助审计补漏），**CI 不自动搬运** `[Unreleased]` 内容——CI 仅负责按 Changelog 内容发布 Release notes。
+**Release cut-over / 发版收口** — 在改 `package.json` 版本号的发版提交里，把 `## [Unreleased]` 重命名为 `## X.Y.Z - YYYY-MM-DD`，并在顶部补一个新的空 `## [Unreleased]`。这一步**由人/AI 手动完成**（可用项目的 `cl` workflow 辅助审计补漏），**CI 不自动搬运** `[Unreleased]` 内容——CI 仅负责按 Changelog 内容发布 Release notes。
 
 ## Post-Task Code Review
 
-After completing all coding for a task, run the `/code-review` skill to perform a senior-level code review in a dedicated subagent. Fix any issues found before reporting completion.
+After completing all coding for a task, run the repository's `code-review` workflow in the current harness's dedicated read-only reviewer. Fix any issues found before reporting completion.
 
 The review must also confirm the **Changelog gate**: if the task carries user-visible changes, check that `## [Unreleased]` was updated and that the new entries follow the format in the Changelog section (bilingual blocks, correct subsection, no edits to released version sections).

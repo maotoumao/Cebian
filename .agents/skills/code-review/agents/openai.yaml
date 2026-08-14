@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Review"
+  short_description: "Review Cebian changes for correctness and risk"
+  default_prompt: "Use $code-review to review the current subtask changes."

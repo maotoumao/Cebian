@@ -1,0 +1,4 @@
+interface:
+  display_name: "I18n Naming"
+  short_description: "Apply Cebian localization naming conventions"
+  default_prompt: "Use $i18n-naming when changing or reviewing localized strings."

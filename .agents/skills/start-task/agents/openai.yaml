@@ -1,0 +1,6 @@
+interface:
+  display_name: "Start Task"
+  short_description: "Resume the next approved implementation task"
+  default_prompt: "Use $start-task to resume the next approved plan subtask."
+policy:
+  allow_implicit_invocation: false

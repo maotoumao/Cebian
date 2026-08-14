@@ -1,0 +1,6 @@
+interface:
+  display_name: "Upgrade Packages"
+  short_description: "Research dependency upgrades and compatibility"
+  default_prompt: "Use $upgrade-packages to research safe dependency upgrades."
+policy:
+  allow_implicit_invocation: false

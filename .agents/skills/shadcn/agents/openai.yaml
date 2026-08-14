@@ -1,0 +1,6 @@
+interface:
+  display_name: "shadcn/ui"
+  short_description: "Manage shadcn/ui components and project setup"
+  icon_small: "./assets/shadcn-small.png"
+  icon_large: "./assets/shadcn.png"
+  default_prompt: "Use $shadcn to add or update a project UI component."

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Changelog"
+  short_description: "Audit and maintain the project changelog"
+  default_prompt: "Use $cl to audit user-visible changes since the last release."
+policy:
+  allow_implicit_invocation: false
