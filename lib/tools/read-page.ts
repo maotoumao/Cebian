@@ -4,6 +4,7 @@ import { TOOL_READ_PAGE } from '@/lib/tools/names';
 import { executeInTabWithArgs } from '@/lib/browser/tab-actions';
 import { ensureOffscreen } from './offscreen';
 import { isLikelyPdfUrl, pdfRedirectHint } from './pdf';
+import { assertFileAccess } from '@/lib/browser/file-access';
 import type { OffscreenRequest, OffscreenResponse } from '@/entrypoints/offscreen/main';
 import { vfs } from '@/lib/persistence/vfs';
 
@@ -933,18 +934,24 @@ export const readPageTool: AgentTool<typeof ReadPageParameters> = {
     // Detect by URL suffix (cheap, no script injection, no network) and
     // tell the agent to switch tools instead of returning empty content
     // that looks like a real failure.
+    let tabUrl: string | undefined;
     try {
-      const tab = await chrome.tabs.get(tabId);
-      if (isLikelyPdfUrl(tab.url)) {
-        return {
-          content: [{ type: 'text', text: pdfRedirectHint(tab.url, tabId) }],
-          details: {},
-        };
-      }
+      tabUrl = (await chrome.tabs.get(tabId)).url;
     } catch {
       // chrome.tabs.get can fail when the tab was just closed; let the
       // existing tool path handle the error so we don't mask it with our
       // own message.
+    }
+    if (tabUrl !== undefined) {
+      // file:// 前置权限检查先于 PDF 分流：开关未开时无论是不是 PDF，
+      // 后续注入 / fetch 都会失败，直接给出定向指引 (#49)
+      await assertFileAccess(tabUrl);
+      if (isLikelyPdfUrl(tabUrl)) {
+        return {
+          content: [{ type: 'text', text: pdfRedirectHint(tabUrl, tabId) }],
+          details: {},
+        };
+      }
     }
 
     let content: string;

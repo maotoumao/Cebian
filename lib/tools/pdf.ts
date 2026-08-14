@@ -1,6 +1,7 @@
 import { Type, type Static } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { TOOL_PDF } from '@/lib/tools/names';
+import { assertFileAccess } from '@/lib/browser/file-access';
 import { vfs } from '@/lib/persistence/vfs';
 import { ensureOffscreen } from './offscreen';
 import type {
@@ -154,9 +155,10 @@ export const pdfTool: AgentTool<typeof PdfParameters> = {
     '"read" (extract text by page range, supports `outputPath` for large docs), ' +
     '"search" (find a substring or regex and return page numbers + snippets). ' +
     'Always supply `tabId`. The tool fetches the PDF bytes from the tab\'s URL and parses ' +
-    'them inside the offscreen document; if the browser sandbox refuses the fetch (e.g. for ' +
-    'local file:// URLs without the "Allow access to file URLs" toggle, or page-scoped ' +
-    'blob: URLs), the error message will surface the actual fetch failure.',
+    'them inside the offscreen document. Local file:// PDFs require the user to enable the ' +
+    '"Allow access to file URLs" toggle — when it is off, the error message contains ' +
+    'ready-made guidance to relay. For other sandbox-refused fetches (e.g. page-scoped ' +
+    'blob: URLs), the error message surfaces the actual fetch failure.',
   parameters: PdfParameters,
 
   async execute(_toolCallId, params, signal): Promise<AgentToolResult<{}>> {
@@ -178,6 +180,10 @@ export const pdfTool: AgentTool<typeof PdfParameters> = {
     } catch {
       throw new Error(`Tab URL is not a valid URL: ${url}`);
     }
+
+    // file:// 前置权限检查：开关未开时直接给出定向指引，而不是让 offscreen
+    // fetch 抛一条无指向性的 "Failed to fetch" (#49)
+    await assertFileAccess(url);
 
     await ensureOffscreen();
     signal?.throwIfAborted();

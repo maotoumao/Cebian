@@ -10,6 +10,7 @@ import { CEBIAN_SKILLS_DIR, CEBIAN_PROMPTS_DIR } from '@/lib/persistence/vfs-pat
 import { encodeRelPath, vfs } from '@/lib/persistence/vfs';
 import { isImageMime, mimeFromPath } from '@/lib/content/mime';
 import { formatBytes } from '@/lib/utils';
+import { extensionSettingsUrl } from '@/lib/browser/file-access';
 
 /**
  * Minimal structural types for the hast (HTML AST) nodes react-markdown passes
@@ -79,6 +80,10 @@ function CodeBlock({ node, children }: { node?: HastElement; children?: ReactNod
  */
 function urlTransform(url: string): string | null | undefined {
   if (/^chrome-extension:/i.test(url)) return url;
+  // 额外仅放行本扩展详情页这一个 chrome:// 地址（LLM 引导用户开启
+  // 「允许访问文件网址」时给出的链接），点击由下方 anchor 组件接管；
+  // 其余 chrome:// 地址仍被默认消毒器剥除
+  if (url === extensionSettingsUrl()) return url;
   return defaultUrlTransform(url);
 }
 
@@ -370,11 +375,30 @@ const components: Components = {
   ),
 
   // External links open in new tab
-  a: ({ href, children, ...props }) => (
-    <a href={resolveVfsHref(href)} target="_blank" rel="noopener noreferrer" className="text-info underline underline-offset-2 hover:text-info/80" {...props}>
-      {children}
-    </a>
-  ),
+  a: ({ href, children, ...props }) => {
+    const resolved = resolveVfsHref(href);
+    // chrome:// 无法从页面内容点击导航。仅白名单本扩展详情页这一个精确地址
+    // （「允许访问文件网址」开关所在页，LLM 引导用户开启时会给出该链接），
+    // 拦截点击改经 chrome.tabs.create 打开；不放开任意 chrome:// 地址
+    const isOwnSettingsPage = resolved === extensionSettingsUrl();
+    return (
+      <a
+        href={resolved}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-info underline underline-offset-2 hover:text-info/80"
+        {...props}
+        onClick={isOwnSettingsPage
+          ? e => {
+              e.preventDefault();
+              void chrome.tabs.create({ url: resolved, active: true });
+            }
+          : props.onClick}
+      >
+        {children}
+      </a>
+    );
+  },
 
   // Horizontal rule with proper spacing
   hr: (props) => (

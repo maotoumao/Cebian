@@ -24,6 +24,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - All password-style inputs gain a show/hide toggle (eye icon), making it easy to double-check what was entered: a custom provider's API Key, an MCP server's Bearer Token, the WebDAV password, and backup encryption/restore passwords
 
+### 变更 / Changed
+
+- 读取本地文件页面（file:// 打开的 PDF / 网页）而扩展的「允许访问文件网址」权限未开启时，不再报无指向性的 "Failed to fetch"：AI 现在会明确说明原因，并给出可直接点击跳转的扩展设置页链接，开启后重试即可 ([#49](https://github.com/maotoumao/Cebian/issues/49))
+
+- Reading a local file:// page (a PDF or web page opened from disk) without the extension's "Allow access to file URLs" permission no longer fails with an unhelpful "Failed to fetch": the assistant now explains the cause and provides a clickable link that jumps straight to the extension settings page, so you can flip the toggle and retry ([#49](https://github.com/maotoumao/Cebian/issues/49))
+
 ### 修复 / Fixed
 
 - 修复自定义 Provider 中勾选「推理模型」后，system prompt 以 `developer` 角色发送、导致通义千问等第三方 OpenAI 兼容 API 返回 400 的问题；现在自定义模型一律使用 `system` 角色（OpenAI 端点会自动为推理模型转换，行为不受影响） ([#46](https://github.com/maotoumao/Cebian/issues/46), [#57](https://github.com/maotoumao/Cebian/issues/57))
