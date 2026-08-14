@@ -101,6 +101,39 @@ export type ClientMessage =
    *  后台仅向发起端口回一条 `memory_organize_state`（不带 outcome，不触发 toast）。 */
   | { type: 'memory_organize_query' };
 
+/**
+ * `ClientMessage['type']` 的值级清单，供运行期穷尽性检查用（类型在编译后被擦除，
+ * background 的 client-router 穷尽性测试需要一份可枚举的值）。
+ *
+ * 与联合类型的双向同步由编译期保证：多写 / 写错由 `satisfies` 报错，漏写由下方
+ * `_AssertClientMessageTypesComplete` 报错（报错信息里会直接列出漏掉的类型名）。
+ */
+export const CLIENT_MESSAGE_TYPES = [
+  'subscribe',
+  'unsubscribe',
+  'prompt',
+  'cancel',
+  'retry',
+  'resolve_tool',
+  'cancel_tool',
+  'resolve_permission',
+  'session_list',
+  'session_delete',
+  'recorder_start',
+  'recorder_stop',
+  'hello',
+  'mcp_read_resource',
+  'memory_organize',
+  'memory_organize_query',
+] as const satisfies readonly ClientMessage['type'][];
+
+type _ExpectNever<T extends never> = T;
+// ClientMessage 新增类型而清单没跟上时，这行 tsc 红，报错里直接列出漏掉的类型名。
+// 纯类型层，无运行时代码。
+type _AssertClientMessageTypesComplete = _ExpectNever<
+  Exclude<ClientMessage['type'], (typeof CLIENT_MESSAGE_TYPES)[number]>
+>;
+
 // ─── Background → Client (events) ───
 
 /** Session metadata without messages, for listing. */

@@ -7,10 +7,10 @@
 //
 // 本模块只放状态与投递，**不 import `session-manager`** —— 否则
 // session-manager → viewers → session-manager 成运行时环，depcruise 会红。因此
-// 「最后一个 viewer 断连后 grace-cancel」这条策略住在编排侧（今天的 `index.ts`），
-// 由它调 `stopViewing(port)` 拿到该窗口原本在看的会话再决定。注意只有**断连**会触发
-// grace-cancel；`unsubscribe` 消息同样调 `stopViewing`，但忽略返回值（用户还在，只是
-// 换了页面）。
+// 「最后一个 viewer 断连后 grace-cancel」这条策略住在 handler 层
+// （`chat/client-handlers.ts`），由它调 `stopViewing(port)` 拿到该窗口原本在看的会话
+// 再决定。注意只有**断连**会触发 grace-cancel；`unsubscribe` 消息同样调
+// `stopViewing`，但忽略返回值（用户还在，只是换了页面）。
 
 import type { ServerMessage } from '@/lib/ipc/protocol';
 import { post } from '../ipc/port-registry';

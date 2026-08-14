@@ -34,21 +34,9 @@ chat/session-store.ts        数据层，可被其它能力 import
 | A | `AGENT_PORT_NAME` → `CLIENT_PORT` + 端口/sendMessage 判据 | ✅ `3eb55bb` |
 | 6 | `ipc/port-registry.ts` 传输层抽出 | ✅ |
 | 6b | 会话路由下沉 `chat/viewers.ts`（`subscription` → viewer 词汇；删 `setBroadcast` 注入） | ✅ |
-| 7 | `ipc/client-router.ts` 注册制 + 各域 `client-handlers.ts` + `mcp-bridge.ts` + 编排下沉 + 穷尽性测试 | ⬜ |
+| 7 | `ipc/client-router.ts` 注册制 + 各域 `client-handlers.ts` + `mcp/bridge.ts` + 编排下沉 + 穷尽性测试 | ✅ |
 | 8 | `recorder/content-bridge.ts` + `port-relay.ts` 抽出 | ⬜ |
 | 9 | 收口：`index.ts` 瘦身校验、depcruise 新规则、注释路径修正 | ⬜ |
-
-### 子任务 7 要点
-
-- `ipc/client-router.ts` 只有一张 `Partial<Record<ClientMessage['type'], Handler>>` 查表，
-  各能力在自己的 `setup()` 里注册，router 不 import 任何域
-- 配穷尽性测试：枚举 `ClientMessage['type']` 断言全部有 handler，漏注册则 CI 红
-- 编排下沉：`session_delete` 的 VFS 清理进 chat、`recorder_start` 的窗口解析与所有权
-  复检进 recorder、`memory_organize` 的广播编排进 memory
-- **grace-cancel 随 chat 的 case 一起下沉到 `chat/client-handlers.ts`** —— 它现在还留在
-  `index.ts`，因为 `chat/viewers.ts` 若自己调 `sessionManager.cancel()` 就会与
-  session-manager 成运行时环（depcruise `no-circular` 是 error）。handlers 层没这个问题
-- `mcp-bridge.ts`（单文件概念）承接 `mcp_status` + `mcp_read_resource`
 
 ### 新增能力时不要建 sendMessage 路由器
 
@@ -77,35 +65,18 @@ chat/session-store.ts        数据层，可被其它能力 import
 抽之前要逐个论证语义，别一刀切：`materializeHandoff` 的顺序反转和 `resolveActionModel`
 的 throw 都是有意的，「对齐」不等于「统一」。
 
-### 2. keepalive 覆盖缺口
+### 2. keepalive 覆盖缺口（剩余部分）
 
-keepalive 是按「有活干」引用计数，只有 `session-manager`（agent 运行）、`organize-manager`、
-`recorder` 三处 acquire。以下长操作**没有**：
+备份恢复的缺口已修（`9028ba6`：缓冲存活期 + commit 期双 acquire，都在 `backup-handler.ts`
+编排层）。还没覆盖的：
 
 | 操作 | 期间有 chrome API 活动 | 风险 |
 |---|---|---|
-| **备份恢复**（chunk 累积 + commit） | ❌ chunk 之间靠消息喂活，commit 是一个大 Dexie 事务 | 中 |
 | `mcp_read_resource` / `mcp_status` | 少 | 中 |
 | 划词流式 `runPageActionStream` | ✅ 每个 delta 都 postMessage | 低 |
 
-**不是数据丢失** —— `applySessionsTransactional` 把 `clear()` + `bulkPut()` 放在同一个
-Dexie rw 事务里，SW 中途被杀会整体回滚，本地会话原样还在。真实后果是「恢复失败 +
-一条看不懂的错误」。
-
-真正的窗口比 `applyAll` 宽：恢复走分块协议，records 先累积在 `backup-handler.ts` 的
-`applyBuffers`（**SW 内存**），最后一条 commit 才落库。SW 若死在 chunk 阶段，缓冲整份
-没了 → commit 因「查无此 nonce 的缓冲」或「累计条数与 expectedCount 不符」而失败
-（后半段 chunk 可能唤醒 SW 并建出一个只含尾部记录的新缓冲）。
-
-**修法**：keepalive 绑两处，都在恢复编排层（`backup-handler.ts`），`session-store.ts`
-不动 —— 数据层不该管操作的保活。
-
-1. **缓冲存活期**：`touchBuffer` 首次建缓冲时 `acquireKeepAlive()`，`dropBuffer` 里
-   `releaseKeepAlive()`。三条释放路径（commit / abort / TTL）全汇聚在 `dropBuffer`，不漏放。
-2. **commit 期**：commit handler 里单独 acquire、`finally` 里 release。
-   **不能省** —— `expectedCount === 0` 的空恢复没有缓冲，但 `applySessionsTransactional`
-   无条件先 `toArray()` 读整张会话表、replace 还要 `clear()`，本地会话多时同样是长事务。
-   引用计数天然处理两者的嵌套。
+mcp 两条现在住 `background/mcp/bridge.ts`，修的话 acquire/release 就地包住两个
+handler 的 async 段即可。划词流式风险低（delta 持续喂活），可以不修。
 
 **是行为改动，单独提交。加固性质、未观测到实际故障 → 不记 CHANGELOG。**
 
