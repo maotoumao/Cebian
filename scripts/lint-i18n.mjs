@@ -170,7 +170,7 @@ async function main() {
     hasFailure = true;
     console.log(`✗ i18n lint: ${localeViolations.length} disallowed top-level locale key(s):`);
     for (const { file, key } of localeViolations) {
-      console.log(`  ${file}: \`${key}\` — not in allow-list (see .agents/skills/i18n-naming/SKILL.md)`);
+      console.log(`  ${file}: \`${key}\` — not in allow-list (see .claude/skills/i18n-naming/SKILL.md)`);
     }
     console.log('');
   } else {

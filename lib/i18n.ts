@@ -5,7 +5,7 @@
  * directly. This indirection lets a future migration to a different i18n
  * library (e.g. react-i18next) be a single-file change.
  *
- * See `.agents/skills/i18n-naming/SKILL.md` for naming, placeholder, and
+ * See `.claude/skills/i18n-naming/SKILL.md` for naming, placeholder, and
  * pluralization conventions.
  */
 import { i18n } from '#i18n';

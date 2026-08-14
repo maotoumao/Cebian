@@ -1,0 +1,6 @@
+allowBuilds:
+  '@google/genai': true
+  esbuild: true
+  msw: true
+  protobufjs: true
+  simple-git-hooks: true

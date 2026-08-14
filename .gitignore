@@ -18,6 +18,8 @@ web-ext.config.ts
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+# Claude Code: shared config is committed, personal overrides are not
+.claude/settings.local.json
 .idea
 .DS_Store
 *.suo

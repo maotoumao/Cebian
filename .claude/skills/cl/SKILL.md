@@ -2,11 +2,11 @@
 name: cl
 description: 审计自上次发版以来的提交，把遗漏的「用户可见变更」补进 CHANGELOG.md 的 [Unreleased]；可选地把 [Unreleased] 收口成正式版本节
 argument-hint: 可选——传版本号（如 1.3.3）表示要发版收口；留空则只做审计补漏，不收口
-agent: agent
-tools: ['search', 'runCommands', 'edit']
+disable-model-invocation: true
+allowed-tools: Read, Edit, Grep, Glob, Bash(git log:*), Bash(git status:*), Bash(git show:*)
 ---
 
-帮我审计并维护 [CHANGELOG.md](../../CHANGELOG.md)，确保自上次发版以来的所有「用户可见变更」都被记录。规则以 [copilot-instructions.md](../copilot-instructions.md) 的 **Changelog** 章节为准。
+帮我审计并维护 [CHANGELOG.md](../../../CHANGELOG.md)，确保自上次发版以来的所有「用户可见变更」都被记录。规则以 [AGENTS.md](../../../AGENTS.md) 的 **Changelog** 章节为准。
 
 参数约定：
 
@@ -16,9 +16,9 @@ tools: ['search', 'runCommands', 'edit']
 ## 工作流
 
 ### 1. 划定审计区间
-- 读取 [CHANGELOG.md](../../CHANGELOG.md)，找到最近一个已发布版本节（如 `## 1.3.2 - 2026-06-14`）和它的日期。
+- 读取 [CHANGELOG.md](../../../CHANGELOG.md)，找到最近一个已发布版本节（如 `## 1.3.2 - 2026-06-14`）和它的日期。
 - 在终端用 `git log` 取出自该版本以来的提交（项目历史是线性的、**无 git tag**，按日期或上一条 release commit 划界即可）。例：
-  `git log --pretty=format:'%h %ad %s' --date=short -- . | Out-String`
+  `git log --no-pager --pretty=format:'%h %ad %s' --date=short --since=<上次发版日期>`
 - 同时读完整个现有 `## [Unreleased]`，记下已经记过的条目，避免重复。
 
 ### 2. 逐条判定「记 / 不记」
@@ -39,7 +39,7 @@ tools: ['search', 'runCommands', 'edit']
 ### 4.（仅当传了版本号）发版收口
 - 把 `## [Unreleased]` 标题改成 `## <版本号> - <今天的日期 YYYY-MM-DD>`。
 - 在文件顶部、紧跟头部约定说明之后，补一个新的空 `## [Unreleased]`。
-- **不要**在这里改 [package.json](../../package.json) 的版本号——版本号 bump 由发版提交单独处理，本 prompt 只管 Changelog。
+- **不要**在这里改 [package.json](../../../package.json) 的版本号——版本号 bump 由发版提交单独处理，本指令只管 Changelog。
 
 ## 输出
 

@@ -2,18 +2,18 @@
 name: upgrade-packages
 description: 调研 package.json 所有依赖的最新版本，交叉验证版本差异，给出可升级到最新版的结论
 argument-hint: 可选——只想检查某些库时，列出库名；留空则检查全部依赖
-agent: agent
-tools: ['search', 'fetch', 'runCommands', 'web']
+disable-model-invocation: true
+allowed-tools: Read, Grep, Glob, WebFetch, WebSearch, Bash(pnpm outdated:*)
 ---
 
 帮我调研当前项目所有依赖的最新版本，深入对比每个库「已安装版本」和「最新版本」之间的内容差异，**交叉验证**后给出结论：哪些库可以安全升级到最新版。
 
-这是一次**调研 + 报告**任务，默认**不要**修改 [package.json](../../package.json) 或执行安装命令。除非我明确要求，否则只产出结论，不动代码。
+这是一次**调研 + 报告**任务，默认**不要**修改 [package.json](../../../package.json) 或执行安装命令。除非我明确要求，否则只产出结论，不动代码。
 
 ## 工作流
 
 ### 1. 盘点依赖
-- 读取 [package.json](../../package.json)，列出全部 `dependencies` 和 `devDependencies`。
+- 读取 [package.json](../../../package.json)，列出全部 `dependencies` 和 `devDependencies`。
 - 在终端运行 `pnpm outdated`（项目用 pnpm，不要用 npm/yarn）拿到「Current / Wanted / Latest」三列。
 - 如果我在参数里指定了具体库名，只处理这些库；否则处理全部有可升级版本的库。
 - 已经是最新版的库直接跳过，不必逐个写说明。
@@ -30,7 +30,7 @@ tools: ['search', 'fetch', 'runCommands', 'web']
 每个结论至少要有两类独立来源相互印证，避免只信单一页面：
 - 来源交叉：GitHub Releases 与 CHANGELOG/官方文档说法是否一致。
 - 代码交叉：用代码搜索确认本项目**实际怎么用这个库**（用到的 API、入口、是否只是间接依赖），据此评估破坏性变更对本项目的**真实影响**——别人眼里的 breaking 在我们这儿可能根本没用到。
-- 生态交叉：注意 React 19、WXT、Tailwind v4 等关键依赖的 peer 兼容要求，别让单个升级破坏整体。特别地，`typebox` 与 pi（pi-ai / pi-agent-core）内部捆绑的 typebox 必须同版本——本项目精确 pin `typebox`（无 `^`）就是为此，**不要单独升 typebox**，它只能跟随 pi 一起动；升级前后都去 [pnpm-lock.yaml](../../pnpm-lock.yaml) 核对 pi 解析的 typebox 版本。
+- 生态交叉：注意 React 19、WXT、Tailwind v4 等关键依赖的 peer 兼容要求，别让单个升级破坏整体。特别地，`typebox` 与 pi（pi-ai / pi-agent-core）内部捆绑的 typebox 必须同版本——本项目精确 pin `typebox`（无 `^`）就是为此，**不要单独升 typebox**，它只能跟随 pi 一起动；升级前后都去 [pnpm-lock.yaml](../../../pnpm-lock.yaml) 核对 pi 解析的 typebox 版本。
 - 遇到来源互相矛盾或信息不足，**如实标注「未确认」**，不要猜。
 
 ### 4. 分类结论
