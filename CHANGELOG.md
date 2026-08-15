@@ -34,11 +34,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 重试不再删除旧回复：任意已完成的回复都可以重试（不再限于最后一条），被替换的版本保留为分支、可随时切回
 - 上下文压缩的摘要卡片现在显示在压缩发生的时间点（对话末尾），而非插在历史中间；历史列表的消息数统计口径同步调整（不再计入摘要与授权卡片，包含所有分支）
 - 读取本地文件页面（file:// 打开的 PDF / 网页）而扩展的「允许访问文件网址」权限未开启时，不再报无指向性的 "Failed to fetch"：AI 现在会明确说明原因，并给出可直接点击跳转的扩展设置页链接，开启后重试即可 ([#49](https://github.com/maotoumao/Cebian/issues/49))
+- AI 回复下方的操作按钮顺序调整为「复制、重试、朗读」，让常用操作排列更符合使用顺序
 
 - Chat history now uses a tree-structured store under the hood (migrated losslessly and automatically on first launch, with the original data kept as a safety net) — the foundation for message editing and branch switching. The backup format stays compatible: new backups additionally carry branch data (older versions ignore it and restore the current branch), and old backups import as before
 - Retry no longer deletes the previous response: any completed response can be retried (not just the latest one), and replaced versions are kept as branches you can switch back to
 - The context-compaction summary card now appears at the point in time when compaction happened (end of the conversation) instead of being inserted mid-history; the history list's message count changes accordingly (summaries and permission cards are no longer counted; all branches are included)
 - Reading a local file:// page (a PDF or web page opened from disk) without the extension's "Allow access to file URLs" permission no longer fails with an unhelpful "Failed to fetch": the assistant now explains the cause and provides a clickable link that jumps straight to the extension settings page, so you can flip the toggle and retry ([#49](https://github.com/maotoumao/Cebian/issues/49))
+- Actions below AI responses are now ordered Copy, Retry, then Read aloud, placing common actions in a more natural sequence
 
 ### 修复 / Fixed
 

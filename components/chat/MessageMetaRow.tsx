@@ -18,8 +18,8 @@ export interface MessageMetaProps {
   /** When provided, a copy button is rendered on the left of the row,
    *  before any retry button. */
   text?: string;
-  /** When provided (alongside `text`), a read-aloud button is rendered to the
-   *  left of the copy button. Lazily yields the message's plain text. */
+  /** When provided (alongside `text`), a read-aloud button is rendered after
+   *  any retry button. Lazily yields the message's plain text. */
   getSpeakText?: () => string;
   /** When provided, a retry button is rendered next to the copy button.
    *  The caller decides eligibility (last turn-closing assistant, agent idle, etc.). */
@@ -85,7 +85,6 @@ export function MessageMetaRow({
     <div className="mt-2 flex items-center gap-1 text-[0.7rem] text-muted-foreground/70">
       {branchSwitcher}
       {text && <CopyButton text={text} />}
-      {text && getSpeakText && <SpeakButton getText={getSpeakText} />}
       {onRetry && (
         <Tooltip>
           <TooltipTrigger asChild>
@@ -102,6 +101,7 @@ export function MessageMetaRow({
           <TooltipContent>{retryLabel}</TooltipContent>
         </Tooltip>
       )}
+      {text && getSpeakText && <SpeakButton getText={getSpeakText} />}
       {parts.length > 0 && <span className="ml-auto font-mono">{parts.join(' · ')}</span>}
     </div>
   );

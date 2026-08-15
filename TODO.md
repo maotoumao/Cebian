@@ -208,25 +208,127 @@ lib/persistence/migrate-messages.ts、session-manager 的 TreeBinding）。
 
 #### 协议的「每次全量重发」（**即使不迁移 harness 也值得单独做**）
 
-现在的增量同步是靠「每次重发全量」实现的：
+> **2026-08 调研结论：值得独立做，而且不应等 harness。** 但目标不是把所有帧都改成
+> delta，而是把「连续流」与「不连续状态跳转」分开：连续流发有序 mutation，订阅 / 重连 /
+> 切分支 / retry 回卷等仍发权威 snapshot。
 
-| 消息 | 载荷 | 频率 |
+### 当前实际数据流
+
+| 消息 | 当前载荷 | 实际频率 / 语义 |
 |---|---|---|
-| `message_update` | **单条**正在流式的 assistant 消息（累积全文） | 每 token 级，高频 |
-| `message_end` | **整个会话历史** `[...agent.state.messages]` | 每条消息结束一次 |
-| `agent_end` | **整个会话历史** | 每轮结束一次 |
-| `session_state` | **整个会话历史** | 压缩 / retry / 授权卡片 / 取消 |
+| `message_update` | 单条在途 assistant 消息的**累积全文** | 每个 provider 流事件一次，不严格等于每 token；text / thinking / tool-call 的 start、delta、end 都会触发 |
+| `message_end` | 当前分支的完整 transcript | 每条 user / assistant / toolResult 完成一次；工具轮会连续触发多次 |
+| `agent_end` | 当前分支的完整 transcript + 分支信息 | 每次 run 结束一次，通常紧跟最后一个 `message_end`，全文基本重复 |
+| `session_state` | 当前分支的完整 transcript + 运行态 | 订阅活会话、压缩、retry / 编辑、切分支、授权卡片、取消与纠错 |
 
-两种代价叠加：
-- `message_update` 每次带「到目前为止的全文」，一条 n 字节回复约 O(n) 次更新 → 累计传输 **O(n²)**（高频，单条消息内部）
-- `message_end` / `agent_end` / `session_state` 每次序列化**整个 transcript** —— 200 条消息的会话，每结束一条消息就全量克隆一遍（低频，但单次体积大得多）
+pi 已在 `AgentEvent.message_update.assistantMessageEvent` 提供 text / thinking / tool-call delta；
+Cebian 目前丢掉这个字段，只转发 `event.message` 的累积副本。因此无需从两份全文反推 delta，
+但也不应把 pi 的含 `partial` 上游对象直接暴露为 wire contract——应在 background 归一化成
+自己的小 patch，避免协议绑死上游版本。
 
-可能的改法：`message_update` 只发 delta（客户端累加）；`message_end` / `agent_end` 只发
-**变化的那条消息**。代价是客户端要维护增量状态，且需要一个「漏帧后重同步」机制。
+### 树化后的边界
 
-**注意**：这也是「按会话路由必须保留」的原因 —— 若不按会话过滤，上面两笔开销都要
-乘以打开的窗口数。客户端多一行 `if` 过滤是免费的，**序列化 + IPC 传输**才是代价。
-路由本身住在 `chat/viewers.ts`。
+- IPC 中的 `messages` 是 **main lane 当前分支投影**，不是整棵树。旧分支不会直接进入每帧，
+  所以不能把全树 entry 数 `T` 与每帧 transcript 大小画等号。
+- 但压缩是无损设计：原消息永远留在 `agent.state.messages`，只在尾部追加摘要，LLM 视图才折叠。
+  因而在**不切分支、不 retry / 编辑回卷的追加路径上**，当前分支消息数 `M` / 字节数 `B`
+  仍单调增长，压缩不会替 IPC 限流；上述跳转会整体换投影，不能说全局单调。
+- `agent_end` 当前还会 `findEntries()` 克隆全树，再由 `buildBranchInfo()` 扫描 `T` 个 entry。
+  `buildBranchInfo()` 本身是 O(T)，但 `findEntries()` 的 `structuredClone` 按整树字节数 `Q`
+  付出 **O(Q) 时间 + 临时内存**；分支多或历史附件大时可能先于传输成为尾延迟，应缓存
+  `branchInfo`，只在 retry / 编辑等确实可能产生 sibling 时标脏重算。
+
+### 第一性成本模型
+
+记 `L` = 当前流式 assistant 长度，`U` = 流事件数，`B` = 当前分支序列化字节数，
+`M` = 当前分支消息数，`T` = 全树 entry 数，`Q` = 全树序列化字节数，
+`V` = 正在看该会话的窗口数：
+
+- 流式传输：`message_update` 总量约 `V × Σ partialLength`，即 **O(VUL)**；若平均每固定
+  `k` 字节来一帧，`U ≈ L/k`，退化为 **O(VL²/k)**。delta 后降为 O(VL)。
+- 终结传输：一轮若产生 `K` 个 `message_end`，当前约 **O(V(K+1)B)**；最后的 `+1`
+  是几乎重复的 `agent_end`。工具调用越多，`K` 越大。
+- 前端：每个 `message_update` 都复制 `messages` 数组 O(M)，整页重新执行 `messages.map`；
+  旧 Markdown 有 `memo` 保护，但在途消息仍每帧重新 Markdown + GFM + highlight 解析，约
+  O(L)。普通会话合计近似 **O(U(M+L))**；当前 assistant row 还会向前扫描轮次边界 / usage，
+  工具密集且连续分组时单次 render 最坏 O(M²)，总计 **O(U(M²+L))**。当前无列表虚拟化，
+  长会话会同时吃 IPC 与主线程。
+- Chrome 扩展消息使用 **JSON serialization**，不是零拷贝；每个 `port.postMessage` 都要跨
+  边界序列化，单帧硬上限 **64 MiB**。现有 `post()` 还会吞掉投递异常，超限时最终
+  `agent_end` 可能静默丢失，让 UI 卡在运行态。
+
+字节风险比「200 条消息」更早到：图片附件每张允许 5 MiB、一次最多 10 个，base64 约有
+4/3 膨胀，理论上单次 prompt 就可超过 64 MiB；即使首发侥幸通过，之后每个全量快照还会
+反复携带历史图片。增量广播只能消除重传，**首发超限仍需另设总附件字节上限，最终把二进制
+改成 VFS / blob 引用**。
+
+### 推荐协议形状
+
+1. **Snapshot 是同步边界**
+   - `session_snapshot { generation, revision, messages, branchInfo, runState, pending... }`
+   - 只用于首次订阅、Port 重连、显式 resync、切分支，以及 retry / 编辑失败后的权威纠错。
+   - retry / 编辑会整体换当前分支投影，保留 snapshot 比尝试描述任意 splice 更可靠。
+   - snapshot 必须包含在途消息的临时 `messageId` 与截至该 revision 的累积内容；否则重连方
+     没见过原 `message_start`，后续 delta 无法定位。`messageId` 按消息分配并保存在活会话，
+     不是按 run 分配；持久化 `entryId` 仍是树操作身份，两者不能混成一个字段。
+2. **连续流是有序 mutation**
+   - `message_start`：为本条 assistant 分配临时 `messageId`，发送最小初始形状。
+   - `message_patch_batch`：发送自己的归一化 patch 联合，绝不带上游 `partial`：
+     `block_start` 带 text / thinking 类型，或 tool-call 的最小 `{ id, name }`；`block_delta`
+     带 `{ messageId, contentIndex, kind, delta }`；`block_commit` 带该 text / thinking /
+     tool-call block 的最终完整形状。start / delta / commit 跨 block 严格保序，不能假设所有
+     pi 事件都只是可拼接字符串（`toolcall_end` 才给权威 `ToolCall`）。
+   - `message_commit`：消息结束时发送一次最终完整消息，作为 delta reducer 的校验点；落树后
+     再附 `entryId`（在途消息没有持久化 id 是现有正确契约）。
+   - `prompt` 增加客户端生成的 `commandId`；乐观 user row 以它为键，server 的 user mutation
+     回显同一 id 并 **replace / commit**，不能再 append 一份。非乐观的 toolResult /
+     compaction / permission 卡片走 append / replace mutation。
+   - `agent_end` 只发 run 状态、清空 pending、必要的 commit / `branchInfo`，不再带 transcript。
+3. **`session_state` 不宜一次性全拆**
+   - 第一阶段只把高频 `message_update`、重复 `message_end` / `agent_end` 增量化。
+   - 压缩、授权与取消频率低且有原子语义，可以暂留 snapshot；之后再把「消息 mutation +
+     pending 状态」放进同一 revision 的事务帧，不能让可点击授权卡片与 pending 集合错帧。
+
+### 顺序、背压与重同步
+
+- 活 Port 内依赖有序投递，不为每帧做 ACK；主要失同步边界是断线、SW 重启、协议 bug 与
+  超限投递。重连后一律重新 `subscribe` 并收 snapshot。
+- 每个活会话维护 `generation + revision`。每次权威状态 mutation 只推进一次 revision；发送
+  snapshot 只是报告当前 state revision，**自身不再占新号**，因此定向 subscribe / resync
+  不会让其它 viewer 凭空看到 gap。snapshot 是权威替换：新 generation 由它建立 / 重置；
+  同 generation 下旧 snapshot（revision < current）忽略，equal / newer snapshot 直接应用，
+  newer 可跨过 gap（resync 本来就负责这件事）。
+  mutation 才要求连续：`revision <= current` 是重复 / 旧帧，直接忽略，
+  `revision === current + 1` 才应用，`revision > current + 1` 才请求 snapshot。snapshot 的消息、
+  运行态、`branchInfo` 与 revision 必须来自同一个串行化状态切片：异步查树期间不能先占
+  revision，查完后拿旧 messages 配新 revision。它也能封住当前「订阅期间 await DB / 全树
+  分支扫描，旧 snapshot 可能晚于新 update 到达」的竞态。
+- Port 没有可用的背压信号。background 应在约 32–50 ms 内合并连续 delta（同块拼字符串、
+  跨块保序），定时器只排队、不阻塞 pi 的 awaited subscriber；`message_commit` / `agent_end`
+  前必须同步 flush。这样既限制 Port 队列，也把 Markdown 重算压到约 20–30 FPS。
+- 所有帧设显式字节预算；`post()` 至少记录非断线类序列化错误，不能继续无差别吞掉。
+
+### 前端配套
+
+- reducer 做结构共享：只替换变化的 message，旧消息对象引用保持稳定。
+- 把单条消息抽成可 memo 的 row，避免每个 delta 重算全部历史消息的 header / meta / tool 查找；
+  Markdown 只在变化的在途 row 上按合帧节奏解析。
+- Chromium-only 的侧边栏可先给离屏消息加 `content-visibility: auto`；真正虚拟化留到实测 DOM
+  数量成为瓶颈后再做，因为变高 Markdown、自动贴底、页内查找与分支切换会显著增加复杂度。
+
+### 实施顺序
+
+1. 先加开发态计数：每类帧次数、UTF-8 字节数
+  `TextEncoder().encode(JSON.stringify(frame)).byteLength`、最大 `B/M/T/Q`、UI commit /
+  long task；用纯文本、工具密集、thinking、图片、retry 多分支五组会话建立基线。
+2. 引入 generation / revision + `session_snapshot`，先把重连和纠错边界固定下来。
+3. `message_end` 改最终消息 commit，`agent_end` 去 transcript；这是低复杂度、直接消掉最多的
+   O(B) 重复帧。
+4. 接 pi delta，做 `message_patch_batch` + background 合帧，再做前端 row memo。
+5. 缓存 `branchInfo`（树规模问题）与二进制引用化（64 MiB 问题）分别立项，不塞进 IPC reducer。
+
+**按会话路由必须保留。** `chat/viewers.ts` 在序列化前筛 viewer；若改成先全局广播、再让客户端
+`if` 过滤，JSON 序列化与传输成本仍会乘以所有打开窗口。客户端过滤只能省业务处理，省不了边界成本。
 
 ### 注意
 
