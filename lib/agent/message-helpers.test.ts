@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { AgentMessage } from '@earendil-works/pi-agent-core';
+import { assertJsonSerializable, type AgentMessage } from '@earendil-works/pi-agent-core';
 import { replaceUserText, sanitizeAgentMessages } from './message-helpers';
 
 // 用 `as unknown as AgentMessage[]` 构造违反类型契约的运行时数据（这正是本函数要兜的场景）。
@@ -49,6 +49,45 @@ describe('sanitizeAgentMessages', () => {
     expect((out[0] as any).content).toEqual([]);
     expect((out[1] as any).content).toEqual([]);
     expect((out[2] as any).content).toEqual([]);
+  });
+
+  it('移除标准消息顶层值为 undefined 的可选字段，使其满足 durable payload 契约', () => {
+    const toolResult = {
+      role: 'toolResult',
+      toolCallId: 't',
+      toolName: 'demo',
+      content: [],
+      details: undefined,
+      usage: undefined,
+      isError: false,
+      timestamp: 1,
+    };
+    const assistant = {
+      role: 'assistant',
+      content: [],
+      api: 'demo-api',
+      provider: 'demo',
+      model: 'demo-model',
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: 'aborted',
+      errorMessage: undefined,
+      timestamp: 2,
+    };
+    const out = sanitizeAgentMessages(asMessages([toolResult, assistant]));
+
+    expect(() => assertJsonSerializable(out)).not.toThrow();
+    expect(Object.hasOwn(out[0], 'details')).toBe(false);
+    expect(Object.hasOwn(out[0], 'usage')).toBe(false);
+    expect(Object.hasOwn(out[1], 'errorMessage')).toBe(false);
+    expect(Object.hasOwn(toolResult, 'usage')).toBe(true);
+    expect(Object.hasOwn(assistant, 'errorMessage')).toBe(true);
   });
 
   it('不给 compactionSummary 这类自定义消息塞 content，原样返回', () => {

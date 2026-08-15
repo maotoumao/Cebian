@@ -206,6 +206,18 @@ function sanitizeBlocks(blocks: unknown[]): unknown[] {
   return out ?? blocks;
 }
 
+/** pi 可能显式写入值为 undefined 的可选字段，而 durable payload 契约要求这类字段必须省略 */
+function omitUndefinedFields<T extends object>(value: T): T {
+  const record = value as Record<string, unknown>;
+  let out: Record<string, unknown> | null = null;
+  for (const key of Object.keys(record)) {
+    if (record[key] !== undefined) continue;
+    out ??= { ...record };
+    delete out[key];
+  }
+  return (out ?? value) as T;
+}
+
 /** 矫正一条消息；无改动时原样返回同一引用 */
 function sanitizeMessage(msg: AgentMessage): AgentMessage {
   // 仅标准 Message 角色带 content；compactionSummary 等自定义消息无 content 字段，跳过，
@@ -213,17 +225,18 @@ function sanitizeMessage(msg: AgentMessage): AgentMessage {
   if (msg.role !== 'user' && msg.role !== 'assistant' && msg.role !== 'toolResult') {
     return msg;
   }
-  const content: unknown = (msg as Message).content;
+  const clean = omitUndefinedFields(msg);
+  const content: unknown = (clean as Message).content;
   // 顶层 content 缺失 → 空数组（对齐 pi transformMessages 的规整）
   if (content == null) {
-    return { ...msg, content: [] } as AgentMessage;
+    return { ...clean, content: [] } as AgentMessage;
   }
   // 字符串 content（常见于 user 消息）无嵌套块，原样返回
   if (!Array.isArray(content)) {
-    return msg;
+    return clean;
   }
   const fixed = sanitizeBlocks(content);
-  return fixed === content ? msg : ({ ...msg, content: fixed } as AgentMessage);
+  return fixed === content ? clean : ({ ...clean, content: fixed } as AgentMessage);
 }
 
 /**
