@@ -543,6 +543,11 @@ chat:
     tokensInBreakdownHitWrite: "未快取 $1 · 快取 $2 · 寫快取 $3"
     # 最新一輪 assistant 訊息左下角重試按鈕的 tooltip / aria-label
     retry: "重試"
+    # 編輯已傳送 user 訊息時的提示（issue #44）
+    editHint: "將從這裡重新產生回覆"
+    # 存在並列版本的訊息上「‹ n/m ›」分支切換器的 tooltip
+    prevBranch: "上一個版本"
+    nextBranch: "下一個版本"
   compaction:
     # 歷史壓縮分割條上的標籤
     divider: "先前上下文已壓縮"

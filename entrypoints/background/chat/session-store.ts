@@ -1,56 +1,121 @@
-// Background-only session store.
-// Sole writer to Dexie DB — eliminates write conflicts from multiple sidepanels.
+// Background-only session store（树化门面）。
+// background 是 `sessions` / `sessionMutations` 两表的唯一写者——消除多 sidepanel 写冲突。
+// transcript 的真相在 mutation 日志（会话树）里；`sessions` 行只承载列表元数据
+// （v1 遗留的 `messages` 影子字段仅作迁移保险，不再更新）。
 
+import { uuidv7, type AgentMessage, type Session } from '@earendil-works/pi-agent-core';
 import {
-  createSession,
+  applySessionsTransactional,
   getSession,
   listSessions,
-  deleteSession,
+  retryTreeMigration,
+  sessionTreeDb,
   updateSessionSettings,
-  applySessionsTransactional,
-  ThrottledSessionWriter,
+  type SessionBackupRecord,
   type SessionRecord,
 } from '@/lib/persistence/db';
+import { DexieSessionRepo, type SessionTreeMeta } from '@/lib/persistence/session-tree';
+import {
+  buildBranchInfo,
+  messageToEntryBody,
+  projectEntries,
+  type BranchEntryInfo,
+} from '@/lib/agent/session-projection';
+import { sanitizeAgentMessages } from '@/lib/agent/message-helpers';
 import { planSessionWrites } from '@/lib/backup/sources/sessions';
 import type { RestoreStrategy } from '@/lib/backup/types';
 import type { ApplySessionsResult } from '@/lib/backup/sources/sessions';
-import type { AgentMessage } from '@earendil-works/pi-agent-core';
-import { sanitizeAgentMessages } from '@/lib/agent/message-helpers';
+
+/** `open()` 的结果：IPC 兼容的 record 视图 + 树句柄 + 投影对齐的 entryId 表。 */
+interface LoadedSession {
+  /** meta 行 + 当前 main 分支投影出的 `messages`（`session_loaded` 兼容形状）。 */
+  record: SessionRecord;
+  /** pi 会话树句柄，后续追加 / moveLane 都经它。 */
+  tree: Session<SessionTreeMeta>;
+  /** 与 `record.messages` 逐位对齐的来源 entryId（见 session-projection）。 */
+  entryIds: string[];
+  /** 当前分支上各分支点的兄弟信息（稀疏，仅兄弟数 ≥2）。 */
+  branchInfo: Record<string, BranchEntryInfo>;
+}
+
+/** 新会话行的应用元数据（id 由调用方生成；messageCount 恒从 0 起）。 */
+interface CreateSessionFields {
+  id: string;
+  title: string;
+  model: string;
+  provider: string;
+  userInstructions: string;
+  thinkingLevel: string;
+}
+
+/**
+ * 树 append 入口：一条消息按共享映射（`messageToEntryBody`）落成 entry。写入前过
+ * 一道 sanitize——append-only 日志一旦冻结坏数据即永久化（issue #43 防线）。
+ * 返回新 entry 的 id（供编排层维护投影对齐表）。
+ */
+async function appendSessionMessage(
+  tree: Session<SessionTreeMeta>,
+  message: AgentMessage,
+): Promise<string> {
+  const [clean] = sanitizeAgentMessages([message]);
+  const entry = await tree.appendEntry({ ...messageToEntryBody(clean), id: uuidv7() }, 'main');
+  return entry.id;
+}
 
 class SessionStore {
-  private writers = new Map<string, ThrottledSessionWriter>();
+  private readonly repo = new DexieSessionRepo(sessionTreeDb);
 
-  async create(session: SessionRecord): Promise<void> {
-    await createSession(session);
+  /** 打开会话：meta 行 + 树句柄 + 当前 main 分支投影。行不存在返回 undefined。 */
+  async open(id: string): Promise<LoadedSession | undefined> {
+    let row = await getSession(id);
+    if (!row) return undefined;
+    if (row.treeMigrationFailed) {
+      // v1→v2 迁移失败行的懒重试：原始数据仍在 messages 影子字段。重试失败则
+      // **拒绝打开**（抛给调用方 → UI 报错）而不是以空树降级——空树可写会让
+      // 后续成功的重建删掉期间写入的新消息（静默丢失）。成功后逐出 repo 缓存
+      //（防早前缓存的空树句柄与重建后的日志撞 seq），并重读行——重建清掉了
+      // 标记、重算了 messageCount，返回的 record 不能再带旧值。
+      await retryTreeMigration(id);
+      this.repo.evict(id);
+      row = (await getSession(id)) ?? row;
+    }
+    const tree = await this.repo.open({ id } as SessionTreeMeta);
+    const entries = await tree.findEntriesOnBranch({ order: 'oldestFirst' });
+    const { messages, entryIds } = projectEntries(entries);
+    const branchInfo = buildBranchInfo(await tree.findEntries({ order: 'oldestFirst' }), entryIds);
+    // 投影后再兜一道 sanitize（防御历史日志中的脏数据），copy-on-write 常态零分配
+    return { record: { ...row, messages: sanitizeAgentMessages(messages) }, tree, entryIds, branchInfo };
   }
 
+  /** 兼容视图：只要 record（IPC `session_loaded` / 标题读取用）。 */
   async load(id: string): Promise<SessionRecord | undefined> {
-    const record = await getSession(id);
-    if (!record) return record;
-    // 唯一的加载边界：把历史整形回类型契约（null text/thinking/name → ''），一处同时
-    // 覆盖 agent 水合、UI 冷加载广播与其它 load 消费者，避免 pi 的 token 估算器取 .length
-    // 整轮崩（issue #43），并让渲染层拿到干净数据。copy-on-write：干净时零分配
-    const messages = sanitizeAgentMessages(record.messages);
-    if (messages === record.messages) return record;
-    // 坏消息的产生源尚未定位（issue #43）：命中即打一条带 id + 条数的日志，便于回查现物
-    const healed = messages.reduce((n, m, i) => n + (m !== record.messages[i] ? 1 : 0), 0);
-    console.warn(
-      `[session-store] session ${id}: healed ${healed} malformed message(s) on load — invalid null/undefined field(s) in history (issue #43)`,
-    );
-    return { ...record, messages };
+    return (await this.open(id))?.record;
+  }
+
+  /** 新会话建行（空树）。id 已存在时抛 pi 的 SessionError('already_exists')。 */
+  async create(fields: CreateSessionFields): Promise<void> {
+    await this.repo.create(fields);
+  }
+
+  /** 建行并写入初始消息（划词动作「在侧边栏继续」的固化路径）。 */
+  async createWithMessages(fields: CreateSessionFields, messages: AgentMessage[]): Promise<void> {
+    const tree = await this.repo.create(fields);
+    for (const message of messages) {
+      await appendSessionMessage(tree, message);
+    }
   }
 
   async list(): Promise<Omit<SessionRecord, 'messages'>[]> {
     const all = await listSessions();
-    return all.map(({ messages, ...rest }) => rest);
+    return all.map(({ messages: _messages, ...rest }) => rest);
   }
 
+  /** 删除会话：repo 负责 meta 行 + mutation 日志 + 在途写清扫（drain + tombstone）。 */
   async delete(id: string): Promise<void> {
-    await deleteSession(id);
-    this.disposeWriter(id);
+    await this.repo.delete({ id } as SessionTreeMeta);
   }
 
-  /** 把会话的模型 / 思考档落库（background 是 Dexie 唯一写者，故经由此处）。 */
+  /** 把会话的模型 / 思考档落库（background 是唯一写者，故经由此处）。 */
   async updateSettings(
     id: string,
     settings: { provider?: string; model?: string; thinkingLevel?: string },
@@ -58,45 +123,20 @@ class SessionStore {
     await updateSessionSettings(id, settings);
   }
 
-  scheduleWrite(id: string, messages: AgentMessage[]): void {
-    let writer = this.writers.get(id);
-    if (!writer) {
-      writer = new ThrottledSessionWriter();
-      this.writers.set(id, writer);
-    }
-    writer.schedule(id, messages);
-  }
-
-  async flush(id: string): Promise<void> {
-    const writer = this.writers.get(id);
-    if (writer) await writer.flush();
-  }
-
-  /** 把全部待写的节流写立即落库。采集备份前由 flush 信号触发，确保页面随后直读 Dexie
-   *  时能读到仍躺在 throttle 计时器里的在途消息。 */
-  async flushAll(): Promise<void> {
-    await Promise.all([...this.writers.values()].map((w) => w.flush()));
-  }
-
   /**
-   * 备份：按恢复策略把会话写回。background 是 Dexie 唯一写者，故 merge/replace
-   * 决策必须在此执行。
+   * 备份：按恢复策略把会话写回。纯决策（写哪些 / 跳过哪些 / 是否清空）在
+   * `planSessionWrites`；执行在 `applySessionsTransactional` 的单个 rw 事务里
+   * （含 mutation 日志重建——树化后恢复必须双写，见 db.ts）。
    *
-   * 纯决策（写哪些 / 跳过哪些 / 是否清空）在 `planSessionWrites`；本方法是执行该
-   * 计划的存储胶水。读 existing → 决策 → 写入整体放进同一个 Dexie rw 事务
-   * （`applySessionsTransactional`），既保证替换模式「清空后写入」原子（写入失败
-   * 不会丢数据），又让读写在 IndexedDB 层隔离，杜绝中途被其它写事务穿插导致旧
-   * 备份覆盖更新的本地会话。
-   *
-   * 已知限制：本方法不强制运行中的 agent 暂停。恢复是用户在设置里主动发起的破坏
-   * 性操作，由 UI 层负责提示恢复期间不要同时进行对话；恢复后 agent 若立刻又写入
-   * 新数据，属于正常的 last-write-wins。
+   * 已知限制（沿袭）：不强制运行中的 agent 暂停。恢复是用户主动发起的破坏性
+   * 操作，由 UI 层提示恢复期间不要同时对话；恢复后活 agent 若再写入，其旧树句柄
+   * 的写要么撞 seq 主键显式失败，要么落成超出重建日志的孤儿行（下次 open 时被
+   * 坏尾截断清理）——两种结局都不会静默覆盖恢复结果。
    */
   async applyAll(
-    records: SessionRecord[],
+    records: SessionBackupRecord[],
     strategy: RestoreStrategy,
   ): Promise<ApplySessionsResult> {
-    await this.flushAll();
     let result: ApplySessionsResult = { written: 0, skipped: 0, cleared: false };
     await applySessionsTransactional((existing) => {
       const plan = planSessionWrites(existing, records, strategy);
@@ -107,29 +147,14 @@ class SessionStore {
       };
       return { clearAll: plan.clearAll, toPut: plan.toPut };
     });
-    // replace 模式清空了会话表：恢复前建的 writer 已无对应会话行，销毁掉——既回收内存，
-    // 也丢弃还卡在 timer / pending 里的旧写
-    //
-    // 恢复不强制暂停运行中的 agent（见上方已知限制），事务期间可能又有 scheduleWrite
-    // 落进来。丢弃而不是 flush 它是有意的：备份通常会重新插入同一批 sessionId，把旧内容
-    // 写回去就盖掉了刚恢复的消息。已经进入 `updateSessionMessages` 的那一笔取消不了，
-    // 仍受既有的 last-write-wins 限制
-    if (result.cleared) this.disposeAllWriters();
+    // 盘上日志已被事务重写：清空 repo 缓存，下次 open 重放新日志
+    this.repo.evictAll();
     return result;
-  }
-
-  private disposeWriter(id: string): void {
-    const writer = this.writers.get(id);
-    if (writer) {
-      writer.dispose();
-      this.writers.delete(id);
-    }
-  }
-
-  private disposeAllWriters(): void {
-    for (const writer of this.writers.values()) writer.dispose();
-    this.writers.clear();
   }
 }
 
+// ─── Public API ───
+
 export const sessionStore = new SessionStore();
+export { appendSessionMessage };
+export type { LoadedSession };

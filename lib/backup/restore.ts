@@ -14,7 +14,7 @@ import {
   type BackupManifest,
   type RestorePlan,
 } from './types';
-import { isValidSessionLike, type SessionRecord as DbSessionRecord } from '@/lib/persistence/db';
+import { isValidSessionLike, type SessionBackupRecord } from '@/lib/persistence/db';
 
 const decoder = new TextDecoder();
 
@@ -124,11 +124,13 @@ export async function restoreBackup(
   if (cats.has('sessions')) {
     // 会话拆成 payload/sessions/{id}.json 多个文件；逐个解析聚合成数组。文件名 id
     // 必须是合法 UUID 且与内容 record.id 一致，挡住畸形 id 写进 Dexie。
-    const records: DbSessionRecord[] = [];
+    const records: SessionBackupRecord[] = [];
     for (const key of Object.keys(bundle.files)) {
       const fileId = sessionIdFromFileKey(key);
       if (fileId === null) continue;
-      const rec = parseJsonBytes<DbSessionRecord>(bundle.files[key], key);
+      // 线格式可能带可选的 mutations 日志（分支），原样透传给 restoreSessions；
+      // 深校验在 background 写库层
+      const rec = parseJsonBytes<SessionBackupRecord>(bundle.files[key], key);
       if (rec.id !== fileId) {
         throw new RestoreError('corruptBackup', `Session file ${key} id mismatch`);
       }

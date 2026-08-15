@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
-import { sanitizeAgentMessages } from './message-helpers';
+import { replaceUserText, sanitizeAgentMessages } from './message-helpers';
 
 // 用 `as unknown as AgentMessage[]` 构造违反类型契约的运行时数据（这正是本函数要兜的场景）。
 const asMessages = (arr: unknown[]) => arr as unknown as AgentMessage[];
@@ -153,5 +153,58 @@ describe('sanitizeAgentMessages', () => {
   it('空数组原样返回', () => {
     const msgs = asMessages([]);
     expect(sanitizeAgentMessages(msgs)).toBe(msgs);
+  });
+});
+
+describe('replaceUserText', () => {
+  const wrap = (text: string) => `<user-request>\n${text}\n</user-request>`;
+
+  it('字符串 content：有 <user-request> 包裹时只换内文，兄弟块保留', () => {
+    const msg = {
+      role: 'user',
+      content: `<attachments><attached-file name="a.txt" type="text/plain"></attached-file></attachments>\n${wrap('旧文案')}`,
+      timestamp: 1,
+    } as any;
+    const out = replaceUserText(msg, '新文案');
+    expect(out.content).toContain('<attachments>');
+    expect(out.content).toContain(wrap('新文案'));
+    expect(out.content).not.toContain('旧文案');
+    expect(msg.content).toContain('旧文案'); // 纯函数，不改入参
+  });
+
+  it('字符串 content：无包裹（裸文本）时整体替换', () => {
+    const out = replaceUserText({ role: 'user', content: '裸文本', timestamp: 1 } as any, '新');
+    expect(out.content).toBe('新');
+  });
+
+  it('块数组 content：替换含 <user-request> 的 text 块，image 块原样保留', () => {
+    const msg = {
+      role: 'user',
+      content: [
+        { type: 'text', text: wrap('旧') },
+        { type: 'image', data: 'xxx', mimeType: 'image/png' },
+      ],
+      timestamp: 1,
+    } as any;
+    const out = replaceUserText(msg, '新');
+    expect(out.content[0].text).toBe(wrap('新'));
+    expect(out.content[1]).toBe(msg.content[1]);
+  });
+
+  it('新文案含 $& / $1 等 replace 特殊模式时按字面写入', () => {
+    const out = replaceUserText(
+      { role: 'user', content: wrap('旧'), timestamp: 1 } as any,
+      '价格是 $1，匹配 $& 保留',
+    );
+    expect(out.content).toContain('价格是 $1，匹配 $& 保留');
+  });
+
+  it('块数组无 text 块时追加一个', () => {
+    const out = replaceUserText(
+      { role: 'user', content: [{ type: 'image', data: 'x', mimeType: 'image/png' }], timestamp: 1 } as any,
+      '新',
+    );
+    expect(out.content).toHaveLength(2);
+    expect(out.content[1]).toEqual({ type: 'text', text: '新' });
   });
 });

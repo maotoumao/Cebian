@@ -142,6 +142,44 @@ export function truncateForRetry<M extends { role: string }>(messages: M[]): M[]
   return null;
 }
 
+/**
+ * 把 user 消息的正文替换为新文本（消息编辑，issue #44），保留附件结构：
+ * - 有 `<user-request>` 包裹（composeUserMessage 的产物）时只替换其内文，
+ *   `<attachments>` 等兄弟块原样保留；
+ * - 无包裹（划词固化等裸文本）时替换整段文本；
+ * - content 为块数组时替换第一个含 `<user-request>` 的 text 块（无则第一个
+ *   text 块；一个 text 块都没有则追加一个），image 等其它块不动。
+ *
+ * 与后台 editMessage / 前端乐观更新共用，保证多窗口收敛时两侧算出同一形状。
+ * 纯函数、不改入参。
+ */
+export function replaceUserText<M extends Message>(msg: M, newText: string): M {
+  // replacement 用函数形式，避免 newText 里的 `$&` / `$1` 被 String.replace 当特殊模式展开
+  const replaceInRaw = (raw: string): string =>
+    USER_REQUEST_RE.test(raw)
+      ? raw.replace(USER_REQUEST_RE, () => `<user-request>\n${newText}\n</user-request>`)
+      : newText;
+
+  if (typeof msg.content === 'string') {
+    return { ...msg, content: replaceInRaw(msg.content) };
+  }
+  if (Array.isArray(msg.content)) {
+    const blocks = msg.content as { type?: string; text?: string }[];
+    let target = blocks.findIndex(
+      (b) => b.type === 'text' && typeof b.text === 'string' && USER_REQUEST_RE.test(b.text),
+    );
+    if (target < 0) target = blocks.findIndex((b) => b.type === 'text');
+    if (target < 0) {
+      return { ...msg, content: [...blocks, { type: 'text', text: newText }] } as M;
+    }
+    const content = blocks.map((b, i) =>
+      i === target ? { ...b, text: replaceInRaw(b.text ?? '') } : b,
+    );
+    return { ...msg, content } as M;
+  }
+  return msg;
+}
+
 // ─── 消息形态规整（类型契约兜底）───
 
 /** 把单个内容块里为 null / undefined 的字符串字段兜成空串；块无需矫正时原样返回同一引用 */

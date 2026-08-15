@@ -1,4 +1,5 @@
 import { RotateCcw } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { CopyButton } from '@/components/common/CopyButton';
@@ -23,6 +24,8 @@ export interface MessageMetaProps {
   /** When provided, a retry button is rendered next to the copy button.
    *  The caller decides eligibility (last turn-closing assistant, agent idle, etc.). */
   onRetry?: () => void;
+  /** 分支导航放在全部消息操作之前，作为操作行最左侧内容。 */
+  branchSwitcher?: ReactNode;
 }
 
 function formatTokens(n: number): string {
@@ -40,6 +43,7 @@ function formatTokens(n: number): string {
  */
 export function MessageMetaRow({
   modelLabel, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, text, getSpeakText, onRetry,
+  branchSwitcher,
 }: MessageMetaProps) {
   const parts: string[] = [];
   if (modelLabel) parts.push(modelLabel);
@@ -68,7 +72,7 @@ export function MessageMetaRow({
     parts.push(t('chat.message.tokensInOut', [inLabel, formatTokens(out)]));
   }
 
-  if (parts.length === 0 && !text && !onRetry) return null;
+  if (parts.length === 0 && !text && !onRetry && !branchSwitcher) return null;
 
   const retryLabel = t('chat.message.retry');
 
@@ -79,6 +83,7 @@ export function MessageMetaRow({
   // alone (the meta span is omitted, not just emptied).
   return (
     <div className="mt-2 flex items-center gap-1 text-[0.7rem] text-muted-foreground/70">
+      {branchSwitcher}
       {text && <CopyButton text={text} />}
       {text && getSpeakText && <SpeakButton getText={getSpeakText} />}
       {onRetry && (

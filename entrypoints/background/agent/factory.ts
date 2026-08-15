@@ -17,7 +17,7 @@ import type { Api, Model, Message } from '@earendil-works/pi-ai';
 import { streamSimple } from '@earendil-works/pi-ai/compat';
 import type { ThinkingLevel } from '@/lib/persistence/storage';
 import { resolveProviderApiKey } from '../providers/credentials';
-import { isCompactionSummary } from '@/lib/agent/compaction';
+import { getRetainedTail, isCompactionSummary, type CompactionSummaryMessage } from '@/lib/agent/compaction';
 import { sanitizeAgentMessages } from '@/lib/agent/message-helpers';
 
 // ─── Agent factory ───
@@ -91,9 +91,14 @@ function createCebianAgent(options: CreateAgentOptions): Agent {
       return out;
     },
 
-    // 上下文窗口管理：若存在压缩摘要，则只把「最后一条摘要 + 其后的全部消息」
-    // 送给 LLM——摘要之前的历史已被该摘要覆盖，无需再发。state.messages 仍保留
-    // 完整历史（无损），此处只是 LLM 边界的视图变换，不写回 state。
+    // 上下文窗口管理：若存在压缩摘要，LLM 视图 = 最后一条摘要 + 其保留区副本
+    // （retainedTail）+ 其后的全部消息——摘要之前的历史已被摘要覆盖，无需再发。
+    // 两种摘要形态由同一条公式统一处理：
+    // - 新压缩（树化后）：摘要尾部追加，保留区原文在摘要**之前**、副本挂在
+    //   retainedTail 上 → 公式展开副本；
+    // - v1 迁移来的旧摘要：无 retainedTail（保留区本就在摘要之后）→ 公式退化为
+    //   原来的「从摘要起切片」。
+    // state.messages 仍保留完整历史（无损），此处只是 LLM 边界的视图变换，不写回 state。
     transformContext: async (msgs: AgentMessage[]): Promise<AgentMessage[]> => {
       let lastSummaryIdx = -1;
       for (let i = msgs.length - 1; i >= 0; i--) {
@@ -103,7 +108,8 @@ function createCebianAgent(options: CreateAgentOptions): Agent {
         }
       }
       if (lastSummaryIdx < 0) return msgs;
-      return msgs.slice(lastSummaryIdx);
+      const summary = msgs[lastSummaryIdx] as CompactionSummaryMessage;
+      return [summary, ...getRetainedTail(summary), ...msgs.slice(lastSummaryIdx + 1)];
     },
 
     // 发送 LLM 请求的 stream 函数。pi 0.81 起 streamFn 必填（内置默认回退被移除），

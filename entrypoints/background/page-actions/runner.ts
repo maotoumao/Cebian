@@ -20,7 +20,6 @@ import {
   resolvePageInteractionSettings,
   type PageInteractionSettings,
 } from '@/lib/persistence/storage';
-import type { SessionRecord } from '@/lib/persistence/db';
 import { getPageAction, type PageActionParams } from '@/lib/page-actions/actions';
 import type { PageActionId, PageActionRequest } from '@/lib/page-actions/types';
 import { resolveProviderApiKey } from '../providers/credentials';
@@ -169,18 +168,17 @@ export async function materializeHandoff(
     stopReason: 'stop',
     timestamp: now,
   };
-  const session: SessionRecord = {
-    id: crypto.randomUUID(),
-    createdAt: now,
-    updatedAt: now,
-    title: makeTitle(req.text),
-    model: identity.modelId,
-    provider: identity.provider,
-    userInstructions: '',
-    thinkingLevel: 'medium',
-    messages: [userMsg, assistantMsg],
-    messageCount: 2,
-  };
-  await sessionStore.create(session);
-  await pendingSidePanelHandoff.setValue({ sessionId: session.id, windowId });
+  const sessionId = crypto.randomUUID();
+  await sessionStore.createWithMessages(
+    {
+      id: sessionId,
+      title: makeTitle(req.text),
+      model: identity.modelId,
+      provider: identity.provider,
+      userInstructions: '',
+      thinkingLevel: 'medium',
+    },
+    [userMsg, assistantMsg],
+  );
+  await pendingSidePanelHandoff.setValue({ sessionId, windowId });
 }

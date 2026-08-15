@@ -82,6 +82,7 @@
     "@webext-core/fake-browser": "^2.0.1",
     "@wxt-dev/module-react": "^1.1.5",
     "dependency-cruiser": "^18.2.0",
+    "fake-indexeddb": "^6.2.5",
     "shadcn": "^4.16.2",
     "simple-git-hooks": "^2.13.1",
     "tailwindcss": "^4.3.3",

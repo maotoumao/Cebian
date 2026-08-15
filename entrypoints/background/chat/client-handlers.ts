@@ -6,7 +6,8 @@
 // viewers）。handler 层没有这个问题 —— session-manager 不 import 本文件。
 
 import { sessionManager } from './session-manager';
-import { sessionStore } from './session-store';
+import { sessionStore, type LoadedSession } from './session-store';
+import type { SessionSnapshot } from '@/lib/ipc/protocol';
 import { setViewing, stopViewing, hasViewer } from './viewers';
 import { registerClientHandlers, type ClientHandlerMap } from '../ipc/client-router';
 import { onPortDisconnect, post, broadcastAll } from '../ipc/port-registry';
@@ -62,6 +63,19 @@ function cancelGrace(sessionId: string): void {
 
 // ─── Handlers ───
 
+/** 冷加载的会话行 → `session_loaded` 快照：给 transcript 附上逐位对齐的树 entryId
+ *  （消息编辑按它定位）。副本，不改 record 本体。 */
+function toSessionSnapshot(loaded: LoadedSession): SessionSnapshot {
+  return {
+    ...loaded.record,
+    messages: loaded.record.messages.map((m, i) => {
+      const entryId = loaded.entryIds[i];
+      return entryId !== undefined ? { ...m, entryId } : m;
+    }),
+    branchInfo: loaded.branchInfo,
+  };
+}
+
 const chatClientHandlers: ClientHandlerMap = {
   async subscribe(port, msg) {
     setViewing(port, msg.sessionId);
@@ -73,7 +87,7 @@ const chatClientHandlers: ClientHandlerMap = {
       // Title isn't part of the in-memory agent state — load it from DB
       // so the new viewer's header can show the session title even when
       // (re)subscribing mid-stream.
-      const session = await sessionStore.load(msg.sessionId);
+      const loaded = await sessionStore.open(msg.sessionId);
       // Re-snapshot AFTER the await: during the DB load the agent could
       // have emitted message_update / agent_end and broadcastToViewers()
       // already forwarded those to this port (we registered it as a viewer
@@ -81,35 +95,38 @@ const chatClientHandlers: ClientHandlerMap = {
       // `messages` state.
       const fresh = sessionManager.getSessionState(msg.sessionId);
       if (fresh) {
+        // 分支信息按活 agent 的当前分支现算（loaded 的快照可能已被在途轮甩开）
+        const branchInfo = await sessionManager.getBranchInfo(msg.sessionId).catch(() => undefined);
         post(port, {
           type: 'session_state',
           sessionId: msg.sessionId,
-          title: session?.title ?? '',
-          provider: session?.provider ?? '',
-          model: session?.model ?? '',
-          thinkingLevel: session?.thinkingLevel ?? '',
+          title: loaded?.record.title ?? '',
+          provider: loaded?.record.provider ?? '',
+          model: loaded?.record.model ?? '',
+          thinkingLevel: loaded?.record.thinkingLevel ?? '',
           messages: fresh.messages,
           isRunning: fresh.isRunning,
           isCompacting: fresh.isCompacting,
           pendingTools: fresh.pendingTools,
           pendingPermissions: fresh.pendingPermissions,
+          ...(branchInfo !== undefined ? { branchInfo } : {}),
         });
       } else {
         // Agent finished during the await — fall through to DB-based
-        // session_loaded using the row we already loaded.
+        // session_loaded using the snapshot we already loaded.
         post(port, {
           type: 'session_loaded',
           sessionId: msg.sessionId,
-          session: session ?? null,
+          session: loaded ? toSessionSnapshot(loaded) : null,
         });
       }
     } else {
       // Agent not running — load from DB. Session not found → session: null.
-      const session = await sessionStore.load(msg.sessionId);
+      const loaded = await sessionStore.open(msg.sessionId);
       post(port, {
         type: 'session_loaded',
         sessionId: msg.sessionId,
-        session: session ?? null,
+        session: loaded ? toSessionSnapshot(loaded) : null,
       });
     }
   },
@@ -153,8 +170,25 @@ const chatClientHandlers: ClientHandlerMap = {
     // "no user message found" / "agent already running" / model setup
     // failures consistently.
     setViewing(port, msg.sessionId);
-    // 同 prompt：透传本轮重试携带的 model / thinkingLevel 作 override。
+    // 同 prompt：透传本轮重试携带的 model / thinkingLevel 作 override；
+    // entryId 指定要重试的轮（缺省 = 最后一轮）。
     sessionManager.retry(msg.sessionId, {
+      model: msg.model,
+      thinkingLevel: msg.thinkingLevel,
+    }, msg.entryId).catch((err) => {
+      post(port, {
+        type: 'error',
+        sessionId: msg.sessionId,
+        error: err.message ?? String(err),
+      });
+    });
+  },
+
+  edit_message(port, msg) {
+    // 编辑已发送的 user 消息并从该点重新生成（issue #44）。错误经 `error`
+    // ServerMessage 冒泡，与 prompt / retry 一致。
+    setViewing(port, msg.sessionId);
+    sessionManager.editMessage(msg.sessionId, msg.entryId, msg.text, {
       model: msg.model,
       thinkingLevel: msg.thinkingLevel,
     }).catch((err) => {
@@ -176,6 +210,18 @@ const chatClientHandlers: ClientHandlerMap = {
 
   resolve_permission(_port, msg) {
     sessionManager.resolvePermission(msg.sessionId, msg.toolCallId, msg.decision);
+  },
+
+  switch_branch(port, msg) {
+    // 切换分支：后台 moveLane + 重投影，结果经 session_state（带 branchInfo）广播。
+    setViewing(port, msg.sessionId);
+    sessionManager.switchBranch(msg.sessionId, msg.targetEntryId).catch((err) => {
+      post(port, {
+        type: 'error',
+        sessionId: msg.sessionId,
+        error: err.message ?? String(err),
+      });
+    });
   },
 
   async session_list(port) {

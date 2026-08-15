@@ -24,6 +24,7 @@ import type { Attachment } from '@/lib/agent/attachments';
 import type { RecordedSession } from '@/lib/recorder/types';
 import type { MCPResourceContents } from '@/lib/mcp/client';
 import type { PermissionRequest } from '@/lib/agent/tool-permissions';
+import type { BranchEntryInfo } from '@/lib/agent/session-projection';
 
 // ─── Port name ───
 
@@ -68,8 +69,20 @@ export type ClientMessage =
    *  is currently running.
    *
    *  `model` / `thinkingLevel`（见 TurnSettings）同 prompt：携带「重试这一轮要用的
-   *  模型 / 思考档」，支持「换个更强的模型再重试」。缺省时保持会话当前选择不变。 */
-  | ({ type: 'retry'; sessionId: string } & TurnSettings)
+   *  模型 / 思考档」，支持「换个更强的模型再重试」。缺省时保持会话当前选择不变。
+   *
+   *  `entryId`（可选）：要重试的那一轮的 **user 消息** entry id——支持从历史任意
+   *  一轮重新生成（旧回复留在分支上）。缺省时沿用旧语义：重试最后一轮。 */
+  | ({ type: 'retry'; sessionId: string; entryId?: string } & TurnSettings)
+  /** 编辑一条已发送的 user 消息并从该点重新生成（issue #44）。`entryId` 是目标
+   *  消息的树 entry id（随广播的 BroadcastMessage 下发；未落树的乐观消息没有，
+   *  UI 不给它显示编辑入口）。语义 = 回卷到该消息之前 + 以新文案重发：原分支
+   *  完整保留为 sibling。`model` / `thinkingLevel` 同 prompt / retry。 */
+  | ({ type: 'edit_message'; sessionId: string; entryId: string; text: string } & TurnSettings)
+  /** 切换到某个分支：`targetEntryId` 是分支点上的目标兄弟 entry（取自
+   *  `branchInfo[...].siblings`）。后台把 main lane 移到该兄弟子树的最深叶并
+   *  重投影广播。仅 agent 空闲时受理。 */
+  | { type: 'switch_branch'; sessionId: string; targetEntryId: string }
   | { type: 'resolve_tool'; sessionId: string; toolName: string; response: any }
   | { type: 'cancel_tool'; sessionId: string; toolName: string }
   /** User's decision on a tool's pre-execution permission prompt, keyed by
@@ -114,9 +127,11 @@ export const CLIENT_MESSAGE_TYPES = [
   'prompt',
   'cancel',
   'retry',
+  'edit_message',
   'resolve_tool',
   'cancel_tool',
   'resolve_permission',
+  'switch_branch',
   'session_list',
   'session_delete',
   'recorder_start',
@@ -135,6 +150,23 @@ type _AssertClientMessageTypesComplete = _ExpectNever<
 >;
 
 // ─── Background → Client (events) ───
+
+/** 广播的消息形态：AgentMessage + 其树 entry id。id 供「按消息定位树操作」
+ *  （消息编辑、将来的分支导航）使用；未落树的消息（乐观插入 / 流式中）没有 id，
+ *  UI 据此隐藏编辑入口。注意 id 只存在于 IPC 副本上——background 的
+ *  `agent.state.messages` 保持干净，否则 id 会被 syncTail 冻进树里。 */
+export type BroadcastMessage = AgentMessage & { entryId?: string };
+
+/** 一个分支点的信息（定义与构建见 lib/agent/session-projection.ts 的
+ *  buildBranchInfo）。键是当前分支上 entry 的 id，仅含兄弟数 ≥2 的分支点（稀疏）。 */
+export type { BranchEntryInfo } from '@/lib/agent/session-projection';
+
+/** `session_loaded` 携带的会话快照：会话行字段 + 带 entryId 标注的 transcript +
+ *  分支点信息。 */
+export type SessionSnapshot = Omit<SessionRecord, 'messages'> & {
+  messages: BroadcastMessage[];
+  branchInfo?: Record<string, BranchEntryInfo>;
+};
 
 /** Session metadata without messages, for listing. */
 export type SessionMeta = Omit<SessionRecord, 'messages'> & {
@@ -156,7 +188,7 @@ export type ServerMessage =
       provider?: string;
       model?: string;
       thinkingLevel?: string;
-      messages: AgentMessage[];
+      messages: BroadcastMessage[];
       isRunning: boolean;
       /** 是否正处于发送前的上下文压缩步骤（状态层正在生成并插入摘要）。
        *  为 true 时 sidepanel 显示「压缩中」指示，区别于普通的思考态。
@@ -169,15 +201,25 @@ export type ServerMessage =
        *  of the prompt card, and lets the UI mark a persisted permissionRequest
        *  message as "expired" when its toolCallId is absent here. */
       pendingPermissions?: PermissionRequest[];
+      /** 分支点信息（稀疏，仅兄弟数 ≥2 的 entry）。只在「分支结构可能变化」的
+       *  帧携带（订阅快照 / 切换分支后）；缺省表示「维持上一帧的值」，前端不清空。 */
+      branchInfo?: Record<string, BranchEntryInfo>;
     }
   | { type: 'agent_start'; sessionId: string }
   | { type: 'message_update'; sessionId: string; message: AgentMessage }
-  | { type: 'message_end'; sessionId: string; messages: AgentMessage[] }
-  | { type: 'agent_end'; sessionId: string; messages: AgentMessage[] }
+  | { type: 'message_end'; sessionId: string; messages: BroadcastMessage[] }
+  | {
+      type: 'agent_end';
+      sessionId: string;
+      messages: BroadcastMessage[];
+      /** 同 session_state.branchInfo：一轮结束（retry / 编辑可能刚造出新分支）时
+       *  携带最新分支结构。 */
+      branchInfo?: Record<string, BranchEntryInfo>;
+    }
   | { type: 'error'; sessionId: string | null; error: string }
   | { type: 'tool_pending'; sessionId: string; toolName: string; toolCallId: string; args: any }
   | { type: 'tool_resolved'; sessionId: string; toolName: string }
-  | { type: 'session_loaded'; sessionId: string; session: SessionRecord | null }
+  | { type: 'session_loaded'; sessionId: string; session: SessionSnapshot | null }
   | { type: 'session_list_result'; sessions: SessionMeta[] }
   | { type: 'session_deleted'; sessionId: string }
   | { type: 'session_created'; sessionId: string; title: string }

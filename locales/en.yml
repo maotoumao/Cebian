@@ -551,6 +551,11 @@ chat:
     tokensInBreakdownHitWrite: "uncached $1 · cached $2 · write $3"
     # Tooltip/aria-label for the retry button on the latest assistant turn.
     retry: "Retry"
+    # Hint shown while editing a sent user message (issue #44).
+    editHint: "Regenerates the response from here"
+    # Branch switcher ("‹ n/m ›") tooltips on messages with sibling versions.
+    prevBranch: "Previous version"
+    nextBranch: "Next version"
   compaction:
     # Label on the divider marking where earlier context was folded into a summary.
     divider: "Earlier context compacted"

@@ -4,7 +4,12 @@
 // 具体的 config.json / credentials.json / sessions/{uuid}.json 负载形状由 collect /
 // restore 阶段定义，不在此处提前固化。
 
-/** 备份包格式版本。bump 意味着 unpack 需要迁移或拒绝旧包。 */
+/** 备份包格式版本。bump 意味着 unpack 需要迁移或拒绝旧包。
+ *
+ *  注意：会话树化后 `sessions/{id}.json` 增加了可选的 `mutations` 字段（完整
+ *  mutation 日志，保留分支）——这是**纯增量**扩展：旧版本忽略未知字段、照常用
+ *  `messages`（当前分支投影）导入，新版本优先用 `mutations`。读者无需变更即可
+ *  正确消费，故不 bump。 */
 export const BACKUP_FORMAT_VERSION = 1;
 
 /** 用户可见的备份分类。 */

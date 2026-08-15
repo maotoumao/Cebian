@@ -41,7 +41,7 @@ import { useStorageItem } from '@/hooks/useStorageItem';
 import { lastSelectedModel, lastSelectedThinkingLevel as thinkingLevelStorage, providerCredentials, customProviders, type ModelIdentity, type ThinkingLevel } from '@/lib/persistence/storage';
 import { hasUsableModel } from '@/lib/providers/usable-models';
 import type { Attachment } from '@/lib/agent/attachments';
-import type { SessionRecord } from '@/lib/persistence/db';
+import type { SessionSnapshot } from '@/lib/ipc/protocol';
 import { t } from '@/lib/i18n';
 
 // ─── ChatPage ───
@@ -110,6 +110,8 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     send,
     cancel,
     retry,
+    editMessage,
+    switchBranch,
     subscribe: portSubscribe,
     unsubscribe: portUnsubscribe,
     resolveTool,
@@ -119,7 +121,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
       onTitleChange?.(title);
       navigate(`/chat/${sessionId}`, { replace: true });
     }, [navigate, onTitleChange]),
-    onSessionLoaded: useCallback((session: SessionRecord | null) => {
+    onSessionLoaded: useCallback((session: SessionSnapshot | null) => {
       if (!session) {
         navigate('/chat/new', { replace: true });
         return;
@@ -135,7 +137,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     }, [seedTurnFromSession]),
   });
 
-  const { messages, isAgentRunning, isCompacting, sessionId: activeSessionId, sessionTitle, lastError } = state;
+  const { messages, branchInfo, isAgentRunning, isCompacting, sessionId: activeSessionId, sessionTitle, lastError } = state;
 
   // Mirror activeSessionId into a ref so the subscribe-effect can read the
   // latest value WITHOUT re-running when activeSessionId changes. Putting
@@ -212,10 +214,23 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     [scrollToBottom, send, turnModel, turnThinking, isNewChat, routeSessionId, activeSessionId],
   );
 
-  // 重试同样携带本轮选中的模型 / 思考档，支持「换个模型再重试」。
-  const handleRetry = useCallback(() => {
-    retry({ model: turnModel ?? undefined, thinkingLevel: turnThinking });
+  // 重试同样携带本轮选中的模型 / 思考档，支持「换个模型再重试」。`entryId` 指定
+  // 要重试的那一轮的 user 消息（历史任意轮）；缺省 = 最后一轮。
+  const handleRetry = useCallback((entryId?: string) => {
+    retry({ model: turnModel ?? undefined, thinkingLevel: turnThinking }, entryId);
   }, [retry, turnModel, turnThinking]);
+
+  // 分支切换：目标是分支点上的兄弟 entry（由消息操作区传入）。
+  const handleSwitchBranch = useCallback((targetEntryId: string) => {
+    switchBranch(targetEntryId);
+  }, [switchBranch]);
+
+  // 编辑已发送的 user 消息（issue #44）：以新文案从该消息重新生成，同样携带本轮
+  // 选中的模型 / 思考档。发送后强制回底，与 handleSend 一致。
+  const handleEdit = useCallback((entryId: string, text: string) => {
+    editMessage(entryId, text, { model: turnModel ?? undefined, thinkingLevel: turnThinking });
+    scrollToBottom({ force: true });
+  }, [editMessage, turnModel, turnThinking, scrollToBottom]);
 
   const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
   // 压缩期间隐藏思考占位符，改由专门的压缩状态条提示，避免两个动效重叠。
@@ -271,8 +286,30 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
             }
 
             if (msg.role === 'user') {
+              // 编辑入口：消息已落树（有 entryId）且 agent 空闲时才提供——
+              // 未落树的乐观消息无处可回卷，运行中编辑会与在途轮冲突。
+              const canEdit = msg.entryId !== undefined && !isAgentRunning;
+              const entryId = msg.entryId;
+              const branch = entryId ? branchInfo[entryId] : undefined;
               return (
-                <UserMessageBubble key={`user-${idx}`} msg={msg} />
+                <UserMessageBubble
+                  key={`user-${entryId ?? idx}`}
+                  msg={msg}
+                  onEdit={canEdit && entryId ? (text) => handleEdit(entryId, text) : undefined}
+                  branch={branch
+                    ? {
+                      index: branch.index,
+                      count: branch.count,
+                      disabled: isAgentRunning,
+                      onPrev: branch.index > 0
+                        ? () => handleSwitchBranch(branch.siblings[branch.index - 1])
+                        : undefined,
+                      onNext: branch.index < branch.count - 1
+                        ? () => handleSwitchBranch(branch.siblings[branch.index + 1])
+                        : undefined,
+                    }
+                    : undefined}
+                />
               );
             }
 
@@ -350,20 +387,55 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                 };
               }
 
-              // Retry button: only on the very last message in the timeline,
-              // only when the turn has actually closed (no pending tool round),
-              // and only when the agent is idle (no overlapping run).
-              const canRetry = isLast && isTurnClosing && !isAgentRunning;
-              const onRetry = canRetry ? handleRetry : undefined;
+              // Retry：任意已闭合的轮次都可重试（树化后旧回复保留为分支，不再
+              // 破坏性截断）。最后一轮沿用旧语义（后台自寻最后一条 user）；历史
+              // 轮次需要定位该轮起点的 user 消息 entryId——向前找最近的 user，
+              // 找不到（该轮由交互式工具结果驱动等）则不提供入口。
+              let turnUserEntryId: string | undefined;
+              for (let i = idx - 1; i >= 0; i--) {
+                const m = messages[i];
+                if (m.role === 'user') {
+                  turnUserEntryId = m.entryId;
+                  break;
+                }
+                if (
+                  m.role === 'toolResult' &&
+                  uiToolRegistry.get((m as ToolResultMessage).toolName)?.renderResultAsUserBubble &&
+                  !(m as ToolResultMessage).details?.cancelled
+                ) {
+                  // 该轮由交互式工具结果开启，无对应 user 消息（被取消的结果对轮
+                  // 边界「透明」，与 showHeader 的扫描口径一致）
+                  break;
+                }
+              }
+              const canRetry =
+                isTurnClosing && !isAgentRunning && (isLast || turnUserEntryId !== undefined);
+              const onRetry = canRetry
+                ? () => handleRetry(isLast ? undefined : turnUserEntryId)
+                : undefined;
+              const branch = msg.entryId ? branchInfo[msg.entryId] : undefined;
 
               return (
                 <AgentMessage
-                  key={`asst-${idx}`}
+                  key={`asst-${msg.entryId ?? idx}`}
                   isStreaming={isStreaming}
                   showHeader={showHeader}
                   meta={meta}
                   copyText={copyText}
                   onRetry={onRetry}
+                  branch={branch
+                    ? {
+                      index: branch.index,
+                      count: branch.count,
+                      disabled: isAgentRunning,
+                      onPrev: branch.index > 0
+                        ? () => handleSwitchBranch(branch.siblings[branch.index - 1])
+                        : undefined,
+                      onNext: branch.index < branch.count - 1
+                        ? () => handleSwitchBranch(branch.siblings[branch.index + 1])
+                        : undefined,
+                    }
+                    : undefined}
                 >
                   {thinkingBlocks.map((block, i) => (
                     <ThinkingBlock key={`t-${idx}-${i}`} content={block.thinking} isLive={isStreaming} />

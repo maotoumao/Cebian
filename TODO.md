@@ -142,8 +142,23 @@ message-helpers / tool-permissions —— 四个都确有 UI + background 双边
 
 ## 🔵 未来方向：迁移到 pi 的 `AgentHarness`
 
-`entrypoints/background/chat/session-manager.ts`（1351 行）有一大半在重写
-`@earendil-works/pi-agent-core` **同版本已导出**的 `AgentHarness`：
+> **进展（2026-08）**：树化迁移已完成——存储层换成会话树（`DexieSessionStorage`
+> implements pi `SessionStorage` + `lib/shims/pi-session-state.ts` 移植 reducer +
+> Dexie v1→v2 无损迁移 + 备份随包分支），运行时经 `TreeBinding`（syncTail 水位线 /
+> moveLane 回卷）接线，消息编辑（#44）/ 任意轮重试 / 分支切换 UI 已上。原「阶段 1」
+> 目标全部落地。**注意**：0.84.x 的 `AgentHarness` 类是空壳（全部方法
+> `HarnessNotImplemented`，能跑的编排在未安装的 `pi-coding-agent` 里），阶段 3 的
+> 运行时替换须等上游填实现；`SessionState` 未公开导出，上游导出后删除本地移植副本。
+>
+> 树化后的剩余后续项：
+> - IPC 增量广播（见下方「每次全量重发」——现在 entry 模型已具备增量条件）
+> - Record 日志接入 SW 崩溃恢复（`appendRecord` / `findOpenOperations` 协议已在存储层可用）
+> - 日志 checkpoint（每 N 条存快照）压 SW 冷启 replay 成本
+> - v3 清理 `sessions.messages` 影子字段（迁移保险，见 db.ts）
+> - `messageCount` 口径为全树 message entry 数（含旧分支），如需精确到当前分支再改
+
+`entrypoints/background/chat/session-manager.ts` 剩下的编排职责仍与
+`@earendil-works/pi-agent-core` 声明的 `AgentHarness` 接口高度重合：
 
 | Cebian 手写 | pi 现成 |
 |---|---|
@@ -172,10 +187,9 @@ sessionsRoot })` 的 root 由调用方注入。要接入只需实现 `SessionSto
 4. bundle 体积（正面信号：现有代码已从同一 index 引入，构建正常，tree-shaking 有效；
    `env/nodejs` 不在主 index 导出里）
 
-**阶段 1 — 存储层换成 `Session` 树（不动运行时）**
-实现 `DexieSessionStorage implements SessionStorage`；定义 `SessionRecord.messages[]` →
-`MessageEntry` 链的映射；**写数据迁移 + 版本化 + 回滚路径**。这一步就能吃到分支重试 / fork /
-树状历史导航的全部收益，且不碰并发语义。风险最高（不可逆）。
+**阶段 1 — 存储层换成 `Session` 树（不动运行时）** ✅ 已完成（2026-08，连同
+消息编辑 / 任意轮重试 / 分支切换 UI 一并落地；实现见 lib/persistence/session-tree.ts、
+lib/persistence/migrate-messages.ts、session-manager 的 TreeBinding）。
 
 **阶段 2 — 模型 / 凭证层对齐**
 5 处 `resolveXxxModel` 收敛成 `ModelRuntime` 等价物，产出 `Models` 集合；

@@ -11,6 +11,7 @@ import {
 import { getApiProvider } from '@earendil-works/pi-ai/compat';
 import {
   type AgentMessage,
+  type CompactionSummaryMessage,
   type ThinkingLevel,
   estimateTokens,
   generateSummary,
@@ -35,39 +36,47 @@ export const COMPACTION_SETTINGS = DEFAULT_COMPACTION_SETTINGS;
  * 摘要替代。这条消息直接作为一条普通成员存在于 `agent.state.messages` 数组里，
  * 跟随正常的持久化 / 广播 / UI 渲染管线，无需改动存储 schema。
  *
- * 关键不变式：摘要永远紧挨插在「保留区首条 user 消息」之前（切点对齐 user
- * turn-start），这样 `truncateForRetry` 无需特判即可正确工作。
+ * 落点：树化后摘要是**尾部追加**（压缩发生在新一轮 user 消息进入之前，故摘要
+ * 总在「上一轮尾部、本轮 user 之前」），保留区副本挂在 `retainedTail` 上。
+ * `truncateForRetry`「截到最后一条 user」天然保住摘要，无需特判。
  *
- * 字段形状对齐 pi harness 的 `CompactionSummaryMessage`：
- * - `summary`：LLM 生成的结构化摘要文本。
- * - `tokensBefore`：压缩前估算的上下文 token 数，仅用于 UI 显示「节省了多少」。
- * - `timestamp`：生成时间（ms）。
+ * 消息类型直接复用 pi harness 的 `CompactionSummaryMessage`（pi 自身已把它注册进
+ * `AgentMessage` union），在此对其做 declaration merging 增广一个字段：
+ * - `retainedTail`：压缩时保留区的消息副本（对齐 pi CompactionEntry 的同名字段）。
+ *   树化后摘要在会话里是**尾部追加**（不再中段插入），保留区原文位于摘要之前，
+ *   LLM 视图由 transformContext 用本字段重建为「摘要 + 保留区 + 其后消息」。
+ *   v1 迁移来的旧摘要没有此字段（保留区本就排在摘要之后），两种形态由同一条
+ *   transformContext 公式统一处理。UI 渲染忽略此字段。
  */
-export interface CompactionSummaryMessage {
-  role: 'compactionSummary';
-  summary: string;
-  tokensBefore: number;
-  timestamp: number;
-}
-
-// 通过 pi-agent-core 官方提供的 declaration merging 扩展点，把 compactionSummary
-// 注入 `AgentMessage` union，使其成为合法的 AgentMessage 成员（类型安全）。
 declare module '@earendil-works/pi-agent-core' {
-  interface CustomAgentMessages {
-    compactionSummary: CompactionSummaryMessage;
+  interface CompactionSummaryMessage {
+    // 语义是 AgentMessage[]，但必须声明为 unknown[]：AgentMessage union 包含本
+    // 接口自身，真递归类型会让 Dexie 的 UpdateSpec/KeyPaths 映射类型无限展开
+    // （TS2615）。读取统一走下面的 getRetainedTail 拿回具体类型。
+    retainedTail?: unknown[];
   }
 }
 
-/** 构造一条 compactionSummary 消息。 */
+export type { CompactionSummaryMessage };
+
+/** 取回 retainedTail 的具体类型（声明层为 unknown[]，见上方注释）；缺失返回 []。 */
+export function getRetainedTail(msg: CompactionSummaryMessage): AgentMessage[] {
+  return (msg.retainedTail as AgentMessage[] | undefined) ?? [];
+}
+
+/** 构造一条 compactionSummary 消息。`retainedTail` 见接口注释（新压缩必传，
+ *  哪怕保留区为空也传 `[]`；仅 v1 迁移来的历史摘要没有该字段）。 */
 export function createCompactionSummaryMessage(
   summary: string,
   tokensBefore: number,
+  retainedTail: AgentMessage[],
 ): CompactionSummaryMessage {
   return {
     role: 'compactionSummary',
     summary,
     tokensBefore,
     timestamp: Date.now(),
+    retainedTail,
   };
 }
 

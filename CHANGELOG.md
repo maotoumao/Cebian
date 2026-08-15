@@ -20,14 +20,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### 新增 / Added
 
+- 支持编辑已发送的消息：鼠标悬停在自己的消息气泡或下方操作区可复制、编辑文案，点击「发送」后 AI 会从这条消息重新生成回复（附件保持不变） ([#44](https://github.com/maotoumao/Cebian/issues/44))
+- 消息支持分支切换：编辑或重试产生的历史版本不再被删除，存在并列版本的消息会在气泡下方操作区显示「‹ n/m ›」切换器，可在不同提问 / 回复版本间来回切换，切走的分支随时可以切回来
 - 所有密码类输入框新增显示 / 隐藏切换（眼睛图标），方便核对填入的内容：自定义 Provider 的 API Key、MCP 服务器的 Bearer Token、WebDAV 密码、备份加密与恢复密码
 
+- Edit sent messages: hover over your own message bubble or its action area to copy or revise the text; after you click “Send,” the assistant regenerates its response from that message (attachments are preserved) ([#44](https://github.com/maotoumao/Cebian/issues/44))
+- Branch switching on messages: past versions produced by editing or retrying are no longer deleted — messages with sibling versions show a "‹ n/m ›" switcher in the action area below the bubble, letting you flip between alternative prompts/responses and return to any branch at any time
 - All password-style inputs gain a show/hide toggle (eye icon), making it easy to double-check what was entered: a custom provider's API Key, an MCP server's Bearer Token, the WebDAV password, and backup encryption/restore passwords
 
 ### 变更 / Changed
 
+- 会话历史底层迁移为树状存储（首次启动自动无损迁移，原数据保留作保险）：这是消息编辑与分支切换的基础。备份格式保持兼容——新备份会额外携带分支信息（旧版本导入时忽略、仅还原当前分支），旧备份照常导入
+- 重试不再删除旧回复：任意已完成的回复都可以重试（不再限于最后一条），被替换的版本保留为分支、可随时切回
+- 上下文压缩的摘要卡片现在显示在压缩发生的时间点（对话末尾），而非插在历史中间；历史列表的消息数统计口径同步调整（不再计入摘要与授权卡片，包含所有分支）
 - 读取本地文件页面（file:// 打开的 PDF / 网页）而扩展的「允许访问文件网址」权限未开启时，不再报无指向性的 "Failed to fetch"：AI 现在会明确说明原因，并给出可直接点击跳转的扩展设置页链接，开启后重试即可 ([#49](https://github.com/maotoumao/Cebian/issues/49))
 
+- Chat history now uses a tree-structured store under the hood (migrated losslessly and automatically on first launch, with the original data kept as a safety net) — the foundation for message editing and branch switching. The backup format stays compatible: new backups additionally carry branch data (older versions ignore it and restore the current branch), and old backups import as before
+- Retry no longer deletes the previous response: any completed response can be retried (not just the latest one), and replaced versions are kept as branches you can switch back to
+- The context-compaction summary card now appears at the point in time when compaction happened (end of the conversation) instead of being inserted mid-history; the history list's message count changes accordingly (summaries and permission cards are no longer counted; all branches are included)
 - Reading a local file:// page (a PDF or web page opened from disk) without the extension's "Allow access to file URLs" permission no longer fails with an unhelpful "Failed to fetch": the assistant now explains the cause and provides a clickable link that jumps straight to the extension settings page, so you can flip the toggle and retry ([#49](https://github.com/maotoumao/Cebian/issues/49))
 
 ### 修复 / Fixed
@@ -361,4 +371,3 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 首个公开版本
 
 - Initial public release
-

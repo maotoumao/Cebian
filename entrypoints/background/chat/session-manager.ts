@@ -12,12 +12,14 @@
 
 import {
   Agent,
+  SessionError,
   type AgentEvent,
   type AgentMessage,
+  type Session,
   estimateContextTokens,
   shouldCompact,
 } from '@earendil-works/pi-agent-core';
-import type { Api, AssistantMessage, Model } from '@earendil-works/pi-ai';
+import type { Api, AssistantMessage, Message, Model } from '@earendil-works/pi-ai';
 import { clampThinkingLevel } from '@earendil-works/pi-ai';
 import { createCebianAgent } from '../agent/factory';
 import { composeUserMessage, composeSystemPrompt } from '../agent/prompt-composer';
@@ -25,6 +27,7 @@ import { resolveProviderApiKey } from '../providers/credentials';
 import {
   COMPACTION_SETTINGS,
   findCompactionCutPoint,
+  getRetainedTail,
   runCompaction,
   createCompactionSummaryMessage,
   isCompactionSummary,
@@ -32,7 +35,13 @@ import {
   type CompactionSummaryMessage,
   type CompactionTarget,
 } from '@/lib/agent/compaction';
-import { sessionStore } from './session-store';
+import { appendSessionMessage, sessionStore } from './session-store';
+import type { SessionTreeMeta } from '@/lib/persistence/session-tree';
+import {
+  buildBranchInfo,
+  projectEntries,
+  type BranchEntryInfo,
+} from '@/lib/agent/session-projection';
 import { extractImages, type Attachment } from '@/lib/agent/attachments';
 import { createSessionTools, buildSessionToolArray } from '@/lib/tools';
 import { runSkillGate } from '@/lib/tools/run-skill';
@@ -46,13 +55,13 @@ import {
   createPermissionGate,
   createPermissionRequestMessage,
   isPermissionRequest,
+  PERMISSION_DECISION_CUSTOM_TYPE,
   type PermissionRequest,
   type PermissionDecision,
   type ToolGate,
 } from '@/lib/agent/tool-permissions';
-import type { TurnSettings } from '@/lib/ipc/protocol';
-import type { SessionRecord } from '@/lib/persistence/db';
-import { truncateForRetry, sanitizeAgentMessages } from '@/lib/agent/message-helpers';
+import type { BroadcastMessage, TurnSettings } from '@/lib/ipc/protocol';
+import { replaceUserText, truncateForRetry, sanitizeAgentMessages } from '@/lib/agent/message-helpers';
 import {
   providerCredentials,
   customProviders as customProvidersStorage,
@@ -144,6 +153,22 @@ interface AgentSession {
    */
   permissionBridge: InteractiveBridge<PermissionRequest, PermissionDecision>;
   unsubscribeAgent: () => void;
+  /**
+   * 会话树句柄（transcript 的持久化真相）。行不存在的会话（`sessionCreated=false`）
+   * 没有树，所有树操作按 `sessionCreated` 守卫跳过。
+   */
+  tree?: Session<SessionTreeMeta>;
+  /** `agent.state.messages` 前缀中已落树的条数（水位线）。 */
+  committedCount: number;
+  /** 与已落树前缀逐位对齐的 entryId（长度 == committedCount）。moveLane 类操作
+   *  用它把「数组下标语义」翻译成树上的目标 entry。 */
+  entryIds: string[];
+  /**
+   * 本会话树操作的串行链：append / moveLane 与水位线更新必须按事件顺序执行，
+   * 否则并发事件会取到交错的水位线。链上的失败已被捕获记录（见 enqueueTreeOp），
+   * `flushTree` 等它落定即等价于旧的「flush 落库」。
+   */
+  treeChain: Promise<void>;
 }
 
 // ─── Session Manager ───
@@ -196,7 +221,7 @@ class SessionManager {
     broadcastToViewers(agentSession.sessionId, {
       type: 'session_state',
       sessionId: agentSession.sessionId,
-      messages: [...agentSession.agent.state.messages],
+      messages: this.annotate(agentSession, agentSession.agent.state.messages),
       isRunning: agentSession.phase !== 'idle',
       isCompacting: agentSession.phase === 'compacting',
       pendingTools: this.getPendingToolSnapshot(agentSession),
@@ -205,24 +230,137 @@ class SessionManager {
   }
 
   /**
-   * 落库本会话的消息——**写会话 transcript 的唯一入口**。全类每一处 transcript
-   * 变更都经此，使将来把存储换成会话树（entry 追加）时只需改这一处。
-   *
-   * 只在构造本会话时确实读到了会话行（`sessionCreated`）才写。底层走
-   * `db.sessions.update()`，行不存在时它是静默 no-op，故这个守卫不是为了防凭空
-   * 造行，而是为了不对「已知没有行」的会话发起无用的节流写（它会建一个永远写不
-   * 进去的 writer）。
-   *
-   * 只管「排写」：刷盘（`flush`）与广播留在各调用点——它们的策略确有差异
-   *（压缩成功路径 flush 失败即抛，取消路径则警告并继续），而排写这一步完全同质。
-   *
-   * @returns 是否真的排了写。调用方据此决定要不要紧跟着 flush：没排写就别 flush，
-   *          避免去刷一个不属于本次变更的遗留 writer。
+   * IPC 广播用：给消息数组附上逐位对齐的树 entryId（消息编辑等按消息定位的树
+   * 操作用它）。产出的是**副本**——entryId 绝不能混进 `agent.state.messages`，
+   * 否则会被 syncTail 当消息体冻进树里。水位线之后的尾部消息（乐观 / 流式 /
+   * 未落树）没有 id，UI 据此隐藏编辑入口。传入数组须与 state 前缀逐位对齐
+   * （state 本体或其截断前缀，以及压缩广播的「+ 待投递 user」尾巴）。
    */
-  private persist(agentSession: AgentSession, messages: AgentMessage[]): boolean {
-    if (!agentSession.sessionCreated) return false;
-    sessionStore.scheduleWrite(agentSession.sessionId, messages);
-    return true;
+  private annotate(agentSession: AgentSession, messages: AgentMessage[]): BroadcastMessage[] {
+    return messages.map((m, i) => {
+      const entryId = agentSession.entryIds[i];
+      return entryId !== undefined ? { ...m, entryId } : m;
+    });
+  }
+
+  /**
+   * 树操作串行入口：所有对本会话树的写（append / moveLane / decision entry）与
+   * 水位线（committedCount / entryIds）更新都经这条链，保证按调用顺序执行。
+   * 链上失败会被记录且不中断后续操作（水位线不前进，下一次 syncTail 会重试同一批
+   * 消息）；返回本次操作的 promise，调用方可 await 它获得旧「flush 落库」语义。
+   */
+  private enqueueTreeOp(agentSession: AgentSession, op: () => Promise<void>): Promise<void> {
+    const run = agentSession.treeChain.then(op);
+    agentSession.treeChain = run.catch((err) => {
+      console.error(`[session-manager] tree write failed for ${agentSession.sessionId}:`, err);
+    });
+    return run;
+  }
+
+  /**
+   * 把 `agent.state.messages` 中尚未落树的尾部逐条追加进会话树——**transcript
+   * 追加型变更的唯一入口**（message_end / agent_end / 各类取消标记 / 权限卡片 /
+   * 压缩摘要都是尾部追加，统一由水位线增量覆盖）。重写型变更（重试回卷、权限
+   * 决策）各自走显式树操作。
+   *
+   * 在链内读取**最新** state：事件间数组可能被 setter 整体替换（截断 / 追加），
+   * 水位线语义天然吸收——只补「水位线之后」的增量。
+   *
+   * 只在构造本会话时确实读到了会话行（`sessionCreated`，此时才有树句柄）才写。
+   */
+  private syncTail(agentSession: AgentSession): Promise<void> {
+    if (!agentSession.sessionCreated || !agentSession.tree) return Promise.resolve();
+    return this.enqueueTreeOp(agentSession, async () => {
+      while (agentSession.committedCount < agentSession.agent.state.messages.length) {
+        const index = agentSession.committedCount;
+        const entryId = await appendSessionMessage(
+          agentSession.tree!,
+          agentSession.agent.state.messages[index],
+        );
+        agentSession.entryIds.push(entryId);
+        agentSession.committedCount = index + 1;
+      }
+    });
+  }
+
+  /** 等本会话已受理的树操作全部落定（等价于旧的「flush 落库」）。链上错误已在
+   *  enqueueTreeOp 处记录，这里只等 settle、不再抛。 */
+  private flushTree(agentSession: AgentSession): Promise<void> {
+    return agentSession.treeChain;
+  }
+
+  /** 等全部会话的树操作链落定。备份采集前的 flush 信号（backup-handler）调用。 */
+  async flushAll(): Promise<void> {
+    await Promise.all([...this.sessions.values()].map((s) => s.treeChain));
+  }
+
+  /** 计算某个活会话当前分支的分支点信息（订阅快照 / agent_end / 切换分支后携带）。
+   *  无树 / 无活会话返回 undefined。 */
+  async getBranchInfo(sessionId: string): Promise<Record<string, BranchEntryInfo> | undefined> {
+    const agentSession = this.sessions.get(sessionId);
+    if (!agentSession?.tree) return undefined;
+    const all = await agentSession.tree.findEntries({ order: 'oldestFirst' });
+    return buildBranchInfo(all, agentSession.entryIds);
+  }
+
+  /**
+   * 切换到某个分支：把 main lane 移到 `targetEntryId` 兄弟子树的最深叶（沿「最新
+   * 子节点」下行——每个分叉处走 seq 最大的孩子，即该分支最近活跃的路径），重投影
+   * 灌回 agent，并广播带最新分支信息的快照。仅 agent 空闲时受理（运行中切分支会
+   * 拽走在途轮的上下文）。
+   */
+  async switchBranch(sessionId: string, targetEntryId: string): Promise<void> {
+    const agentSession = await this.getOrCreateAgent(sessionId);
+    if (agentSession.phase !== 'idle') {
+      console.debug('[session-manager] switch_branch: phase not idle, ignored', sessionId, agentSession.phase);
+      return;
+    }
+    if (!agentSession.sessionCreated || !agentSession.tree) return;
+    const tree = agentSession.tree;
+    let branchInfo: Record<string, BranchEntryInfo> | undefined;
+    let switched = false;
+    await this.enqueueTreeOp(agentSession, async () => {
+      // 复检 phase：等链 + 读库的窗口里可能有 prompt 抢跑（另一个窗口 / 快速连点），
+      // 此刻整体替换 state 会撕碎在途轮的上下文——静默放弃，切换点已被新轮甩开。
+      if (agentSession.phase !== 'idle') {
+        console.debug('[session-manager] switch_branch: run started mid-switch, abandoned', sessionId);
+        return;
+      }
+      const all = await tree.findEntries({ order: 'oldestFirst' });
+      const byId = new Map(all.map((e) => [e.id, e]));
+      if (!byId.has(targetEntryId)) throw new Error(`Branch target not found: ${targetEntryId}`);
+      // 沿子节点下行到叶：all 是 seq 序，正序扫描时后写的孩子覆盖先写的，
+      // latestChild 最终存的即「seq 最大的孩子」
+      const latestChild = new Map<string, string>();
+      for (const e of all) {
+        if (e.parentId !== null) latestChild.set(e.parentId, e.id);
+      }
+      let leaf = targetEntryId;
+      for (let next = latestChild.get(leaf); next !== undefined; next = latestChild.get(leaf)) {
+        leaf = next;
+      }
+      await tree.moveLane('main', leaf);
+      const entries = await tree.findEntriesOnBranch({ order: 'oldestFirst' });
+      const { messages, entryIds } = projectEntries(entries);
+      agentSession.agent.state.messages = sanitizeAgentMessages(messages);
+      agentSession.entryIds = entryIds;
+      agentSession.committedCount = messages.length;
+      // op 内已有全树，就地算分支信息，免二次扫树
+      branchInfo = buildBranchInfo(all, entryIds);
+      switched = true;
+    });
+    // 广播前再确认：切换真的发生了、且没有新轮接管（接管者的广播才是权威）
+    if (!switched || agentSession.phase !== 'idle') return;
+    broadcastToViewers(sessionId, {
+      type: 'session_state',
+      sessionId,
+      messages: this.annotate(agentSession, agentSession.agent.state.messages),
+      isRunning: false,
+      isCompacting: false,
+      pendingTools: this.getPendingToolSnapshot(agentSession),
+      pendingPermissions: this.getPendingPermissions(agentSession),
+      ...(branchInfo !== undefined ? { branchInfo } : {}),
+    });
   }
 
   /**
@@ -262,7 +400,8 @@ class SessionManager {
     // 再 request，那一帧 pendingPermissions 会是空的，UI 会把刚插入的卡片误判为
     // 已失效（失效判定 = toolCallId 不在活 pending 快照里）。
     const decisionPromise = agentSession.permissionBridge.request(request.toolCallId, request, signal);
-    this.persist(agentSession, [...agentSession.agent.state.messages]);
+    // 卡片是尾部追加：syncTail 会把它映射为 permissionRequest CustomEntry 落树
+    void this.syncTail(agentSession);
     this.broadcastSessionSnapshot(agentSession);
 
     // ③ 等用户在卡片上点击（或被取消 / abort）。
@@ -273,13 +412,29 @@ class SessionManager {
     // 会话在等待期间被销毁 / 替换：放弃回写与广播，避免复活已删会话行。
     if (this.sessions.get(sessionId) !== agentSession) return decision;
 
-    // ④ 把最终决策回写到那条 pending 卡片上（按 toolCallId 定位）。
+    // ④ 决策回写。内存态按 toolCallId 就地更新卡片（UI 真相）；树是 append-only，
+    // 不改历史 entry——追加一条 permissionDecision CustomEntry，投影层折叠后与
+    // 内存态同形（round-trip 一致）。decision entry 不投影成独立消息，故不动
+    // 水位线 / entryIds。
+    //
+    // 已知边界（接受）：steering 取消（dismissed）时本 entry 与被 steer 的 user
+    // 消息在链上竞序，若落在 user entry 之后、且用户随后 retry 回卷到该 user，
+    // decision entry 会被留在旧分支外，冷加载后卡片折叠回 pending 形态——UI 的
+    // 「不在活 pending 集合即过期」规则会把它渲染成过期卡，无功能影响。
     agentSession.agent.state.messages = agentSession.agent.state.messages.map((m) =>
       isPermissionRequest(m) && m.toolCallId === request.toolCallId
         ? { ...m, decision }
         : m,
     );
-    this.persist(agentSession, [...agentSession.agent.state.messages]);
+    if (agentSession.sessionCreated && agentSession.tree) {
+      void this.enqueueTreeOp(agentSession, async () => {
+        await agentSession.tree!.appendCustomEntry(PERMISSION_DECISION_CUSTOM_TYPE, {
+          toolCallId: request.toolCallId,
+          decision,
+          timestamp: Date.now(),
+        });
+      });
+    }
     this.broadcastSessionSnapshot(agentSession);
 
     return decision;
@@ -417,9 +572,10 @@ class SessionManager {
    * agent，不走这里。
    */
   private async createAgent(sessionId: string): Promise<AgentSession> {
-    // 会话行 = 本会话模型 / 思考档的真相来源。
-    const existingSession = await sessionStore.load(sessionId);
-    // sessionStore.load 已把历史整形回类型契约（issue #43），此处拿到的即干净数据
+    // 会话行 = 本会话模型 / 思考档的真相来源；transcript 从会话树投影
+    //（store.open 已 sanitize，issue #43，此处拿到的即干净数据）。
+    const loaded = await sessionStore.open(sessionId);
+    const existingSession = loaded?.record;
     const messages: AgentMessage[] = existingSession?.messages ?? [];
     const sessionCreated = !!existingSession;
 
@@ -473,6 +629,11 @@ class SessionManager {
       toolCtx,
       permissionBridge,
       unsubscribeAgent: () => {},
+      tree: loaded?.tree,
+      // 水位线与投影对齐表：冷加载的全部消息都已在树上
+      committedCount: messages.length,
+      entryIds: loaded?.entryIds ? [...loaded.entryIds] : [],
+      treeChain: Promise.resolve(),
     };
     this.wireSubscriptions(agentSession);
     this.sessions.set(sessionId, agentSession);
@@ -553,8 +714,8 @@ class SessionManager {
 
       case 'message_end': {
         const messages = [...agent.state.messages];
-        broadcastToViewers(sessionId, { type: 'message_end', sessionId, messages });
-        this.persist(agentSession, messages);
+        broadcastToViewers(sessionId, { type: 'message_end', sessionId, messages: this.annotate(agentSession, messages) });
+        void this.syncTail(agentSession);
         break;
       }
 
@@ -567,19 +728,24 @@ class SessionManager {
         // await 一个永不到来的点击。
         agentSession.permissionBridge.cancel();
         const messages = [...agent.state.messages];
-        broadcastToViewers(sessionId, { type: 'agent_end', sessionId, messages });
-        // Persist final state before flushing. Normally the trailing
-        // `message_end` already scheduled a write with the same content,
-        // but pi-agent-core's `handleRunFailure` (abort/error path) appends
-        // a synthetic assistant marker straight to `state.messages` and
-        // fires `agent_end` without a preceding `message_end` — so without
-        // this schedule the marker reaches the session's viewers via the
-        // broadcast above but never lands in DB, and disappears on the
-        // next cold-load. The scheduler is idempotent for unchanged
-        // content so this is safe to call unconditionally on every
-        // agent_end.
-        this.persist(agentSession, messages);
-        await sessionStore.flush(sessionId);
+        // 收尾同步 + 等落定（失败已在链上记录，吞掉以免打断 pi 的事件派发）。
+        // 通常尾部的 message_end 已把内容同步进树，但
+        // pi-agent-core 的 handleRunFailure（abort / error 路径）会把合成的
+        // assistant 标记直接 append 进 `state.messages` 且不发 message_end——
+        // 若不在此补一次 syncTail，该标记只到达了 viewer 广播、never 落树，
+        // 下次冷加载即消失。syncTail 按水位线增量，无新消息时是 no-op，
+        // 每次 agent_end 无条件调用是安全的。
+        //
+        // 先落树再广播：agent_end 携带最新分支结构（retry / 编辑刚造出的新分支
+        // 要在本轮 entry 全部进树后才可见），且 annotate 需要齐全的水位线。
+        await this.syncTail(agentSession).catch(() => undefined);
+        const branchInfo = await this.getBranchInfo(sessionId).catch(() => undefined);
+        broadcastToViewers(sessionId, {
+          type: 'agent_end',
+          sessionId,
+          messages: this.annotate(agentSession, messages),
+          ...(branchInfo !== undefined ? { branchInfo } : {}),
+        });
         break;
       }
     }
@@ -622,30 +788,26 @@ class SessionManager {
         }
         const trimmed = text.trim();
         const title = trimmed.slice(0, 50) + (trimmed.length > 50 ? '...' : '');
-        const session: SessionRecord = {
-          id: sessionId,
-          title: title || t('common.newChat'),
-          model: modelCfg.modelId,
-          provider: modelCfg.provider,
-          userInstructions: instructions || '',
-          thinkingLevel: thinkingLvl || 'medium',
-          messageCount: 0,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          messages: [],
-        };
+        const sessionTitle = title || t('common.newChat');
         try {
-          await sessionStore.create(session);
+          await sessionStore.create({
+            id: sessionId,
+            title: sessionTitle,
+            model: modelCfg.modelId,
+            provider: modelCfg.provider,
+            userInstructions: instructions || '',
+            thinkingLevel: thinkingLvl || 'medium',
+          });
           broadcastToViewers(sessionId, {
             type: 'session_created',
             sessionId,
-            title: session.title,
+            title: sessionTitle,
           });
-        } catch (err: any) {
+        } catch (err) {
           // Race: another concurrent prompt() for the same brand-new id won
-          // the create. Re-throw anything that isn't a duplicate-key violation;
+          // the create. Re-throw anything that isn't a duplicate-id violation;
           // the winning call has already broadcast 'session_created'.
-          if (err?.name !== 'ConstraintError') throw err;
+          if (!(err instanceof SessionError && err.code === 'already_exists')) throw err;
         }
       }
     }
@@ -778,10 +940,11 @@ class SessionManager {
    * exceeds the configured threshold.
    *
    * Lossless design: the original messages stay in
-   * `agent.state.messages` forever — we only *insert* a `compactionSummary`
-   * marker at a turn-start boundary. The LLM-facing fold (keep only the last
-   * summary + everything after it) happens later in `transformContext`; this
-   * method never drops history.
+   * `agent.state.messages` forever — we only *append* a `compactionSummary`
+   * marker at the tail, carrying a copy of the retained region in its
+   * `retainedTail`. The LLM-facing fold (last summary + retainedTail +
+   * everything after) happens later in `transformContext`; this method never
+   * drops history.
    *
    * Flow:
    * 1. Estimate context tokens (last assistant `usage.totalTokens` +
@@ -793,9 +956,10 @@ class SessionManager {
    *    last summary*, and the previous summary text is fed to `generateSummary`
    *    as `previousSummary` for an UPDATE-style merge. Multiple summaries
    *    accumulate physically; `transformContext` only ever sends the last one.
-   * 4. On success, splice the new summary right before the cut user message
-   *    and persist. On failure (after one internal retry), skip the
-   *    summary and send anyway — the turn-start-aligned cut guarantees no 400.
+   * 4. On success, append the new summary at the tail (retained region copied
+   *    into its `retainedTail`) and sync to the session tree. On failure
+   *    (after one internal retry), skip the summary and send anyway — the
+   *    turn-start-aligned cut guarantees no 400.
    *
    * Concurrency: runs under `phase === 'compacting'` with a dedicated
    * `compactionController`. `cancel()` aborts it; the top-of-`prompt()` guard
@@ -819,16 +983,11 @@ class SessionManager {
     const messages = sanitizeAgentMessages(agentSession.agent.state.messages);
     const model = agentSession.agent.state.model;
 
-    // token 估算：优先读最后一条 assistant 的真实 usage，尾部按 char/4 估算。
-    const { tokens } = estimateContextTokens(messages);
-    if (!shouldCompact(tokens, model.contextWindow, COMPACTION_SETTINGS)) return false;
-
-    // 切点对齐到 user turn-start（排除 toolResult 中间），修 issue #9。
-    const cut = findCompactionCutPoint(messages, COMPACTION_SETTINGS.keepRecentTokens);
-
-    // 滚动摘要：定位上一条摘要，待摘要区间是「上一条摘要之后 → 新切点」的增量
-    //（更早的历史已被旧摘要覆盖，无需重复总结），旧摘要文本作为 previousSummary
-    // 喂给 generateSummary 做 UPDATE 合并。
+    // 滚动摘要的工作序列：定位上一条摘要，「自上次摘要以来」的活跃上下文 =
+    // 上次的保留区副本（retainedTail，其原文在 state 里位于摘要之前）+ 摘要之后
+    // 的新消息；无摘要时 = 全量。估算 / 切点 / 待摘要区间都基于这个序列——它就是
+    // transformContext 发给 LLM 的内容（摘要本体除外），保证阈值判断与真实负载
+    // 一致，也保证上一轮保留区会被并入下一轮摘要而不是被静默丢弃。
     let lastSummaryIdx = -1;
     for (let i = messages.length - 1; i >= 0; i--) {
       if (isCompactionSummary(messages[i])) {
@@ -836,11 +995,21 @@ class SessionManager {
         break;
       }
     }
-    // baseIdx：上一条摘要之后的起点；为 0 表示尚无摘要。
-    const baseIdx = lastSummaryIdx + 1;
+    const lastSummary =
+      lastSummaryIdx >= 0 ? (messages[lastSummaryIdx] as CompactionSummaryMessage) : null;
+    const sinceLast = lastSummary
+      ? [...getRetainedTail(lastSummary), ...messages.slice(lastSummaryIdx + 1)]
+      : messages;
 
-    // 切点未越过「上一条摘要之后」→ 自上次压缩以来没有新的可摘要历史，跳过。
-    if (cut <= baseIdx) return false;
+    // token 估算：与 LLM 视图同形（摘要 + 自上次摘要以来的序列）；优先读最后一条
+    // assistant 的真实 usage，尾部按 char/4 估算。
+    const { tokens } = estimateContextTokens(lastSummary ? [lastSummary, ...sinceLast] : messages);
+    if (!shouldCompact(tokens, model.contextWindow, COMPACTION_SETTINGS)) return false;
+
+    // 切点对齐到 user turn-start（排除 toolResult 中间），修 issue #9。
+    // cut <= 0：无 user 可切 / 从头保留即 no-op（其前没有可摘要的历史），跳过。
+    const cut = findCompactionCutPoint(sinceLast, COMPACTION_SETTINGS.keepRecentTokens);
+    if (cut <= 0) return false;
 
     // 进入 compacting 阶段：占用非 idle 状态（自动保活 + 阻止并发 prompt）。
     // 这一步在「任何 await 之前」同步完成，把可取消的忙碌态原子地占住——否则在
@@ -855,7 +1024,7 @@ class SessionManager {
       sessionId,
       // 带上待投递的用户消息，压缩期间用户气泡保持可见（前端 session_state 全量
       // 替换，不带就会冲掉乐观插入的气泡）。
-      messages: [...messages, pendingUserMessage],
+      messages: this.annotate(agentSession, [...messages, pendingUserMessage]),
       isRunning: true,
       isCompacting: true,
       pendingTools: [],
@@ -870,11 +1039,10 @@ class SessionManager {
       // transformContext 仍会带上已有的最后一条摘要）。
       if (!apiKey) return false;
 
-      const previousSummary =
-        lastSummaryIdx >= 0
-          ? (messages[lastSummaryIdx] as CompactionSummaryMessage).summary
-          : undefined;
-      const messagesToSummarize = messages.slice(baseIdx, cut);
+      // 待摘要区间 = sinceLast 的切点之前（含上一轮保留区副本，避免其被丢出上下文），
+      // 旧摘要文本作为 previousSummary 喂给 generateSummary 做 UPDATE 合并。
+      const previousSummary = lastSummary?.summary;
+      const messagesToSummarize = sinceLast.slice(0, cut);
 
       const summary = await runCompaction({
         messagesToSummarize,
@@ -889,23 +1057,25 @@ class SessionManager {
       if (signal.aborted) return await this.commitCompactionCancel(agentSession, pendingUserMessage);
 
       if (summary) {
-        // 在切点首条 user 之前插入摘要（不变式：摘要紧贴 user turn-start，
-        // 保证 truncateForRetry 与 transformContext 无需特判）。原始消息全保留。
+        // 摘要**尾部追加**（树是 append-only，摘要 entry 落在链尾）：保留区
+        // （切点之后的消息）以副本形式挂在 retainedTail 上，原始消息全保留。
+        // LLM 视图由 transformContext 重建为「摘要 + retainedTail + 其后消息」，
+        // 与旧的中段插入形态等价；随后 agent.prompt() 追加的本轮 user 消息
+        // 排在摘要之后，retry 的「截到最后一条 user」仍会保住摘要。
         const updated = [
-          ...messages.slice(0, cut),
-          createCompactionSummaryMessage(summary, tokens),
-          ...messages.slice(cut),
+          ...messages,
+          createCompactionSummaryMessage(summary, tokens, sinceLast.slice(cut)),
         ];
         agentSession.agent.state.messages = updated;
-        if (this.persist(agentSession, updated)) {
-          await sessionStore.flush(sessionId);
-        }
+        // 等落树（旧「persist + flush」语义）：SW 在广播后立刻被杀也不丢摘要。
+        // 失败已在链上记录，吞掉——压缩是增益路径，不因落库失败中断本轮发送
+        await this.syncTail(agentSession).catch(() => undefined);
         broadcastToViewers(sessionId, {
           type: 'session_state',
           sessionId,
           // 同样带上待投递的用户消息，避免摘要插入后到 agent.prompt() 之间
           // 这一帧用户气泡闪掉。agent.prompt() 随后会 append 真实的同内容消息。
-          messages: [...updated, pendingUserMessage],
+          messages: this.annotate(agentSession, [...updated, pendingUserMessage]),
           isRunning: true,
           isCompacting: true,
           pendingTools: [],
@@ -951,22 +1121,15 @@ class SessionManager {
       pendingUserMessage,
       this.buildAbortedMarker(agentSession),
     ];
-    // 同步内存态，否则下一轮 prompt 会基于缺这两条的旧 state 续写并覆盖 DB。
+    // 同步内存态，否则下一轮 prompt 会基于缺这两条的旧 state 续写。
     agentSession.agent.state.messages = finalMessages;
-
-    if (this.persist(agentSession, finalMessages)) {
-      try {
-        await sessionStore.flush(sessionId);
-      } catch (err) {
-        console.warn(`[session-manager] flush on compaction cancel failed for ${sessionId}:`, err);
-        // 继续广播——DB 落后可恢复，不该把停止按钮卡在界面上。
-      }
-    }
+    // 等落树（失败已在链上记录，不阻塞广播——落库落后可恢复，不该把停止按钮卡在界面上）
+    await this.syncTail(agentSession).catch(() => undefined);
 
     broadcastToViewers(sessionId, {
       type: 'session_state',
       sessionId,
-      messages: finalMessages,
+      messages: this.annotate(agentSession, finalMessages),
       isRunning: false,
       isCompacting: false,
       pendingTools: [],
@@ -1007,9 +1170,34 @@ class SessionManager {
    * `turn` 同 prompt：本轮重试携带的模型 / 思考档。带它且与活 agent 当前选择不同
    * 时才换并落库；不带（或相同）时保持活 agent 当前的会话选择不动。
    */
-  async retry(
+  async retry(sessionId: string, turn?: TurnSettings, entryId?: string): Promise<void> {
+    return this.rewindAndResume(sessionId, turn, entryId ? { entryId } : null);
+  }
+
+  /**
+   * 编辑一条已发送的 user 消息并从该点重新生成（issue #44）。语义 = 回卷到该
+   * 消息之前 + 以新文案重发：与 retry 共用同一条「回卷 + 续跑」路径，区别只在
+   * 回卷目标（指定 entry 而非最后一条 user）与替换文本。原分支（该消息本体及
+   * 其后的一切）留在树上成为 sibling，不物理删除。附件结构保留（只换
+   * `<user-request>` 内文，见 replaceUserText）。
+   */
+  async editMessage(
     sessionId: string,
+    entryId: string,
+    text: string,
     turn?: TurnSettings,
+  ): Promise<void> {
+    return this.rewindAndResume(sessionId, turn, { entryId, text });
+  }
+
+  /** retry / editMessage 共用的回卷 + 续跑实现。`target` 三态：
+   *  - null：重试最后一轮（回卷到最后一条 user 并原样重发）；
+   *  - { entryId }：重试指定轮（回卷到该 user 消息、含它，重新生成其后内容）；
+   *  - { entryId, text }：编辑指定 user 消息（回卷到它之前，以新文案重发）。 */
+  private async rewindAndResume(
+    sessionId: string,
+    turn: TurnSettings | undefined,
+    target: { entryId: string; text?: string } | null,
   ): Promise<void> {
     // Cold-load if needed. If multiple retry() calls land concurrently for
     // a session not yet in the map, they all await the same in-flight
@@ -1024,7 +1212,7 @@ class SessionManager {
       // streaming (`running`). Silent no-op so the duplicate window doesn't
       // see a misleading toast — the in-flight run's broadcasts reconcile
       // every viewing window to the correct state.
-      console.debug('[session-manager] retry: phase not idle, ignored', sessionId, agentSession.phase);
+      console.debug('[session-manager] rewind: phase not idle, ignored', sessionId, agentSession.phase);
       return;
     }
 
@@ -1039,28 +1227,86 @@ class SessionManager {
 
     try {
       const messages = [...agentSession.agent.state.messages];
-      const truncated = truncateForRetry(messages);
-      if (!truncated) {
-        // The UI only shows retry on the latest assistant turn, which by
-        // definition has a preceding user message. Throwing surfaces the bug
-        // instead of silently no-oping.
-        throw new Error('No user message found to retry');
+      // 回卷后的目标转录 truncated 与「树上保留的前缀长度」keepCount：
+      // - retry：截到最后一条 user（含），keepCount = truncated.length（全部已落树）；
+      // - edit：截到目标 user 之前 + 换文案的新 user 消息，keepCount = 目标下标
+      //   （新 user 消息尚未落树，稍后由 syncTail 作为新分支的首个 entry 追加）。
+      let truncated: AgentMessage[];
+      let keepCount: number;
+      if (target) {
+        const index = agentSession.entryIds.indexOf(target.entryId);
+        const original = index >= 0 ? messages[index] : undefined;
+        if (!original || original.role !== 'user') {
+          // 目标不存在（已被并发操作回卷走）或不是 user 消息——UI 只在 user 消息上
+          // 提供编辑 / 指定轮重试入口，走到这里说明状态已漂移，诚实报错让用户重试。
+          throw new Error('Target message not found');
+        }
+        if (target.text !== undefined) {
+          // 编辑：回卷到该消息之前，以新文案重发。
+          // IPC 边界防御：空文案会回卷树后空跑一轮（UI 已挡，此处兜底）
+          if (!target.text.trim()) throw new Error('Edited message text is empty');
+          keepCount = index;
+          truncated = [
+            ...messages.slice(0, index),
+            { ...replaceUserText(original as Message, target.text), timestamp: Date.now() } as AgentMessage,
+          ];
+        } else {
+          // 指定轮重试：保留该 user 消息（含），重新生成其后内容
+          keepCount = index + 1;
+          truncated = messages.slice(0, index + 1);
+        }
+      } else {
+        const t = truncateForRetry(messages);
+        if (!t) {
+          // The UI only shows retry on the latest assistant turn, which by
+          // definition has a preceding user message. Throwing surfaces the bug
+          // instead of silently no-oping.
+          throw new Error('No user message found to retry');
+        }
+        truncated = t;
+        keepCount = truncated.length;
       }
-      busySnapshot = truncated;
+      // 编辑路径的忙碌帧：新 user 消息尚未落树，只给已提交前缀附 entryId——
+      // annotate(truncated) 会把 entryIds[keepCount]（旧目标 entry 的 id）误附给
+      // 新文案，误导以 entryId 为键的消费者（分支导航）并翻动 React key。
+      // （指定轮重试的 truncated 全部已提交，走普通 annotate。）
+      const isEdit = target?.text !== undefined;
       broadcastToViewers(sessionId, {
         type: 'session_state',
         sessionId,
-        messages: truncated,
+        messages: isEdit
+          ? [...this.annotate(agentSession, truncated.slice(0, keepCount)), truncated[keepCount]]
+          : this.annotate(agentSession, truncated),
         isRunning: true,
         pendingTools: this.getPendingToolSnapshot(agentSession),
       });
 
-      // Persist truncation BEFORE continue. An SW restart mid-run must not
-      // resurrect the failed turn from disk. `flush` collapses the
-      // throttler's pending timer and writes immediately.
-      if (this.persist(agentSession, truncated)) {
-        await sessionStore.flush(sessionId);
+      // 树侧非破坏回卷 BEFORE continue：moveLane 到 truncated 末条（user）对应的
+      // entry——其后的旧 assistant / toolResult 留在旧分支上成为 sibling，不再
+      // 物理删除；continue() 产生的新回复将作为该 user entry 的新子分支追加。
+      // 操作排进串行链（在途 syncTail 先落定，水位线届时已覆盖全量），await 保证
+      // SW 重启不会从盘上复活失败轮。
+      //
+      // 水位线的回缩（entryIds 截短 / committedCount 下调）只在 moveLane 成功后
+      // 执行；op 中途失败则树与水位线都停在「未回卷」状态，与此刻尚未截断的
+      // `state.messages` 保持一致——catch 分支据 `busySnapshot === null` 识别
+      // 这种情况，广播完整转录解除 UI 的乐观截断，绝不把内存截到树之前。
+      if (agentSession.sessionCreated && agentSession.tree) {
+        await this.enqueueTreeOp(agentSession, async () => {
+          if (keepCount === 0) {
+            // 编辑第一条消息：回卷到根（moveLane 到 null 是合法目标）
+            await agentSession.tree!.moveLane('main', null);
+          } else {
+            const target = agentSession.entryIds[keepCount - 1];
+            // 对齐表缺位（不应发生）时宁可不动 lane，也不能误把分支清空
+            if (target) await agentSession.tree!.moveLane('main', target);
+          }
+          agentSession.entryIds = agentSession.entryIds.slice(0, keepCount);
+          agentSession.committedCount = Math.min(agentSession.committedCount, keepCount);
+        });
       }
+      // 树已回卷（或无树可回卷）：此后内存态才允许对齐到 truncated
+      busySnapshot = truncated;
 
       // 模型 / 思考档：仅当 retry 携带 turn（用户在重试前切了模型 / 思考）且与活
       // agent 当前选择不同时才换并落库；否则保持不动——没有「空闲时改了
@@ -1087,6 +1333,10 @@ class SessionManager {
       agentSession.toolCtx.cancelAll();
       agentSession.permissionBridge.cancel();
       agentSession.agent.state.messages = truncated;
+      // 编辑路径的新 user 消息此刻尚未落树（keepCount = 目标下标）：continue()
+      // 之前先补一次 syncTail，SW 在流式开始前被杀也不丢这条消息。retry 路径
+      // 水位线已齐，此调用是 no-op。
+      await this.syncTail(agentSession).catch(() => undefined);
       if (resolved) {
         agentSession.agent.state.model = resolved.model;
         agentSession.modelKey = turnKey!;
@@ -1116,7 +1366,7 @@ class SessionManager {
       broadcastToViewers(sessionId, {
         type: 'session_state',
         sessionId,
-        messages: truncated,
+        messages: this.annotate(agentSession, truncated),
         isRunning: true,
         pendingTools: this.getPendingToolSnapshot(agentSession),
       });
@@ -1140,10 +1390,26 @@ class SessionManager {
       // broadcast and we must not clobber a marker it may have appended.
       if (busySnapshot && agentSession.phase === 'preparing') {
         agentSession.agent.state.messages = busySnapshot;
+        // 树已回卷但（编辑路径的）新 user 消息可能尚未落树——补一次 syncTail，
+        // 否则此后 SW 被杀，冷加载会缺这条消息且旧分支不可达（编辑内容丢失）
+        await this.syncTail(agentSession).catch(() => undefined);
+        // 回卷已产生新分支：带上最新分支结构
+        const rewoundBranchInfo = await this.getBranchInfo(agentSession.sessionId).catch(() => undefined);
         broadcastToViewers(agentSession.sessionId, {
           type: 'session_state',
           sessionId: agentSession.sessionId,
-          messages: busySnapshot,
+          messages: this.annotate(agentSession, busySnapshot),
+          isRunning: false,
+          pendingTools: [],
+          ...(rewoundBranchInfo !== undefined ? { branchInfo: rewoundBranchInfo } : {}),
+        });
+      } else if (agentSession.phase === 'preparing') {
+        // moveLane 之前 / 之中失败：树未回卷，内存保持完整转录。广播全量以撤销
+        // 上面已发出的乐观截断帧，避免 viewer 停留在「已截断但没在跑」的假象。
+        broadcastToViewers(agentSession.sessionId, {
+          type: 'session_state',
+          sessionId: agentSession.sessionId,
+          messages: this.annotate(agentSession, agentSession.agent.state.messages),
           isRunning: false,
           pendingTools: [],
         });
@@ -1192,22 +1458,18 @@ class SessionManager {
       this.buildAbortedMarker(agentSession),
     ];
     agentSession.agent.state.messages = finalMessages;
-    if (this.persist(agentSession, finalMessages)) {
-      try {
-        await sessionStore.flush(agentSession.sessionId);
-      } catch (err) {
-        console.warn(
-          `[session-manager] flush on retry cancel failed for ${agentSession.sessionId}:`,
-          err,
-        );
-      }
-    }
+    // 标记是尾部追加（moveLane 已在链上先行，水位线 = truncated.length）；等落树，
+    // 失败已在链上记录，不阻塞广播
+    await this.syncTail(agentSession).catch(() => undefined);
+    // moveLane 已产生新分支（旧轮成为 sibling）：带上最新分支结构
+    const branchInfo = await this.getBranchInfo(agentSession.sessionId).catch(() => undefined);
     broadcastToViewers(agentSession.sessionId, {
       type: 'session_state',
       sessionId: agentSession.sessionId,
-      messages: finalMessages,
+      messages: this.annotate(agentSession, finalMessages),
       isRunning: false,
       pendingTools: [],
+      ...(branchInfo !== undefined ? { branchInfo } : {}),
     });
   }
 
@@ -1276,10 +1538,10 @@ class SessionManager {
    * No-op if no `AgentSession` entry exists — the session has nothing to cancel
    * (either never started or already cleaned up).
    *
-   * Flushes the throttled session writer BEFORE removing the agent from
-   * the map so any concurrent `subscribe` / `prompt` for the same id
-   * either reuses the still-live in-memory state or reads a fully-persisted
-   * DB row — never an interleaved half-flushed snapshot.
+   * Waits for the session's tree-write chain to settle BEFORE removing the
+   * agent from the map so any concurrent `subscribe` / `prompt` for the same
+   * id either reuses the still-live in-memory state or reads a fully-persisted
+   * mutation log — never an interleaved half-written snapshot.
    */
   async cancel(sessionId: string): Promise<void> {
     const agentSession = this.sessions.get(sessionId);
@@ -1340,32 +1602,27 @@ class SessionManager {
     // on an orphan agent reference — silently lost. `waitForIdle()` is
     // the API pi-agent-core exposes precisely for this synchronization.
     await agentSession.agent.waitForIdle();
-    // Drain any throttler write scheduled by trailing message_end events
-    // from the just-aborted run.
-    try {
-      await sessionStore.flush(sessionId);
-    } catch (err) {
-      console.warn(`[session-manager] flush on cancel failed for ${sessionId}:`, err);
-    }
     // Snapshot post-abort state. If pi-agent-core appended the marker,
     // length increased by one; if not (idle branch / no active run),
-    // length is unchanged and we skip the redundant write.
+    // length is unchanged and syncTail is a watermark no-op anyway.
     const finalMessages = [...agentSession.agent.state.messages];
-    if (finalMessages.length !== preLen && this.persist(agentSession, finalMessages)) {
-      try {
-        await sessionStore.flush(sessionId);
-      } catch (err) {
-        console.warn(`[session-manager] post-abort persist failed for ${sessionId}:`, err);
-        // Continue to broadcast anyway — DB lag is recoverable.
-      }
+    if (finalMessages.length !== preLen) {
+      void this.syncTail(agentSession);
     }
+    // 等链上全部在途树写（含刚 abort 的 run 尾部 message_end 排入的 syncTail 与
+    // 上面的标记同步）落定后再摘除会话；失败已在链上记录，不阻塞广播。
+    await this.flushTree(agentSession);
+    // 分支信息须在会话出表前算（getBranchInfo 按 sessionId 查活会话）——中断的
+    // retry / 编辑可能刚在树上造出新分支，撤下的 agent_end 帧要携带它
+    const branchInfo = await this.getBranchInfo(sessionId).catch(() => undefined);
     this.sessions.delete(sessionId);
     this.updateKeepAlive();
     // Ensure client knows the agent stopped (abort may not fire agent_end)
     broadcastToViewers(sessionId, {
       type: 'agent_end',
       sessionId,
-      messages: finalMessages,
+      messages: this.annotate(agentSession, finalMessages),
+      ...(branchInfo !== undefined ? { branchInfo } : {}),
     });
   }
 
@@ -1411,7 +1668,7 @@ class SessionManager {
    *  reconnecting or second window keeps the composer blocked instead of
    *  dispatching a prompt the manager would ignore while `phase !== 'idle'`. */
   getSessionState(sessionId: string): {
-    messages: AgentMessage[];
+    messages: BroadcastMessage[];
     isRunning: boolean;
     isCompacting: boolean;
     pendingTools: { toolName: string; toolCallId: string; args: any }[];
@@ -1420,7 +1677,7 @@ class SessionManager {
     const agentSession = this.sessions.get(sessionId);
     if (!agentSession) return null;
     return {
-      messages: [...agentSession.agent.state.messages],
+      messages: this.annotate(agentSession, agentSession.agent.state.messages),
       isRunning: agentSession.phase !== 'idle',
       isCompacting: agentSession.phase === 'compacting',
       pendingTools: this.getPendingToolSnapshot(agentSession),

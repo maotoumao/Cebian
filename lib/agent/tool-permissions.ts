@@ -104,6 +104,28 @@ function isPermissionRequest(
   return msg.role === 'permissionRequest';
 }
 
+// ─── 会话树持久化契约（wire contract）───
+//
+// 树化存储（append-only entry 链）里，授权卡片以两条 CustomEntry 表达：
+// - `permissionRequest`：卡片本体（data = PermissionRequestMessage 去掉 role），
+//   插入时 decision 通常是 'pending'；
+// - `permissionDecision`：用户决策后**追加**的一条（append-only 不改历史 entry），
+//   投影层按 toolCallId 把最后一条 decision 折叠回卡片消息。
+// 这两个 customType 字面量与 data 字段名是持久化契约，改动会破坏既有会话数据。
+
+const PERMISSION_REQUEST_CUSTOM_TYPE = 'permissionRequest';
+const PERMISSION_DECISION_CUSTOM_TYPE = 'permissionDecision';
+
+/** permissionRequest CustomEntry 的 data 载荷。 */
+type PermissionRequestEntryData = Omit<PermissionRequestMessage, 'role'>;
+
+/** permissionDecision CustomEntry 的 data 载荷。 */
+interface PermissionDecisionEntryData {
+  toolCallId: string;
+  decision: PermissionDecision;
+  timestamp: number;
+}
+
 // ─── 权限 token → 人话解释 ───
 
 /**
@@ -281,6 +303,8 @@ export type {
   PermissionRequest,
   PermissionRequestDetails,
   PermissionRequestMessage,
+  PermissionRequestEntryData,
+  PermissionDecisionEntryData,
   RequestDecisionFn,
   BeforeToolCallHook,
   ToolGate,
@@ -290,6 +314,9 @@ export {
   // permissionRequest 自定义消息
   createPermissionRequestMessage,
   isPermissionRequest,
+  // 会话树持久化契约
+  PERMISSION_REQUEST_CUSTOM_TYPE,
+  PERMISSION_DECISION_CUSTOM_TYPE,
   // 权限说明
   describePermission,
   // LLM-facing 阻断 reason

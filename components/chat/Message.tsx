@@ -1,7 +1,9 @@
-import { Bot, ChevronRight, Lightbulb, CheckCircle, Crosshair, FileText, Film, FoldVertical, ShieldAlert } from 'lucide-react';
+import { Bot, ChevronLeft, ChevronRight, Lightbulb, CheckCircle, Crosshair, FileText, Film, FoldVertical, Pencil, ShieldAlert } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { CopyButton } from '@/components/common/CopyButton';
 import { MarkdownRenderer } from '@/components/common/MarkdownRenderer';
 import { MessageMetaRow, type MessageMetaProps } from '@/components/chat/MessageMetaRow';
 import { extractUserText, extractUserAttachments } from '@/lib/agent/message-helpers';
@@ -12,14 +14,138 @@ import { describePermission } from '@/lib/agent/tool-permissions';
 import { downloadFile, formatDuration, formatCompactCount } from '@/lib/utils';
 import type { Message } from '@earendil-works/pi-ai';
 
+/* ─── Branch switcher ─── */
+
+interface BranchSwitcherProps {
+  index: number;
+  count: number;
+  onPrev?: () => void;
+  onNext?: () => void;
+  disabled?: boolean;
+}
+
+/**
+ * 分支切换器「‹ n/m ›」：一条消息存在并列版本（重试产生的并列回复 / 编辑产生的
+ * 并列提问）时渲染在其下方。onPrev / onNext 缺省表示已到边界（按钮禁用）；
+ * disabled 在 agent 运行中整体禁用（后台切分支只在空闲时受理）。
+ */
+export function BranchSwitcher({
+  index,
+  count,
+  onPrev,
+  onNext,
+  disabled,
+}: BranchSwitcherProps) {
+  return (
+    <div className="flex items-center gap-0.5 text-[0.7rem] text-muted-foreground/70">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-5"
+        onClick={onPrev}
+        disabled={disabled || !onPrev}
+        aria-label={t('chat.message.prevBranch')}
+        title={t('chat.message.prevBranch')}
+      >
+        <ChevronLeft className="size-3" />
+      </Button>
+      <span className="font-mono tabular-nums select-none">{index + 1}/{count}</span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-5"
+        onClick={onNext}
+        disabled={disabled || !onNext}
+        aria-label={t('chat.message.nextBranch')}
+        title={t('chat.message.nextBranch')}
+      >
+        <ChevronRight className="size-3" />
+      </Button>
+    </div>
+  );
+}
+
 /* ─── User Message ─── */
-export function UserMessageBubble({ msg, children }: { msg?: Message; children?: ReactNode }) {
+export function UserMessageBubble({
+  msg,
+  children,
+  onEdit,
+  branch,
+}: {
+  msg?: Message;
+  children?: ReactNode;
+  /** 编辑已发送消息（issue #44）：以新文案从此消息重新生成。仅当消息已落树
+   *  （广播带 entryId）且 agent 空闲时由上层传入；缺省不显示编辑入口。 */
+  onEdit?: (text: string) => void;
+  /** 当前消息存在并列版本时，在固定操作区展示分支导航。 */
+  branch?: BranchSwitcherProps;
+}) {
   const text = msg ? extractUserText(msg) : null;
   const attachments = useMemo(() => msg ? extractUserAttachments(msg) : null, [msg]);
   const hasAttachments = attachments && (attachments.images.length > 0 || attachments.elements.length > 0 || attachments.files.length > 0 || attachments.recordings.length > 0);
 
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (editing) textareaRef.current?.focus();
+  }, [editing]);
+  // 编辑入口在编辑途中被收回（如另一窗口开始了新一轮）：退出编辑态，
+  // 避免「点发送却静默丢弃草稿」的假成功
+  const canEdit = onEdit !== undefined;
+  useEffect(() => {
+    if (!canEdit) setEditing(false);
+  }, [canEdit]);
+
+  const commitEdit = () => {
+    const next = draft.trim();
+    setEditing(false);
+    // 空文案或没改不发——避免误触把消息清空 / 空跑一轮
+    if (next && next !== text) onEdit?.(next);
+  };
+
+  if (editing) {
+    return (
+      <div className="self-end w-[95%]">
+        <div className="bg-card border border-border rounded-2xl p-2 flex flex-col gap-2">
+          <textarea
+            ref={textareaRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              // IME 组词中的 Enter 是「选字确认」，不能触发发送（对齐 ChatInput）
+              if (e.nativeEvent.isComposing) return;
+              // Enter 发送（Shift+Enter 换行），Esc 取消——对齐 ChatInput 的习惯
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                commitEdit();
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                setEditing(false);
+              }
+            }}
+            aria-label={t('common.edit')}
+            rows={Math.min(8, Math.max(2, draft.split('\n').length))}
+            className="w-full resize-y bg-transparent text-[0.9rem] leading-relaxed outline-none px-2 py-1"
+          />
+          <div className="flex items-center justify-end gap-2 px-1">
+            <span className="text-[0.7rem] text-muted-foreground mr-auto">
+              {t('chat.message.editHint')}
+            </span>
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setEditing(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button size="sm" className="h-6 px-2 text-xs" onClick={commitEdit} disabled={!draft.trim()}>
+              {t('common.send')}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="self-end max-w-[95%]">
+    <div className="self-end max-w-[95%] group/user">
       <div className="bg-card border border-border px-4 py-3 rounded-2xl text-[0.9rem] leading-relaxed w-fit ml-auto whitespace-pre-wrap break-all">
         {text ?? children}
       </div>
@@ -78,6 +204,34 @@ export function UserMessageBubble({ msg, children }: { msg?: Message; children?:
               </span>
             </Badge>
           ))}
+        </div>
+      )}
+
+      {text != null && (
+        <div className="flex h-8 items-center justify-end gap-1.5 px-1">
+          <div className="flex items-center gap-1 opacity-0 pointer-events-none transition-opacity group-hover/user:opacity-100 group-hover/user:pointer-events-auto group-focus-within/user:opacity-100 group-focus-within/user:pointer-events-auto [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto">
+            <CopyButton text={text} />
+            {onEdit && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 text-muted-foreground hover:text-foreground"
+                    aria-label={t('common.edit')}
+                    onClick={() => {
+                      setDraft(text);
+                      setEditing(true);
+                    }}
+                  >
+                    <Pencil />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t('common.edit')}</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+          {branch && <BranchSwitcher {...branch} />}
         </div>
       )}
     </div>
@@ -161,17 +315,20 @@ export function AgentMessage({
   meta,
   copyText,
   onRetry,
+  branch,
 }: {
   children?: ReactNode;
   isStreaming?: boolean;
   showHeader?: boolean;
   /** Meta is rendered as soon as `!isStreaming`; the copy button inside the
    * row is gated on `copyText` (skipped for pure tool-call turns). */
-  meta?: Omit<MessageMetaProps, 'text' | 'onRetry'>;
+  meta?: Omit<MessageMetaProps, 'text' | 'onRetry' | 'branchSwitcher'>;
   copyText?: string;
   /** When provided, a retry button is shown in the meta row. Caller decides
    *  eligibility (last turn-closing assistant, agent idle). */
   onRetry?: () => void;
+  /** 当前回复存在并列版本时，在操作行最左侧展示分支导航。 */
+  branch?: BranchSwitcherProps;
 }) {
   // 朗读按钮惰性读取这个容器的 DOM 文本（见 extractSpeakText），避免提前求值。
   const contentRef = useRef<HTMLDivElement>(null);
@@ -192,12 +349,13 @@ export function AgentMessage({
           />
         )}
       </div>
-      {!isStreaming && (meta || copyText || onRetry) && (
+      {!isStreaming && (meta || copyText || onRetry || branch) && (
         <MessageMetaRow
           {...(meta ?? {})}
           text={copyText}
           getSpeakText={() => extractSpeakText(contentRef.current)}
           onRetry={onRetry}
+          branchSwitcher={branch ? <BranchSwitcher {...branch} /> : undefined}
         />
       )}
     </div>

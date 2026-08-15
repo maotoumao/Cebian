@@ -2,12 +2,20 @@
 // Replaces useAgentLifecycle + useSessionManager.
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { AgentMessage } from '@earendil-works/pi-agent-core';
-import { CLIENT_PORT, type ClientMessage, type ServerMessage, type SessionMeta, type TurnSettings } from '@/lib/ipc/protocol';
-import type { SessionRecord } from '@/lib/persistence/db';
+import {
+  CLIENT_PORT,
+  type BranchEntryInfo,
+  type BroadcastMessage,
+  type ClientMessage,
+  type ServerMessage,
+  type SessionMeta,
+  type SessionSnapshot,
+  type TurnSettings,
+} from '@/lib/ipc/protocol';
 import type { Attachment } from '@/lib/agent/attachments';
 import type { PermissionRequest } from '@/lib/agent/tool-permissions';
-import { truncateForRetry } from '@/lib/agent/message-helpers';
+import { replaceUserText, truncateForRetry } from '@/lib/agent/message-helpers';
+import type { Message } from '@earendil-works/pi-ai';
 import { t } from '@/lib/i18n';
 import { recorderChannel } from '@/lib/recorder/sidepanel-channel';
 import { mcpAppResourceChannel } from '@/lib/mcp/sidepanel-channel';
@@ -16,7 +24,11 @@ import { myInstanceId } from '@/lib/ipc/instance-id';
 // ─── State ───
 
 export interface AgentPortState {
-  messages: AgentMessage[];
+  /** 广播形态：消息 + 可选的树 entryId（消息编辑用它定位；乐观 / 流式消息没有）。 */
+  messages: BroadcastMessage[];
+  /** 当前分支的分支点信息（稀疏，键为 entryId）。只在结构可能变化的帧下发，
+   *  缺省帧保持上一次的值。 */
+  branchInfo: Record<string, BranchEntryInfo>;
   isAgentRunning: boolean;
   /** 后台正在执行发送前的上下文压缩时为 true。用于驱动一个与普通思考态不同的
    *  「压缩中」指示。 */
@@ -48,7 +60,7 @@ const PROMPT_RECONNECT_TIMEOUT_MS = 1_500;
 
 export interface AgentPortCallbacks {
   onSessionCreated?: (sessionId: string, title: string) => void;
-  onSessionLoaded?: (session: SessionRecord | null) => void;
+  onSessionLoaded?: (session: SessionSnapshot | null) => void;
   /** 重新订阅一个仍有活 agent 的会话时，后台走 `session_state`（带消息但非完整
    *  会话行）。这里把该会话的 provider / model / 思考档单独回传，供上层回填本地的
    *  turn 草稿——与 `onSessionLoaded` 对齐，修复「发消息后进设置再返回模型被重置」。 */
@@ -62,6 +74,7 @@ export interface AgentPortCallbacks {
 export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
   const [state, setState] = useState<AgentPortState>({
     messages: [],
+    branchInfo: {},
     isAgentRunning: false,
     isCompacting: false,
     sessionId: null,
@@ -134,6 +147,8 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
             // value rather than wiping the header.
             ...(msg.title !== undefined ? { sessionTitle: msg.title } : {}),
             messages: msg.messages,
+            // 分支信息只在结构可能变化的帧携带；缺省帧保持现值，避免切换器闪没
+            branchInfo: msg.branchInfo ?? prev.branchInfo,
             isAgentRunning: msg.isRunning,
             isCompacting: msg.isCompacting ?? false,
           }));
@@ -172,6 +187,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           setState(prev => ({
             ...prev,
             messages: msg.messages,
+            branchInfo: msg.branchInfo ?? prev.branchInfo,
             isAgentRunning: false,
             isCompacting: false,
           }));
@@ -219,6 +235,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
               sessionId: msg.session!.id,
               sessionTitle: msg.session!.title,
               messages: msg.session!.messages,
+              branchInfo: msg.session!.branchInfo ?? {},
               isAgentRunning: false,
               isCompacting: false,
             }));
@@ -462,8 +479,51 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     if (sessionId) postMessage({ type: 'cancel', sessionId });
   }, [postMessage]);
 
+  /** 编辑一条已发送的 user 消息并从该点重新生成（issue #44）。乐观更新：本地按
+   *  entryId 截断到该消息之前、放入换好文案的 user 气泡（复用后台同款
+   *  replaceUserText，附件徽标不闪），随后的权威广播完成收敛。 */
+  const editMessage = useCallback((entryId: string, text: string, turn?: TurnSettings) => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId) return;
+    if (!portRef.current) {
+      setState(prev => ({ ...prev, lastError: t('chat.session.notConnected') }));
+      return;
+    }
+    setState(prev => {
+      const index = prev.messages.findIndex(m => m.entryId === entryId);
+      if (index < 0) return prev;
+      // 剥掉旧 entryId：编辑产生的是尚未落树的新消息，保留旧 id 会与后台
+      // 广播帧的「未提交消息无 id」约定冲突
+      const { entryId: _stale, ...edited } = {
+        ...replaceUserText(prev.messages[index] as Message, text),
+        timestamp: Date.now(),
+      } as BroadcastMessage;
+      return {
+        ...prev,
+        messages: [...prev.messages.slice(0, index), edited],
+        isAgentRunning: true,
+        isCompacting: false,
+        lastError: null,
+      };
+    });
+    postMessage({ type: 'edit_message', sessionId, entryId, text, model: turn?.model, thinkingLevel: turn?.thinkingLevel });
+  }, [postMessage]);
+
+  /** 切换到分支点上的另一个兄弟版本。后台 moveLane + 重投影后以 session_state
+   *  （带 branchInfo）广播回来，本地不做乐观切换（树在后台，无从预知目标分支内容）。 */
+  const switchBranch = useCallback((targetEntryId: string) => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId) return;
+    if (!portRef.current) {
+      setState(prev => ({ ...prev, lastError: t('chat.session.notConnected') }));
+      return;
+    }
+    postMessage({ type: 'switch_branch', sessionId, targetEntryId });
+  }, [postMessage]);
+
   const retry = useCallback((
     turn?: TurnSettings,
+    entryId?: string,
   ) => {
     const sessionId = sessionIdRef.current;
     if (!sessionId) return;
@@ -491,7 +551,13 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     // skip the optimistic step and let the background's own no-op path
     // surface the issue (matches BG's defensive throw).
     setState(prev => {
-      const truncated = truncateForRetry(prev.messages);
+      // 指定轮重试：截到目标 user 消息（含）；缺省沿用最后一轮语义
+      const truncated = entryId
+        ? (() => {
+            const index = prev.messages.findIndex(m => m.entryId === entryId);
+            return index >= 0 ? prev.messages.slice(0, index + 1) : null;
+          })()
+        : truncateForRetry(prev.messages);
       return {
         ...prev,
         messages: truncated ?? prev.messages,
@@ -500,7 +566,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
         lastError: null,
       };
     });
-    postMessage({ type: 'retry', sessionId, model: turn?.model, thinkingLevel: turn?.thinkingLevel });
+    postMessage({ type: 'retry', sessionId, entryId, model: turn?.model, thinkingLevel: turn?.thinkingLevel });
   }, [postMessage]);
 
   const subscribe = useCallback((sessionId: string) => {
@@ -514,6 +580,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
       ? {
           ...prev,
           messages: [],
+          branchInfo: {},
           isAgentRunning: false,
           isCompacting: false,
           sessionTitle: '',
@@ -527,6 +594,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     sessionIdRef.current = null;
     setState({
       messages: [],
+      branchInfo: {},
       isAgentRunning: false,
       isCompacting: false,
       sessionId: null,
@@ -596,6 +664,8 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     send,
     cancel,
     retry,
+    editMessage,
+    switchBranch,
     subscribe,
     unsubscribe,
     listSessions,

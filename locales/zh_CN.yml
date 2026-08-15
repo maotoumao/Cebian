@@ -543,6 +543,11 @@ chat:
     tokensInBreakdownHitWrite: "未缓存 $1 · 缓存 $2 · 写缓存 $3"
     # 最新一轮 assistant 消息左下角重试按钮的 tooltip / aria-label
     retry: "重试"
+    # 编辑已发送 user 消息时的提示（issue #44）
+    editHint: "将从这里重新生成回复"
+    # 存在并列版本的消息上「‹ n/m ›」分支切换器的 tooltip
+    prevBranch: "上一个版本"
+    nextBranch: "下一个版本"
   compaction:
     # 历史压缩分割条上的标签
     divider: "此前上下文已压缩"

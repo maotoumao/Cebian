@@ -5,7 +5,7 @@
 // 必须经这里转一手（见 lib/backup/sources/sessions.ts 的 wire 契约）。
 //
 // 采集（读）已改为页面侧直读同源 Dexie，不再经 background——本文件对读这条线只提供一个
-// 无 payload 的 flush 信号，把在途的节流写刷落库，让页面随后直读时不漏最新消息。
+// 无 payload 的 flush 信号，等全部会话的在途树写落定，让页面随后直读时不漏最新消息。
 //
 // 写回（恢复）走分块协议：页面按字节预算把 records 切批，逐批 CHUNK 累积进一个按 nonce
 // 隔离的缓冲，最后 COMMIT 一次性在单事务里写入——避免一条巨大的 runtime message 撞
@@ -15,6 +15,7 @@
 // 只处理会话这一条线。
 
 import { sessionStore } from './session-store';
+import { sessionManager } from './session-manager';
 import {
   BACKUP_FLUSH_SESSIONS,
   BACKUP_APPLY_CHUNK,
@@ -23,7 +24,12 @@ import {
   type BackupResponse,
   type ApplySessionsResult,
 } from '@/lib/backup/sources/sessions';
-import { toSessionRecord, isValidSessionLike, type SessionRecord, type SessionRecordLike } from '@/lib/persistence/db';
+import {
+  toSessionRecord,
+  isValidSessionLike,
+  type SessionBackupRecord,
+  type SessionRecordLike,
+} from '@/lib/persistence/db';
 import { acquireKeepAlive, releaseKeepAlive } from '../lifecycle/keepalive';
 
 /** 统一把异步结果包成响应信封发回，错误转成可读字符串（页面侧据此重新抛出）。 */
@@ -51,9 +57,10 @@ function respond<T>(
 // commit 只消费自己 nonce 的缓冲。半截缓冲（页面中途崩溃 / 关闭，只发了一部分 chunk）由
 // 一个 TTL 计时器兜底清理，避免永久占内存。
 
-/** 单个 nonce 的累积缓冲。`records` 已逐条 toSessionRecord 规整。 */
+/** 单个 nonce 的累积缓冲。`records` 已逐条 toSessionRecord 规整（可能带随包的
+ *  mutations 日志，深校验在写库层）。 */
 interface ApplyBuffer {
-  records: SessionRecord[];
+  records: SessionBackupRecord[];
   timer: ReturnType<typeof setTimeout>;
 }
 
@@ -116,9 +123,9 @@ export function registerBackupHandler(): void {
       return true;
     }
 
-    // flush：把在途节流写刷落库，供页面随后直读 Dexie 采集。无 payload、无返回值。
+    // flush：等全部会话的在途树写落定，供页面随后直读 Dexie 采集。无 payload、无返回值。
     if (msg.type === BACKUP_FLUSH_SESSIONS) {
-      return respond<void>(() => sessionStore.flushAll(), sendResponse);
+      return respond<void>(() => sessionManager.flushAll(), sendResponse);
     }
 
     // chunk：校验并规整这一批 records，累积进对应 nonce 的缓冲。逐条 isValidSessionLike
@@ -143,7 +150,14 @@ export function registerBackupHandler(): void {
         }
         const buf = touchBuffer(msg.nonce);
         for (const r of msg.records as SessionRecordLike[]) {
-          buf.records.push(toSessionRecord(r));
+          const record: SessionBackupRecord = toSessionRecord(r);
+          // 随包的 mutation 日志（新备份带分支）：此处只做形状保留，严格 replay
+          // 校验在 applySessionsTransactional 落库时做，失败会回退 messages 重建
+          const log = (r as { mutations?: unknown }).mutations;
+          if (Array.isArray(log) && log.length > 0) {
+            record.mutations = log as SessionBackupRecord['mutations'];
+          }
+          buf.records.push(record);
         }
       }, sendResponse);
     }
