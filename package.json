@@ -2,7 +2,7 @@
   "name": "Cebian",
   "description": "AI-powered browser extension for enhanced web browsing experience",
   "private": true,
-  "version": "1.4.2",
+  "version": "1.5.0",
   "license": "AGPL-3.0-only",
   "type": "module",
   "packageManager": "pnpm@10.22.0",

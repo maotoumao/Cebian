@@ -14,7 +14,7 @@ export default defineConfig({
   dev: {
     server: { port: 3210 },
   },
-  manifest: {
+  manifest: ({ manifestVersion }) => ({
     default_locale: 'en',
     name: '__MSG_extName__',
     description: '__MSG_extDescription__',
@@ -74,19 +74,21 @@ export default defineConfig({
     //
     // Splitting per-entry would require WXT-level support that doesn't
     // exist; accept the shared widening as a one-time trust trade-off.
-    content_security_policy: {
-      sandbox:
-        "sandbox allow-scripts allow-forms allow-popups allow-modals; " +
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; " +
-        "style-src 'self' 'unsafe-inline' https: data:; " +
-        "connect-src 'self' https: wss: data: blob:; " +
-        "img-src 'self' data: blob: https:; " +
-        "font-src 'self' data: https:; " +
-        "media-src 'self' data: blob: https:; " +
-        "child-src 'self' data: blob:; " +
-        "base-uri *;",
-    },
-  },
+    content_security_policy: manifestVersion === 2
+      ? "script-src 'self'; object-src 'self';"
+      : {
+          sandbox:
+            "sandbox allow-scripts allow-forms allow-popups allow-modals; " +
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; " +
+            "style-src 'self' 'unsafe-inline' https: data:; " +
+            "connect-src 'self' https: wss: data: blob:; " +
+            "img-src 'self' data: blob: https:; " +
+            "font-src 'self' data: https:; " +
+            "media-src 'self' data: blob: https:; " +
+            "child-src 'self' data: blob:; " +
+            "base-uri *;",
+        },
+  }),
   vite: () => ({
     plugins: [
       tailwindcss(),

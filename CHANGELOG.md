@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## 1.5.0 - 2026-08-15
+
 ### 新增 / Added
 
 - 支持编辑已发送的消息：鼠标悬停在自己的消息气泡或下方操作区可复制、编辑文案，点击「发送」后 AI 会从这条消息重新生成回复（附件保持不变） ([#44](https://github.com/maotoumao/Cebian/issues/44))
