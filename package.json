@@ -5,6 +5,7 @@
   "version": "1.4.2",
   "license": "AGPL-3.0-only",
   "type": "module",
+  "packageManager": "pnpm@10.22.0",
   "engines": {
     "node": ">=22.19.0"
   },
