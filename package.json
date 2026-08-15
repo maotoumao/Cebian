@@ -9,6 +9,11 @@
   "engines": {
     "node": ">=22.19.0"
   },
+  "pnpm": {
+    "overrides": {
+      "publish-browser-extension": "6.1.1"
+    }
+  },
   "scripts": {
     "dev": "wxt",
     "dev:firefox": "wxt -b firefox",

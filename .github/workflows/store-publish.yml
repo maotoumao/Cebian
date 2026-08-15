@@ -59,7 +59,7 @@ jobs:
           fi
           gh release download "$TAG" --repo "$REPO" \
             --pattern 'cebian-*-chrome.zip' --dir dist
-          # 必须恰好命中一个 chrome zip,否则下游商店 action 会静默选错或报错
+          # 必须恰好命中一个 chrome zip,否则下游发布工具会静默选错或报错
           count=$(find dist -maxdepth 1 -name 'cebian-*-chrome.zip' | wc -l)
           if [ "$count" -ne 1 ]; then
             echo "::error::expected exactly 1 chrome zip, found $count"
@@ -85,23 +85,48 @@ jobs:
     # release 触发始终发布;手动触发仅当 target 为 chrome 或 both 时发布
     if: ${{ github.event_name == 'release' || github.event.inputs.target == 'both' || github.event.inputs.target == 'chrome' }}
     environment: store-publish # 审批门 + 商店密钥(Chrome 与 Edge 共用同一环境)
+    env:
+      CHROME_API_VERSION: v2
     steps:
+      # actions/checkout v5
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      # pnpm/action-setup v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+
+      # actions/setup-node v5
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install publishing tool
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
       - name: Download chrome zip
         uses: actions/download-artifact@v5
         with:
           name: store-chrome-zip
           path: dist
 
-      # mnao305/chrome-extension-upload v6.0.0
+      - name: Verify Chrome Web Store credentials
+        run: pnpm wxt submit --dry-run --chrome-zip dist/extension.zip
+        env:
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
+          CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL }}
+          CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
+
       - name: Upload & publish to Chrome Web Store
-        uses: mnao305/chrome-extension-upload@fdfe79400af990f5145a319e834aee64907ccff4
-        with:
-          file-path: dist/extension.zip
-          extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
-          client-id: ${{ secrets.CHROME_CLIENT_ID }}
-          client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
-          refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
-          publish: true
+        run: pnpm wxt submit --chrome-zip dist/extension.zip
+        env:
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
+          CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL }}
+          CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
 
   publish-edge:
     name: Publish to Edge Add-ons
@@ -111,17 +136,40 @@ jobs:
     if: ${{ github.event_name == 'release' || github.event.inputs.target == 'both' || github.event.inputs.target == 'edge' }}
     environment: store-publish # 审批门 + 商店密钥(Chrome 与 Edge 共用同一环境)
     steps:
+      # actions/checkout v5
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      # pnpm/action-setup v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+
+      # actions/setup-node v5
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install publishing tool
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
       - name: Download chrome zip
         uses: actions/download-artifact@v5
         with:
           name: store-chrome-zip
           path: dist
 
-      # wdzeng/edge-addon v2.1.1
+      - name: Validate Edge Add-ons configuration
+        run: pnpm wxt submit --dry-run --edge-zip dist/extension.zip
+        env:
+          EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
+          EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
+          EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+
       - name: Upload & submit to Edge Add-ons
-        uses: wdzeng/edge-addon@9881f57720358040d079eaa06a4596dc9c273eb6
-        with:
-          product-id: ${{ secrets.EDGE_PRODUCT_ID }}
-          zip-path: dist/extension.zip
-          client-id: ${{ secrets.EDGE_CLIENT_ID }}
-          api-key: ${{ secrets.EDGE_API_KEY }}
+        run: pnpm wxt submit --edge-zip dist/extension.zip
+        env:
+          EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
+          EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
+          EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
