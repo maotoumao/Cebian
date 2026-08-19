@@ -88,6 +88,7 @@ export interface Dict {
         github: { title: string; desc: string };
         chrome: { title: string; desc: string };
         edge: { title: string; desc: string };
+        firefox: { title: string; desc: string };
       };
     };
   };

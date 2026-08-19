@@ -110,6 +110,10 @@ export const en: Dict = {
           title: 'Edge Add-ons',
           desc: 'Microsoft Edge',
         },
+        firefox: {
+          title: 'Firefox Add-ons',
+          desc: 'Mozilla Firefox',
+        },
       },
     },
   },

@@ -18,6 +18,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 新增 / Added
+
+- 官网首页与安装文档新增 Firefox 附加组件商店入口
+
+- Added a Firefox Add-ons store link to the website homepage and installation guide
+
 ### 变更 / Changed
 
 - Firefox 版本现通过浏览器内置的数据同意机制声明会把用户主动提交的聊天、网页上下文、浏览活动、书签与认证信息发送给用户配置的 AI / MCP 服务，并将最低支持版本调整为 Firefox 140

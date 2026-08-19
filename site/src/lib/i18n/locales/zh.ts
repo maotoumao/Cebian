@@ -109,6 +109,10 @@ export const zh: Dict = {
           title: 'Edge 插件市场',
           desc: 'Microsoft Edge 浏览器',
         },
+        firefox: {
+          title: 'Firefox 附加组件',
+          desc: 'Mozilla Firefox 浏览器',
+        },
       },
     },
   },
