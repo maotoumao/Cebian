@@ -30,6 +30,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The Firefox build now uses the browser's built-in data consent mechanism to disclose that user-submitted chats, page context, browsing activity, bookmarks, and authentication information are sent to user-configured AI/MCP services, and now requires Firefox 140 or later
 
+### 修复 / Fixed
+
+- 修复 AI 回复中的粗体紧邻中日韩标点与后续文字时，Markdown 强调标记会原样显示的问题
+
+- Fixed Markdown emphasis markers appearing literally in AI responses when bold text ended with CJK punctuation and was immediately followed by more text
+
 ## 1.5.0 - 2026-08-15
 
 ### 新增 / Added

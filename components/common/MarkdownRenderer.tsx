@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import Markdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkCjkFriendly from 'remark-cjk-friendly/parseOnly';
 import rehypeHighlight from 'rehype-highlight';
 import type { Components } from 'react-markdown';
 import { showDialog } from '@/lib/ui/dialog';
@@ -523,7 +524,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
   return (
     <div className={`max-w-none wrap-break-word ${className ?? ''}`}>
       <Markdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkCjkFriendly]}
         rehypePlugins={[rehypeHighlight]}
         components={components}
         urlTransform={urlTransform}
