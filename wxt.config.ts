@@ -14,10 +14,28 @@ export default defineConfig({
   dev: {
     server: { port: 3210 },
   },
-  manifest: ({ manifestVersion }) => ({
+  manifest: ({ browser, manifestVersion }) => ({
     default_locale: 'en',
     name: '__MSG_extName__',
     description: '__MSG_extDescription__',
+    ...(browser === 'firefox' && {
+      browser_specific_settings: {
+        gecko: {
+          strict_min_version: '140.0',
+          data_collection_permissions: {
+            required: [
+              'authenticationInfo',
+              'personalCommunications',
+              'browsingActivity',
+              'websiteContent',
+              'websiteActivity',
+              'searchTerms',
+              'bookmarksInfo',
+            ],
+          },
+        },
+      },
+    }),
     permissions: [
       'sidePanel', 'activeTab', 'tabs', 'scripting', 'storage', 'alarms',
       'offscreen', 'debugger', 'webNavigation',
