@@ -440,7 +440,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                   {thinkingBlocks.map((block, i) => (
                     <ThinkingBlock key={`t-${idx}-${i}`} content={block.thinking} isLive={isStreaming} />
                   ))}
-                  {text && <AgentTextBlock content={text} />}
+                  {text && <AgentTextBlock content={text} streaming={isStreaming} />}
                   {isError && (
                     <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 mt-2 whitespace-pre-wrap break-all">
                       {assistantMsg.errorMessage ?? t('chat.session.modelError')}

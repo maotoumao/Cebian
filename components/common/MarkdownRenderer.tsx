@@ -1,9 +1,9 @@
-import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import Markdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkCjkFriendly from 'remark-cjk-friendly/parseOnly';
 import rehypeHighlight from 'rehype-highlight';
-import type { Components } from 'react-markdown';
+import type { Components, Options as MarkdownOptions } from 'react-markdown';
 import { showDialog } from '@/lib/ui/dialog';
 import { CopyButton } from './CopyButton';
 import { t } from '@/lib/i18n';
@@ -12,6 +12,8 @@ import { encodeRelPath, vfs } from '@/lib/persistence/vfs';
 import { isImageMime, mimeFromPath } from '@/lib/content/mime';
 import { formatBytes } from '@/lib/utils';
 import { extensionSettingsUrl } from '@/lib/browser/file-access';
+import { normalizeMathDelimiters } from '@/lib/content/math-delimiters';
+import { splitMarkdownBlocks } from '@/lib/content/markdown-blocks';
 
 /**
  * Minimal structural types for the hast (HTML AST) nodes react-markdown passes
@@ -70,6 +72,66 @@ function CodeBlock({ node, children }: { node?: HastElement; children?: ReactNod
         {children}
       </pre>
     </div>
+  );
+}
+
+/** 深度优先找 KaTeX 输出里的 <annotation encoding="application/x-tex">（LaTeX 源码）。 */
+function katexSourceOf(node: HastElement | undefined): string {
+  if (!node) return '';
+  const stack: HastChild[] = [...node.children];
+  while (stack.length) {
+    const n = stack.pop()!;
+    if (n.type !== 'element') continue;
+    const el = n as HastElement;
+    if (
+      el.tagName === 'annotation' &&
+      (el.properties as { encoding?: string } | undefined)?.encoding === 'application/x-tex'
+    ) {
+      return hastToText(el.children);
+    }
+    stack.push(...el.children);
+  }
+  return '';
+}
+
+/** 该 .katex 元素是否为块级公式（MathML 输出下块级判定只能看 math 的 display 属性）。 */
+function isDisplayMath(node: HastElement | undefined): boolean {
+  return !!node?.children.some(
+    (c) =>
+      c.type === 'element' &&
+      (c as HastElement).tagName === 'math' &&
+      ((c as HastElement).properties as { display?: string } | undefined)?.display === 'block',
+  );
+}
+
+/**
+ * 块级公式容器：悬浮显示「复制 LaTeX 源码」按钮（照 CodeBlock 的复制模式，
+ * 但公式不用常驻头部栏，悬浮更轻）。行内公式不加按钮——整条消息复制本就
+ * 保留原始 Markdown 源码。
+ */
+function MathBlock({
+  node,
+  className,
+  children,
+  ...rest
+}: {
+  node?: HastElement;
+  className?: string;
+  children?: ReactNode;
+} & Record<string, unknown>) {
+  const source = katexSourceOf(node);
+  return (
+    <span className="relative block group/math">
+      <span className={className} {...rest}>
+        {children}
+      </span>
+      {source && (
+        // focus-within：键盘 Tab 到按钮时同样显形，避免不可见的可聚焦目标
+        <span className="absolute right-0 top-0 opacity-0 group-hover/math:opacity-100 group-focus-within/math:opacity-100 transition-opacity">
+          <CopyButton text={source} />
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -369,6 +431,81 @@ async function openVfsImagePreview(vfsPath: string, alt?: string): Promise<void>
   }
 }
 
+// ─── KaTeX 数学公式（按需加载）───
+//
+// katex（rehype-katex 的传递依赖）压缩后约 260KB，而含公式的对话是少数，
+// 照 lib/content/pdf-loader.ts 的先例做模块级单例的动态 import：首次检测到
+// 数学定界符才加载；加载完成前该消息按普通 Markdown 渲染（公式暂显源码，
+// 加载完成后一次性替换）。
+
+type MathPlugins = {
+  remarkMath: typeof import('remark-math').default;
+  rehypeKatex: typeof import('rehype-katex').default;
+};
+
+let mathPlugins: MathPlugins | null = null;
+let mathPluginsPromise: Promise<MathPlugins> | null = null;
+// 加载完成时通知所有挂载中的 MarkdownRenderer——任何一个实例触发的加载
+// （包括失败后由后来实例重试成功）都要让全部实例重渲染出公式
+const mathListeners = new Set<() => void>();
+
+function subscribeMathPlugins(onChange: () => void): () => void {
+  mathListeners.add(onChange);
+  return () => {
+    mathListeners.delete(onChange);
+  };
+}
+
+function loadMathPlugins(): Promise<MathPlugins> {
+  mathPluginsPromise ??= Promise.all([import('remark-math'), import('rehype-katex')])
+    .then(([rm, rk]) => {
+      mathPlugins = { remarkMath: rm.default, rehypeKatex: rk.default };
+      for (const notify of mathListeners) notify();
+      return mathPlugins;
+    })
+    .catch((err) => {
+      // 失败后清空单例允许下次重试（照 lib/content/pdf-loader.ts 的先例），
+      // 避免一次瞬时的 chunk 加载失败让本会话永远渲染不了公式
+      mathPluginsPromise = null;
+      throw err;
+    });
+  return mathPluginsPromise;
+}
+
+/** 粗筛：内容里是否可能出现数学定界符（$...$ / $$...$$ / \(...\) / \[...\]）。
+ *  只用来决定要不要加载 KaTeX，误报（如 shell 变量里的 $）只是多加载一次，无渲染影响。 */
+const MATH_HINT_RE = /\$|\\[([]/;
+
+/** rehype-katex 选项。
+ *  - output 'mathml'：交给浏览器原生 MathML Core 渲染（Chromium 109+ / Firefox
+ *    均支持），免去 ~1MB KaTeX 字体和 katex.min.css；
+ *  - throwOnError false：流式中的半截公式渲染为源码而不是抛错；
+ *  - strict false：容忍公式里的 CJK 等非严格 LaTeX 用法（LLM 输出常见）。 */
+const KATEX_OPTIONS = { output: 'mathml', throwOnError: false, strict: false } as const;
+
+/** 未加载/无公式时的基础插件表；含公式时在其上追加数学插件。 */
+const BASE_REMARK_PLUGINS: NonNullable<MarkdownOptions['remarkPlugins']> = [
+  remarkGfm,
+  remarkCjkFriendly,
+];
+const BASE_REHYPE_PLUGINS: NonNullable<MarkdownOptions['rehypePlugins']> = [rehypeHighlight];
+
+/** 订阅数学插件加载：内容含数学定界符时触发加载，完成后重渲染。
+ *  用 useSyncExternalStore 订阅模块级单例而不是各自持有 state——加载可能由
+ *  任何实例在任何时刻完成（含 render 与 effect 之间、失败后由后来实例重试
+ *  成功），订阅保证所有挂载中的实例都被通知，不会有实例停留在源码态。 */
+function useMathPlugins(content: string): MathPlugins | null {
+  const wantsMath = MATH_HINT_RE.test(content);
+  const plugins = useSyncExternalStore(subscribeMathPlugins, () => mathPlugins);
+  useEffect(() => {
+    if (!wantsMath || mathPlugins) return;
+    loadMathPlugins().catch((err) => {
+      console.warn('[MarkdownRenderer] failed to load math plugins:', err);
+    });
+  }, [wantsMath]);
+  return wantsMath ? plugins : null;
+}
+
 const components: Components = {
   // Images — click to preview
   img: ({ src, alt, ...props }) => (
@@ -444,6 +581,23 @@ const components: Components = {
   // Code blocks with header (language + copy button).
   pre: ({ node, children }) => <CodeBlock node={node as unknown as HastElement | undefined}>{children}</CodeBlock>,
 
+  // 块级 KaTeX 公式加悬浮复制按钮；其余 span（含 hljs 高亮片段、行内公式）原样透传
+  span: ({ node, className, children, ...props }) => {
+    const el = node as unknown as HastElement | undefined;
+    if (className && /(?:^|\s)katex(?:\s|$)/.test(className) && isDisplayMath(el)) {
+      return (
+        <MathBlock node={el} className={className} {...props}>
+          {children}
+        </MathBlock>
+      );
+    }
+    return (
+      <span className={className} {...props}>
+        {children}
+      </span>
+    );
+  },
+
   // Inline code (block code is rendered inside `pre`/`CodeBlock` above).
   // NOTE: rehype-highlight rewrites block code's className to `"hljs language-xxx ..."`,
   // so we test for the `language-` token anywhere in the class list — checking only
@@ -512,25 +666,64 @@ const components: Components = {
   ),
 };
 
+/** 单篇/单块 Markdown 的实际渲染。按 (content, math) memo——流式分块时
+ *  稳定前缀块的 content 字符串不变，parse/高亮/KaTeX 全部跳过。 */
+const MarkdownDoc = memo(function MarkdownDoc({
+  content,
+  math,
+}: {
+  content: string;
+  math: MathPlugins | null;
+}) {
+  return (
+    <Markdown
+      remarkPlugins={math ? [...BASE_REMARK_PLUGINS, math.remarkMath] : BASE_REMARK_PLUGINS}
+      rehypePlugins={
+        math ? [...BASE_REHYPE_PLUGINS, [math.rehypeKatex, KATEX_OPTIONS]] : BASE_REHYPE_PLUGINS
+      }
+      components={components}
+      urlTransform={urlTransform}
+    >
+      {content}
+    </Markdown>
+  );
+});
+
 interface MarkdownRendererProps {
   content: string;
   className?: string;
+  /** 归一化 LLM 风格的数学定界符（\(...\) → $...$ 等，见 lib/content/math-delimiters.ts）。
+   *  只对聊天等「LLM 产出的内容」开启；任意 Markdown 文件（VFS 预览）里的
+   *  \( 是 CommonMark 转义括号，不能当数学定界符转换。 */
+  normalizeMath?: boolean;
+  /** 流式输出中。开启两件事：
+   *  1. 按顶层块级边界分块渲染并逐块 memo——每个增量只有末尾块重渲染
+   *     （见 lib/content/markdown-blocks.ts；跨块引用/脚注在流式中途暂显
+   *     源码，流结束后切回整篇渲染即恢复）；
+   *  2. 归一化时启用末尾未闭合 $$ 的防闪烁保护。 */
+  streaming?: boolean;
 }
 
 export const MarkdownRenderer = memo(function MarkdownRenderer({
-  content,
+  content: rawContent,
   className,
+  normalizeMath = false,
+  streaming = false,
 }: MarkdownRendererProps) {
+  const content = normalizeMath
+    ? normalizeMathDelimiters(rawContent, { streaming })
+    : rawContent;
+  const math = useMathPlugins(content);
   return (
     <div className={`max-w-none wrap-break-word ${className ?? ''}`}>
-      <Markdown
-        remarkPlugins={[remarkGfm, remarkCjkFriendly]}
-        rehypePlugins={[rehypeHighlight]}
-        components={components}
-        urlTransform={urlTransform}
-      >
-        {content}
-      </Markdown>
+      {streaming ? (
+        splitMarkdownBlocks(content).map((block, idx) => (
+          // 前缀稳定（块边界不随追加移动），index 作 key 安全
+          <MarkdownDoc key={idx} content={block} math={math} />
+        ))
+      ) : (
+        <MarkdownDoc content={content} math={math} />
+      )}
     </div>
   );
 });

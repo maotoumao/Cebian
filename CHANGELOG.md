@@ -21,14 +21,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### 新增 / Added
 
 - 官网首页与安装文档新增 Firefox 附加组件商店入口
+- AI 回复中的 LaTeX 数学公式现在渲染为真正的公式（支持行内 `$...$`、`\(...\)` 与块级 `$$...$$`、`\[...\]`），深浅色主题下均清晰可读；块级公式悬停可复制 LaTeX 源码；朗读时公式读作其 LaTeX 源码，货币金额（如 $5）不会被误认成公式 ([#61](https://github.com/maotoumao/Cebian/issues/61))
 
 - Added a Firefox Add-ons store link to the website homepage and installation guide
+- LaTeX math in AI responses now renders as real formulas (inline `$...$` / `\(...\)` and block `$$...$$` / `\[...\]`), clearly readable in both light and dark themes; hover a block formula to copy its LaTeX source; read-aloud speaks the LaTeX source, and currency amounts (e.g. $5) are no longer mistaken for math ([#61](https://github.com/maotoumao/Cebian/issues/61))
 
 ### 变更 / Changed
 
 - Firefox 版本现通过浏览器内置的数据同意机制声明会把用户主动提交的聊天、网页上下文、浏览活动、书签与认证信息发送给用户配置的 AI / MCP 服务，并将最低支持版本调整为 Firefox 140
+- AI 回复流式输出时改为按块增量渲染，公式与代码高亮不再随每个字符全量重渲染，长回复输出更流畅 ([#61](https://github.com/maotoumao/Cebian/issues/61))
 
 - The Firefox build now uses the browser's built-in data consent mechanism to disclose that user-submitted chats, page context, browsing activity, bookmarks, and authentication information are sent to user-configured AI/MCP services, and now requires Firefox 140 or later
+- Streaming responses now render incrementally block by block, so formulas and code highlighting no longer re-render on every character, making long responses smoother ([#61](https://github.com/maotoumao/Cebian/issues/61))
 
 ### 修复 / Fixed
 

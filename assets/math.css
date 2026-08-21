@@ -1,0 +1,26 @@
+/*
+ * KaTeX MathML 输出的最小样式。
+ *
+ * rehype-katex 配置为 `output: 'mathml'`，公式交给浏览器原生 MathML Core
+ * 渲染（Chromium 109+ / Firefox 均支持）。因此不引入 katex.min.css ——
+ * 它的主体是 HTML 输出的排版规则 + ~1MB 的 KaTeX 字体，MathML 输出用不上。
+ *
+ * 注意 MathML 输出的结构与 HTML 输出不同：没有 `.katex-display` / `.katex-error`
+ * 包装，块级公式是 `span.katex > math[display="block"]`（实测见 rehype-katex
+ * 输出），块级判定只能用 math 元素的 display 属性。
+ */
+
+/* 块级公式（$$...$$）：独占一行，超宽时横向滚动而不是撑破消息气泡 */
+.katex:has(> math[display='block']) {
+  display: block;
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* 块级公式居中：MathML Core 的块级 math 默认左对齐，
+ * 用 max-content + auto margin 居中；超宽时由外层容器滚动 */
+.katex > math[display='block'] {
+  width: max-content;
+  margin-inline: auto;
+}

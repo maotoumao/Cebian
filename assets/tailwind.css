@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "./code-highlight.css";
+@import "./math.css";
 
 /* @tailwindcss/typography — the `prose` utility, used by VFS markdown
  *  preview for GitHub-style document rendering. */
