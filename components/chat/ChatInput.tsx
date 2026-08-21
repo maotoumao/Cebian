@@ -16,7 +16,8 @@ import { getSupportedThinkingLevels, clampThinkingLevel } from '@earendil-works/
 import { resolveModel } from '@/lib/providers/resolve-model';
 import { startElementPicker, cancelElementPicker } from '@/lib/browser/element-picker';
 import { scanPrompts, type PromptMeta } from '@/lib/ai-config/scanner';
-import { replaceTemplateVars, gatherTemplateVars } from '@/lib/ai-config/template';
+import { replaceTemplateVars } from '@/lib/ai-config/template';
+import { gatherTemplateVars } from '@/lib/ai-config/template-vars-sidepanel';
 import { vfs } from '@/lib/persistence/vfs';
 import { parseFrontmatter } from '@/lib/content/frontmatter';
 import { CEBIAN_PROMPTS_DIR } from '@/lib/persistence/vfs-paths';

@@ -31,11 +31,11 @@ Implication: anything you want the agent to consider when deciding whether to ac
 
 Keys other than the ones below are passed through to the L1 index but have no special meaning. Use them freely for skill-author bookkeeping.
 
-### `matched-url` (string, picomatch glob)
+### `matched-url` (string, Chrome match pattern)
 
 Restricts the skill to a specific URL pattern. Goes into the L1 index as part of `<metadata>`. The agent treats `matched-url` as a one-way **filter**, not an activation signal:
 
-- When present and the active tab URL does **not** match the glob, the skill is suppressed even if its `name` / `description` otherwise would have triggered it.
+- When present and the active tab URL does **not** match the pattern, the skill is suppressed even if its `name` / `description` otherwise would have triggered it.
 - When present and the URL matches, activation is still decided by the `name` / `description` signals — `matched-url` alone never activates a skill.
 - When absent, the skill is URL-agnostic and the `name` / `description` signals govern alone.
 
@@ -43,10 +43,16 @@ No runtime enforcement — this is honored by the agent based on the preamble in
 
 ```yaml
 metadata:
-  matched-url: "https://github.com/**"
+  matched-url: "https://github.com/*"
 ```
 
-Use globs (`*`, `**`, `?`, `{a,b}`), not regex. Omit entirely if the skill is page-agnostic. Avoid `"*"` — it matches every URL and is equivalent to omitting the field, only noisier.
+Use [Chrome match-pattern](https://developer.chrome.com/docs/extensions/develop/concepts/match-patterns) syntax — `<scheme>://<host><path>`, where scheme is `*` / `http` / `https`, host may be `*` or `*.example.com`, and `*` in the path matches any characters:
+
+- `https://github.com/*` — every page on github.com
+- `*://*.example.com/*` — example.com and any subdomain, over http or https
+- `https://mail.google.com/mail/*` — only under `/mail`
+
+This is the same syntax as the `bgFetch:<pattern>` permission above and as the extension's own page-matching rules, so there is exactly one URL vocabulary to learn. Note the path part matches the pathname only — query strings and fragments are not matched. Older skills written with picomatch-style globs (`**`, `{a,b}`) still convey intent to the agent, but prefer match patterns in new skills. Omit the field entirely if the skill is page-agnostic; avoid `<all_urls>` / `*://*/*`, which match everything and are equivalent to omitting the field, only noisier.
 
 ### `permissions` (string array)
 

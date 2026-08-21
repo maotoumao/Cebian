@@ -2,6 +2,8 @@ import { storage } from '#imports';
 // 合法档位由 pi 定义（运行时消费方），Cebian 只持久化其中一个值 → 直接复用其类型，
 // 避免与 pi-agent-core 的定义漂移（compaction / agent state 早已用其 7 档 off~max）
 import type { ThinkingLevel } from '@earendil-works/pi-agent-core';
+// 划词动作配置的形状归属其概念（lib/page-actions），这里只声明持久化位置。
+import type { PageActionsConfig } from '@/lib/page-actions/types';
 
 // ─── Provider credential types ───
 
@@ -295,6 +297,10 @@ export interface PageInteractionSettings {
   toolbarModel?: ModelIdentity;
   /** 翻译目标语言 BCP-47 代码；空串 = 跟随界面语言 */
   translateTarget: string;
+  /** 悬浮球在这些页面隐藏（match pattern，见 lib/page-actions/match.ts）。空 = 不隐藏 */
+  ballHiddenPages: string[];
+  /** 划词工具条在这些页面隐藏。与悬浮球各存一份——两块 UI 的干扰场景不同 */
+  toolbarHiddenPages: string[];
 }
 
 /** 页面交互设置默认值（新装机 fallback + 旧装机字段回填共用单一真理源）。 */
@@ -302,18 +308,52 @@ const DEFAULT_PAGE_INTERACTION: PageInteractionSettings = {
   showFloatingBall: true,
   showSelectionToolbar: true,
   translateTarget: '',
+  ballHiddenPages: [],
+  toolbarHiddenPages: [],
 };
 
-/** 取规范的页面交互设置：补齐旧装机 / 部分写入缺失的字段。读设置的唯一入口。 */
+/** 取规范的页面交互设置：补齐旧装机 / 部分写入缺失的字段。读设置的唯一入口。
+ *  数组字段复制一份返回，避免调用方就地改动污染默认值常量。 */
 export function resolvePageInteractionSettings(
   s: Partial<PageInteractionSettings> | undefined,
 ): PageInteractionSettings {
-  return { ...DEFAULT_PAGE_INTERACTION, ...s };
+  const merged = { ...DEFAULT_PAGE_INTERACTION, ...s };
+  return {
+    ...merged,
+    ballHiddenPages: [...merged.ballHiddenPages],
+    toolbarHiddenPages: [...merged.toolbarHiddenPages],
+  };
 }
 
 export const pageInteractionSettings = storage.defineItem<PageInteractionSettings>(
   'local:pageInteractionSettings',
   { fallback: { ...DEFAULT_PAGE_INTERACTION } },
+);
+
+/**
+ * 划词工具条上的动作配置：内置动作的覆盖层（启停 / 改名 / 限定页面 / 后处理脚本）
+ * 与用户自定义动作。与 `pageInteractionSettings` 分开存——前者是「功能开关」，
+ * 这里是随用户编辑频繁增删的内容集合，混在一起会让每次改动都重写整份开关。
+ */
+export const DEFAULT_PAGE_ACTIONS_CONFIG: PageActionsConfig = {
+  builtin: {},
+  custom: [],
+};
+
+/** 取规范的划词动作配置：补齐缺失字段并复制集合，读配置的唯一入口。 */
+export function resolvePageActionsConfig(
+  c: Partial<PageActionsConfig> | undefined,
+): PageActionsConfig {
+  return {
+    builtin: { ...(c?.builtin ?? {}) },
+    custom: [...(c?.custom ?? [])],
+    ...(c?.order ? { order: [...c.order] } : {}),
+  };
+}
+
+export const pageActionsConfig = storage.defineItem<PageActionsConfig>(
+  'local:pageActionsConfig',
+  { fallback: { ...DEFAULT_PAGE_ACTIONS_CONFIG } },
 );
 
 /**

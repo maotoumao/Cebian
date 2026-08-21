@@ -41,7 +41,7 @@ metadata:
   author: ""
   version: "0.1.0"
   # Optional Cebian extensions — uncomment as needed:
-  # matched-url: "https://example.com/**"
+  # matched-url: "https://example.com/*"
   # permissions:
   #   - chrome.bookmarks
   #   - page.executeJs

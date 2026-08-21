@@ -149,3 +149,18 @@ export function base64ToBytes(b64: string): Uint8Array {
 export function assertNever(x: never): never {
   throw new Error(`Unexpected value: ${String(x)}`);
 }
+
+/**
+ * 语言代码 → 英文语言名（如 `zh-CN` → `Chinese (China)`）；无法解析时回退代码本身。
+ *
+ * 给模型看的语言一律用英文名而不是 BCP-47 代码——"Reply in Chinese" 比
+ * "Reply in zh-CN" 稳当。内置划词动作与用户模板的 `{{ui_language}}` 共用此函数，
+ * 保证同一个变量在不同场景含义一致。
+ */
+export function languageName(code: string): string {
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}

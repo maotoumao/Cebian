@@ -17,6 +17,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { Spinner } from '@/components/ui/spinner';
 import { templateHighlight } from './extensions/template-highlight';
 import { templateCompletion } from './extensions/template-completion';
+import type { TemplateScene } from '@/lib/ai-config/template';
 
 // ─── Language resolver ───
 
@@ -48,8 +49,10 @@ interface CodeMirrorEditorProps {
   isDark?: boolean;
   placeholder?: string;
   readOnly?: boolean;
-  /** Enable {{variable}} highlighting + autocomplete (Prompts only). */
-  enableTemplateVars?: boolean;
+  /** 传入场景即开启 {{变量}} 高亮 + 自动完成，并按场景过滤可用变量；不传则不开。 */
+  templateVarScene?: TemplateScene;
+  /** 可见标签的 id：挂到真正带 role="textbox" 的 content DOM 上，读屏才念得出这是什么框。 */
+  labelledBy?: string;
   className?: string;
 }
 
@@ -62,7 +65,8 @@ export function CodeMirrorEditor({
   isDark = true,
   placeholder = '',
   readOnly = false,
-  enableTemplateVars = false,
+  templateVarScene,
+  labelledBy,
   className = '',
 }: CodeMirrorEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -103,10 +107,13 @@ export function CodeMirrorEditor({
       }),
     ];
 
+    if (labelledBy) {
+      extensions.push(EditorView.contentAttributes.of({ 'aria-labelledby': labelledBy }));
+    }
     if (placeholder) extensions.push(cmPlaceholder(placeholder));
-    if (enableTemplateVars) {
+    if (templateVarScene) {
       extensions.push(templateHighlight());
-      extensions.push(templateCompletion());
+      extensions.push(templateCompletion(templateVarScene));
     }
 
     const state = EditorState.create({ doc: value, extensions });
@@ -119,7 +126,7 @@ export function CodeMirrorEditor({
       viewRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [language, enableTemplateVars, placeholder]);
+  }, [language, templateVarScene, placeholder, labelledBy]);
 
   // Reconfigure theme without destroying editor
   useEffect(() => {

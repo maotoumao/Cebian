@@ -70,7 +70,7 @@ The "before" describes how the skill works; the "after" describes when to use it
 - **Pure capability, no triggers.** "Translates text." The agent knows what *translate* means but does not know *when this particular skill should run*.
 - **Overlapping with another skill.** Before writing a new skill, scan `~/.cebian/skills/` for any existing skill that already covers the territory. Two skills with overlapping descriptions both undertrigger.
 - **Hostile pushiness.** Padding the description with imperatives like "ALWAYS USE THIS SKILL" or "MUST RUN ON EVERY MESSAGE" hurts more than it helps — the agent recognizes this pattern as a bid for attention and may downweight it. Earn the activation by writing better triggers.
-- **Stale `metadata.matched-url`.** A `matched-url` glob narrows the agent's mental model of when the skill applies. If the glob is wrong (typo, outdated domain), the skill silently never matches. Verify against actual current page URLs.
+- **Stale `metadata.matched-url`.** A `matched-url` pattern narrows the agent's mental model of when the skill applies. If the pattern is wrong (typo, outdated domain), the skill silently never matches. Verify against actual current page URLs.
 
 ## Rewriting an existing description
 
@@ -81,7 +81,7 @@ If a user reports the skill "isn't being picked up":
 3. Where the answer is "no" or "maybe", note the missing keyword/phrasing/context and add it.
 4. Rewrite the description in one paragraph using the three-part structure above.
 5. Test with the user: have them open a new message in an existing session (any `fs_edit_file` / `fs_create_file` / `fs_delete` write under `~/.cebian/skills/` invalidates the index cache automatically) and run two or three of the candidate prompts. Confirm the agent reads the `SKILL.md` via `fs_read_file` before responding.
-6. If the skill still does not fire, revisit `metadata.matched-url` — an over-restrictive glob is the second-most-common cause after weak descriptions.
+6. If the skill still does not fire, revisit `metadata.matched-url` — an over-restrictive pattern is the second-most-common cause after weak descriptions.
 
 ## Length and formatting
 

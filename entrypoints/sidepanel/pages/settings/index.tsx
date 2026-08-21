@@ -46,7 +46,7 @@ export function SettingsRoutes({ basePath, showBackButton = false, showOpenInTab
         <Route path="skills/*" element={<SkillsSection />} />
         <Route path="memory/*" element={<MemorySection />} />
         <Route path="mcp" element={<MCPSection />} />
-        <Route path="page-interaction" element={<PageInteractionSection />} />
+        <Route path="page-interaction/*" element={<PageInteractionSection />} />
         <Route path="backup" element={<BackupSection />} />
         <Route path="storage" element={<StorageSection />} />
         <Route path="advanced" element={<AdvancedSection />} />

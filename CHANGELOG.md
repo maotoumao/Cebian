@@ -22,17 +22,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - 官网首页与安装文档新增 Firefox 附加组件商店入口
 - AI 回复中的 LaTeX 数学公式现在渲染为真正的公式（支持行内 `$...$`、`\(...\)` 与块级 `$$...$$`、`\[...\]`），深浅色主题下均清晰可读；块级公式悬停可复制 LaTeX 源码；朗读时公式读作其 LaTeX 源码，货币金额（如 $5）不会被误认成公式 ([#61](https://github.com/maotoumao/Cebian/issues/61))
+- 悬浮球与划词工具条现在可以按页面隐藏：在「设置 → 页面交互」里各自维护一份页面规则（Chrome match pattern，如 `*://*.example.com/*`），命中的页面不再显示对应 UI
+- 划词工具条的动作现在可以自己配置：内置的解释 / 翻译 / 总结可改按钮文本、限定生效页面、调整顺序或关掉；也可以新建自己的动作，用 `{{选中文本}}` 等变量写提示词模板（可用变量：选中文本、选区周边文本、页面 URL、页面标题、当前日期、界面语言）
+- 划词动作支持输出后处理脚本：写一小段 JavaScript 对 AI 的输出做加工（入参 `text` 与 `vars`，返回要显示的字符串）。脚本在一次性沙箱中执行——拿不到任何浏览器扩展 API，跑完或超时（5 秒）即销毁，不会影响其它功能；出错时照常显示原始输出。脚本仍能访问网络，故只运行你自己信得过的脚本
 
 - Added a Firefox Add-ons store link to the website homepage and installation guide
 - LaTeX math in AI responses now renders as real formulas (inline `$...$` / `\(...\)` and block `$$...$$` / `\[...\]`), clearly readable in both light and dark themes; hover a block formula to copy its LaTeX source; read-aloud speaks the LaTeX source, and currency amounts (e.g. $5) are no longer mistaken for math ([#61](https://github.com/maotoumao/Cebian/issues/61))
+- The floating ball and the selection toolbar can now be hidden per page: keep a separate list of page rules for each under Settings → Page interaction (Chrome match patterns such as `*://*.example.com/*`); matching pages no longer show that UI
+- Selection toolbar actions are now configurable: rename the built-in Explain / Translate / Summarize buttons, scope them to certain pages, reorder them or turn them off — and add your own actions with a prompt template using variables such as `{{selected_text}}` (available: selected text, surrounding text, page URL, page title, current date, interface language)
+- Selection actions can post-process their output with a script: a small piece of JavaScript that reshapes the AI output (receives `text` and `vars`, returns the string to display). It runs in a throwaway sandbox — no access to any browser extension APIs, torn down as soon as it finishes or times out (5 s) so it cannot affect anything else; on failure the original output is shown as usual. Scripts can still reach the network, so only run ones you trust
 
 ### 变更 / Changed
 
 - Firefox 版本现通过浏览器内置的数据同意机制声明会把用户主动提交的聊天、网页上下文、浏览活动、书签与认证信息发送给用户配置的 AI / MCP 服务，并将最低支持版本调整为 Firefox 140
 - AI 回复流式输出时改为按块增量渲染，公式与代码高亮不再随每个字符全量重渲染，长回复输出更流畅 ([#61](https://github.com/maotoumao/Cebian/issues/61))
+- 技能的 `matched-url` 改用与扩展其它部分一致的 Chrome match pattern 语法（如 `https://github.com/*`），不再用 picomatch glob；旧写法仍能向 AI 传达意图，新技能建议改用新语法
 
 - The Firefox build now uses the browser's built-in data consent mechanism to disclose that user-submitted chats, page context, browsing activity, bookmarks, and authentication information are sent to user-configured AI/MCP services, and now requires Firefox 140 or later
 - Streaming responses now render incrementally block by block, so formulas and code highlighting no longer re-render on every character, making long responses smoother ([#61](https://github.com/maotoumao/Cebian/issues/61))
+- A skill's `matched-url` now uses the same Chrome match-pattern syntax as the rest of the extension (e.g. `https://github.com/*`) instead of picomatch globs; older globs still convey intent to the AI, but new skills should use the new syntax
 
 ### 修复 / Fixed
 

@@ -2,22 +2,28 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { Copy, Check, Sparkles, Languages, ScrollText, GripVertical } from 'lucide-react';
+import { Copy, Check, Sparkles, Languages, ScrollText, Wand2, GripVertical } from 'lucide-react';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import {
+  pageActionsConfig,
   pageInteractionSettings,
+  resolvePageActionsConfig,
   resolvePageInteractionSettings,
 } from '@/lib/persistence/storage';
+import { visibleToolbarActions } from '@/lib/page-actions/actions';
 import type { PageActionId } from '@/lib/page-actions/types';
+import { matchesAnyPagePattern } from '@/lib/page-actions/match';
 import { t } from '@/lib/i18n';
 import { copyText } from './clipboard';
-import { gatherContext } from './context';
+import { gatherPageVars } from './context';
 import { ResultCard } from './ResultCard';
+import { useCurrentUrl } from './useCurrentUrl';
 
 /** 选区锚点：选中的文本 + 其在视口中的包围盒。 */
 interface SelectionAnchor {
@@ -273,16 +279,38 @@ function ToolButton({
   );
 }
 
+/** 内置动作的图标（UI 关切，故留在内容脚本；自定义动作统一用魔杖图标）。 */
+const BUILTIN_ICONS: Record<string, typeof Sparkles> = {
+  explain: Sparkles,
+  translate: Languages,
+  summarize: ScrollText,
+};
+
+function actionIcon(id: string, size: number) {
+  const Icon = Object.hasOwn(BUILTIN_ICONS, id) ? BUILTIN_ICONS[id] : Wand2;
+  return <Icon size={size} />;
+}
+
 /**
- * SelectionToolbar — 划词工具条：选中文本时锚定在选区附近，提供 复制 / 解释 / 翻译，
- * 左侧把手可拖拽移动。受 `pageInteractionSettings.showSelectionToolbar` 实时控制。
- * 解释 / 翻译点击后展开内联结果卡（ResultCard）。
+ * SelectionToolbar — 划词工具条：选中文本时锚定在选区附近，提供复制 + 一组可配置动作
+ * （内置解释 / 翻译 / 总结，加用户自定义动作），左侧把手可拖拽移动。
+ * 受 `pageInteractionSettings`（总开关 + 隐藏页面）与 `pageActionsConfig`（动作启停 /
+ * 改名 / 页面规则 / 排序）实时控制。点动作后展开内联结果卡（ResultCard）。
  */
 export function SelectionToolbar() {
   const [stored] = useStorageItem(pageInteractionSettings, undefined);
+  const [storedActions] = useStorageItem(pageActionsConfig, undefined);
   const settings = resolvePageInteractionSettings(stored);
+  const url = useCurrentUrl();
 
-  const anchor = useSelectionAnchor(settings.showSelectionToolbar);
+  // 命中隐藏规则时连选区监听一起停掉（enabled=false 会清空锚点），不只是不渲染。
+  const enabled =
+    settings.showSelectionToolbar && !matchesAnyPagePattern(url, settings.toolbarHiddenPages);
+  const actions = useMemo(
+    () => visibleToolbarActions(resolvePageActionsConfig(storedActions), url),
+    [storedActions, url],
+  );
+  const anchor = useSelectionAnchor(enabled);
   const barRef = useRef<HTMLDivElement>(null);
   const [computed, setComputed] = useState<Position | null>(null);
   const [dragPos, setDragPos] = useState<Position | null>(null);
@@ -291,8 +319,10 @@ export function SelectionToolbar() {
   // text / context / rect 在点击时捕获，卡片独立于后续选区变化。
   const [action, setAction] = useState<{
     id: PageActionId;
+    label: string;
     text: string;
-    context: string;
+    /** 点击那刻的页面侧模板变量（context / page_url / page_title）。 */
+    vars: Record<string, string>;
     rect: DOMRect;
   } | null>(null);
   // 拖拽 / 复制反馈的清理句柄：组件卸载（含拖拽中途）时统一收尾，避免残留监听 / 定时器。
@@ -373,10 +403,10 @@ export function SelectionToolbar() {
   }, [anchor]);
 
   const startAction = useCallback(
-    (id: PageActionId) => {
+    (id: PageActionId, label: string) => {
       if (!anchor) return;
-      // 点击时选区仍在（onMouseDown preventDefault），此刻采集有界上下文。
-      setAction({ id, text: anchor.text, context: gatherContext(), rect: anchor.rect });
+      // 点击时选区仍在（onMouseDown preventDefault），此刻采集页面侧变量。
+      setAction({ id, label, text: anchor.text, vars: gatherPageVars(), rect: anchor.rect });
     },
     [anchor],
   );
@@ -385,9 +415,10 @@ export function SelectionToolbar() {
   if (action) {
     return (
       <ResultCard
-        action={action.id}
+        actionId={action.id}
+        title={action.label}
         text={action.text}
-        context={action.context}
+        vars={action.vars}
         anchorRect={action.rect}
         onClose={() => setAction(null)}
       />
@@ -423,21 +454,14 @@ export function SelectionToolbar() {
         onClick={handleCopy}
       />
       <div style={dividerStyle} />
-      <ToolButton
-        icon={<Sparkles size={iconSize} />}
-        label={t('pageActions.toolbar.explain')}
-        onClick={() => startAction('explain')}
-      />
-      <ToolButton
-        icon={<Languages size={iconSize} />}
-        label={t('pageActions.toolbar.translate')}
-        onClick={() => startAction('translate')}
-      />
-      <ToolButton
-        icon={<ScrollText size={iconSize} />}
-        label={t('pageActions.toolbar.summarize')}
-        onClick={() => startAction('summarize')}
-      />
+      {actions.map((a) => (
+        <ToolButton
+          key={a.id}
+          icon={actionIcon(a.id, iconSize)}
+          label={a.label}
+          onClick={() => startAction(a.id, a.label)}
+        />
+      ))}
     </div>
   );
 }

@@ -93,6 +93,8 @@ pageActions:
     error: "Something went wrong. Please try again."
     close: "Close"
     continue: "Continue in sidebar"
+    transformFailed: "Post-process script failed — showing the original output."
+    empty: "No output."
 
 # ─── Settings hub ───
 settings:
@@ -146,12 +148,53 @@ settings:
       followMain: "Same as conversation model"
   pageInteraction:
     title: "Page interaction"
+    hiddenPages:
+      label: "Hide on these pages"
+      hint: "Chrome match patterns, e.g. *://*.example.com/*. Query strings and fragments are ignored."
+    pagePattern:
+      placeholder: "*://*.example.com/*"
+      # $1 = the match pattern on that row
+      remove: "Remove pattern $1"
+    actions:
+      title: "Toolbar actions"
+      hint: "Buttons appear on the toolbar in this order. Built-in actions can be renamed, scoped or turned off; add your own with a custom prompt."
+      builtin: "Built-in"
+      custom: "Custom"
+      pageScoped: "Scoped"
+      create: "New action"
+      # $1 = action name
+      moveUp: "Move $1 up"
+      # $1 = action name
+      moveDown: "Move $1 down"
+      # $1 = action name
+      delete: "Delete $1"
+      # $1 = action name
+      edit: "Edit $1"
+      deleteConfirmTitle: "Delete this action?"
+      # $1 = action name
+      deleteConfirmDescription: "\"$1\" will be removed from the toolbar. This cannot be undone."
+      editBuiltin: "Built-in action"
+      editCustom: "Custom action"
+      label: "Button text"
+      labelPlaceholder: "e.g. Key points"
+      labelFollowLocale: "Follow interface language"
+      labelBuiltinHint: "Leave empty to follow the interface language."
+      prompt: "System prompt"
+      # $1 = the trigger characters for variable autocomplete ("{{")
+      promptHint: "Tells the model what to do with the selected text. Type $1 to insert a variable."
+      # $1 / $2 = template variable names, rendered literally as {{name}}
+      promptPlaceholder: "e.g. Extract the key points from $1 and reply in $2."
+      pages: "Show only on these pages"
+      pagesHint: "Leave empty to show on every page."
+      transform: "Post-process script (optional)"
+      transformHint: "JavaScript run on the finished output. Receives text and vars, returns the string to display. On error the original output is shown. Runs in a throwaway sandbox with no access to extension APIs, but it can still reach the network — only run scripts you trust."
+      transformPlaceholder: "return text.trim()"
     ball:
       label: "Floating ball"
       hint: "Show a pinned ball on web pages; click it to open or close the sidebar."
     toolbar:
       label: "Selection toolbar"
-      hint: "When you select text on a page, show a small toolbar with Copy, Explain and Translate."
+      hint: "When you select text on a page, show a small toolbar of quick actions."
     model:
       label: "Toolbar model"
       hint: "The model used by the toolbar's Explain and Translate. A small, cheap model is usually enough. Defaults to the conversation model."
@@ -170,12 +213,14 @@ settings:
     newBody: "(Write your prompt here)"
     # $1 = trigger character ("/")
     hint: "Reusable prompt templates. Trigger them with $1 in the chat input."
-    placeholders:
-      selectedText: "Selected text on page"
-      pageUrl: "Current page URL"
-      pageTitle: "Current page title"
-      date: "Current date"
-      clipboard: "Clipboard content"
+  templateVars:
+    selectedText: "Selected text on page"
+    context: "Text around the selection"
+    pageUrl: "Current page URL"
+    pageTitle: "Current page title"
+    date: "Current date"
+    uiLanguage: "Interface language"
+    clipboard: "Clipboard content"
   memory:
     title: "Memory"
     enable: "Enable memory"
@@ -793,6 +838,11 @@ permission:
 
 # ─── Errors (toasts, thrown messages) ───
 errors:
+  pagePattern:
+    invalid: "Not a valid match pattern."
+    duplicate: "This pattern is already in the list."
+  pageActionGone: "This action no longer exists."
+  pageActionSaveFailed: "Could not save the action."
   oauth:
     cancelled: "Cancelled"
     timeout: "Authorization timed out"

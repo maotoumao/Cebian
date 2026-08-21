@@ -24,6 +24,7 @@ import {
 import { FileTree, type FileTreeHandle } from '@/components/editor/FileTree';
 import { EditorPanel } from './EditorPanel';
 import { useIsDark } from '@/hooks/useIsDark';
+import type { TemplateScene } from '@/lib/ai-config/template';
 import { useStorageItem, type StorageItem } from '@/hooks/useStorageItem';
 import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
@@ -79,7 +80,7 @@ export interface FileWorkspaceProps {
   /** Initial content for files created via the toolbar "+" button. */
   newFileTemplate?: string;
   /** Enable `{{variable}}` highlighting + autocomplete in the editor. */
-  enableTemplateVars?: boolean;
+  templateVarScene?: TemplateScene;
   /** Storage item for persisting the left-panel width. */
   panelWidthStorage: StorageItem<number>;
   /** Default left-panel width when no stored value is present. */
@@ -105,7 +106,7 @@ export const FileWorkspace = forwardRef<FileWorkspaceHandle, FileWorkspaceProps>
   onSave,
   allowNewFolder = false,
   newFileTemplate = '',
-  enableTemplateVars = false,
+  templateVarScene,
   panelWidthStorage,
   defaultPanelWidth = 280,
   toolbarActions,
@@ -361,7 +362,7 @@ export const FileWorkspace = forwardRef<FileWorkspaceHandle, FileWorkspaceProps>
       filePath={selectedAbs}
       rootPath={root}
       isDark={isDark}
-      enableTemplateVars={enableTemplateVars}
+      templateVarScene={templateVarScene}
       onSave={handleSave}
     />
   ) : (

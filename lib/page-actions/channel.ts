@@ -9,6 +9,7 @@ import {
   isPageActionStreamMessage,
   isSuppressMessage,
   type PageActionId,
+  type PageActionOutcome,
   type PageActionMessage,
   type PageActionRequest,
 } from './types';
@@ -70,7 +71,8 @@ export function announcePresent(): void {
 /** {@link runPageAction} 的流式回调。 */
 export interface PageActionStreamHandlers {
   onDelta: (delta: string) => void;
-  onDone: () => void;
+  /** 终态：`transformed` 存在则用它替换展示，`transformError` 表示后处理脚本失败。 */
+  onDone: (outcome: PageActionOutcome) => void;
   onError: (message?: string) => void;
 }
 
@@ -95,7 +97,16 @@ export function runPageAction(
   port.onMessage.addListener((msg: unknown) => {
     if (!isPageActionStreamMessage(msg)) return;
     if (msg.type === 'chunk') handlers.onDelta(msg.delta);
-    else if (msg.type === 'done') settle(handlers.onDone);
+    else if (msg.type === 'done') {
+      // msg 已过守卫（两个字段互斥），直接把结局原样交给回调。
+      const outcome: PageActionOutcome =
+        msg.transformed !== undefined
+          ? { transformed: msg.transformed }
+          : msg.transformError !== undefined
+            ? { transformError: msg.transformError }
+            : {};
+      settle(() => handlers.onDone(outcome));
+    }
     else settle(() => handlers.onError(msg.message));
   });
   port.onDisconnect.addListener(() => {

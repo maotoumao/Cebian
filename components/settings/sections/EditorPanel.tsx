@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { CodeMirrorEditor } from '@/components/editor/CodeMirrorEditor';
+import type { TemplateScene } from '@/lib/ai-config/template';
 import { vfs } from '@/lib/persistence/vfs';
 import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
@@ -26,7 +27,7 @@ interface EditorPanelProps {
   /** Theme for CodeMirror. */
   isDark: boolean;
   /** Enable {{variable}} template highlighting + autocomplete. */
-  enableTemplateVars?: boolean;
+  templateVarScene?: TemplateScene;
   /** Called after a successful save. */
   onSave?: () => void;
 }
@@ -37,7 +38,7 @@ function detectLanguage(filePath: string): 'markdown' | 'yaml' | 'javascript' {
   return 'markdown';
 }
 
-export function EditorPanel({ filePath, rootPath, isDark, enableTemplateVars = false, onSave }: EditorPanelProps) {
+export function EditorPanel({ filePath, rootPath, isDark, templateVarScene, onSave }: EditorPanelProps) {
   const [body, setBody] = useState('');
   const [savedContent, setSavedContent] = useState('');
   const [loading, setLoading] = useState(false);
@@ -294,7 +295,7 @@ export function EditorPanel({ filePath, rootPath, isDark, enableTemplateVars = f
           onChange={setBody}
           language={language}
           isDark={isDark}
-          enableTemplateVars={enableTemplateVars}
+          templateVarScene={templateVarScene}
           className="h-full"
         />
       </div>

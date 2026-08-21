@@ -15,7 +15,7 @@ export default defineContentScript({
       // host 充满视口但 pointer-events:none，只有内部交互元素（悬浮球 / 工具条）
       // 自己置 pointer-events:auto。这样既不阻挡页面交互，又能稳定命中自己的
       // 子元素——0x0 host 会让溢出到它盒外的固定子元素在 Chrome 里点不到（能画出、收不到事件）。
-      css: ':host { position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; margin: 0 !important; pointer-events: none !important; z-index: 2147483647 !important; } @keyframes cebian-spin { to { transform: rotate(360deg); } }',
+      css: ':host { position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; margin: 0 !important; pointer-events: none !important; z-index: 2147483647 !important; } @keyframes cebian-spin { to { transform: rotate(360deg); } } @keyframes cebian-fade-in { from { opacity: 0; } to { opacity: 1; } }',
       onMount(container) {
         const root = ReactDOM.createRoot(container);
         root.render(<PageActionsApp />);

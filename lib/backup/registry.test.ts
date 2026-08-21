@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as storageModule from '@/lib/persistence/storage';
 import type { MCPServerConfig, CustomProviderConfig } from '@/lib/persistence/storage';
+import type { CustomPageAction, PageActionsConfig } from '@/lib/page-actions/types';
 import {
   BACKUP_REGISTRY,
   registeredStorageKeys,
@@ -252,5 +253,68 @@ describe('customProviders 密钥拆分 / 恢复', () => {
     const restored = restoreCustomProviderHeaders(local, secret, 'replace');
     expect(restored).toHaveLength(1);
     expect(restored[0].id).toBe('p-plain');
+  });
+});
+
+describe('pageActionsConfig 合并补缺', () => {
+  /** 从注册表里取该 item 的 fillMissing（合并恢复的语义就写在注册表上）。 */
+  const fillMissing = BACKUP_REGISTRY.find(
+    (e) => e.item.key === 'local:pageActionsConfig',
+  )!.fillMissing! as (local: PageActionsConfig, backup: PageActionsConfig) => PageActionsConfig;
+
+  const custom = (id: string, label: string): CustomPageAction => ({
+    id,
+    label,
+    systemPrompt: 'p',
+  });
+
+  it('自定义动作按 id 只增不减：本地保留，备份里本地没有的补入', () => {
+    const merged = fillMissing(
+      { builtin: {}, custom: [custom('custom-aaaaaaaa', 'local')] },
+      {
+        builtin: {},
+        custom: [custom('custom-aaaaaaaa', 'backup'), custom('custom-bbbbbbbb', 'added')],
+      },
+    );
+    expect(merged.custom.map((a) => a.id)).toEqual(['custom-aaaaaaaa', 'custom-bbbbbbbb']);
+    // 同 id 保留本地版本，不被备份覆盖。
+    expect(merged.custom[0].label).toBe('local');
+  });
+
+  it('内置覆盖层逐 id 补缺：本地改过的保留，本地没碰过的从备份补入', () => {
+    const merged = fillMissing(
+      { builtin: { explain: { enabled: false } }, custom: [] },
+      { builtin: { explain: { enabled: true }, translate: { label: 'T' } }, custom: [] },
+    );
+    expect(merged.builtin.explain).toEqual({ enabled: false });
+    expect(merged.builtin.translate).toEqual({ label: 'T' });
+  });
+
+  it('本地没排过序 → 采用备份的 order（不丢顺序）', () => {
+    const merged = fillMissing(
+      { builtin: {}, custom: [] },
+      { builtin: {}, custom: [], order: ['translate', 'explain'] },
+    );
+    expect(merged.order).toEqual(['translate', 'explain']);
+  });
+
+  it('本地已排过序 → 保留本地 order', () => {
+    const merged = fillMissing(
+      { builtin: {}, custom: [], order: ['summarize'] },
+      { builtin: {}, custom: [], order: ['translate', 'explain'] },
+    );
+    expect(merged.order).toEqual(['summarize']);
+  });
+
+  it('两侧都没有 order → 结果不带 order 字段（由生效列表按缺省规则兜底）', () => {
+    const merged = fillMissing({ builtin: {}, custom: [] }, { builtin: {}, custom: [] });
+    expect(merged.order).toBeUndefined();
+  });
+
+  it('order 数组是复制的，改动结果不影响入参', () => {
+    const backup: PageActionsConfig = { builtin: {}, custom: [], order: ['explain'] };
+    const merged = fillMissing({ builtin: {}, custom: [] }, backup);
+    merged.order!.push('translate');
+    expect(backup.order).toEqual(['explain']);
   });
 });

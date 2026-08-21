@@ -63,6 +63,20 @@ const bodyStyle: CSSProperties = {
   wordBreak: 'break-word',
 };
 
+// 后处理结果整段替换原文时的淡入（keyframes 在内容脚本的 Shadow DOM 样式里声明）。
+const fadeInStyle: CSSProperties = {
+  animation: 'cebian-fade-in 0.18s ease-out',
+};
+
+// 后处理失败的提示：展示已降级为原始输出，这行只说明「脚本没跑成」。
+const transformErrorStyle: CSSProperties = {
+  marginTop: 8,
+  paddingTop: 6,
+  borderTop: '1px solid rgba(0, 0, 0, 0.06)',
+  color: '#8a8d9b',
+  fontSize: 11,
+};
+
 const footerStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -93,23 +107,29 @@ function HeaderIcon({ status }: { status: Status }) {
 }
 
 interface ResultCardProps {
-  action: PageActionId;
+  actionId: PageActionId;
+  /** 卡片标题：发起方已解析好的动作显示名（内置跟随界面语言，自定义为用户起的名）。 */
+  title: string;
   text: string;
-  /** 有界上下文（页面标题 + 选区周边），供模型消歧。 */
-  context: string;
+  /** 点击那刻采集的页面侧模板变量（context / page_url / page_title）。 */
+  vars: Record<string, string>;
   /** 触发时选区的视口矩形，用于锚定卡片。 */
   anchorRect: DOMRect;
   onClose: () => void;
 }
 
 /**
- * ResultCard — 划词工具条的内联结果卡：对选中文本执行翻译 / 解释，流式显示结果。
+ * ResultCard — 划词工具条的内联结果卡：对选中文本执行一个划词动作，流式显示结果。
  * 以纯文本（pre-wrap）呈现（内容脚本无法加载非 web_accessible 的动态 chunk，故不在
- * 页内渲染 markdown；富文本交给「在侧边栏继续」）。「短暂调用」：翻译 / 解释本身不落库、
+ * 页内渲染 markdown；富文本交给「在侧边栏继续」）。「短暂调用」：动作本身不落库、
  * 历史查不到；只有点「在侧边栏继续」才把本次交互固化成会话。
  */
-export function ResultCard({ action, text, context, anchorRect, onClose }: ResultCardProps) {
+export function ResultCard({ actionId, title, text, vars, anchorRect, onClose }: ResultCardProps) {
   const [content, setContent] = useState('');
+  // 后处理脚本的产物：非 null 即替换展示与复制内容（原始输出仍用于「在侧边栏继续」，
+  // 那是模型真正说过的话，固化成历史才不会错位）。
+  const [transformed, setTransformed] = useState<string | null>(null);
+  const [transformFailed, setTransformFailed] = useState(false);
   const [status, setStatus] = useState<Status>('streaming');
   const [copied, setCopied] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -128,13 +148,17 @@ export function ResultCard({ action, text, context, anchorRect, onClose }: Resul
   useEffect(() => {
     let acc = '';
     const cancel = runPageAction(
-      { actionId: action, text, params: { context } },
+      { actionId, text, params: vars },
       {
         onDelta: (delta) => {
           acc += delta;
           setContent(acc);
         },
-        onDone: () => setStatus('done'),
+        onDone: ({ transformed: out, transformError }) => {
+          if (out !== undefined) setTransformed(out);
+          if (transformError !== undefined) setTransformFailed(true);
+          setStatus('done');
+        },
         onError: () => setStatus((s) => (s === 'streaming' ? 'error' : s)),
       },
     );
@@ -142,7 +166,7 @@ export function ResultCard({ action, text, context, anchorRect, onClose }: Resul
       cancel();
       if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
     };
-  }, [action, text, context]);
+  }, [actionId, text, vars]);
 
   // 点击卡片外部关闭。卡片在 Shadow DOM 里，document 层的 event.target 会被重定向成
   // shadow host，无法区分内外；用 composedPath()（穿透 shadow、含真实点击节点）判断。
@@ -175,8 +199,14 @@ export function ResultCard({ action, text, context, anchorRect, onClose }: Resul
     }
   }, [anchorRect]);
 
+  // 展示与复制都用后处理后的文本（没配脚本或脚本失败时就是原始输出）。
+  const shown = transformed ?? content;
+  // 「有没有可见内容」要单独判断：后处理脚本合法地返回空串时，状态已是 done，
+  // 若沿用 truthy 判断正文会一直显示「思考中」、页脚也不出现。
+  const hasContent = shown.trim().length > 0;
+
   const handleCopy = () => {
-    void copyText(content).then((ok) => {
+    void copyText(shown).then((ok) => {
       if (!ok) return;
       setCopied(true);
       if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
@@ -226,13 +256,6 @@ export function ResultCard({ action, text, context, anchorRect, onClose }: Resul
     dragCleanupRef.current = cleanup;
   };
 
-  const title =
-    action === 'translate'
-      ? t('pageActions.toolbar.translate')
-      : action === 'explain'
-        ? t('pageActions.toolbar.explain')
-        : t('pageActions.toolbar.summarize');
-
   const anchored = dragPos ?? placement;
   // 根据锚定边算可用高度上限，使卡片在长结果下先滚动而不至于长出视口。
   const vh = window.innerHeight;
@@ -277,14 +300,25 @@ export function ResultCard({ action, text, context, anchorRect, onClose }: Resul
       <div style={bodyStyle}>
         {status === 'error' ? (
           <span style={{ color: '#b4432f' }}>{t('pageActions.result.error')}</span>
-        ) : content ? (
-          content
-        ) : (
+        ) : hasContent ? (
+          <span
+            // 后处理结果是在流式结束后整段换掉的，淡入一下让这次跳变不突兀。
+            key={transformed !== null ? 'transformed' : 'raw'}
+            style={transformed !== null ? fadeInStyle : undefined}
+          >
+            {shown}
+          </span>
+        ) : status === 'streaming' ? (
           <span style={{ color: '#8a8d9b' }}>{t('pageActions.result.loading')}</span>
+        ) : (
+          <span style={{ color: '#8a8d9b' }}>{t('pageActions.result.empty')}</span>
+        )}
+        {transformFailed && (
+          <div style={transformErrorStyle}>{t('pageActions.result.transformFailed')}</div>
         )}
       </div>
 
-      {status === 'done' && content && (
+      {status === 'done' && hasContent && (
         <div style={footerStyle}>
           <button type="button" style={iconBtnStyle} onClick={handleCopy}>
             {copied ? <Check size={14} /> : <Copy size={14} />}
@@ -294,7 +328,7 @@ export function ResultCard({ action, text, context, anchorRect, onClose }: Resul
             type="button"
             style={iconBtnStyle}
             onClick={() => {
-              continueInSidePanel(action, text, content);
+              continueInSidePanel(actionId, text, content);
               onClose();
             }}
           >

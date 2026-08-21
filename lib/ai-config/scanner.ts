@@ -23,8 +23,9 @@ A clear match exists when EITHER of the following is true:
     e.g. "\u767e\u5ea6" matches "baidu", "\u641c\u7d22" matches "search") in the user's request, OR
   • the user's request is a concrete instance of the action the description names.
 
-matched-url metadata, when present, only filters out skills whose glob does not
-cover the active tab — it never makes a skill match on its own.
+matched-url metadata (a Chrome match pattern like https://github.com/*), when present,
+only filters out skills whose pattern does not cover the active tab — it never makes a
+skill match on its own.
 
 When there is a clear match, fs_read_file the skill's SKILL.md FIRST, then follow it —
 even when native tools (interact, execute_js, chrome_api, etc.) look sufficient. The

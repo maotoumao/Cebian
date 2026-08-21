@@ -396,6 +396,10 @@ async function executeScript(req: RunRequest): Promise<unknown> {
 // ─── Message Handler ───
 
 window.addEventListener('message', async (event) => {
+  // 只认直接宿主（offscreen 文档）发来的协议消息。兄弟 iframe 之间跨源仍可拿到
+  // `parent.frames[i]` 并 postMessage——不校验来源的话，一个低权限沙箱就能往另一个
+  // 沙箱注入代码、在那边挂监听，从而窥探并借用后者那次执行被授予的权限。
+  if (event.source !== window.parent) return;
   const msg = event.data;
   if (!msg || typeof msg.type !== 'string') return;
 
@@ -419,7 +423,9 @@ window.addEventListener('message', async (event) => {
         window.parent.postMessage({
           type: 'sandbox:run_result',
           id: req.id,
-          error: (err as Error).message,
+          // 脚本可能 `throw 'reason'` / `throw 1`——那种值没有 .message，直接取会得到
+          // undefined，让宿主把「脚本报错」误判成「返回值不是字符串」。
+          error: err instanceof Error ? err.message : String(err),
         } satisfies RunResponse, '*');
       }
       break;

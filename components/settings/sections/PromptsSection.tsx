@@ -59,7 +59,7 @@ export function PromptsSection() {
         relativePath={relativePath}
         onSelectRelative={handleSelect}
         newFileTemplate={PROMPT_TEMPLATE()}
-        enableTemplateVars
+        templateVarScene="prompts"
         panelWidthStorage={settingsFilePanelWidth}
         compactMode={breakpoint === 'compact'}
         className="flex-1"

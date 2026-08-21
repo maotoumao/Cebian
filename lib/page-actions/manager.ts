@@ -18,6 +18,7 @@ import {
   type PageActionId,
   type PageActionRequest,
   type PageActionStreamMessage,
+  type PageActionOutcome,
 } from './types';
 
 /**
@@ -27,7 +28,7 @@ import {
 export type PageActionStreamRunner = (
   request: PageActionRequest,
   handlers: { onDelta: (delta: string) => void; signal: AbortSignal },
-) => Promise<void>;
+) => Promise<PageActionOutcome>;
 
 /** setupPageActions 需要的 background 侧回调（均由 background 注入）。 */
 export interface PageActionHandlers {
@@ -107,7 +108,16 @@ function handlePageActionPort(
       signal: controller.signal,
       onDelta: (delta) => post({ type: 'chunk', delta }),
     })
-      .then(() => post({ type: 'done' }))
+      .then((outcome) => {
+        // 显式分支而不是展开 outcome：done 的三种结局是互斥联合，展开会丢掉这个约束。
+        if (outcome.transformed !== undefined) {
+          post({ type: 'done', transformed: outcome.transformed });
+        } else if (outcome.transformError !== undefined) {
+          post({ type: 'done', transformError: outcome.transformError });
+        } else {
+          post({ type: 'done' });
+        }
+      })
       .catch((err) => {
         if (controller.signal.aborted) return;
         console.warn('[page-actions] stream failed:', err);

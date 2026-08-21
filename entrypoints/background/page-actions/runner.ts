@@ -11,37 +11,83 @@
 import { stream } from '@earendil-works/pi-ai/compat';
 import type { Api, Model, UserMessage, AssistantMessage } from '@earendil-works/pi-ai';
 import { resolveModel } from '@/lib/providers/resolve-model';
+import { languageName } from '@/lib/utils';
 import {
   providerCredentials,
   customProviders,
   lastSelectedModel,
+  pageActionsConfig,
   pageInteractionSettings,
   pendingSidePanelHandoff,
+  resolvePageActionsConfig,
   resolvePageInteractionSettings,
   type PageInteractionSettings,
 } from '@/lib/persistence/storage';
-import { getPageAction, type PageActionParams } from '@/lib/page-actions/actions';
-import type { PageActionId, PageActionRequest } from '@/lib/page-actions/types';
+import {
+  findPageAction,
+  stringParams,
+  type PageActionParams,
+  type ResolvedPageAction,
+} from '@/lib/page-actions/actions';
+import type {
+  PageActionId,
+  PageActionOutcome,
+  PageActionRequest,
+} from '@/lib/page-actions/types';
 import { resolveProviderApiKey } from '../providers/credentials';
 import { sessionStore } from '../chat/session-store';
+import { runTransform } from './transform';
 
-/** 语言代码 → 英文语言名（供提示词用，稳健且模型易懂）；失败回退代码本身。 */
-function languageName(code: string): string {
-  try {
-    return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? code;
-  } catch {
-    return code;
-  }
-}
-
-/** 按动作解析渲染参数：翻译目标语言（空 = 跟随界面语言）、解释回复语言（界面语言）。
- *  内置动作的参数来自设置，故在此解析（content 只传原始 request）。 */
-function resolveParams(actionId: PageActionId, settings: PageInteractionSettings): PageActionParams {
+/**
+ * 内置动作的渲染参数：翻译目标语言（空 = 跟随界面语言）、解释 / 总结的回复语言（界面
+ * 语言）。这些参数来自设置，故在 background 解析（内容脚本只传页面侧素材）。
+ */
+function builtinParams(actionId: PageActionId, settings: PageInteractionSettings): PageActionParams {
   const uiLang = chrome.i18n.getUILanguage();
   if (actionId === 'translate') {
     return { target: languageName(settings.translateTarget || uiLang) };
   }
   return { lang: languageName(uiLang) };
+}
+
+/**
+ * 自定义动作的模板变量：环境常量在此补齐（date / ui_language），页面侧的
+ * selected_text / context / page_url / page_title 由内容脚本随请求带上。
+ *
+ * `ui_language` 给的是**英文语言名**而非 BCP-47 代码——与内置动作给模型的说法一致，
+ * 且 "Reply in Chinese" 比 "Reply in zh-CN" 对模型稳当。
+ */
+function templateParams(request: PageActionRequest): PageActionParams {
+  return {
+    ...request.params,
+    selected_text: request.text,
+    date: new Date().toLocaleDateString(),
+    ui_language: languageName(chrome.i18n.getUILanguage()),
+  };
+}
+
+/** 一次动作执行要用的参数：内置走设置解析，自定义走模板变量。 */
+function resolveParams(
+  action: ResolvedPageAction,
+  request: PageActionRequest,
+  settings: PageInteractionSettings,
+): PageActionParams {
+  if (action.kind === 'builtin') {
+    const contextParam = typeof request.params.context === 'string' ? request.params.context : '';
+    return {
+      ...builtinParams(action.id, settings),
+      ...(contextParam ? { context: contextParam } : {}),
+    };
+  }
+  return templateParams(request);
+}
+
+/** 取一个已解析动作；id 查不到定义就诚实报错（内容脚本可能带来陈旧 / 伪造的 id）。 */
+async function loadAction(actionId: PageActionId): Promise<ResolvedPageAction> {
+  const config = resolvePageActionsConfig(await pageActionsConfig.getValue());
+  const action = findPageAction(config, actionId);
+  if (!action) throw new Error(`Unknown page action: ${actionId}`);
+  return action;
 }
 
 /** 解析工具条动作要用的模型 + 凭证：toolbarModel 优先，未配置 / 解析不出回退主模型；
@@ -64,44 +110,60 @@ async function resolveActionModel(
   return { model, apiKey };
 }
 
-/** 执行一次划词动作的流式调用，逐 delta 回调；成功 resolve，失败 throw。 */
+/**
+ * 执行一次划词动作的流式调用，逐 delta 回调；成功 resolve 出收尾信息，失败 throw。
+ *
+ * 配了后处理脚本的动作在全文生成完后再跑脚本（脚本要看完整输出，天然不能流式），
+ * 结果随 done 回传给内容脚本替换展示。脚本失败只降级成提示——它是锦上添花，不该
+ * 把一次已经成功的生成变成失败。
+ */
 export async function runPageActionStream(
   request: PageActionRequest,
   handlers: { onDelta: (delta: string) => void; signal: AbortSignal },
-): Promise<void> {
-  const def = getPageAction(request.actionId);
-  if (!def) throw new Error(`Unknown page action: ${request.actionId}`);
-
+): Promise<PageActionOutcome> {
+  const action = await loadAction(request.actionId);
   const settings = resolvePageInteractionSettings(await pageInteractionSettings.getValue());
-  // 渲染参数 = 设置解析出的（翻译目标 / 回复语言）+ 内容脚本随请求带来的有界上下文。
-  const contextParam = typeof request.params.context === 'string' ? request.params.context : '';
-  const params: PageActionParams = {
-    ...resolveParams(request.actionId, settings),
-    ...(contextParam ? { context: contextParam } : {}),
-  };
+  const params = resolveParams(action, request, settings);
   const { model, apiKey } = await resolveActionModel(settings);
 
   const events = stream(
     model,
     {
-      systemPrompt: def.renderSystemPrompt(params),
+      systemPrompt: action.renderSystemPrompt(params),
       messages: [
-        { role: 'user', content: def.renderUserIntent(request.text, params), timestamp: Date.now() },
+        {
+          role: 'user',
+          content: action.renderUserIntent(request.text, params),
+          timestamp: Date.now(),
+        },
       ],
     },
     { apiKey, signal: handlers.signal },
   );
 
+  let output = '';
   for await (const ev of events) {
     if (ev.type === 'text_delta') {
+      output += ev.delta;
       handlers.onDelta(ev.delta);
     } else if (ev.type === 'error') {
       // aborted 是我们主动取消（换选区 / 关卡片），不当错误上报。
-      if (ev.reason === 'aborted') return;
+      if (ev.reason === 'aborted') return {};
       throw new Error(ev.error.errorMessage || 'Stream error');
     }
   }
+
+  if (!action.transform) return {};
+  // 取消后不必再跑脚本（卡片已经关了）。
+  if (handlers.signal.aborted) return {};
+  try {
+    return { transformed: await runTransform(action.transform, output, stringParams(params)) };
+  } catch (err) {
+    console.warn('[page-actions] transform failed:', err);
+    return { transformError: (err as Error).message };
+  }
 }
+
 
 // 空 usage（固化的历史 assistant 消息无真实计量；字段仅元数据）。
 const EMPTY_USAGE = {
@@ -133,10 +195,10 @@ export async function materializeHandoff(
   },
   windowId: number,
 ): Promise<void> {
-  const def = getPageAction(req.actionId);
-  if (!def) throw new Error(`Unknown page action: ${req.actionId}`);
+  const action = await loadAction(req.actionId);
   const settings = resolvePageInteractionSettings(await pageInteractionSettings.getValue());
-  const params = resolveParams(req.actionId, settings);
+  // 固化历史只需要 user turn，自定义动作的 user turn 就是原文，与模板变量无关。
+  const params = action.kind === 'builtin' ? builtinParams(action.id, settings) : {};
 
   const [creds, customProvs, globalModel] = await Promise.all([
     providerCredentials.getValue(),
@@ -155,7 +217,7 @@ export async function materializeHandoff(
   const now = Date.now();
   const userMsg: UserMessage = {
     role: 'user',
-    content: def.renderUserIntent(req.text, params),
+    content: action.renderUserIntent(req.text, params),
     timestamp: now,
   };
   const assistantMsg: AssistantMessage = {

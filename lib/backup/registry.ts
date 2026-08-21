@@ -7,6 +7,7 @@
 
 import type { WxtStorageItem } from 'wxt/utils/storage';
 import type { RestoreStrategy } from './types';
+import type { PageActionsConfig } from '@/lib/page-actions/types';
 import {
   lastSelectedModel,
   compactionModel,
@@ -24,6 +25,7 @@ import {
   memorySettings,
   memoryOrganizeState,
   pageInteractionSettings,
+  pageActionsConfig,
   floatingBallPosition,
   pendingSidePanelHandoff,
   type MCPServerConfig,
@@ -320,8 +322,26 @@ export const BACKUP_REGISTRY: BackupEntry<any>[] = [
   // 记忆系统设置（仅开关，无密钥）。merge 恢复时保留本地开关状态（无 fillMissing）。
   entry({ item: memorySettings, storageClass: 'settings' }),
   entry({ item: memoryOrganizeState, storageClass: 'exclude' }),
-  // 页面交互设置（悬浮球 / 划词工具条开关 + 工具条模型 + 翻译目标；无密钥）。
+  // 页面交互设置（悬浮球 / 划词工具条开关 + 工具条模型 + 翻译目标 + 隐藏页面；无密钥）。
   entry({ item: pageInteractionSettings, storageClass: 'settings' }),
+  // 划词动作配置（内置覆盖层 + 自定义动作；提示词与后处理脚本均非密钥）。
+  entry({
+    item: pageActionsConfig,
+    storageClass: 'settings',
+    // 合并：自定义动作按 id 补缺（本地已有的保留本地），内置覆盖层逐 id 补缺——
+    // 本地改过的内置动作保持本地，本地没碰过的从备份补入。
+    // order 按「本地缺失才从备份补」处理（与其它 item 的补缺语义一致）：本地排过序
+    // 就保留本地，本地没排过则采用备份的顺序，而不是丢掉。两侧 id 集合不一致无妨
+    // ——生效列表会忽略 order 里不存在的 id、并把未列出的动作按缺省规则补在后面。
+    fillMissing: (local: PageActionsConfig, backup: PageActionsConfig) => {
+      const order = local.order ?? backup.order;
+      return {
+        builtin: { ...backup.builtin, ...local.builtin },
+        custom: fillMissingById(local.custom ?? [], backup.custom ?? [], (a) => a.id),
+        ...(order ? { order: [...order] } : {}),
+      };
+    },
+  }),
   // 悬浮球位置（设备本地 UI 状态）。
   entry({ item: floatingBallPosition, storageClass: 'exclude' }),
   // 「在侧边栏继续」的一次性交接标记（派生，备份无意义）。
