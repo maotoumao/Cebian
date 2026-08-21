@@ -9,6 +9,7 @@ import { sessionManager } from './session-manager';
 import { sessionStore, type LoadedSession } from './session-store';
 import type { SessionSnapshot } from '@/lib/ipc/protocol';
 import { setViewing, stopViewing, hasViewer } from './viewers';
+import { flushStreamOps } from './stream-broadcast';
 import { registerClientHandlers, type ClientHandlerMap } from '../ipc/client-router';
 import { onPortDisconnect, post, broadcastAll } from '../ipc/port-registry';
 import { vfs } from '@/lib/persistence/vfs';
@@ -88,15 +89,18 @@ const chatClientHandlers: ClientHandlerMap = {
       // so the new viewer's header can show the session title even when
       // (re)subscribing mid-stream.
       const loaded = await sessionStore.open(msg.sessionId);
-      // Re-snapshot AFTER the await: during the DB load the agent could
-      // have emitted message_update / agent_end and broadcastToViewers()
-      // already forwarded those to this port (we registered it as a viewer
-      // above). Posting an older snapshot here would regress the hook's
-      // `messages` state.
+      // 分支信息按活 agent 的当前分支现算（loaded 的快照可能已被在途轮甩开）。
+      // 它是本函数最后一个悬挂点，必须先于快照取样——见下
+      const branchInfo = await sessionManager.getBranchInfo(msg.sessionId).catch(() => undefined);
+      // 快照必须在**所有 await 之后**同步取样、取样与 post 之间不再悬挂：
+      // 上面 setViewing 后本 port 已在收流式广播，任何夹在取样与 post 之间
+      // 的 await 都可能让先送达的新帧被这份旧快照回退。
+      // 取样前先把待发的增量帧 flush 出去（见 flushStreamOps 注释）：快照
+      // 已包含这些增量，若留在缓冲里，快照之后到期的 trailing 帧会把同一
+      // 段增量对着快照重复应用。flush → 取样全程同步，中间不会混入新事件
+      flushStreamOps(msg.sessionId);
       const fresh = sessionManager.getSessionState(msg.sessionId);
       if (fresh) {
-        // 分支信息按活 agent 的当前分支现算（loaded 的快照可能已被在途轮甩开）
-        const branchInfo = await sessionManager.getBranchInfo(msg.sessionId).catch(() => undefined);
         post(port, {
           type: 'session_state',
           sessionId: msg.sessionId,

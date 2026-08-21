@@ -13,6 +13,7 @@ import {
   type TurnSettings,
 } from '@/lib/ipc/protocol';
 import type { Attachment } from '@/lib/agent/attachments';
+import { applyStreamOps } from '@/lib/agent/stream-replica';
 import type { PermissionRequest } from '@/lib/agent/tool-permissions';
 import { replaceUserText, truncateForRetry } from '@/lib/agent/message-helpers';
 import type { Message } from '@earendil-works/pi-ai';
@@ -94,6 +95,21 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
   const sessionIdRef = useRef<string | null>(null);
   const connectedWaitersRef = useRef<Set<(connected: boolean) => void>>(new Set());
   const scheduleRetryRef = useRef<(() => void) | null>(null);
+  // 流式副本漂移时的重同步：重发 subscribe 拉权威快照（session_state）。
+  // 幂等 + 1s 时间去重——它可能从 setState updater 里被调用（含 StrictMode
+  // 双调用），重复触发的代价只是一帧多余的快照。
+  const lastResyncAtRef = useRef(0);
+  const requestResyncRef = useRef<((sessionId: string) => void) | null>(null);
+  requestResyncRef.current = (sessionId: string) => {
+    // updater 可能延迟到会话已切换后才执行——重发过期会话的 subscribe 会把
+    // background 的 viewer 路由改回旧会话，新会话从此收不到广播。只为当前
+    // 会话重同步
+    if (sessionIdRef.current !== sessionId) return;
+    const now = Date.now();
+    if (now - lastResyncAtRef.current < 1_000) return;
+    lastResyncAtRef.current = now;
+    portRef.current?.postMessage({ type: 'subscribe', sessionId } satisfies ClientMessage);
+  };
   // Stable callback refs to avoid re-creating the port listener
   const callbacksRef = useRef(callbacks);
   callbacksRef.current = callbacks;
@@ -163,17 +179,20 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           setState(prev => ({ ...prev, isAgentRunning: true, isCompacting: false }));
           break;
 
-        case 'message_update':
+        case 'stream_ops':
           if (!isCurrentSession(msg.sessionId)) break;
           setState(prev => {
-            const msgs = [...prev.messages];
-            const last = msgs[msgs.length - 1];
-            if (last && last.role === 'assistant') {
-              msgs[msgs.length - 1] = msg.message;
-            } else {
-              msgs.push(msg.message);
+            const next = applyStreamOps(prev.messages, msg.ops);
+            if (next === null) {
+              // 副本漂移（正常流程不该发生）：保持现状，请求重新订阅拉取
+              // 权威快照。副本在 message_end / agent_end 的全量 transcript
+              // 边界也会被整体校正，这里只是提前自愈。
+              // 在 updater 里发起副作用不理想，但 requestResync 幂等且带
+              // 时间去重（StrictMode 双调用也只发一次），坏处有界。
+              requestResyncRef.current?.(msg.sessionId);
+              return prev;
             }
-            return { ...prev, messages: msgs };
+            return { ...prev, messages: next };
           });
           break;
 

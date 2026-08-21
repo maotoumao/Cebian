@@ -157,6 +157,23 @@ type _AssertClientMessageTypesComplete = _ExpectNever<
  *  `agent.state.messages` 保持干净，否则 id 会被 syncTail 冻进树里。 */
 export type BroadcastMessage = AgentMessage & { entryId?: string };
 
+/** 流式复制操作：`stream_ops` 帧的最小增量单元，tail 指正在流式生成的
+ *  assistant 尾消息。生产端见 entrypoints/background/chat/stream-broadcast.ts
+ *  （从 pi 的 delta 事件构造并按时间窗合并），应用端见
+ *  lib/agent/stream-replica.ts。副本的任何漂移都会在 message_end / agent_end
+ *  的全量 transcript 边界被校正，本操作流只需覆盖两个边界之间的增量。 */
+export type StreamOp =
+  /** 内容块结构变化（块开始/结束等低频事件）：用快照整体替换（或追加）尾消息 */
+  | { kind: 'tail_replace'; message: AgentMessage }
+  /** 向尾消息第 blockIndex 个内容块的字段追加文本增量。text / thinking 直接
+   *  追加；partialJson 追加后由应用端重新解析出 toolCall 的 arguments */
+  | {
+      kind: 'tail_append';
+      blockIndex: number;
+      field: 'text' | 'thinking' | 'partialJson';
+      delta: string;
+    };
+
 /** 一个分支点的信息（定义与构建见 lib/agent/session-projection.ts 的
  *  buildBranchInfo）。键是当前分支上 entry 的 id，仅含兄弟数 ≥2 的分支点（稀疏）。 */
 export type { BranchEntryInfo } from '@/lib/agent/session-projection';
@@ -206,7 +223,11 @@ export type ServerMessage =
       branchInfo?: Record<string, BranchEntryInfo>;
     }
   | { type: 'agent_start'; sessionId: string }
-  | { type: 'message_update'; sessionId: string; message: AgentMessage }
+  /** 两个全量边界（session_state / message_end / agent_end）之间的流式增量帧
+   *  （一次合并窗内的操作序列，按序应用）。应用失败说明副本漂移，订阅方应
+   *  重发 subscribe 拉取权威快照；对着过期副本应用产生的短暂错乱也会被下一
+   *  个全量边界整体校正。 */
+  | { type: 'stream_ops'; sessionId: string; ops: StreamOp[] }
   | { type: 'message_end'; sessionId: string; messages: BroadcastMessage[] }
   | {
       type: 'agent_end';

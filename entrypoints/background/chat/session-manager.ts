@@ -78,6 +78,7 @@ import { resolveModel } from '@/lib/providers/resolve-model';
 import { t } from '@/lib/i18n';
 import { acquireKeepAlive, releaseKeepAlive } from '../lifecycle/keepalive';
 import { broadcastToViewers } from './viewers';
+import { queueStreamEvent, snapshotStreamingTail, dropStreamBroadcast } from './stream-broadcast';
 
 // ─── Types ───
 
@@ -704,15 +705,16 @@ class SessionManager {
 
       case 'message_update':
         if (event.message.role === 'assistant') {
-          broadcastToViewers(sessionId, {
-            type: 'message_update',
-            sessionId,
-            message: event.message,
-          });
+          // 压缩成 StreamOp 增量帧并按时间窗合并——逐条全量克隆整条消息的
+          // 成本随回复长度二次增长，见 stream-broadcast.ts 头注释
+          queueStreamEvent(sessionId, event.assistantMessageEvent);
         }
         break;
 
       case 'message_end': {
+        // 消息已定稿：待发的流式帧必须丢弃，否则晚到的 trailing 帧会用
+        // 过期 partial 覆盖下面这条包含最终内容的广播
+        dropStreamBroadcast(sessionId);
         const messages = [...agent.state.messages];
         broadcastToViewers(sessionId, { type: 'message_end', sessionId, messages: this.annotate(agentSession, messages) });
         void this.syncTail(agentSession);
@@ -720,6 +722,7 @@ class SessionManager {
       }
 
       case 'agent_end': {
+        dropStreamBroadcast(sessionId);
         agentSession.phase = 'idle';
         this.updateKeepAlive();
         // Cancel any pending interactive tools on this session
@@ -1578,6 +1581,8 @@ class SessionManager {
     // content and bump `updatedAt`, reordering the session in the history
     // list with no real change.
     const preLen = agentSession.agent.state.messages.length;
+    // 取消路径随后自行广播 agent_end 快照，待发流式帧同样必须丢弃
+    dropStreamBroadcast(sessionId);
     agentSession.agent.abort();
     agentSession.unsubscribeAgent();
     agentSession.toolCtx.dispose();
@@ -1676,8 +1681,17 @@ class SessionManager {
   } | null {
     const agentSession = this.sessions.get(sessionId);
     if (!agentSession) return null;
+    // 快照补上流式中的 partial 尾巴（pi 把它放在 streamingMessage、不进
+    // messages）——mid-stream subscribe 的 session_state 若缺尾巴，会把
+    // 该窗口已收到的流式帧回退掉，要等下一个合并窗才恢复。尾巴须经
+    // snapshotStreamingTail 出口（注入协议维护的工具参数续写基底）
+    const { messages, streamingMessage } = agentSession.agent.state;
+    const withTail =
+      streamingMessage !== undefined
+        ? [...messages, snapshotStreamingTail(sessionId, streamingMessage)]
+        : messages;
     return {
-      messages: this.annotate(agentSession, agentSession.agent.state.messages),
+      messages: this.annotate(agentSession, withTail),
       isRunning: agentSession.phase !== 'idle',
       isCompacting: agentSession.phase === 'compacting',
       pendingTools: this.getPendingToolSnapshot(agentSession),
@@ -1701,6 +1715,7 @@ class SessionManager {
       agentSession.toolCtx.dispose();
       agentSession.permissionBridge.cancel();
       agentSession.agent.abort();
+      dropStreamBroadcast(sessionId);
       this.sessions.delete(sessionId);
       this.updateKeepAlive();
     }

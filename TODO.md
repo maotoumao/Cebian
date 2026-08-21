@@ -151,7 +151,9 @@ message-helpers / tool-permissions —— 四个都确有 UI + background 双边
 > 运行时替换须等上游填实现；`SessionState` 未公开导出，上游导出后删除本地移植副本。
 >
 > 树化后的剩余后续项：
-> - IPC 增量广播（见下方「每次全量重发」——现在 entry 模型已具备增量条件）
+> - IPC 增量广播（2026-08-22 部分完成：流式帧已增量化为 `stream_ops` + 80ms 合帧，
+>   见 `stream-broadcast.ts` / `stream-replica.ts`；`message_end` / `agent_end` 的
+>   全量 transcript 仍待单条化，见下方实施顺序第 3 步）
 > - Record 日志接入 SW 崩溃恢复（`appendRecord` / `findOpenOperations` 协议已在存储层可用）
 > - 日志 checkpoint（每 N 条存快照）压 SW 冷启 replay 成本
 > - v3 清理 `sessions.messages` 影子字段（迁移保险，见 db.ts）
@@ -216,15 +218,15 @@ lib/persistence/migrate-messages.ts、session-manager 的 TreeBinding）。
 
 | 消息 | 当前载荷 | 实际频率 / 语义 |
 |---|---|---|
-| `message_update` | 单条在途 assistant 消息的**累积全文** | 每个 provider 流事件一次，不严格等于每 token；text / thinking / tool-call 的 start、delta、end 都会触发 |
+| `stream_ops`（2026-08-22 替代 `message_update`） | StreamOp 增量帧：text / thinking / 工具参数只传新增字符串，块结构变化传尾消息快照 | 80ms 时间窗合并（leading 立即 + trailing 续窗），总量 O(VL) |
 | `message_end` | 当前分支的完整 transcript | 每条 user / assistant / toolResult 完成一次；工具轮会连续触发多次 |
 | `agent_end` | 当前分支的完整 transcript + 分支信息 | 每次 run 结束一次，通常紧跟最后一个 `message_end`，全文基本重复 |
 | `session_state` | 当前分支的完整 transcript + 运行态 | 订阅活会话、压缩、retry / 编辑、切分支、授权卡片、取消与纠错 |
 
 pi 已在 `AgentEvent.message_update.assistantMessageEvent` 提供 text / thinking / tool-call delta；
-Cebian 目前丢掉这个字段，只转发 `event.message` 的累积副本。因此无需从两份全文反推 delta，
-但也不应把 pi 的含 `partial` 上游对象直接暴露为 wire contract——应在 background 归一化成
-自己的小 patch，避免协议绑死上游版本。
+2026-08-22 起 background 已把它归一化成自己的 `StreamOp`（`lib/ipc/protocol.ts`）再广播，
+协议不绑上游版本；工具参数的累计 JSON 由 `stream-broadcast.ts` 自己维护（pi 各 provider
+的 scratch 字段名不统一），快照发出前注入 `partialJson` 供应用端续写。
 
 ### 树化后的边界
 
@@ -324,7 +326,9 @@ Cebian 目前丢掉这个字段，只转发 `event.message` 的累积副本。�
 2. 引入 generation / revision + `session_snapshot`，先把重连和纠错边界固定下来。
 3. `message_end` 改最终消息 commit，`agent_end` 去 transcript；这是低复杂度、直接消掉最多的
    O(B) 重复帧。
-4. 接 pi delta，做 `message_patch_batch` + background 合帧，再做前端 row memo。
+4. ~~接 pi delta，做增量帧 + background 合帧~~（2026-08-22 完成：`stream_ops` / `StreamOp`
+   + 80ms 合帧；订阅竞态用「flush → 同步取样 → post 零 await」+ 应用失败重订阅兜底，
+   未引入 generation/revision——若做第 2 步再统一）；前端 row memo 仍待做。
 5. 缓存 `branchInfo`（树规模问题）与二进制引用化（64 MiB 问题）分别立项，不塞进 IPC reducer。
 
 **按会话路由必须保留。** `chat/viewers.ts` 在序列化前筛 viewer；若改成先全局广播、再让客户端
