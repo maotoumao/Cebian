@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## 1.5.1 - 2026-08-22
+
 ### 新增 / Added
 
 - 官网首页与安装文档新增 Firefox 附加组件商店入口
@@ -54,9 +56,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - 修复 AI 回复中的粗体紧邻中日韩标点与后续文字时，Markdown 强调标记会原样显示的问题
 - 修复自定义操作编辑器中长提示文本会把光标撑高的问题；已添加的页面匹配规则现在以普通文本显示，并可直接编辑，无需删除后重新添加
+- 修复读取页面、截图、PDF 或划词后处理遇到一次临时初始化失败后会持续报错、只能重启浏览器恢复的问题；现在后续操作会自动重试
 
 - Fixed Markdown emphasis markers appearing literally in AI responses when bold text ended with CJK punctuation and was immediately followed by more text
 - Fixed long placeholder text stretching the caret in the custom action editor; saved page match patterns now appear as plain text and can be edited directly instead of being removed and re-added
+- Fixed page reading, screenshots, PDF processing, or selection-action post-processing continuing to fail after one temporary initialization error and requiring a browser restart; later operations now retry automatically
 
 ## 1.5.0 - 2026-08-15
 

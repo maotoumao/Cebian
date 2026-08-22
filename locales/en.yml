@@ -131,6 +131,7 @@ settings:
   about:
     title: "About"
     tagline: "AI browser sidebar assistant"
+    website: "Website"
     feedback: "Feedback"
     checkUpdate: "Check for updates"
     checking: "Checking…"

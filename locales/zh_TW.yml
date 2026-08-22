@@ -127,6 +127,7 @@ settings:
   about:
     title: "關於"
     tagline: "AI 瀏覽器側邊欄助手"
+    website: "官方網站"
     feedback: "意見回饋"
     checkUpdate: "檢查更新"
     checking: "檢查中…"

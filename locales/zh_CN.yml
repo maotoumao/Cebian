@@ -127,6 +127,7 @@ settings:
   about:
     title: "关于"
     tagline: "AI 浏览器侧边栏助手"
+    website: "官网"
     feedback: "反馈"
     checkUpdate: "检查更新"
     checking: "检查中…"

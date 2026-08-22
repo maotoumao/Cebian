@@ -59,6 +59,15 @@ export function AboutSection() {
         <p className="text-xs text-muted-foreground">{t('settings.about.tagline')}</p>
         <div className="flex gap-2 pt-2 text-xs text-muted-foreground">
           <a
+            href="https://cebian.catcat.work"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="underline underline-offset-2 hover:text-foreground transition-colors"
+          >
+            {t('settings.about.website')}
+          </a>
+          <span>·</span>
+          <a
             href="https://github.com/maotoumao/Cebian"
             target="_blank"
             rel="noreferrer noopener"
