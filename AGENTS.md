@@ -41,8 +41,8 @@ Once a plan is approved, execution must follow this strict per-task gating cycle
 
 If a subtask reveals the plan is wrong, stop and trigger the Plan-First re-approval flow above instead of pushing forward.
 
-**Changelog gate** — 当整个任务（非每个子任务）含有用户可见变更时，在报告完成前须按「Changelog」章节的规则在 `CHANGELOG.md` 的 `## [Unreleased]` 追加条目。纯内部重构 / 测试 / 构建 / 依赖升级等终端用户感知不到的变更可不记。
-When the overall task (not each subtask) carries user-visible changes, append entries to `## [Unreleased]` in `CHANGELOG.md` per the Changelog section before reporting completion. Internal-only churn (refactor / test / build / dependency bumps users can't perceive) may be skipped.
+**Changelog gate** — 当整个任务（非每个子任务）相对最近已发布版本产生最终用户可见差异时，在报告完成前须按「Changelog」章节的规则在 `CHANGELOG.md` 的 `## [Unreleased]` 追加条目。纯内部重构 / 测试 / 构建 / 依赖升级可不记；在当前未发布周期内引入又修复的问题不得单独记录，若最终发布行为仍有用户可见差异，只记录最终行为。
+When the overall task (not each subtask) creates a final user-visible difference from the latest released version, append entries to `## [Unreleased]` in `CHANGELOG.md` per the Changelog section before reporting completion. Internal-only churn (refactor / test / build / dependency bumps) may be skipped. Regressions both introduced and fixed within the current unreleased cycle must not be recorded separately; if the final release behavior still differs, record only that final behavior.
 
 ## Architecture Validation
 
@@ -142,7 +142,7 @@ Unit tests use **Vitest** with the **`WxtVitest`** plugin (`wxt/testing/vitest-p
 项目根目录维护单一的 `CHANGELOG.md`，格式遵循 [Keep a Changelog](https://keepachangelog.com/) + 语义化版本，中英双语。
 The repo keeps one root `CHANGELOG.md` following Keep a Changelog + SemVer, bilingual (Chinese + English).
 
-**What to record / 记什么** — 只记终端用户能感知的变更：新功能、行为变化、Bug 修复、面向用户的破坏性变更。纯重构、测试、构建、内部依赖升级（除非影响用户）一般不记。来自 issue 的变更在条目末尾附 `(#编号)`。
+**What to record / 记什么** — 以「相对最近已发布版本，终端用户最终能感知到什么差异」为准：只记新功能、行为变化、Bug 修复、面向用户的破坏性变更。若问题由当前 `[Unreleased]` 中尚未发布的改动引入、又在发版前修复，且最近已发布版本不含该问题，则不把这次修复单独记为 Bug 修复：最终仍有用户可见差异时，只记录最终行为；没有差异时不记。纯重构、测试、构建、内部依赖升级（除非影响用户）一般不记。来自 issue 的变更在条目末尾附 `(#编号)`。
 
 **Where / 写到哪** — 日常一律写入顶部的 `## [Unreleased]`。已发布的版本节（如 `## 1.3.2 - 2026-06-14`）**只读，永不修改**。写入前先读完整个 `[Unreleased]`，往已有小节追加，不要重复建小节。
 
@@ -156,4 +156,4 @@ The repo keeps one root `CHANGELOG.md` following Keep a Changelog + SemVer, bili
 
 After completing all coding for a task, run the repository's `code-review` workflow in the current harness's dedicated read-only reviewer. Fix any issues found before reporting completion.
 
-The review must also confirm the **Changelog gate**: if the task carries user-visible changes, check that `## [Unreleased]` was updated and that the new entries follow the format in the Changelog section (bilingual blocks, correct subsection, no edits to released version sections).
+The review must also confirm the **Changelog gate**: if the task creates a final user-visible difference from the latest released version, check that `## [Unreleased]` was updated and that the new entries follow the format in the Changelog section (bilingual blocks, correct subsection, no edits to released version sections). Reject separate entries for regressions introduced and fixed within the current unreleased cycle; when a final user-visible difference remains, require an entry describing only that final behavior.
