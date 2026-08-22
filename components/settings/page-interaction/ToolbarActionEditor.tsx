@@ -51,7 +51,6 @@ export function ToolbarActionEditor({ initial, onSave, saving, onBack }: Toolbar
           variant="ghost"
           size="icon"
           className="size-7"
-          disabled={saving}
           onClick={onBack}
         >
           <ArrowLeft className="size-4" />
@@ -155,7 +154,7 @@ export function ToolbarActionEditor({ initial, onSave, saving, onBack }: Toolbar
       </div>
 
       <div className="flex justify-end gap-2 pb-2">
-        <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={onBack}>
+        <Button type="button" variant="ghost" size="sm" onClick={onBack}>
           {t('common.cancel')}
         </Button>
         <Button
