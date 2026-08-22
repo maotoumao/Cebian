@@ -93,7 +93,8 @@ pageActions:
     error: "Something went wrong. Please try again."
     close: "Close"
     continue: "Continue in sidebar"
-    transformFailed: "Post-process script failed — showing the original output."
+    # $1 = the error thrown by the script
+    transformFailed: "Post-process script failed, showing the original output — $1"
     empty: "No output."
 
 # ─── Settings hub ───
@@ -190,17 +191,17 @@ settings:
       promptPlaceholder: "e.g. Extract the key points from $1 and reply in $2."
       pages: "Where it applies"
       transform: "Post-process script (optional)"
-      transformHint: "JavaScript run on the finished output. Receives text and vars, returns the string to display. On error the original output is shown. Runs in a throwaway sandbox with no access to extension APIs, but it can still reach the network — only run scripts you trust."
-      transformPlaceholder: "return text.trim()"
+      transformHint: "JavaScript that post-processes the finished output. Define a function named transform(text, vars) and return the string to display. vars carries the same environment variables as prompt templates: selected_text, context, page_url, page_title, date, ui_language. If the script fails, the original output is shown unchanged. It runs in a throwaway sandbox with no access to extension APIs, but it can still reach the network — only run scripts you trust."
+      transformPlaceholder: "function transform(text, vars) {\n  return text.trim();\n}"
     ball:
       label: "Floating ball"
       hint: "Show a pinned ball on web pages; click it to open or close the sidebar."
     toolbar:
       label: "Selection toolbar"
-      hint: "When you select text on a page, show a small toolbar of quick actions."
+      hint: "Show a quick-action toolbar when you select text on a page."
     model:
       label: "Toolbar model"
-      hint: "The model used by the toolbar's Explain and Translate. A small, cheap model is usually enough. Defaults to the conversation model."
+      hint: "The model used by all toolbar actions. A fast, low-cost model is usually enough. Defaults to the conversation model."
       followMain: "Same as conversation model"
     translate:
       label: "Translation target language"

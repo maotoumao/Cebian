@@ -89,7 +89,8 @@ pageActions:
     error: "出錯了，請重試。"
     close: "關閉"
     continue: "在側邊欄繼續"
-    transformFailed: "後處理指令稿執行失敗，顯示原始輸出。"
+    # $1 = 指令稿抛出的錯誤
+    transformFailed: "後處理指令稿執行失敗，顯示原始輸出——$1"
     empty: "沒有輸出。"
 
 # ─── 設定 ───
@@ -147,21 +148,21 @@ settings:
     pageScope:
       include: "僅在這些頁面生效"
       includeHint: "留空則在所有頁面生效。"
-      exclude: "但排除這些頁面"
-      excludeHint: "優先於上面那份清單。"
+      exclude: "排除以下頁面"
+      excludeHint: "排除規則優先於包含規則。"
       addExclude: "新增排除規則"
-      syntax: "使用 Chrome match pattern，例如 *://*.example.com/*。查詢參數與片段不參與比對。"
+      syntax: "使用 Chrome 頁面比對規則，例如 *://*.example.com/*。URL 中 ? 和 # 後的內容不參與比對。"
     pagePattern:
       placeholder: "*://*.example.com/*"
       # $1 = 該列的 match pattern
       remove: "移除規則 $1"
     actions:
-      title: "工具列動作"
-      hint: "按此順序顯示在工具列上。內建動作可改名、限定頁面或關閉；也可以自己寫提示詞新增動作。"
+      title: "工具列操作"
+      hint: "操作會依此順序顯示。內建操作可重新命名、設定生效範圍或關閉，也可以新增自訂操作。"
       builtin: "內建"
       custom: "自訂"
       pageScoped: "限定頁面"
-      create: "新增動作"
+      create: "新增操作"
       # $1 = 動作名稱
       moveUp: "上移 $1"
       # $1 = 動作名稱
@@ -170,37 +171,37 @@ settings:
       delete: "刪除 $1"
       # $1 = 動作名稱
       edit: "編輯 $1"
-      deleteConfirmTitle: "刪除這個動作？"
+      deleteConfirmTitle: "刪除這個操作？"
       # $1 = 動作名稱
-      deleteConfirmDescription: "「$1」將從工具列移除，此操作無法復原。"
-      editBuiltin: "內建動作"
-      editCustom: "自訂動作"
+      deleteConfirmDescription: "刪除「$1」後將無法復原。"
+      editBuiltin: "內建操作"
+      editCustom: "自訂操作"
       label: "按鈕文字"
       labelPlaceholder: "例如：擷取要點"
       labelFollowLocale: "跟隨介面語言"
       labelBuiltinHint: "留空則跟隨介面語言。"
-      prompt: "System 提示詞"
+      prompt: "系統提示詞"
       # $1 = 變數自動完成的觸發字元（「{{」）
-      promptHint: "告訴模型拿選取文字做什麼。輸入 $1 可插入變數。"
+      promptHint: "告訴模型如何處理選取文字。輸入 $1 可插入變數。"
       # $1 / $2 = 模板變數名，渲染成字面量 {{name}}
-      promptPlaceholder: "例如：擷取 $1 的要點，用 $2 回答。"
+      promptPlaceholder: "例如：擷取 $1 中的要點，並用 $2 回覆。"
       pages: "生效範圍"
       transform: "輸出後處理指令稿（選填）"
-      transformHint: "在產生完畢的輸出上執行的 JavaScript。參數為 text 與 vars，回傳要顯示的字串。出錯時顯示原始輸出。指令稿在一次性沙箱中執行、拿不到擴充功能 API，但仍能存取網路——只執行你信得過的指令稿。"
-      transformPlaceholder: "return text.trim()"
+      transformHint: "對產生完畢的輸出做加工的 JavaScript。定義一個名為 transform(text, vars) 的函式，回傳要顯示的字串。vars 與提示詞模板同一套環境變數：selected_text、context、page_url、page_title、date、ui_language。指令稿出錯時原樣顯示原始輸出。指令稿在一次性沙箱中執行、拿不到擴充功能 API，但仍能存取網路——只執行你信得過的指令稿。"
+      transformPlaceholder: "function transform(text, vars) {\n  return text.trim();\n}"
     ball:
       label: "懸浮球"
       hint: "在網頁上顯示一個貼邊的懸浮球，單擊可開啟或關閉側邊欄。"
     toolbar:
       label: "劃詞工具列"
-      hint: "在網頁上選取文字時，顯示包含快速動作的小工具列。"
+      hint: "選取文字時顯示快速工具列。"
     model:
       label: "工具列模型"
-      hint: "劃詞工具列的解釋、翻譯所用模型，通常小而省的模型就夠，預設與對話模型相同。"
+      hint: "劃詞工具列使用的模型。通常選擇速度快、成本低的模型即可，預設與對話模型相同。"
       followMain: "與對話模型相同"
     translate:
       label: "翻譯目標語言"
-      hint: "工具列翻譯成的目標語言。"
+      hint: "翻譯結果使用的語言。"
       auto: "跟隨介面語言"
   instructions:
     title: "指引"
@@ -214,7 +215,7 @@ settings:
     hint: "可重複使用的提示詞模板，透過 $1 命令在聊天輸入中觸發。"
   templateVars:
     selectedText: "頁面選取文字"
-    context: "選取範圍周邊文字"
+    context: "選取文字的上下文"
     pageUrl: "當前頁面 URL"
     pageTitle: "當前頁面標題"
     date: "當前日期"
@@ -829,10 +830,10 @@ permission:
 # ─── 錯誤（toast、抛出的錯誤訊息）───
 errors:
   pagePattern:
-    invalid: "不是合法的 match pattern。"
-    duplicate: "該規則已在清單中。"
-  pageActionGone: "該動作已不存在。"
-  pageActionSaveFailed: "動作儲存失敗。"
+    invalid: "頁面比對規則格式錯誤。"
+    duplicate: "該規則已存在。"
+  pageActionGone: "找不到該操作。"
+  pageActionSaveFailed: "儲存失敗，請重試。"
   oauth:
     cancelled: "已取消"
     timeout: "授權逾時"

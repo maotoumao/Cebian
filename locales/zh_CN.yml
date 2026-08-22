@@ -89,7 +89,8 @@ pageActions:
     error: "出错了，请重试。"
     close: "关闭"
     continue: "在侧边栏继续"
-    transformFailed: "后处理脚本执行失败，显示原始输出。"
+    # $1 = 脚本抛出的错误
+    transformFailed: "后处理脚本执行失败，显示原始输出——$1"
     empty: "没有输出。"
 
 # ─── 设置 ───
@@ -147,21 +148,21 @@ settings:
     pageScope:
       include: "仅在这些页面生效"
       includeHint: "留空则在所有页面生效。"
-      exclude: "但排除这些页面"
-      excludeHint: "优先于上面那份列表。"
+      exclude: "排除以下页面"
+      excludeHint: "排除规则优先于包含规则。"
       addExclude: "添加排除规则"
-      syntax: "使用 Chrome match pattern，例如 *://*.example.com/*。查询参数与片段不参与匹配。"
+      syntax: "使用 Chrome 页面匹配规则，例如 *://*.example.com/*。URL 中 ? 和 # 后的内容不参与匹配。"
     pagePattern:
       placeholder: "*://*.example.com/*"
       # $1 = 该行的 match pattern
       remove: "移除规则 $1"
     actions:
-      title: "工具条动作"
-      hint: "按此顺序显示在工具条上。内置动作可改名、限定页面或关掉；也可以自己写提示词新增动作。"
+      title: "工具条操作"
+      hint: "操作按此顺序显示。内置操作可改名、设置生效范围或关闭，也可以添加自定义操作。"
       builtin: "内置"
       custom: "自定义"
       pageScoped: "限定页面"
-      create: "新建动作"
+      create: "新建操作"
       # $1 = 动作名称
       moveUp: "上移 $1"
       # $1 = 动作名称
@@ -170,37 +171,37 @@ settings:
       delete: "删除 $1"
       # $1 = 动作名称
       edit: "编辑 $1"
-      deleteConfirmTitle: "删除这个动作？"
+      deleteConfirmTitle: "删除这个操作？"
       # $1 = 动作名称
-      deleteConfirmDescription: "“$1”将从工具条移除，此操作不可撤销。"
-      editBuiltin: "内置动作"
-      editCustom: "自定义动作"
+      deleteConfirmDescription: "删除“$1”后无法恢复。"
+      editBuiltin: "内置操作"
+      editCustom: "自定义操作"
       label: "按钮文本"
       labelPlaceholder: "例如：提取要点"
       labelFollowLocale: "跟随界面语言"
       labelBuiltinHint: "留空则跟随界面语言。"
-      prompt: "System 提示词"
+      prompt: "系统提示词"
       # $1 = 变量自动完成的触发字符（“{{”）
-      promptHint: "告诉模型拿选中文本做什么。输入 $1 可插入变量。"
+      promptHint: "告诉模型如何处理选中文本。输入 $1 可插入变量。"
       # $1 / $2 = 模板变量名，渲染成字面量 {{name}}
-      promptPlaceholder: "例如：提取 $1 的要点，用 $2 回答。"
+      promptPlaceholder: "例如：提取 $1 中的要点，并用 $2 回答。"
       pages: "生效范围"
       transform: "输出后处理脚本（可选）"
-      transformHint: "在生成完毕的输出上运行的 JavaScript。入参 text 与 vars，返回要显示的字符串。出错时显示原始输出。脚本在一次性沙箱中执行、拿不到扩展 API，但仍能访问网络——只运行你信得过的脚本。"
-      transformPlaceholder: "return text.trim()"
+      transformHint: "对生成完毕的输出做加工的 JavaScript。定义一个名为 transform(text, vars) 的函数，返回要显示的字符串。vars 与提示词模板同一套环境变量：selected_text、context、page_url、page_title、date、ui_language。脚本出错时原样显示原始输出。脚本在一次性沙箱中执行、拿不到扩展 API，但仍能访问网络——只运行你信得过的脚本。"
+      transformPlaceholder: "function transform(text, vars) {\n  return text.trim();\n}"
     ball:
       label: "悬浮球"
       hint: "在网页上显示一个贴边的悬浮球，单击可打开或关闭侧边栏。"
     toolbar:
       label: "划词工具条"
-      hint: "在网页上选中文本时，显示包含快捷动作的小工具条。"
+      hint: "选中文本时显示快捷工具条。"
     model:
       label: "工具条模型"
-      hint: "划词工具条的解释、翻译所用模型，通常小而省的模型就够，默认与对话模型相同。"
+      hint: "划词工具条使用的模型。通常选择速度快、成本低的模型即可，默认与对话模型相同。"
       followMain: "与对话模型相同"
     translate:
       label: "翻译目标语言"
-      hint: "工具条翻译成的目标语言。"
+      hint: "翻译结果使用的语言。"
       auto: "跟随界面语言"
   instructions:
     title: "指引"
@@ -214,7 +215,7 @@ settings:
     hint: "可复用的提示模板，通过 $1 命令在聊天输入中触发。"
   templateVars:
     selectedText: "页面选中文本"
-    context: "选区周边文本"
+    context: "选中文本的上下文"
     pageUrl: "当前页面 URL"
     pageTitle: "当前页面标题"
     date: "当前日期"
@@ -830,10 +831,10 @@ permission:
 # ─── 错误（toast、抛出的错误信息）───
 errors:
   pagePattern:
-    invalid: "不是合法的 match pattern。"
-    duplicate: "该规则已在列表中。"
-  pageActionGone: "该动作已不存在。"
-  pageActionSaveFailed: "动作保存失败。"
+    invalid: "页面匹配规则格式错误。"
+    duplicate: "该规则已存在。"
+  pageActionGone: "找不到该操作。"
+  pageActionSaveFailed: "保存失败，请重试。"
   oauth:
     cancelled: "已取消"
     timeout: "授权超时"
