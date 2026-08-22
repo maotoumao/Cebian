@@ -11,7 +11,7 @@
 import { stream } from '@earendil-works/pi-ai/compat';
 import type { Api, Model, UserMessage, AssistantMessage } from '@earendil-works/pi-ai';
 import { resolveModel } from '@/lib/providers/resolve-model';
-import { languageName } from '@/lib/utils';
+import { languageName, oneLine, truncate } from '@/lib/utils';
 import {
   providerCredentials,
   customProviders,
@@ -183,10 +183,9 @@ const EMPTY_USAGE = {
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 };
 
-/** 会话标题：选中原文去空白截断。 */
+/** 会话标题：选中原文压成一行再截断；全空白则回落扩展名。 */
 function makeTitle(text: string): string {
-  const t = text.trim().replace(/\s+/g, ' ');
-  return t.length > 48 ? `${t.slice(0, 48)}…` : t || 'Cebian';
+  return truncate(oneLine(text), 48) || 'Cebian';
 }
 
 /**

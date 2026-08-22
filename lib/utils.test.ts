@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { asString, isValidSessionId, assertNever, formatCompactCount, formatBytes } from '@/lib/utils';
+import {
+  asString,
+  isValidSessionId,
+  assertNever,
+  formatCompactCount,
+  formatBytes,
+  oneLine,
+  truncate,
+} from '@/lib/utils';
 
 describe('asString', () => {
   it('是字符串 → 原样返回（含空串）', () => {
@@ -69,5 +77,30 @@ describe('formatBytes', () => {
     expect(formatBytes(1536)).toBe('1.5 KB');
     expect(formatBytes(1024 * 1024)).toBe('1.0 MB');
     expect(formatBytes(30 * 1024 * 1024)).toBe('30.0 MB');
+  });
+});
+
+describe('oneLine', () => {
+  it('连续空白折叠成单个空格并去掉首尾', () => {
+    expect(oneLine('  a\n\n  b\tc  ')).toBe('a b c');
+  });
+
+  it('全是空白 → 空串（调用方据此回落）', () => {
+    expect(oneLine(' \n\t ')).toBe('');
+  });
+});
+
+describe('truncate', () => {
+  it('不超长原样返回', () => {
+    expect(truncate('abc', 3)).toBe('abc');
+  });
+
+  it('超长则截断并以省略号结尾', () => {
+    expect(truncate('abcdef', 3)).toBe('abc…');
+  });
+
+  it('不折叠空白——那是 oneLine 的事，组合使用', () => {
+    expect(truncate('a  b', 4)).toBe('a  b');
+    expect(truncate(oneLine('a  b'), 4)).toBe('a b');
   });
 });

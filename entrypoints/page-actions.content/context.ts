@@ -1,6 +1,8 @@
 // 采集有界上下文（页面标题 + 选区周边文本），供翻译 / 解释 / 总结消歧用。内容脚本侧
 // 逻辑（需要选区的 DOM 上下文）。刻意有界：控制 token、成本与隐私。
 
+import { truncate } from '@/lib/utils';
+
 const MAX_CONTEXT = 800;
 const SIDE_WINDOW = 350;
 
@@ -64,7 +66,7 @@ function gatherContext(): string {
   if (title) parts.push(`Page title: ${title}`);
   if (surrounding) parts.push(surrounding);
   const joined = parts.join('\n');
-  return joined.length > MAX_CONTEXT ? `${joined.slice(0, MAX_CONTEXT)}…` : joined;
+  return truncate(joined, MAX_CONTEXT);
 }
 
 /**

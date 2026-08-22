@@ -9,6 +9,7 @@ import {
 import { Copy, Check, Loader2, X, PanelRight } from 'lucide-react';
 import { runPageAction, continueInSidePanel } from '@/lib/page-actions/channel';
 import type { PageActionId } from '@/lib/page-actions/types';
+import { oneLine, truncate } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 import { copyText } from './clipboard';
 
@@ -98,12 +99,6 @@ const iconBtnStyle: CSSProperties = {
   fontSize: 12,
   cursor: 'pointer',
 };
-
-/** 截断过长文本（脚本抛出的错误可能很长，卡片里放不下）。 */
-function truncate(text: string, max: number): string {
-  const one = text.replace(/\s+/g, ' ').trim();
-  return one.length > max ? `${one.slice(0, max)}…` : one;
-}
 
 function HeaderIcon({ status }: { status: Status }) {
   if (status === 'streaming') {
@@ -323,7 +318,7 @@ export function ResultCard({ actionId, title, text, vars, anchorRect, onClose }:
         )}
         {transformError !== null && (
           <div style={transformErrorStyle}>
-            {t('pageActions.result.transformFailed', [truncate(transformError, 200)])}
+            {t('pageActions.result.transformFailed', [truncate(oneLine(transformError), 200)])}
           </div>
         )}
       </div>

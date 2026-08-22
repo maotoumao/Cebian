@@ -12,6 +12,7 @@
 // The recorder's content script is a WXT entrypoint (built as a standalone
 // bundle and injected via `files: [...]`), so normal imports work here.
 
+import { oneLine, truncate } from '@/lib/utils';
 import { SEMANTIC_ROLES, SEMANTIC_TAGS, TEXT_PREVIEW_MAX } from './constants';
 import type { MutationChange } from './types';
 
@@ -134,13 +135,9 @@ export function getTextPreview(
 ): string | undefined {
   if (TEXT_PREVIEW_SKIP_TAGS.has(el.tagName)) return undefined;
   const raw = cachedInnerText ?? (el as HTMLElement).innerText ?? el.textContent ?? '';
-  const collapsed = raw.replace(/\s+/g, ' ').trim();
+  const collapsed = oneLine(raw);
   if (!collapsed) return undefined;
   return truncate(collapsed, max);
-}
-
-function truncate(s: string, max: number): string {
-  return s.length > max ? s.slice(0, max) + '…' : s;
 }
 
 // ─── Recorder-specific helpers ────────────────────────────────────────
