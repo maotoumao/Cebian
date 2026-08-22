@@ -1,17 +1,17 @@
 name: Publish to Stores
 
 # 监听 GitHub Release 发布事件:你在仓库点 "Publish release" 后自动把扩展同时提交到
-# Chrome Web Store 与 Edge Add-ons。复用该 Release 上已验证的 chrome zip 资产,
+# Chrome Web Store、Edge Add-ons 与 Firefox Add-ons。复用该 Release 上已验证的 zip 资产,
 # 绝不重新构建,确保上架的字节与你 smoke-test 过的完全一致。
 #
 # 也支持手动触发(workflow_dispatch):指定一个已发布的 tag 重新推商店,用于
 # token 失效修复后重推、或某个商店单独补推等场景。手动触发同样要过审批门。
-# 通过 target 参数可选择只推 chrome、只推 edge、或同时推两个商店(默认)。
+# 通过 target 参数可选择单独推一个商店,或同时推全部商店(默认)。
 #
 # 安全设计:
 #   - 第三方 action 全部 pin 到完整 commit SHA(防供应链投毒)。
-#   - publish-chrome / publish-edge 共用 store-publish 环境(审批门 + 环境级密钥),
-#     一次审批同时放行两个商店;未审批前 job 拿不到任何商店密钥。
+#   - 三个发布 job 共用 store-publish 环境(审批门 + 环境级密钥),
+#     一次审批同时放行全部商店;未审批前 job 拿不到任何商店密钥。
 #   - 顶层权限收到最小(contents: read,仅够下载 Release 资产)。
 #   - 统一跳过 pre-release:无论自动还是手动触发,预发布都不提交商店。
 on:
@@ -20,30 +20,31 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: '已发布的 Release tag(例 v1.3.2),从其资产取 chrome zip 重新推商店'
+        description: '已发布的 Release tag(例 v1.3.2),从其资产取对应 zip 重新推商店'
         required: true
         type: string
       target:
-        description: '目标商店:both = Chrome + Edge,chrome = 仅 Chrome,edge = 仅 Edge'
+        description: '目标商店:all = 全部,或仅 Chrome、Edge、Firefox'
         required: false
         type: choice
-        default: both
+        default: all
         options:
-          - both
+          - all
           - chrome
           - edge
+          - firefox
 
 permissions:
   contents: read
 
 jobs:
   fetch:
-    name: Fetch verified chrome zip from release
+    name: Fetch verified store zips from release
     runs-on: ubuntu-latest
     # release 事件的预发布在这里干净跳过;手动触发的预发布在下方步骤运行时校验
     if: ${{ github.event_name != 'release' || !github.event.release.prerelease }}
     steps:
-      - name: Download chrome zip asset
+      - name: Validate release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # 手动触发用输入的 tag;release 触发用事件里的 tag
@@ -57,6 +58,15 @@ jobs:
             echo "::error::$TAG 是预发布(prerelease),不提交商店。"
             exit 1
           fi
+
+      - name: Download chrome zip asset
+        if: ${{ github.event_name == 'release' || github.event.inputs.target == 'all' || github.event.inputs.target == 'chrome' || github.event.inputs.target == 'edge' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag || github.event.release.tag_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
           gh release download "$TAG" --repo "$REPO" \
             --pattern 'cebian-*-chrome.zip' --dir dist
           # 必须恰好命中一个 chrome zip,否则下游发布工具会静默选错或报错
@@ -67,14 +77,43 @@ jobs:
             exit 1
           fi
           # 归一化成固定文件名,下游无需再用 glob
-          mv dist/cebian-*-chrome.zip dist/extension.zip
+          mv dist/cebian-*-chrome.zip dist/chrome.zip
           ls -la dist
 
-      - name: Upload zip for store jobs
+      - name: Download Firefox zip asset
+        if: ${{ github.event_name == 'release' || github.event.inputs.target == 'all' || github.event.inputs.target == 'firefox' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag || github.event.release.tag_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release download "$TAG" --repo "$REPO" \
+            --pattern 'cebian-*-firefox.zip' --dir dist
+          count=$(find dist -maxdepth 1 -name 'cebian-*-firefox.zip' | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "::error::expected exactly 1 Firefox zip, found $count"
+            ls -la dist
+            exit 1
+          fi
+          mv dist/cebian-*-firefox.zip dist/firefox.zip
+          ls -la dist
+
+      - name: Upload chrome zip for store jobs
+        if: ${{ github.event_name == 'release' || github.event.inputs.target == 'all' || github.event.inputs.target == 'chrome' || github.event.inputs.target == 'edge' }}
         uses: actions/upload-artifact@v5
         with:
           name: store-chrome-zip
-          path: dist/extension.zip
+          path: dist/chrome.zip
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Firefox zip for store job
+        if: ${{ github.event_name == 'release' || github.event.inputs.target == 'all' || github.event.inputs.target == 'firefox' }}
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: store-firefox-zip
+          path: dist/firefox.zip
           if-no-files-found: error
           retention-days: 7
 
@@ -82,9 +121,9 @@ jobs:
     name: Publish to Chrome Web Store
     runs-on: ubuntu-latest
     needs: fetch
-    # release 触发始终发布;手动触发仅当 target 为 chrome 或 both 时发布
-    if: ${{ github.event_name == 'release' || github.event.inputs.target == 'both' || github.event.inputs.target == 'chrome' }}
-    environment: store-publish # 审批门 + 商店密钥(Chrome 与 Edge 共用同一环境)
+    # release 触发始终发布;手动触发仅当 target 为 chrome 或 all 时发布
+    if: ${{ github.event_name == 'release' || github.event.inputs.target == 'all' || github.event.inputs.target == 'chrome' }}
+    environment: store-publish # 审批门 + 三个商店共用的环境级密钥
     env:
       CHROME_API_VERSION: v2
     steps:
@@ -113,7 +152,7 @@ jobs:
           path: dist
 
       - name: Verify Chrome Web Store credentials
-        run: pnpm wxt submit --dry-run --chrome-zip dist/extension.zip
+        run: pnpm wxt submit --dry-run --chrome-zip dist/chrome.zip
         env:
           CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
           CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
@@ -121,7 +160,7 @@ jobs:
           CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
 
       - name: Upload & publish to Chrome Web Store
-        run: pnpm wxt submit --chrome-zip dist/extension.zip
+        run: pnpm wxt submit --chrome-zip dist/chrome.zip
         env:
           CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
           CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
@@ -132,9 +171,9 @@ jobs:
     name: Publish to Edge Add-ons
     runs-on: ubuntu-latest
     needs: fetch
-    # release 触发始终发布;手动触发仅当 target 为 edge 或 both 时发布
-    if: ${{ github.event_name == 'release' || github.event.inputs.target == 'both' || github.event.inputs.target == 'edge' }}
-    environment: store-publish # 审批门 + 商店密钥(Chrome 与 Edge 共用同一环境)
+    # release 触发始终发布;手动触发仅当 target 为 edge 或 all 时发布
+    if: ${{ github.event_name == 'release' || github.event.inputs.target == 'all' || github.event.inputs.target == 'edge' }}
+    environment: store-publish # 审批门 + 三个商店共用的环境级密钥
     steps:
       # actions/checkout v5
       - name: Checkout repository
@@ -161,15 +200,63 @@ jobs:
           path: dist
 
       - name: Validate Edge Add-ons configuration
-        run: pnpm wxt submit --dry-run --edge-zip dist/extension.zip
+        run: pnpm wxt submit --dry-run --edge-zip dist/chrome.zip
         env:
           EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
           EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
           EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
 
       - name: Upload & submit to Edge Add-ons
-        run: pnpm wxt submit --edge-zip dist/extension.zip
+        run: pnpm wxt submit --edge-zip dist/chrome.zip
         env:
           EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
           EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
           EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+
+  publish-firefox:
+    name: Publish to Firefox Add-ons
+    runs-on: ubuntu-latest
+    needs: fetch
+    # release 触发始终发布;手动触发仅当 target 为 firefox 或 all 时发布
+    if: ${{ github.event_name == 'release' || github.event.inputs.target == 'all' || github.event.inputs.target == 'firefox' }}
+    environment: store-publish # 审批门 + 三个商店共用的环境级密钥
+    env:
+      FIREFOX_CHANNEL: listed
+    steps:
+      # actions/checkout v5
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      # pnpm/action-setup v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+
+      # actions/setup-node v5
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install publishing tool
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Download Firefox zip
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: store-firefox-zip
+          path: dist
+
+      - name: Verify Firefox Add-ons credentials
+        run: pnpm wxt submit --dry-run --firefox-zip dist/firefox.zip
+        env:
+          FIREFOX_EXTENSION_ID: ${{ secrets.FIREFOX_EXTENSION_ID }}
+          FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
+          FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
+
+      - name: Upload & submit to Firefox Add-ons
+        run: pnpm wxt submit --firefox-zip dist/firefox.zip
+        env:
+          FIREFOX_EXTENSION_ID: ${{ secrets.FIREFOX_EXTENSION_ID }}
+          FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
+          FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
