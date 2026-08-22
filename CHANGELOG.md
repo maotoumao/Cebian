@@ -23,12 +23,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 官网首页与安装文档新增 Firefox 附加组件商店入口
 - AI 回复中的 LaTeX 数学公式现在渲染为真正的公式（支持行内 `$...$`、`\(...\)` 与块级 `$$...$$`、`\[...\]`），深浅色主题下均清晰可读；块级公式悬停可复制 LaTeX 源码；朗读时公式读作其 LaTeX 源码，货币金额（如 $5）不会被误认成公式 ([#61](https://github.com/maotoumao/Cebian/issues/61))
 - 悬浮球、划词工具条与每个工具条动作现在都能限定生效页面：在「设置 → 页面交互」里各自配置「仅在这些页面生效」与「但排除这些页面」（Chrome match pattern，如 `*://*.example.com/*`；留空即所有页面，排除优先）
+- 页面匹配规则说明新增「查看配置规则」入口，可直接打开 MDN 的完整语法文档
 - 划词工具条的动作现在可以自己配置：内置的解释 / 翻译 / 总结可改按钮文本、限定生效页面、调整顺序或关掉；也可以新建自己的动作，用 `{{selected_text}}` 等变量写提示词模板（可用变量：选中文本、选区周边文本、页面 URL、页面标题、当前日期、界面语言）。翻译的目标语言也收进了「翻译」这个动作自己的设置里
 - 划词动作支持输出后处理脚本：写一个 `transform(text, vars)` 函数对 AI 的输出做加工，返回要显示的字符串；`vars` 与提示词模板同一套环境变量。脚本在一次性沙箱中执行——拿不到任何浏览器扩展 API，跑完或超时（5 秒）即销毁，不会影响其它功能；脚本出错时原样显示原始输出并附上错误原因，方便排查。脚本仍能访问网络，故只运行你自己信得过的脚本
 
 - Added a Firefox Add-ons store link to the website homepage and installation guide
 - LaTeX math in AI responses now renders as real formulas (inline `$...$` / `\(...\)` and block `$$...$$` / `\[...\]`), clearly readable in both light and dark themes; hover a block formula to copy its LaTeX source; read-aloud speaks the LaTeX source, and currency amounts (e.g. $5) are no longer mistaken for math ([#61](https://github.com/maotoumao/Cebian/issues/61))
 - The floating ball, the selection toolbar and every toolbar action can now be scoped to specific pages: each has its own "show only on these pages" and "except on these pages" lists under Settings → Page interaction (Chrome match patterns such as `*://*.example.com/*`; empty means every page, and exceptions win)
+- Page match-pattern guidance now includes a "View configuration rules" link to the full MDN syntax documentation
 - Selection toolbar actions are now configurable: rename the built-in Explain / Translate / Summarize buttons, scope them to certain pages, reorder them or turn them off — and add your own actions with a prompt template using variables such as `{{selected_text}}` (available: selected text, surrounding text, page URL, page title, current date, interface language). The translation target language now lives in the Translate action's own settings
 - Selection actions can post-process their output with a script: define a `transform(text, vars)` function that returns the string to display, where `vars` carries the same environment variables as prompt templates. It runs in a throwaway sandbox — no access to any browser extension APIs, torn down as soon as it finishes or times out (5 s) so it cannot affect anything else; if the script fails, the original output is shown unchanged along with the reason so you can debug it. Scripts can still reach the network, so only run ones you trust
 
@@ -47,8 +49,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### 修复 / Fixed
 
 - 修复 AI 回复中的粗体紧邻中日韩标点与后续文字时，Markdown 强调标记会原样显示的问题
+- 修复自定义操作编辑器中长提示文本会把光标撑高的问题；已添加的页面匹配规则现在以普通文本显示，并可直接编辑，无需删除后重新添加
 
 - Fixed Markdown emphasis markers appearing literally in AI responses when bold text ended with CJK punctuation and was immediately followed by more text
+- Fixed long placeholder text stretching the caret in the custom action editor; saved page match patterns now appear as plain text and can be edited directly instead of being removed and re-added
 
 ## 1.5.0 - 2026-08-15
 

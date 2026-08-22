@@ -30,56 +30,66 @@ export function PageScopeEditor({ scope, onChange, disabled }: PageScopeEditorPr
   const excludeLabelId = useId();
 
   return (
-    <div className={cn('space-y-2', disabled && 'pointer-events-none opacity-50')}>
-      <div className="space-y-1.5">
-        <Label id={includeLabelId} className="text-xs font-normal text-muted-foreground">
-          {t('settings.pageInteraction.pageScope.include')}
-        </Label>
-        <PagePatternsEditor
-          patterns={scope.include}
-          onChange={(include) => onChange({ ...scope, include })}
-          disabled={disabled}
-          labelledBy={includeLabelId}
-        />
-        <p className="text-xs text-muted-foreground">
-          {t('settings.pageInteraction.pageScope.includeHint')}
-        </p>
-      </div>
-
-      {showExclude ? (
+    <div className="space-y-2">
+      <div className={cn('space-y-2', disabled && 'pointer-events-none opacity-50')}>
         <div className="space-y-1.5">
-          <Label id={excludeLabelId} className="text-xs font-normal text-muted-foreground">
-            {t('settings.pageInteraction.pageScope.exclude')}
+          <Label id={includeLabelId} className="text-xs font-normal text-muted-foreground">
+            {t('settings.pageInteraction.pageScope.include')}
           </Label>
           <PagePatternsEditor
-            patterns={scope.exclude}
-            onChange={(exclude) => {
-              setPinned(true);
-              onChange({ ...scope, exclude });
-            }}
+            patterns={scope.include}
+            onChange={(include) => onChange({ ...scope, include })}
             disabled={disabled}
-            labelledBy={excludeLabelId}
+            labelledBy={includeLabelId}
           />
           <p className="text-xs text-muted-foreground">
-            {t('settings.pageInteraction.pageScope.excludeHint')}
+            {t('settings.pageInteraction.pageScope.includeHint')}
           </p>
         </div>
-      ) : (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2 text-xs text-muted-foreground"
-          disabled={disabled}
-          onClick={() => setPinned(true)}
-        >
-          <Plus className="size-3" />
-          {t('settings.pageInteraction.pageScope.addExclude')}
-        </Button>
-      )}
+
+        {showExclude ? (
+          <div className="space-y-1.5">
+            <Label id={excludeLabelId} className="text-xs font-normal text-muted-foreground">
+              {t('settings.pageInteraction.pageScope.exclude')}
+            </Label>
+            <PagePatternsEditor
+              patterns={scope.exclude}
+              onChange={(exclude) => {
+                setPinned(true);
+                onChange({ ...scope, exclude });
+              }}
+              disabled={disabled}
+              labelledBy={excludeLabelId}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t('settings.pageInteraction.pageScope.excludeHint')}
+            </p>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs text-muted-foreground"
+            disabled={disabled}
+            onClick={() => setPinned(true)}
+          >
+            <Plus className="size-3" />
+            {t('settings.pageInteraction.pageScope.addExclude')}
+          </Button>
+        )}
+      </div>
 
       <p className="text-xs text-muted-foreground">
-        {t('settings.pageInteraction.pageScope.syntax')}
+        {t('settings.pageInteraction.pageScope.syntax')}{' '}
+        <a
+          href="https://developer.mozilla.org/docs/Mozilla/Add-ons/WebExtensions/Match_patterns"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="underline underline-offset-2 transition-colors hover:text-foreground"
+        >
+          {t('settings.pageInteraction.pageScope.syntaxDocs')}
+        </a>
       </p>
     </div>
   );

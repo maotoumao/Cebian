@@ -6,7 +6,13 @@
  */
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { EditorState, Compartment } from '@codemirror/state';
-import { EditorView, keymap, placeholder as cmPlaceholder, lineNumbers } from '@codemirror/view';
+import {
+  EditorView,
+  drawSelection,
+  keymap,
+  placeholder as cmPlaceholder,
+  lineNumbers,
+} from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { yaml } from '@codemirror/lang-yaml';
@@ -87,6 +93,7 @@ export function CodeMirrorEditor({
 
     const extensions = [
       lineNumbers(),
+      drawSelection(),
       history(),
       keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),

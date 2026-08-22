@@ -156,8 +156,11 @@ settings:
       excludeHint: "Takes precedence over the list above."
       addExclude: "Add an exception"
       syntax: "Chrome match patterns, e.g. *://*.example.com/*. Query strings and fragments are ignored."
+      syntaxDocs: "View configuration rules"
     pagePattern:
       placeholder: "*://*.example.com/*"
+      # $1 = the match pattern on that row
+      edit: "Edit pattern $1"
       # $1 = the match pattern on that row
       remove: "Remove pattern $1"
     actions:
@@ -191,7 +194,7 @@ settings:
       promptPlaceholder: "e.g. Extract the key points from $1 and reply in $2."
       pages: "Where it applies"
       transform: "Post-process script (optional)"
-      transformHint: "JavaScript that post-processes the finished output. Define a function named transform(text, vars) and return the string to display. vars carries the same environment variables as prompt templates: selected_text, context, page_url, page_title, date, ui_language. If the script fails, the original output is shown unchanged. Do not declare args or module at the top level — the host reserves those names. It runs in a throwaway sandbox with no access to extension APIs, but it can still reach the network — only run scripts you trust."
+      transformHint: "JavaScript for post-processing the completed output. Define a function named transform(text, vars) that returns the string to display. vars provides the same environment variables as prompt templates: selected_text, context, page_url, page_title, date, ui_language. If the script fails, the original output is displayed unchanged."
       transformPlaceholder: "function transform(text, vars) {\n  return text.trim();\n}"
     ball:
       label: "Floating ball"

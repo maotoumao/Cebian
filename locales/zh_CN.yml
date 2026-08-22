@@ -152,8 +152,11 @@ settings:
       excludeHint: "排除规则优先于包含规则。"
       addExclude: "添加排除规则"
       syntax: "使用 Chrome 页面匹配规则，例如 *://*.example.com/*。URL 中 ? 和 # 后的内容不参与匹配。"
+      syntaxDocs: "查看配置规则"
     pagePattern:
       placeholder: "*://*.example.com/*"
+      # $1 = 该行的 match pattern
+      edit: "编辑规则 $1"
       # $1 = 该行的 match pattern
       remove: "移除规则 $1"
     actions:
@@ -187,7 +190,7 @@ settings:
       promptPlaceholder: "例如：提取 $1 中的要点，并用 $2 回答。"
       pages: "生效范围"
       transform: "输出后处理脚本（可选）"
-      transformHint: "对生成完毕的输出做加工的 JavaScript。定义一个名为 transform(text, vars) 的函数，返回要显示的字符串。vars 与提示词模板同一套环境变量：selected_text、context、page_url、page_title、date、ui_language。脚本出错时原样显示原始输出。脚本顶层不要声明 args 与 module——这两个名字由宿主保留。脚本在一次性沙箱中执行、拿不到扩展 API，但仍能访问网络——只运行你信得过的脚本。"
+      transformHint: "对生成完毕的输出做加工的 JavaScript。定义名为 transform(text, vars) 的函数，返回要显示的字符串。vars 与提示词模板同一套环境变量：selected_text、context、page_url、page_title、date、ui_language。脚本出错时原样显示原始输出。"
       transformPlaceholder: "function transform(text, vars) {\n  return text.trim();\n}"
     ball:
       label: "悬浮球"

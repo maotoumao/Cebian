@@ -152,8 +152,11 @@ settings:
       excludeHint: "排除規則優先於包含規則。"
       addExclude: "新增排除規則"
       syntax: "使用 Chrome 頁面比對規則，例如 *://*.example.com/*。URL 中 ? 和 # 後的內容不參與比對。"
+      syntaxDocs: "查看設定規則"
     pagePattern:
       placeholder: "*://*.example.com/*"
+      # $1 = 該列的 match pattern
+      edit: "編輯規則 $1"
       # $1 = 該列的 match pattern
       remove: "移除規則 $1"
     actions:
@@ -187,7 +190,7 @@ settings:
       promptPlaceholder: "例如：擷取 $1 中的要點，並用 $2 回覆。"
       pages: "生效範圍"
       transform: "輸出後處理指令稿（選填）"
-      transformHint: "對產生完畢的輸出做加工的 JavaScript。定義一個名為 transform(text, vars) 的函式，回傳要顯示的字串。vars 與提示詞模板同一套環境變數：selected_text、context、page_url、page_title、date、ui_language。指令稿出錯時原樣顯示原始輸出。指令稿頂層不要宣告 args 與 module——這兩個名字由宿主保留。指令稿在一次性沙箱中執行、拿不到擴充功能 API，但仍能存取網路——只執行你信得過的指令稿。"
+      transformHint: "用 JavaScript 加工產生完畢的輸出。定義名為 transform(text, vars) 的函式，回傳要顯示的字串。vars 提供與提示詞範本相同的環境變數：selected_text、context、page_url、page_title、date、ui_language。指令稿出錯時，原始輸出會原樣顯示。"
       transformPlaceholder: "function transform(text, vars) {\n  return text.trim();\n}"
     ball:
       label: "懸浮球"
