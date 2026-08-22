@@ -6,6 +6,10 @@
 // 刻意不复用 skill 那个长存的共享沙箱——同一 realm 里脚本能窥探后续 skill 的执行信封
 // 并借其权限行事。
 //
+// 契约：用户脚本定义一个完整的 `transform(text, vars)` 函数，由宿主按名字查到并调用
+// （见 transform-sandbox.ts 的 wrapHookCall）。`vars` 是环境变量那一套，与提示词模板同源，
+// 不含任何设置项。
+//
 // 脚本零权限：沙箱不注入 chrome / vfs / bgFetch / executeInPage，它只拿到字符串 text 与
 // 字符串映射 vars；沙箱侧只接受直接宿主发来的协议消息，故它也注入不了别的沙箱实例。
 // 局限（如实记录）：(1) sandbox page 的 CSP 是全局共享的，故脚本仍能访问原生 fetch——
@@ -16,6 +20,7 @@
 // 也刻意不走页面内 MAIN world 执行：那会被站点 CSP 拦，还把用户脚本塞进宿主页面。
 
 import { ensureOffscreen } from '@/lib/tools/offscreen';
+import type { OffscreenRequest } from '@/entrypoints/offscreen/main';
 
 /**
  * background 侧的独立超时，比宿主那道（5s）留一点余量。
@@ -30,7 +35,8 @@ const TRANSFORM_DEADLINE_MS = 8_000;
 /**
  * 跑一段后处理脚本，返回要展示的文本。
  *
- * 失败即抛（超时、脚本自身抛错、返回值不是字符串）——调用方据此降级展示原始输出。
+ * 失败即抛（超时、没定义 transform、脚本自身抛错、返回值不是字符串）——后处理是可选的，
+ * 故调用方捕获后照常展示原始输出，只把错误消息带到卡片上供用户排查。
  * 脚本返回非字符串一律视为错误而不是强转：`[object Object]` 冒充模型输出比报错更糟。
  */
 export async function runTransform(
@@ -48,9 +54,18 @@ export async function runTransform(
     );
   });
 
+  // 显式标注消息体类型：字段名与宿主对不上会在编译期报错（这里曾把 script 发成宿主
+  // 读不到的名字，导致脚本被静默丢掉、每次都报「没定义 transform」）。
+  const request: OffscreenRequest = {
+    type: 'transform:run',
+    script,
+    hook: 'transform',
+    args: { text, vars },
+  };
+
   try {
     const response: unknown = await Promise.race([
-      chrome.runtime.sendMessage({ type: 'transform:run', script, args: { text, vars } }),
+      chrome.runtime.sendMessage(request),
       deadline,
     ]);
     const out = response as { result?: string; error?: string } | undefined;

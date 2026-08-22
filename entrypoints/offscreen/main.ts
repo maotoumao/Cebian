@@ -4,7 +4,7 @@
 import { Readability } from '@mozilla/readability';
 import TurndownService from 'turndown';
 import { gfm } from 'turndown-plugin-gfm';
-import { runTransformInFreshSandbox } from './transform-sandbox';
+import { runScriptHookInFreshSandbox, type ScriptHook } from './transform-sandbox';
 import {
   handlePdfInfo,
   handlePdfText,
@@ -21,7 +21,13 @@ export type OffscreenRequest =
   | { type: 'crop-image'; imageData: string; crop: { x: number; y: number; width: number; height: number } }
   | { type: 'pdf-info'; url: string }
   | { type: 'pdf-text'; url: string; pageRange?: string; maxChars?: number }
-  | { type: 'transform:run'; code: string; args: Record<string, unknown> }
+  | {
+      type: 'transform:run';
+      /** 用户脚本原文（包装与校验在宿主侧做，见 transform-sandbox.ts）。 */
+      script: string;
+      hook: ScriptHook;
+      args: Record<string, unknown>;
+    }
   | {
       type: 'pdf-search';
       url: string;
@@ -155,7 +161,7 @@ chrome.runtime.onMessage.addListener(
     // ─── Original offscreen handlers ───
     const req = message as OffscreenRequest;
     if (req.type === 'transform:run') {
-      void runTransformInFreshSandbox(req.code, req.args).then(sendResponse);
+      void runScriptHookInFreshSandbox(req.script, req.hook, req.args).then(sendResponse);
       return true;
     }
     if (req.type === 'crop-image') {

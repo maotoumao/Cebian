@@ -146,7 +146,7 @@ export interface CustomPageAction {
   systemPrompt: string;
   /** 页面生效范围；缺省 = 不限制（所有页面）。 */
   pages?: PageScope;
-  /** 输出后处理脚本（函数体，入参 text / vars，返回字符串）；缺省 = 不做后处理。 */
+  /** 输出后处理脚本：定义一个完整的 `transform(text, vars)` 函数；缺省 = 不做后处理。 */
   transform?: string;
 }
 

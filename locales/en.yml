@@ -191,7 +191,7 @@ settings:
       promptPlaceholder: "e.g. Extract the key points from $1 and reply in $2."
       pages: "Where it applies"
       transform: "Post-process script (optional)"
-      transformHint: "JavaScript that post-processes the finished output. Define a function named transform(text, vars) and return the string to display. vars carries the same environment variables as prompt templates: selected_text, context, page_url, page_title, date, ui_language. If the script fails, the original output is shown unchanged. It runs in a throwaway sandbox with no access to extension APIs, but it can still reach the network — only run scripts you trust."
+      transformHint: "JavaScript that post-processes the finished output. Define a function named transform(text, vars) and return the string to display. vars carries the same environment variables as prompt templates: selected_text, context, page_url, page_title, date, ui_language. If the script fails, the original output is shown unchanged. Do not declare args or module at the top level — the host reserves those names. It runs in a throwaway sandbox with no access to extension APIs, but it can still reach the network — only run scripts you trust."
       transformPlaceholder: "function transform(text, vars) {\n  return text.trim();\n}"
     ball:
       label: "Floating ball"

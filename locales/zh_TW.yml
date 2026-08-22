@@ -89,7 +89,7 @@ pageActions:
     error: "出錯了，請重試。"
     close: "關閉"
     continue: "在側邊欄繼續"
-    # $1 = 指令稿抛出的錯誤
+    # $1 = 指令稿拋出的錯誤
     transformFailed: "後處理指令稿執行失敗，顯示原始輸出——$1"
     empty: "沒有輸出。"
 
@@ -187,7 +187,7 @@ settings:
       promptPlaceholder: "例如：擷取 $1 中的要點，並用 $2 回覆。"
       pages: "生效範圍"
       transform: "輸出後處理指令稿（選填）"
-      transformHint: "對產生完畢的輸出做加工的 JavaScript。定義一個名為 transform(text, vars) 的函式，回傳要顯示的字串。vars 與提示詞模板同一套環境變數：selected_text、context、page_url、page_title、date、ui_language。指令稿出錯時原樣顯示原始輸出。指令稿在一次性沙箱中執行、拿不到擴充功能 API，但仍能存取網路——只執行你信得過的指令稿。"
+      transformHint: "對產生完畢的輸出做加工的 JavaScript。定義一個名為 transform(text, vars) 的函式，回傳要顯示的字串。vars 與提示詞模板同一套環境變數：selected_text、context、page_url、page_title、date、ui_language。指令稿出錯時原樣顯示原始輸出。指令稿頂層不要宣告 args 與 module——這兩個名字由宿主保留。指令稿在一次性沙箱中執行、拿不到擴充功能 API，但仍能存取網路——只執行你信得過的指令稿。"
       transformPlaceholder: "function transform(text, vars) {\n  return text.trim();\n}"
     ball:
       label: "懸浮球"

@@ -51,35 +51,39 @@ function builtinParams(actionId: PageActionId, settings: PageInteractionSettings
 }
 
 /**
- * 自定义动作的模板变量：环境常量在此补齐（date / ui_language），页面侧的
- * selected_text / context / page_url / page_title 由内容脚本随请求带上。
+ * 环境变量：运行时能读到的事实。页面侧的 selected_text / context / page_url /
+ * page_title 由内容脚本随请求带上，date / ui_language 在此补齐。
+ *
+ * 自定义动作的提示词模板与所有动作的脚本钩子**共用同一套**，与动作是内置还是自定义
+ * 无关——同一个 `vars` 在哪儿都得是同一个意思。内置动作渲染提示词用的 target / lang
+ * 是「设置解析出来的参数」，不属于环境变量，故刻意不混进来（脚本不透传设置项）。
  *
  * `ui_language` 给的是**英文语言名**而非 BCP-47 代码——与内置动作给模型的说法一致，
  * 且 "Reply in Chinese" 比 "Reply in zh-CN" 对模型稳当。
  */
-function templateParams(request: PageActionRequest): PageActionParams {
-  return {
+function envVars(request: PageActionRequest): Record<string, string> {
+  return stringParams({
     ...request.params,
     selected_text: request.text,
     date: new Date().toLocaleDateString(),
     ui_language: languageName(chrome.i18n.getUILanguage()),
-  };
+  });
 }
 
-/** 一次动作执行要用的参数：内置走设置解析，自定义走模板变量。 */
+/** 一次动作执行要用的提示词渲染参数：内置走设置解析，自定义直接用环境变量。 */
 function resolveParams(
   action: ResolvedPageAction,
-  request: PageActionRequest,
+  vars: Record<string, string>,
   settings: PageInteractionSettings,
 ): PageActionParams {
   if (action.kind === 'builtin') {
-    const contextParam = typeof request.params.context === 'string' ? request.params.context : '';
+    const contextParam = vars.context ?? '';
     return {
       ...builtinParams(action.id, settings),
       ...(contextParam ? { context: contextParam } : {}),
     };
   }
-  return templateParams(request);
+  return vars;
 }
 
 /** 取一个已解析动作；id 查不到定义就诚实报错（内容脚本可能带来陈旧 / 伪造的 id）。 */
@@ -123,7 +127,10 @@ export async function runPageActionStream(
 ): Promise<PageActionOutcome> {
   const action = await loadAction(request.actionId);
   const settings = resolvePageInteractionSettings(await pageInteractionSettings.getValue());
-  const params = resolveParams(action, request, settings);
+  // 环境变量一次动作只取一份快照：提示词渲染与后处理脚本共用它，免得两处各算一次
+  // （`date` 在跨午夜那一刻会不一致）。
+  const vars = envVars(request);
+  const params = resolveParams(action, vars, settings);
   const { model, apiKey } = await resolveActionModel(settings);
 
   const events = stream(
@@ -157,7 +164,8 @@ export async function runPageActionStream(
   // 取消后不必再跑脚本（卡片已经关了）。
   if (handlers.signal.aborted) return {};
   try {
-    return { transformed: await runTransform(action.transform, output, stringParams(params)) };
+    // 脚本拿的是环境变量，不是提示词渲染参数——内置动作也一样，故传 vars 而不是 params。
+    return { transformed: await runTransform(action.transform, output, vars) };
   } catch (err) {
     console.warn('[page-actions] transform failed:', err);
     return { transformError: (err as Error).message };

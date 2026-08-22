@@ -128,7 +128,7 @@ export interface ResolvedPageAction {
   enabled: boolean;
   /** 页面生效范围（已归一：两个列表都在，空 include = 所有页面）。 */
   pages: PageScope;
-  /** 输出后处理脚本（函数体）；缺省 = 不做后处理。 */
+  /** 输出后处理脚本（完整的 `transform(text, vars)` 函数）；缺省 = 不做后处理。 */
   transform?: string;
   /** LLM 的 system 提示词（含动作指令）。 */
   renderSystemPrompt(params: PageActionParams): string;

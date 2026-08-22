@@ -68,7 +68,7 @@ const fadeInStyle: CSSProperties = {
   animation: 'cebian-fade-in 0.18s ease-out',
 };
 
-// 后处理失败的提示：展示已降级为原始输出，这行只说明「脚本没跑成」。
+// 后处理失败的提示：展示已降级为原始输出，这行带上失败原因（可能折行）供用户排查。
 const transformErrorStyle: CSSProperties = {
   marginTop: 8,
   paddingTop: 6,
@@ -98,6 +98,12 @@ const iconBtnStyle: CSSProperties = {
   fontSize: 12,
   cursor: 'pointer',
 };
+
+/** 截断过长文本（脚本抛出的错误可能很长，卡片里放不下）。 */
+function truncate(text: string, max: number): string {
+  const one = text.replace(/\s+/g, ' ').trim();
+  return one.length > max ? `${one.slice(0, max)}…` : one;
+}
 
 function HeaderIcon({ status }: { status: Status }) {
   if (status === 'streaming') {
@@ -129,7 +135,9 @@ export function ResultCard({ actionId, title, text, vars, anchorRect, onClose }:
   // 后处理脚本的产物：非 null 即替换展示与复制内容（原始输出仍用于「在侧边栏继续」，
   // 那是模型真正说过的话，固化成历史才不会错位）。
   const [transformed, setTransformed] = useState<string | null>(null);
-  const [transformFailed, setTransformFailed] = useState(false);
+  // 后处理脚本的失败原因。脚本是用户自己写的，看不到 "xxx is not a function" 这类消息
+  // 基本没法调试，故如实显示（截断）而不是只给一句笼统提示。
+  const [transformError, setTransformError] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>('streaming');
   const [copied, setCopied] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -154,9 +162,9 @@ export function ResultCard({ actionId, title, text, vars, anchorRect, onClose }:
           acc += delta;
           setContent(acc);
         },
-        onDone: ({ transformed: out, transformError }) => {
+        onDone: ({ transformed: out, transformError: failure }) => {
           if (out !== undefined) setTransformed(out);
-          if (transformError !== undefined) setTransformFailed(true);
+          if (failure !== undefined) setTransformError(failure);
           setStatus('done');
         },
         onError: () => setStatus((s) => (s === 'streaming' ? 'error' : s)),
@@ -313,8 +321,10 @@ export function ResultCard({ actionId, title, text, vars, anchorRect, onClose }:
         ) : (
           <span style={{ color: '#8a8d9b' }}>{t('pageActions.result.empty')}</span>
         )}
-        {transformFailed && (
-          <div style={transformErrorStyle}>{t('pageActions.result.transformFailed')}</div>
+        {transformError !== null && (
+          <div style={transformErrorStyle}>
+            {t('pageActions.result.transformFailed', [truncate(transformError, 200)])}
+          </div>
         )}
       </div>
 

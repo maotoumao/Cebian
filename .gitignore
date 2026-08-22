@@ -9,6 +9,8 @@ lerna-debug.log*
 
 node_modules
 .output
+# pnpm 的本地 store（某些环境会落在仓库根，不该入库）
+.pnpm-store/
 stats.html
 stats-*.json
 .wxt
