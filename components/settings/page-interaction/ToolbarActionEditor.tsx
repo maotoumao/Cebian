@@ -1,12 +1,12 @@
 import { useId, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CodeMirrorEditor } from '@/components/editor/CodeMirrorEditor';
 import { PageScopeEditor } from './PageScopeEditor';
-import { TranslateTargetSelector } from './TranslateTargetSelector';
 import { useIsDark } from '@/hooks/useIsDark';
+import { resetBuiltinActionDraft } from '@/lib/page-actions/edit-config';
 import type { PageActionDraft } from '@/lib/page-actions/types';
 import { t } from '@/lib/i18n';
 
@@ -28,13 +28,12 @@ interface ToolbarActionEditorProps {
  *
  * 后处理脚本写的是完整的 `transform(text, vars)` 函数（宿主按名字查到并调用），不是函数体。
  *
- * 内置动作只暴露外观 / 生效范围（名称、页面规则、后处理脚本），**不展示提示词**
- * ——它定义在代码里且不可改，展示出来只会让人以为能改。个别内置动作有自己的专属参数
- * （目前只有「翻译」的目标语言），按 `draft` 上有没有对应字段决定是否渲染——为一个字段
- * 建通用的参数描述符体系是过度设计。
+ * 内置与自定义动作共用同一组字段。内置动作的 prompt 草稿会装入本地化默认值；用户清空
+ * 后保存即删除覆盖值，下次打开仍显示当前语言的默认 prompt。
  */
 export function ToolbarActionEditor({ initial, onSave, saving, onBack }: ToolbarActionEditorProps) {
   const [draft, setDraft] = useState<PageActionDraft>(initial);
+  const [promptEditorKey, setPromptEditorKey] = useState(0);
   const isDark = useIsDark();
   const promptLabelId = useId();
   const transformLabelId = useId();
@@ -42,6 +41,12 @@ export function ToolbarActionEditor({ initial, onSave, saving, onBack }: Toolbar
   const isBuiltin = draft.kind === 'builtin';
   // 自定义动作至少要有名字和提示词才存得住；内置动作随时可存（全空即回到默认）。
   const canSave = isBuiltin || (draft.label.trim().length > 0 && draft.systemPrompt.trim().length > 0);
+
+  const resetBuiltin = () => {
+    setDraft(resetBuiltinActionDraft(draft));
+    // CodeMirror 的外部 value 同步会触发 onChange；重建实例可避免把程序化重置标成用户覆盖
+    setPromptEditorKey((key) => key + 1);
+  };
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-6 space-y-5">
@@ -71,60 +76,40 @@ export function ToolbarActionEditor({ initial, onSave, saving, onBack }: Toolbar
           id="action-label"
           value={draft.label}
           onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-          placeholder={
-            isBuiltin
-              ? t('settings.pageInteraction.actions.labelFollowLocale')
-              : t('settings.pageInteraction.actions.labelPlaceholder')
-          }
+          placeholder={t('settings.pageInteraction.actions.labelPlaceholder')}
+          disabled={isBuiltin}
         />
-        {isBuiltin && (
-          <p className="text-xs text-muted-foreground">
-            {t('settings.pageInteraction.actions.labelBuiltinHint')}
-          </p>
-        )}
       </div>
 
-      {!isBuiltin && (
-        <div className="space-y-1.5">
-          <Label id={promptLabelId} className="text-sm">
-            {t('settings.pageInteraction.actions.prompt')}
-          </Label>
-          <p className="text-xs text-muted-foreground">
-            {t('settings.pageInteraction.actions.promptHint', ['{{'])}
-          </p>
-          <div className="h-56 overflow-hidden rounded-md border border-border">
-            <CodeMirrorEditor
-              value={draft.systemPrompt}
-              onChange={(value) => setDraft({ ...draft, systemPrompt: value })}
-              language="markdown"
-              isDark={isDark}
-              templateVarScene="pageAction"
-              labelledBy={promptLabelId}
-              placeholder={t('settings.pageInteraction.actions.promptPlaceholder', [
-                '{{selected_text}}',
-                '{{ui_language}}',
-              ])}
-            />
-          </div>
+      <div className="space-y-1.5">
+        <Label id={promptLabelId} className="text-sm">
+          {t('settings.pageInteraction.actions.prompt')}
+        </Label>
+        <p className="text-xs text-muted-foreground">
+          {t('settings.pageInteraction.actions.promptHint', ['{{'])}
+        </p>
+        <div className="h-56 overflow-hidden rounded-md border border-border">
+          <CodeMirrorEditor
+            key={promptEditorKey}
+            value={draft.systemPrompt}
+            onChange={(value) =>
+              setDraft({
+                ...draft,
+                systemPrompt: value,
+                systemPromptOverridden: isBuiltin || undefined,
+              })
+            }
+            language="markdown"
+            isDark={isDark}
+            templateVarScene="pageAction"
+            labelledBy={promptLabelId}
+            placeholder={t('settings.pageInteraction.actions.promptPlaceholder', [
+              '{{selected_text}}',
+              '{{ui_language}}',
+            ])}
+          />
         </div>
-      )}
-
-      {draft.translateTarget !== undefined && (
-        <div className="flex items-center justify-between gap-4">
-          <div className="min-w-0 space-y-1">
-            <Label className="text-sm">{t('settings.pageInteraction.translate.label')}</Label>
-            <p className="text-xs text-muted-foreground">
-              {t('settings.pageInteraction.translate.hint')}
-            </p>
-          </div>
-          <div className="shrink-0">
-            <TranslateTargetSelector
-              value={draft.translateTarget}
-              onSelect={(target) => setDraft({ ...draft, translateTarget: target })}
-            />
-          </div>
-        </div>
-      )}
+      </div>
 
       <div className="space-y-1.5">
         <Label className="text-sm">{t('settings.pageInteraction.actions.pages')}</Label>
@@ -153,18 +138,28 @@ export function ToolbarActionEditor({ initial, onSave, saving, onBack }: Toolbar
         </div>
       </div>
 
-      <div className="flex justify-end gap-2 pb-2">
-        <Button type="button" variant="ghost" size="sm" onClick={onBack}>
-          {t('common.cancel')}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          disabled={!canSave || saving}
-          onClick={() => onSave(draft)}
-        >
-          {t('common.save')}
-        </Button>
+      <div className="flex items-center justify-between gap-2 pb-2">
+        {isBuiltin ? (
+          <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={resetBuiltin}>
+            <RotateCcw className="size-4" />
+            {t('common.reset')}
+          </Button>
+        ) : (
+          <span />
+        )}
+        <div className="flex gap-2">
+          <Button type="button" variant="ghost" size="sm" onClick={onBack}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            disabled={!canSave || saving}
+            onClick={() => onSave(draft)}
+          >
+            {t('common.save')}
+          </Button>
+        </div>
       </div>
     </div>
   );

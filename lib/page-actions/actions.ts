@@ -1,9 +1,7 @@
 // 划词动作的定义注册表 + 纯渲染函数（domain content，随概念走）。
 //
-// 数据驱动：每个动作是一条 PageActionDef，用 id 索引；renderSystemPrompt /
-// renderUserIntent 是无平台依赖的纯函数，内联短暂调用与（后续）会话固化共用同一
-// 渲染源，保证「怎么问」单一事实源、零漂移。动作指令（如「只输出译文」）放 system
-// prompt，user turn 只放干净意图，便于将来固化进历史时读起来自然。
+// 数据驱动：每个内置动作只登记缺省按钮文本与缺省 system prompt。配置解析后，内置与
+// 自定义动作共用同一个模板渲染器；user turn 都只放选中文本。
 
 import { t } from '@/lib/i18n';
 import { replaceTemplateVars } from '@/lib/ai-config/template';
@@ -19,81 +17,35 @@ import {
 } from './types';
 
 /** 渲染用参数（已由 background 解析成具体值，如目标语言名）。 */
-export type PageActionParams = Record<string, unknown>;
+type PageActionParams = Record<string, unknown>;
 
 interface PageActionDef {
   id: PageActionId;
   /** 缺省按钮文本（内置动作跟随界面语言；用户 overlay 可覆盖）。 */
   getLabel(): string;
-  /** LLM 的 system 提示词（含动作指令）。 */
-  renderSystemPrompt(params: PageActionParams): string;
-  /** 干净的用户意图（作为 user turn；将来固化进历史也用它）。 */
-  renderUserIntent(text: string, params: PageActionParams): string;
-}
-
-function str(params: PageActionParams, key: string, fallback: string): string {
-  const v = params[key];
-  return typeof v === 'string' && v ? v : fallback;
-}
-
-/** 若带有界上下文（页面标题 + 选区周边），拼成一段「仅供消歧的参考」附在 system 末尾。
- *  只进 system、不进 user turn，故「在侧边栏继续」固化的历史里 user 消息仍是干净意图。 */
-function contextBlock(params: PageActionParams): string {
-  const ctx = str(params, 'context', '');
-  if (!ctx) return '';
-  return (
-    '\n\nFor reference only, here is surrounding context from the page. ' +
-    'Use it to disambiguate; do NOT translate, explain, or summarize the context itself:\n' +
-    ctx
-  );
+  /** 本地化的缺省 system 提示词模板。 */
+  getSystemPrompt(): string;
 }
 
 const TRANSLATE: PageActionDef = {
   id: 'translate',
   getLabel: () => t('pageActions.toolbar.translate'),
-  renderSystemPrompt: (p) => {
-    const target = str(p, 'target', 'English');
-    return (
-      `You are a professional translator. Translate the user's text into ${target}. ` +
-      'Preserve the original meaning and tone. ' +
-      'Output only the translated text as plain text — no markdown, explanations, notes, or surrounding quotes.' +
-      contextBlock(p)
-    );
-  },
-  renderUserIntent: (text, p) => {
-    const target = str(p, 'target', 'English');
-    return `Translate into ${target}:\n\n${text}`;
-  },
+  getSystemPrompt: () =>
+    t('pageActions.prompts.translate', ['{{ui_language}}', '{{context}}']),
 };
 
 const EXPLAIN: PageActionDef = {
   id: 'explain',
   getLabel: () => t('pageActions.toolbar.explain'),
-  renderSystemPrompt: (p) => {
-    const lang = str(p, 'lang', "the user's language");
-    return (
-      `You are a helpful assistant. Explain the user's selected text clearly and concisely ` +
-      `in ${lang}. Cover what it means and any important context a reader would want. ` +
-      'Keep it brief. Reply in plain prose without markdown formatting.' +
-      contextBlock(p)
-    );
-  },
-  renderUserIntent: (text) => `Explain:\n\n${text}`,
+  getSystemPrompt: () =>
+    t('pageActions.prompts.explain', ['{{ui_language}}', '{{context}}']),
 };
 
 const SUMMARIZE: PageActionDef = {
   id: 'summarize',
   getLabel: () => t('pageActions.toolbar.summarize'),
-  renderSystemPrompt: (p) => {
-    const lang = str(p, 'lang', "the user's language");
-    return (
-      `You are a helpful assistant. Summarize the user's selected text in ${lang}, ` +
-      'capturing the key points concisely. ' +
-      'Reply in plain prose (short sentences or a compact list is fine) without markdown formatting.' +
-      contextBlock(p)
-    );
-  },
-  renderUserIntent: (text) => `Summarize:\n\n${text}`,
+  getSystemPrompt: () =>
+    t('pageActions.prompts.summarize', ['{{ui_language}}', '{{context}}']),
 };
 
 // `satisfies Record<BuiltinPageActionId, …>` 保持穷尽：新增内置 id 忘了登记会编译失败。
@@ -110,6 +62,16 @@ function getBuiltinAction(id: string): PageActionDef | undefined {
   return Object.hasOwn(REGISTRY, id)
     ? (REGISTRY as Record<string, PageActionDef>)[id]
     : undefined;
+}
+
+/** 取内置动作当前语言的缺省 system 提示词 */
+function getBuiltinDefaultSystemPrompt(id: BuiltinPageActionId): string {
+  return REGISTRY[id].getSystemPrompt();
+}
+
+/** 取内置动作当前语言的缺省按钮文本 */
+function getBuiltinDefaultLabel(id: BuiltinPageActionId): string {
+  return REGISTRY[id].getLabel();
 }
 
 // ─── 生效动作的解析（配置 + 当前页 → 实际可用的动作） ───
@@ -132,8 +94,6 @@ export interface ResolvedPageAction {
   transform?: string;
   /** LLM 的 system 提示词（含动作指令）。 */
   renderSystemPrompt(params: PageActionParams): string;
-  /** 干净的用户意图（作为 user turn；固化进历史也用它）。 */
-  renderUserIntent(text: string, params: PageActionParams): string;
 }
 
 /** 自定义动作 → 已解析形状：用户模板即 system 提示词，user turn 仍是干净的选中文本。 */
@@ -144,30 +104,33 @@ function resolveCustom(action: CustomPageAction): ResolvedPageAction {
     label: action.label,
     enabled: action.enabled !== false,
     pages: resolvePageScope(action.pages),
-    renderSystemPrompt: (params) =>
-      replaceTemplateVars(action.systemPrompt, stringParams(params)),
-    renderUserIntent: (text) => text,
+    renderSystemPrompt: renderSystemPrompt(action.systemPrompt),
     ...(action.transform ? { transform: action.transform } : {}),
   };
 }
 
-/** 内置动作 + 用户 overlay → 已解析形状（overlay 只动外观 / 生效范围，不动提示词）。 */
+/** 内置动作 + 用户 overlay → 已解析形状；prompt 未覆盖时回落当前语言的缺省模板。 */
 function resolveBuiltin(def: PageActionDef, config: PageActionsConfig): ResolvedPageAction {
   const overlay = Object.hasOwn(config.builtin, def.id)
     ? config.builtin[def.id as BuiltinPageActionId]
     : undefined;
-  const label = overlay?.label?.trim();
+  const systemPrompt = overlay?.systemPrompt?.trim()
+    ? overlay.systemPrompt
+    : def.getSystemPrompt();
   return {
     id: def.id,
     kind: 'builtin',
-    renderSystemPrompt: def.renderSystemPrompt,
-    renderUserIntent: def.renderUserIntent,
-    // 用户没起名（或清空了）就回落到跟随界面语言的内置文案。
-    label: label || def.getLabel(),
+    renderSystemPrompt: renderSystemPrompt(systemPrompt),
+    label: def.getLabel(),
     enabled: overlay?.enabled !== false,
     pages: resolvePageScope(overlay?.pages),
     ...(overlay?.transform ? { transform: overlay.transform } : {}),
   };
+}
+
+/** system prompt 模板统一渲染入口：内置与自定义动作共用。 */
+function renderSystemPrompt(template: string): (params: PageActionParams) => string {
+  return (params) => replaceTemplateVars(template, stringParams(params));
 }
 
 /** 只保留参数里的字符串值：模板替换与后处理脚本都只吃字符串，非字符串项（不该有）
@@ -258,3 +221,5 @@ export function visibleToolbarActions(
 ): ResolvedPageAction[] {
   return listPageActions(config).filter((a) => a.enabled && matchesPageScope(url, a.pages));
 }
+
+export { getBuiltinDefaultLabel, getBuiltinDefaultSystemPrompt };

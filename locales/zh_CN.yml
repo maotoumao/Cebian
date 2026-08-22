@@ -25,6 +25,7 @@ common:
   cancel: "取消"
   confirm: "确认"
   save: "保存"
+  reset: "重置"
   delete: "删除"
   rename: "重命名"
   edit: "编辑"
@@ -84,6 +85,13 @@ pageActions:
     explain: "解释"
     translate: "翻译"
     summarize: "总结"
+  prompts:
+    # $1 = {{ui_language}}，$2 = {{context}}
+    explain: "用$1清晰、简洁地解释用户提供的文本，说明其含义以及读者需要了解的重要背景。回答应简短，使用纯文本，不使用 Markdown。以下页面上下文仅用于消歧，不要把它当作选中文本的一部分进行解释：\n\n$2"
+    # $1 = {{ui_language}}，$2 = {{context}}
+    translate: "将用户提供的文本翻译为$1，保留原意和语气。只输出翻译后的纯文本，不使用 Markdown，不添加解释、注释或引号。以下页面上下文仅用于消歧，不要把它当作选中文本的一部分进行翻译：\n\n$2"
+    # $1 = {{ui_language}}，$2 = {{context}}
+    summarize: "用$1简洁地总结用户提供的文本，保留关键要点。使用纯文本或紧凑列表，不使用 Markdown。以下页面上下文仅用于消歧，不要把它当作选中文本的一部分进行总结：\n\n$2"
   result:
     loading: "思考中…"
     error: "出错了，请重试。"
@@ -161,19 +169,21 @@ settings:
       remove: "移除规则 $1"
     actions:
       title: "工具条操作"
-      hint: "操作按此顺序显示。内置操作可改名、设置生效范围或关闭，也可以添加自定义操作。"
+      hint: "操作按此顺序显示。内置操作可自定义系统提示词、设置生效范围或关闭，也可以添加带自定义名称和提示词的操作。"
       builtin: "内置"
       custom: "自定义"
       pageScoped: "限定页面"
       create: "新建操作"
       # $1 = 动作名称
-      moveUp: "上移 $1"
+      more: "「$1」的更多操作"
       # $1 = 动作名称
-      moveDown: "下移 $1"
+      moveUp: "上移「$1」"
       # $1 = 动作名称
-      delete: "删除 $1"
+      moveDown: "下移「$1」"
       # $1 = 动作名称
-      edit: "编辑 $1"
+      delete: "删除「$1」"
+      # $1 = 动作名称
+      edit: "编辑「$1」"
       deleteConfirmTitle: "删除这个操作？"
       # $1 = 动作名称
       deleteConfirmDescription: "删除“$1”后无法恢复。"
@@ -181,8 +191,6 @@ settings:
       editCustom: "自定义操作"
       label: "按钮文本"
       labelPlaceholder: "例如：提取要点"
-      labelFollowLocale: "跟随界面语言"
-      labelBuiltinHint: "留空则跟随界面语言。"
       prompt: "系统提示词"
       # $1 = 变量自动完成的触发字符（“{{”）
       promptHint: "告诉模型如何处理选中文本。输入 $1 可插入变量。"
@@ -202,10 +210,6 @@ settings:
       label: "工具条模型"
       hint: "划词工具条使用的模型。通常选择速度快、成本低的模型即可，默认与对话模型相同。"
       followMain: "与对话模型相同"
-    translate:
-      label: "翻译目标语言"
-      hint: "翻译结果使用的语言。"
-      auto: "跟随界面语言"
   instructions:
     title: "指引"
     label: "自定义指引"

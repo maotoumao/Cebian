@@ -163,7 +163,7 @@ export function CodeMirrorEditor({
   }, [value]);
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative h-full min-h-0 ${className}`}>
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
           <Spinner className="size-5" />
@@ -171,7 +171,7 @@ export function CodeMirrorEditor({
       )}
       <div
         ref={containerRef}
-        className="min-h-[200px] h-full [&_.cm-editor]:h-full [&_.cm-scroller]:overflow-auto text-[13px]"
+        className="h-full min-h-0 [&_.cm-editor]:h-full [&_.cm-editor]:min-h-0 [&_.cm-scroller]:overflow-auto text-[13px]"
       />
     </div>
   );

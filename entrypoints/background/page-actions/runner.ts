@@ -26,7 +26,6 @@ import {
 import {
   findPageAction,
   stringParams,
-  type PageActionParams,
   type ResolvedPageAction,
 } from '@/lib/page-actions/actions';
 import type {
@@ -39,24 +38,8 @@ import { sessionStore } from '../chat/session-store';
 import { runTransform } from './transform';
 
 /**
- * 内置动作的渲染参数：翻译目标语言（空 = 跟随界面语言）、解释 / 总结的回复语言（界面
- * 语言）。这些参数来自设置，故在 background 解析（内容脚本只传页面侧素材）。
- */
-function builtinParams(actionId: PageActionId, settings: PageInteractionSettings): PageActionParams {
-  const uiLang = chrome.i18n.getUILanguage();
-  if (actionId === 'translate') {
-    return { target: languageName(settings.translateTarget || uiLang) };
-  }
-  return { lang: languageName(uiLang) };
-}
-
-/**
  * 环境变量：运行时能读到的事实。页面侧的 selected_text / context / page_url /
  * page_title 由内容脚本随请求带上，date / ui_language 在此补齐。
- *
- * 自定义动作的提示词模板与所有动作的脚本钩子**共用同一套**，与动作是内置还是自定义
- * 无关——同一个 `vars` 在哪儿都得是同一个意思。内置动作渲染提示词用的 target / lang
- * 是「设置解析出来的参数」，不属于环境变量，故刻意不混进来（脚本不透传设置项）。
  *
  * `ui_language` 给的是**英文语言名**而非 BCP-47 代码——与内置动作给模型的说法一致，
  * 且 "Reply in Chinese" 比 "Reply in zh-CN" 对模型稳当。
@@ -68,22 +51,6 @@ function envVars(request: PageActionRequest): Record<string, string> {
     date: new Date().toLocaleDateString(),
     ui_language: languageName(chrome.i18n.getUILanguage()),
   });
-}
-
-/** 一次动作执行要用的提示词渲染参数：内置走设置解析，自定义直接用环境变量。 */
-function resolveParams(
-  action: ResolvedPageAction,
-  vars: Record<string, string>,
-  settings: PageInteractionSettings,
-): PageActionParams {
-  if (action.kind === 'builtin') {
-    const contextParam = vars.context ?? '';
-    return {
-      ...builtinParams(action.id, settings),
-      ...(contextParam ? { context: contextParam } : {}),
-    };
-  }
-  return vars;
 }
 
 /** 取一个已解析动作；id 查不到定义就诚实报错（内容脚本可能带来陈旧 / 伪造的 id）。 */
@@ -130,17 +97,16 @@ export async function runPageActionStream(
   // 环境变量一次动作只取一份快照：提示词渲染与后处理脚本共用它，免得两处各算一次
   // （`date` 在跨午夜那一刻会不一致）。
   const vars = envVars(request);
-  const params = resolveParams(action, vars, settings);
   const { model, apiKey } = await resolveActionModel(settings);
 
   const events = stream(
     model,
     {
-      systemPrompt: action.renderSystemPrompt(params),
+      systemPrompt: action.renderSystemPrompt(vars),
       messages: [
         {
           role: 'user',
-          content: action.renderUserIntent(request.text, params),
+          content: request.text,
           timestamp: Date.now(),
         },
       ],
@@ -164,7 +130,7 @@ export async function runPageActionStream(
   // 取消后不必再跑脚本（卡片已经关了）。
   if (handlers.signal.aborted) return {};
   try {
-    // 脚本拿的是环境变量，不是提示词渲染参数——内置动作也一样，故传 vars 而不是 params。
+    // 提示词与脚本共用同一份环境变量快照。
     return { transformed: await runTransform(action.transform, output, vars) };
   } catch (err) {
     console.warn('[page-actions] transform failed:', err);
@@ -202,10 +168,8 @@ export async function materializeHandoff(
   },
   windowId: number,
 ): Promise<void> {
-  const action = await loadAction(req.actionId);
+  await loadAction(req.actionId);
   const settings = resolvePageInteractionSettings(await pageInteractionSettings.getValue());
-  // 固化历史只需要 user turn，自定义动作的 user turn 就是原文，与模板变量无关。
-  const params = action.kind === 'builtin' ? builtinParams(action.id, settings) : {};
 
   const [creds, customProvs, globalModel] = await Promise.all([
     providerCredentials.getValue(),
@@ -224,7 +188,7 @@ export async function materializeHandoff(
   const now = Date.now();
   const userMsg: UserMessage = {
     role: 'user',
-    content: action.renderUserIntent(req.text, params),
+    content: req.text,
     timestamp: now,
   };
   const assistantMsg: AssistantMessage = {

@@ -24,24 +24,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - AI 回复中的 LaTeX 数学公式现在渲染为真正的公式（支持行内 `$...$`、`\(...\)` 与块级 `$$...$$`、`\[...\]`），深浅色主题下均清晰可读；块级公式悬停可复制 LaTeX 源码；朗读时公式读作其 LaTeX 源码，货币金额（如 $5）不会被误认成公式 ([#61](https://github.com/maotoumao/Cebian/issues/61))
 - 悬浮球、划词工具条与每个工具条动作现在都能限定生效页面：在「设置 → 页面交互」里各自配置「仅在这些页面生效」与「但排除这些页面」（Chrome match pattern，如 `*://*.example.com/*`；留空即所有页面，排除优先）
 - 页面匹配规则说明新增「查看配置规则」入口，可直接打开 MDN 的完整语法文档
-- 划词工具条的动作现在可以自己配置：内置的解释 / 翻译 / 总结可改按钮文本、限定生效页面、调整顺序或关掉；也可以新建自己的动作，用 `{{selected_text}}` 等变量写提示词模板（可用变量：选中文本、选区周边文本、页面 URL、页面标题、当前日期、界面语言）。翻译的目标语言也收进了「翻译」这个动作自己的设置里
+- 划词工具条的动作现在可以自己配置：内置的解释 / 翻译 / 总结可改系统提示词、限定生效页面、调整顺序或关掉；内置提示词会按界面语言提供默认内容，未覆盖时自动回落，编辑页中的设置也可一键重置。也可以新建自己的动作，自定义按钮名称，并用 `{{selected_text}}` 等变量写提示词模板（可用变量：选中文本、选区周边文本、页面 URL、页面标题、当前日期、界面语言）。动作列表集中展示名称、范围与启用状态，排序和删除等低频操作收在「更多操作」菜单
 - 划词动作支持输出后处理脚本：写一个 `transform(text, vars)` 函数对 AI 的输出做加工，返回要显示的字符串；`vars` 与提示词模板同一套环境变量。脚本在一次性沙箱中执行——拿不到任何浏览器扩展 API，跑完或超时（5 秒）即销毁，不会影响其它功能；脚本出错时原样显示原始输出并附上错误原因，方便排查。脚本仍能访问网络，故只运行你自己信得过的脚本
 
 - Added a Firefox Add-ons store link to the website homepage and installation guide
 - LaTeX math in AI responses now renders as real formulas (inline `$...$` / `\(...\)` and block `$$...$$` / `\[...\]`), clearly readable in both light and dark themes; hover a block formula to copy its LaTeX source; read-aloud speaks the LaTeX source, and currency amounts (e.g. $5) are no longer mistaken for math ([#61](https://github.com/maotoumao/Cebian/issues/61))
 - The floating ball, the selection toolbar and every toolbar action can now be scoped to specific pages: each has its own "show only on these pages" and "except on these pages" lists under Settings → Page interaction (Chrome match patterns such as `*://*.example.com/*`; empty means every page, and exceptions win)
 - Page match-pattern guidance now includes a "View configuration rules" link to the full MDN syntax documentation
-- Selection toolbar actions are now configurable: rename the built-in Explain / Translate / Summarize buttons, scope them to certain pages, reorder them or turn them off — and add your own actions with a prompt template using variables such as `{{selected_text}}` (available: selected text, surrounding text, page URL, page title, current date, interface language). The translation target language now lives in the Translate action's own settings
+- Selection toolbar actions are now configurable: edit the system prompt for built-in Explain / Translate / Summarize actions, scope them to certain pages, reorder them or turn them off. Built-in prompts have localized defaults, fall back automatically when not overridden, and the settings shown in the editor can be reset with one click. You can also add your own actions with a custom button name and a prompt template using variables such as `{{selected_text}}` (available: selected text, surrounding text, page URL, page title, current date, interface language). The action list keeps names, scope and enabled state easy to scan while moving infrequent reorder and delete commands into a More actions menu
 - Selection actions can post-process their output with a script: define a `transform(text, vars)` function that returns the string to display, where `vars` carries the same environment variables as prompt templates. It runs in a throwaway sandbox — no access to any browser extension APIs, torn down as soon as it finishes or times out (5 s) so it cannot affect anything else; if the script fails, the original output is shown unchanged along with the reason so you can debug it. Scripts can still reach the network, so only run ones you trust
 
 ### 变更 / Changed
 
+- 移除单独的「翻译目标语言」设置；内置翻译动作默认翻译为界面语言，需要其它目标语言时可直接修改该动作的系统提示词
 - Firefox 版本现通过浏览器内置的数据同意机制声明会把用户主动提交的聊天、网页上下文、浏览活动、书签与认证信息发送给用户配置的 AI / MCP 服务，并将最低支持版本调整为 Firefox 140
 - AI 回复流式输出时改为按块增量渲染，公式与代码高亮不再随每个字符全量重渲染，长回复输出更流畅 ([#61](https://github.com/maotoumao/Cebian/issues/61))
 - AI 回复的流式更新现在按 80 毫秒窗口合并、只传输新增内容（此前每个模型输出片段都全量重发整条消息），长回复与工具调用期间的 CPU 占用大幅降低，打字机效果保持连贯
 - 技能的 `matched-url` 改用与扩展其它部分一致的 Chrome match pattern 语法（如 `https://github.com/*`），不再用 picomatch glob；旧写法仍能向 AI 传达意图，新技能建议改用新语法
 - 代码编辑器在 macOS 上的块注释快捷键改为 `Ctrl-Shift-A`，避免与使用 `Alt-A` 输入特殊字符的键盘布局冲突；整行选择与扩大语法选择现在也会按移动方向自然扩展
 
+- Removed the separate translation target language setting. The built-in Translate action now targets the interface language by default; edit its system prompt to use another language
 - The Firefox build now uses the browser's built-in data consent mechanism to disclose that user-submitted chats, page context, browsing activity, bookmarks, and authentication information are sent to user-configured AI/MCP services, and now requires Firefox 140 or later
 - Streaming responses now render incrementally block by block, so formulas and code highlighting no longer re-render on every character, making long responses smoother ([#61](https://github.com/maotoumao/Cebian/issues/61))
 - Streaming updates are now coalesced into 80 ms windows and carry only newly generated content (previously every model output chunk re-sent the entire message), greatly reducing CPU usage during long responses and tool calls while keeping the typing effect smooth

@@ -26,6 +26,7 @@ common:
   cancel: "Cancel"
   confirm: "Confirm"
   save: "Save"
+  reset: "Reset"
   delete: "Delete"
   rename: "Rename"
   edit: "Edit"
@@ -88,6 +89,13 @@ pageActions:
     explain: "Explain"
     translate: "Translate"
     summarize: "Summarize"
+  prompts:
+    # $1 = {{ui_language}}, $2 = {{context}}
+    explain: "Explain the user's text clearly and concisely in $1. Cover its meaning and any important context a reader would need. Keep the response brief and use plain prose without Markdown. The surrounding page context below is only for disambiguation; do not explain it as part of the selected text:\n\n$2"
+    # $1 = {{ui_language}}, $2 = {{context}}
+    translate: "Translate the user's text into $1 while preserving its meaning and tone. Output only the translated plain text, without Markdown, explanations, notes, or surrounding quotation marks. The surrounding page context below is only for disambiguation; do not translate it as part of the selected text:\n\n$2"
+    # $1 = {{ui_language}}, $2 = {{context}}
+    summarize: "Summarize the user's text concisely in $1, preserving its key points. Use plain prose or a compact list without Markdown. The surrounding page context below is only for disambiguation; do not summarize it as part of the selected text:\n\n$2"
   result:
     loading: "Thinking…"
     error: "Something went wrong. Please try again."
@@ -165,19 +173,21 @@ settings:
       remove: "Remove pattern $1"
     actions:
       title: "Toolbar actions"
-      hint: "Buttons appear on the toolbar in this order. Built-in actions can be renamed, scoped or turned off; add your own with a custom prompt."
+      hint: "Buttons appear on the toolbar in this order. Built-in actions can use a custom system prompt, be scoped or turned off; add your own actions with a custom name and prompt."
       builtin: "Built-in"
       custom: "Custom"
       pageScoped: "Scoped"
       create: "New action"
       # $1 = action name
-      moveUp: "Move $1 up"
+      more: "More actions for “$1”"
       # $1 = action name
-      moveDown: "Move $1 down"
+      moveUp: "Move “$1” up"
       # $1 = action name
-      delete: "Delete $1"
+      moveDown: "Move “$1” down"
       # $1 = action name
-      edit: "Edit $1"
+      delete: "Delete “$1”"
+      # $1 = action name
+      edit: "Edit “$1”"
       deleteConfirmTitle: "Delete this action?"
       # $1 = action name
       deleteConfirmDescription: "\"$1\" will be removed from the toolbar. This cannot be undone."
@@ -185,8 +195,6 @@ settings:
       editCustom: "Custom action"
       label: "Button text"
       labelPlaceholder: "e.g. Key points"
-      labelFollowLocale: "Follow interface language"
-      labelBuiltinHint: "Leave empty to follow the interface language."
       prompt: "System prompt"
       # $1 = the trigger characters for variable autocomplete ("{{")
       promptHint: "Tells the model what to do with the selected text. Type $1 to insert a variable."
@@ -206,10 +214,6 @@ settings:
       label: "Toolbar model"
       hint: "The model used by all toolbar actions. A fast, low-cost model is usually enough. Defaults to the conversation model."
       followMain: "Same as conversation model"
-    translate:
-      label: "Translation target language"
-      hint: "The language the toolbar translates into."
-      auto: "Follow interface language"
   instructions:
     title: "Instructions"
     label: "Custom instructions"

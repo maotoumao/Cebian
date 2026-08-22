@@ -18,7 +18,7 @@ import {
   customProviders as customProvidersStorage,
   type PageInteractionSettings,
 } from '@/lib/persistence/storage';
-import { listPageActions } from '@/lib/page-actions/actions';
+import { getBuiltinDefaultSystemPrompt, listPageActions } from '@/lib/page-actions/actions';
 import { resolvePageScope, type PageScope } from '@/lib/page-actions/match';
 import {
   deleteCustomAction,
@@ -51,7 +51,6 @@ function PageScopeField({
 /**
  * 页面交互设置的主面板：两块 UI 的显示开关与页面生效范围、工具条模型（复用聊天的
  * `ModelSelector`，`inheritOption` 提供「跟随主模型」）、工具条动作列表。
- * 翻译目标语言不在这里——它是「翻译」动作的专属参数，住在那个动作的编辑页。
  */
 function PageInteractionPanel({ onEditAction }: { onEditAction: (id: string) => void }) {
   const [stored, setStored] = useStorageItem(pageInteractionSettings, undefined);
@@ -169,26 +168,30 @@ function PageInteractionPanel({ onEditAction }: { onEditAction: (id: string) => 
 /** 编辑页的「新建」占位段：URL 里出现 `action/new` 表示还没落库的新动作。 */
 const NEW_ACTION_SEGMENT = 'new';
 
-/** 按 id 从配置取出可编辑草稿；动作不存在返回 null。
- *  `translateTarget` 只给内置「翻译」动作带上——它是那个动作的专属参数，值来自
- *  `pageInteractionSettings`（既有持久化 key，只搬 UI 不搬存储）。 */
-function draftFor(
-  config: PageActionsConfig,
-  actionId: string,
-  translateTarget: string,
-): PageActionDraft | null {
+/** 按 id 从配置取出可编辑草稿；动作不存在返回 null。 */
+function draftFor(config: PageActionsConfig, actionId: string): PageActionDraft | null {
   const action = listPageActions(config).find((a) => a.id === actionId);
   if (!action) return null;
+  const builtinPrompt = isBuiltinPageActionId(action.id)
+    ? config.builtin[action.id]?.systemPrompt
+    : undefined;
   return {
     id: action.id,
     kind: action.kind,
-    // 内置动作的 label 已回落成界面文案，编辑框要显示「用户到底改没改」，
-    // 故这里回读原始 overlay 值而不是解析后的显示名。
-    label: rawLabel(config, action.id, action.kind),
-    systemPrompt: config.custom.find((a) => a.id === action.id)?.systemPrompt ?? '',
+    label: action.label,
+    ...(action.kind === 'builtin'
+      ? {
+          systemPromptOverridden: Boolean(builtinPrompt?.trim()),
+        }
+      : {}),
+    systemPrompt:
+      action.kind === 'builtin' && isBuiltinPageActionId(action.id)
+        ? builtinPrompt?.trim()
+          ? builtinPrompt
+          : getBuiltinDefaultSystemPrompt(action.id)
+        : config.custom.find((a) => a.id === action.id)?.systemPrompt ?? '',
     pages: resolvePageScope(action.pages),
     transform: action.transform ?? '',
-    ...(action.id === 'translate' ? { translateTarget } : {}),
   };
 }
 
@@ -201,9 +204,6 @@ function draftFor(
  */
 function ActionEditorRoute({ actionId, onBack }: { actionId: string; onBack: () => void }) {
   const [storedActions, setStoredActions] = useStorageItem(pageActionsConfig, undefined);
-  // 翻译动作的目标语言仍存在 pageInteractionSettings（已发布的持久化 key），编辑页只是
-  // 把它的控件收拢过来，故这里也要读写那一份设置。
-  const [storedSettings, setStoredSettings] = useStorageItem(pageInteractionSettings, undefined);
   const [initial, setInitial] = useState<PageActionDraft | null>(null);
   const [gone, setGone] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -213,20 +213,18 @@ function ActionEditorRoute({ actionId, onBack }: { actionId: string; onBack: () 
     mountedRef.current = false;
   }, []);
 
-  // 两份 storage 都得等到真正加载完：任一还是 undefined 就先不建草稿。
-  const loaded = storedActions !== undefined && storedSettings !== undefined;
+  const loaded = storedActions !== undefined;
 
   useEffect(() => {
     if (!loaded || initial || gone) return;
     const config = resolvePageActionsConfig(storedActions);
-    const settings = resolvePageInteractionSettings(storedSettings);
     const draft =
       actionId === NEW_ACTION_SEGMENT
         ? newActionDraft(config)
-        : draftFor(config, actionId, settings.translateTarget);
+        : draftFor(config, actionId);
     if (draft) setInitial(draft);
     else setGone(true);
-  }, [loaded, storedActions, storedSettings, actionId, initial, gone]);
+  }, [loaded, storedActions, actionId, initial, gone]);
 
   // 动作不存在（多端删除 / 手改数据 / 陈旧链接）：回列表。导航放 effect 里做，
   // render 期调 navigate 会触发 React 的「渲染时更新另一个组件」告警。
@@ -250,15 +248,6 @@ function ActionEditorRoute({ actionId, onBack }: { actionId: string; onBack: () 
     setSaving(true);
     try {
       await setStoredActions(saveActionDraft(config, draft));
-      // 翻译目标语言是另一份 storage item，跟着同一次保存写回。
-      //
-      // 「有没有改过」拿**表单初值**比，不能拿 storedSettings 比：useStorageItem 的 setValue
-      // 是先乐观更新本地 state 再落库，若上一次落库失败，本地已是新值，再比就会得出「没改」
-      // 而跳过写入——用户看到保存成功，storage 里还是旧值。
-      if (draft.translateTarget !== undefined && draft.translateTarget !== initial.translateTarget) {
-        const settings = resolvePageInteractionSettings(storedSettings);
-        await setStoredSettings({ ...settings, translateTarget: draft.translateTarget });
-      }
       if (mountedRef.current) onBack();
     } catch (err) {
       // 写入失败就留在编辑页，别把用户刚填的内容随卸载一起丢掉。
@@ -272,12 +261,6 @@ function ActionEditorRoute({ actionId, onBack }: { actionId: string; onBack: () 
   return (
     <ToolbarActionEditor initial={initial} saving={saving} onSave={handleSave} onBack={onBack} />
   );
-}
-
-/** 取用户为某动作显式设置过的名字（没设置就是空串——编辑框留空即「跟随界面语言」）。 */
-function rawLabel(config: PageActionsConfig, id: string, kind: 'builtin' | 'custom'): string {
-  if (kind === 'custom') return config.custom.find((a) => a.id === id)?.label ?? '';
-  return isBuiltinPageActionId(id) ? config.builtin[id]?.label ?? '' : '';
 }
 
 /**

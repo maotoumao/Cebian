@@ -286,8 +286,6 @@ export const memoryOrganizeState = storage.defineItem<MemoryOrganizeState>(
  * 翻译）。两块 UI 各有显示开关；工具条的 AI 单独配置，缺省回退对话主模型。
  *
  * `toolbarModel` 缺省（undefined）= 跟随主模型，语义同压缩模型的「跟随对话模型」。
- * `translateTarget` 是翻译目标语言的 BCP-47 代码；空串 = 跟随界面语言（读取时由调用
- * 方解析成具体语言），语义同「自动」。
  */
 export interface PageInteractionSettings {
   /** 悬浮球显示开关。默认 true */
@@ -296,8 +294,6 @@ export interface PageInteractionSettings {
   showSelectionToolbar: boolean;
   /** 工具条专用模型；缺省回退主模型 */
   toolbarModel?: ModelIdentity;
-  /** 翻译目标语言 BCP-47 代码；空串 = 跟随界面语言 */
-  translateTarget: string;
   /** 悬浮球的页面生效范围（include 空 = 所有页面，exclude 优先扣除） */
   ballPages: PageScope;
   /** 划词工具条的页面生效范围。与悬浮球各存一份——两块 UI 的干扰场景不同 */
@@ -308,7 +304,6 @@ export interface PageInteractionSettings {
 const DEFAULT_PAGE_INTERACTION: PageInteractionSettings = {
   showFloatingBall: true,
   showSelectionToolbar: true,
-  translateTarget: '',
   ballPages: { include: [], exclude: [] },
   toolbarPages: { include: [], exclude: [] },
 };
@@ -351,7 +346,6 @@ export function resolvePageInteractionSettings(
     showFloatingBall: merged.showFloatingBall,
     showSelectionToolbar: merged.showSelectionToolbar,
     ...(merged.toolbarModel ? { toolbarModel: merged.toolbarModel } : {}),
-    translateTarget: merged.translateTarget,
     ballPages: scopeOf('ballPages', legacy?.ballHiddenPages),
     toolbarPages: scopeOf('toolbarPages', legacy?.toolbarHiddenPages),
   };

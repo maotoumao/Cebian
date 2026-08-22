@@ -5,7 +5,8 @@ import type { CustomPageAction, PageActionsConfig } from '@/lib/page-actions/typ
 // 内置动作的 label 走 `t`，而 fakeBrowser 不实现 chrome.i18n.getMessage。
 // Mock 成回显 key：测的是「label 从哪来、overlay 有没有覆盖」，不耦合具体译文。
 vi.mock('@/lib/i18n', () => ({
-  t: (key: string) => key,
+  t: (key: string, substitutions?: string[]) =>
+    substitutions ? `${key}:${substitutions.join('|')}` : key,
 }));
 
 const PAGE = 'https://example.com/docs/intro';
@@ -45,16 +46,12 @@ describe('visibleToolbarActions — 内置 overlay', () => {
     expect(ids).toEqual(['explain', 'summarize']);
   });
 
-  it('overlay 的 label 覆盖界面文案；空白 label 视为没改', () => {
-    const [renamed] = visibleToolbarActions(
+  it('旧配置中的 label 不覆盖内置名称', () => {
+    const [action] = visibleToolbarActions(
       config({ builtin: { explain: { label: '讲讲' } } }),
       PAGE,
     );
-    expect(renamed.label).toBe('讲讲');
-
-    const [blank] = visibleToolbarActions(config({ builtin: { explain: { label: '  ' } } }), PAGE);
-    expect(blank.label).not.toBe('  ');
-    expect(blank.label.length).toBeGreaterThan(0);
+    expect(action.label).toBe('pageActions.toolbar.explain');
   });
 
   it('overlay 的 include 只在命中页显示', () => {
@@ -65,9 +62,19 @@ describe('visibleToolbarActions — 内置 overlay', () => {
     expect(visibleToolbarActions(c, 'https://other.com/x').map((a) => a.id)).toContain('translate');
   });
 
-  it('overlay 改不了内置提示词，只影响外观', () => {
-    const [explain] = visibleToolbarActions(config({ builtin: { explain: { label: 'X' } } }), PAGE);
-    expect(explain.renderSystemPrompt({ lang: 'Chinese' })).toContain('Chinese');
+  it('内置提示词未配置时回落 i18n 默认值，overlay 可覆盖并渲染变量', () => {
+    const [fallback] = visibleToolbarActions(config(), PAGE);
+    expect(fallback.renderSystemPrompt({ ui_language: 'Chinese', context: 'ctx' })).toBe(
+      'pageActions.prompts.explain:Chinese|ctx',
+    );
+
+    const [overridden] = visibleToolbarActions(
+      config({ builtin: { explain: { systemPrompt: 'Explain in {{ui_language}}: {{context}}' } } }),
+      PAGE,
+    );
+    expect(overridden.renderSystemPrompt({ ui_language: 'Chinese', context: 'ctx' })).toBe(
+      'Explain in Chinese: ctx',
+    );
   });
 });
 
@@ -93,12 +100,11 @@ describe('visibleToolbarActions — 自定义动作', () => {
     ).toHaveLength(3);
   });
 
-  it('system 提示词由模板渲染，user turn 就是原文', () => {
+  it('system 提示词由模板渲染', () => {
     const [action] = visibleToolbarActions(config({ custom: [custom()] }), PAGE).slice(-1);
     expect(action.renderSystemPrompt({ selected_text: 'hello' })).toBe(
       'Extract key points from hello.',
     );
-    expect(action.renderUserIntent('hello', {})).toBe('hello');
   });
 
   it('模板里的非字符串参数被丢掉，不会渲染成 [object Object]', () => {

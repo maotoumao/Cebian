@@ -1,7 +1,15 @@
-import { ChevronRight, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronRight, ChevronUp, ChevronDown, Ellipsis, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,7 +19,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import type { ResolvedPageAction } from '@/lib/page-actions/actions';
 import { isUnrestrictedPageScope } from '@/lib/page-actions/match';
@@ -28,12 +35,8 @@ interface ToolbarActionListProps {
 }
 
 /**
- * 工具条动作列表：内置与自定义混排一列，行上直接启停 / 调序 / 进编辑，自定义可删。
- * 顺序即工具条上的显示顺序，所以这里不做分组——用户看到的就是实际排布。
- *
- * 行内的 ChevronRight 放在「进编辑」那个按钮**内部**并靠右（而不是整行最右）：它标示的
- * 是「点这块进编辑」，摆在按钮外面就成了看着能点、点了没反应；而 Switch 与删除是另外两个
- * 独立控件，本不该被它涵盖。同时它保持 aria-hidden，无障碍名字由行按钮的 aria-label 给。
+ * 工具条动作列表：默认态突出名称、范围与启用状态，编辑入口占据主要点击区域
+ * 低频的调序与删除收进更多菜单，避免窄侧栏里出现密集的小按钮
  */
 export function ToolbarActionList({
   actions,
@@ -43,57 +46,34 @@ export function ToolbarActionList({
   onEdit,
   onCreate,
 }: ToolbarActionListProps) {
+  const [pendingDelete, setPendingDelete] = useState<ResolvedPageAction | null>(null);
+
   return (
-    <div className="space-y-1">
-      <ul className="space-y-1">
+    <div className="flex flex-col gap-2">
+      <ul className="divide-y overflow-hidden rounded-md border border-border">
         {actions.map((action, index) => (
           <li
             key={action.id}
-            className="flex items-center gap-1 rounded-md border border-border px-2 py-1.5"
+            className="flex min-h-12 items-center gap-1 px-1"
           >
-            <div className="flex flex-col">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-4 text-muted-foreground"
-                disabled={index === 0}
-                onClick={() => onMove(action.id, -1)}
-                aria-label={t('settings.pageInteraction.actions.moveUp', [action.label])}
-              >
-                <ChevronUp className="size-3" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-4 text-muted-foreground"
-                disabled={index === actions.length - 1}
-                onClick={() => onMove(action.id, 1)}
-                aria-label={t('settings.pageInteraction.actions.moveDown', [action.label])}
-              >
-                <ChevronDown className="size-3" />
-              </Button>
-            </div>
-
             <button
               type="button"
-              className="flex min-w-0 flex-1 items-center gap-2 text-left"
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-sm px-2 py-2 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-[3px] focus-visible:ring-ring/50"
               onClick={() => onEdit(action.id)}
               aria-label={t('settings.pageInteraction.actions.edit', [action.label])}
             >
-              <span className="truncate text-sm">{action.label}</span>
-              <Badge variant="secondary" className="shrink-0 text-[10px]">
-                {action.kind === 'builtin'
-                  ? t('settings.pageInteraction.actions.builtin')
-                  : t('settings.pageInteraction.actions.custom')}
-              </Badge>
-              {!isUnrestrictedPageScope(action.pages) && (
-                <Badge variant="outline" className="shrink-0 text-[10px]">
-                  {t('settings.pageInteraction.actions.pageScoped')}
-                </Badge>
-              )}
-              <ChevronRight className="ml-auto size-4 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{action.label}</span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {action.kind === 'builtin'
+                    ? t('settings.pageInteraction.actions.builtin')
+                    : t('settings.pageInteraction.actions.custom')}
+                  {!isUnrestrictedPageScope(action.pages) && (
+                    <> · {t('settings.pageInteraction.actions.pageScoped')}</>
+                  )}
+                </span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
             </button>
 
             <Switch
@@ -103,42 +83,63 @@ export function ToolbarActionList({
               aria-label={action.label}
             />
 
-            {action.kind === 'custom' && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
-                    aria-label={t('settings.pageInteraction.actions.delete', [action.label])}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 shrink-0 text-muted-foreground"
+                  aria-label={t('settings.pageInteraction.actions.more', [action.label])}
+                >
+                  <Ellipsis />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 max-w-[calc(100vw-1rem)]">
+                <DropdownMenuGroup>
+                  <DropdownMenuItem onSelect={() => onEdit(action.id)}>
+                    <Pencil />
+                    <span className="min-w-0 break-words">
+                      {t('settings.pageInteraction.actions.edit', [action.label])}
+                    </span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={index === 0}
+                    onSelect={() => onMove(action.id, -1)}
                   >
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      {t('settings.pageInteraction.actions.deleteConfirmTitle')}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {t('settings.pageInteraction.actions.deleteConfirmDescription', [
-                        action.label,
-                      ])}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-                    <AlertDialogAction
-                      variant="destructive"
-                      onClick={() => onDelete(action.id)}
-                    >
-                      {t('common.delete')}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
+                    <ChevronUp />
+                    <span className="min-w-0 break-words">
+                      {t('settings.pageInteraction.actions.moveUp', [action.label])}
+                    </span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={index === actions.length - 1}
+                    onSelect={() => onMove(action.id, 1)}
+                  >
+                    <ChevronDown />
+                    <span className="min-w-0 break-words">
+                      {t('settings.pageInteraction.actions.moveDown', [action.label])}
+                    </span>
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+                {action.kind === 'custom' && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onSelect={() => setPendingDelete(action)}
+                      >
+                        <Trash2 />
+                        <span className="min-w-0 break-words">
+                          {t('settings.pageInteraction.actions.delete', [action.label])}
+                        </span>
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </li>
         ))}
       </ul>
@@ -147,6 +148,39 @@ export function ToolbarActionList({
         <Plus className="size-3.5" />
         {t('settings.pageInteraction.actions.create')}
       </Button>
+
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('settings.pageInteraction.actions.deleteConfirmTitle')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete
+                ? t('settings.pageInteraction.actions.deleteConfirmDescription', [
+                    pendingDelete.label,
+                  ])
+                : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (pendingDelete) onDelete(pendingDelete.id);
+              }}
+            >
+              {t('common.delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

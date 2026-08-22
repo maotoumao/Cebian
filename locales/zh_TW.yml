@@ -25,6 +25,7 @@ common:
   cancel: "取消"
   confirm: "確認"
   save: "儲存"
+  reset: "重設"
   delete: "刪除"
   rename: "重新命名"
   edit: "編輯"
@@ -84,6 +85,13 @@ pageActions:
     explain: "解釋"
     translate: "翻譯"
     summarize: "總結"
+  prompts:
+    # $1 = {{ui_language}}，$2 = {{context}}
+    explain: "用$1清楚、簡潔地解釋使用者提供的文字，說明其含義以及讀者需要瞭解的重要背景。回覆應簡短，使用純文字，不使用 Markdown。以下頁面上下文僅用於釐清語意，不要把它當作選取文字的一部分進行解釋：\n\n$2"
+    # $1 = {{ui_language}}，$2 = {{context}}
+    translate: "將使用者提供的文字翻譯為$1，保留原意和語氣。只輸出翻譯後的純文字，不使用 Markdown，不添加解釋、註解或引號。以下頁面上下文僅用於釐清語意，不要把它當作選取文字的一部分進行翻譯：\n\n$2"
+    # $1 = {{ui_language}}，$2 = {{context}}
+    summarize: "用$1簡潔地總結使用者提供的文字，保留關鍵要點。使用純文字或精簡清單，不使用 Markdown。以下頁面上下文僅用於釐清語意，不要把它當作選取文字的一部分進行總結：\n\n$2"
   result:
     loading: "思考中…"
     error: "出錯了，請重試。"
@@ -161,19 +169,21 @@ settings:
       remove: "移除規則 $1"
     actions:
       title: "工具列操作"
-      hint: "操作會依此順序顯示。內建操作可重新命名、設定生效範圍或關閉，也可以新增自訂操作。"
+      hint: "操作會依此順序顯示。內建操作可自訂系統提示詞、設定生效範圍或關閉，也可以新增具自訂名稱與提示詞的操作。"
       builtin: "內建"
       custom: "自訂"
       pageScoped: "限定頁面"
       create: "新增操作"
       # $1 = 動作名稱
-      moveUp: "上移 $1"
+      more: "「$1」的更多操作"
       # $1 = 動作名稱
-      moveDown: "下移 $1"
+      moveUp: "上移「$1」"
       # $1 = 動作名稱
-      delete: "刪除 $1"
+      moveDown: "下移「$1」"
       # $1 = 動作名稱
-      edit: "編輯 $1"
+      delete: "刪除「$1」"
+      # $1 = 動作名稱
+      edit: "編輯「$1」"
       deleteConfirmTitle: "刪除這個操作？"
       # $1 = 動作名稱
       deleteConfirmDescription: "刪除「$1」後將無法復原。"
@@ -181,8 +191,6 @@ settings:
       editCustom: "自訂操作"
       label: "按鈕文字"
       labelPlaceholder: "例如：擷取要點"
-      labelFollowLocale: "跟隨介面語言"
-      labelBuiltinHint: "留空則跟隨介面語言。"
       prompt: "系統提示詞"
       # $1 = 變數自動完成的觸發字元（「{{」）
       promptHint: "告訴模型如何處理選取文字。輸入 $1 可插入變數。"
@@ -202,10 +210,6 @@ settings:
       label: "工具列模型"
       hint: "劃詞工具列使用的模型。通常選擇速度快、成本低的模型即可，預設與對話模型相同。"
       followMain: "與對話模型相同"
-    translate:
-      label: "翻譯目標語言"
-      hint: "翻譯結果使用的語言。"
-      auto: "跟隨介面語言"
   instructions:
     title: "指引"
     label: "自訂指引"

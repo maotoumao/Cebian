@@ -6,11 +6,16 @@
 // 写回时省略空字段（空 label / 空 pages / 空 transform 一律不落库），让存下来的配置
 // 只包含用户真正改过的东西——既省空间，也让「用户到底改了什么」在备份 JSON 里一眼可见。
 
-import { listPageActionIds } from './actions';
+import {
+  getBuiltinDefaultLabel,
+  getBuiltinDefaultSystemPrompt,
+  listPageActionIds,
+} from './actions';
 import { isUnrestrictedPageScope, type PageScope } from './match';
 import {
   isBuiltinPageActionId,
   newCustomPageActionId,
+  type BuiltinPageActionId,
   type BuiltinActionOverlay,
   type CustomPageAction,
   type PageActionDraft,
@@ -36,6 +41,19 @@ function newActionDraft(config: PageActionsConfig): PageActionDraft {
   };
 }
 
+/** 把内置动作草稿恢复为当前语言的默认值；自定义动作原样返回 */
+function resetBuiltinActionDraft(draft: PageActionDraft): PageActionDraft {
+  if (!isBuiltinPageActionId(draft.id)) return draft;
+  return {
+    ...draft,
+    label: getBuiltinDefaultLabel(draft.id),
+    systemPrompt: getBuiltinDefaultSystemPrompt(draft.id),
+    systemPromptOverridden: false,
+    pages: { include: [], exclude: [] },
+    transform: '',
+  };
+}
+
 /** 只在范围真有限制时给出可落库的副本；没做任何限制则 undefined（与空 label / 空脚本
  *  同理，不落库）。 */
 function pageScopeIfRestricted(scope: PageScope): PageScope | undefined {
@@ -48,14 +66,19 @@ function overlayFrom(
   draft: PageActionDraft,
   previous: BuiltinActionOverlay | undefined,
 ): BuiltinActionOverlay | undefined {
-  const label = draft.label.trim();
+  const systemPrompt = draft.systemPrompt.trim();
+  const defaultSystemPrompt = getBuiltinDefaultSystemPrompt(draft.id as BuiltinPageActionId).trim();
+  const systemPromptOverridden =
+    draft.systemPromptOverridden ?? systemPrompt !== defaultSystemPrompt;
   const transform = draft.transform.trim();
   const pages = pageScopeIfRestricted(draft.pages);
   const next: BuiltinActionOverlay = {
     // enabled 由列表上的开关维护，编辑页只是原样带过去。只保留 false——`enabled: true`
     // 与默认完全等价，留着就成了「看起来改过其实没改」的空壳。
     ...(previous?.enabled === false ? { enabled: false } : {}),
-    ...(label ? { label } : {}),
+    ...(systemPromptOverridden && systemPrompt
+      ? { systemPrompt: draft.systemPrompt }
+      : {}),
     ...(pages ? { pages } : {}),
     ...(transform ? { transform } : {}),
   };
@@ -155,6 +178,7 @@ function moveAction(config: PageActionsConfig, id: string, delta: -1 | 1): PageA
 
 export {
   newActionDraft,
+  resetBuiltinActionDraft,
   saveActionDraft,
   setActionEnabled,
   deleteCustomAction,

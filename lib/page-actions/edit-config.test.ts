@@ -3,10 +3,15 @@ import {
   deleteCustomAction,
   moveAction,
   newActionDraft,
+  resetBuiltinActionDraft,
   saveActionDraft,
   setActionEnabled,
 } from '@/lib/page-actions/edit-config';
 import type { CustomPageAction, PageActionDraft, PageActionsConfig } from '@/lib/page-actions/types';
+
+vi.mock('@/lib/i18n', () => ({
+  t: (key: string) => key,
+}));
 
 function config(over: Partial<PageActionsConfig> = {}): PageActionsConfig {
   return { builtin: {}, custom: [], ...over };
@@ -99,9 +104,18 @@ describe('saveActionDraft — 自定义动作', () => {
 
 describe('saveActionDraft — 内置动作', () => {
   it('写成 overlay，不进 custom 数组', () => {
-    const next = saveActionDraft(config(), draft({ id: 'explain', kind: 'builtin', label: '讲讲' }));
+    const next = saveActionDraft(
+      config(),
+      draft({
+        id: 'explain',
+        kind: 'builtin',
+        label: '讲讲',
+        systemPrompt: 'pageActions.prompts.explain',
+        transform: 'return text',
+      }),
+    );
     expect(next.custom).toHaveLength(0);
-    expect(next.builtin.explain).toEqual({ label: '讲讲' });
+    expect(next.builtin.explain).toEqual({ transform: 'return text' });
   });
 
   it('全部字段清空 → 整条 overlay 删除（回到默认）', () => {
@@ -114,6 +128,7 @@ describe('saveActionDraft — 内置动作', () => {
         id: 'explain',
         kind: 'builtin',
         label: '',
+        systemPrompt: '',
         pages: { include: [], exclude: [] },
         transform: '',
       }),
@@ -123,22 +138,88 @@ describe('saveActionDraft — 内置动作', () => {
 
   it('清空 label 但仍被关掉 → 保留 enabled，不误删 overlay', () => {
     const before = config({ builtin: { explain: { enabled: false, label: 'X' } } });
-    const next = saveActionDraft(before, draft({ id: 'explain', kind: 'builtin', label: '' }));
+    const next = saveActionDraft(
+      before,
+      draft({ id: 'explain', kind: 'builtin', label: '', systemPrompt: '' }),
+    );
     expect(next.builtin.explain).toEqual({ enabled: false });
   });
 
   it('清空 label 后只剩「启用」→ 整条 overlay 删除，不留 enabled: true 空壳', () => {
     const before = config({ builtin: { explain: { enabled: true, label: 'X' } } });
-    const next = saveActionDraft(before, draft({ id: 'explain', kind: 'builtin', label: '' }));
+    const next = saveActionDraft(
+      before,
+      draft({ id: 'explain', kind: 'builtin', label: '', systemPrompt: '' }),
+    );
     expect(next.builtin.explain).toBeUndefined();
   });
 
-  it('内置动作的提示词不写入配置（改不了）', () => {
+  it('内置动作只保存不同于 i18n 默认值的提示词', () => {
     const next = saveActionDraft(
       config(),
       draft({ id: 'explain', kind: 'builtin', label: 'X', systemPrompt: 'hijack' }),
     );
-    expect(JSON.stringify(next)).not.toContain('hijack');
+    expect(next.builtin.explain?.systemPrompt).toBe('hijack');
+
+    const fallback = saveActionDraft(
+      next,
+      draft({
+        id: 'explain',
+        kind: 'builtin',
+        label: 'X',
+        systemPrompt: 'pageActions.prompts.explain',
+      }),
+    );
+    expect(fallback.builtin.explain).toBeUndefined();
+
+    const paddedFallback = saveActionDraft(
+      next,
+      draft({
+        id: 'explain',
+        kind: 'builtin',
+        label: 'X',
+        systemPrompt: '  pageActions.prompts.explain  ',
+      }),
+    );
+    expect(paddedFallback.builtin.explain).toBeUndefined();
+  });
+
+  it('内置动作不写名称覆盖；提示词按显式覆盖状态写入并可重置', () => {
+    const overridden = saveActionDraft(
+      config(),
+      draft({
+        id: 'explain',
+        kind: 'builtin',
+        label: 'pageActions.toolbar.explain',
+        systemPrompt: 'pageActions.prompts.explain',
+        systemPromptOverridden: true,
+      }),
+    );
+    expect(overridden.builtin.explain).toEqual({
+      systemPrompt: 'pageActions.prompts.explain',
+    });
+
+    const resetDraft = resetBuiltinActionDraft(
+      draft({
+        id: 'explain',
+        kind: 'builtin',
+        label: 'Custom',
+        systemPrompt: 'Custom prompt',
+        systemPromptOverridden: true,
+        pages: { include: ['https://example.com/*'], exclude: [] },
+        transform: 'function transform(text) { return text; }',
+      }),
+    );
+    expect(resetDraft).toMatchObject({
+      label: 'pageActions.toolbar.explain',
+      systemPrompt: 'pageActions.prompts.explain',
+      systemPromptOverridden: false,
+      pages: { include: [], exclude: [] },
+      transform: '',
+    });
+
+    const reset = saveActionDraft(overridden, resetDraft);
+    expect(reset.builtin.explain).toBeUndefined();
   });
 });
 

@@ -92,8 +92,8 @@ export function isSuppressMessage(m: unknown): m is SuppressMessage {
  * `satisfies Record<BuiltinPageActionId, …>` 保持穷尽——三处不会各自漂移。
  * 数组顺序即工具条上内置动作的缺省顺序。
  *
- * 内置动作的提示词定义在代码里（见 lib/page-actions/actions.ts），用户只能通过
- * overlay 调整其外观 / 生效范围，不能改提示词。
+ * 内置动作的缺省提示词定义在 i18n 文案里（见 lib/page-actions/actions.ts），用户可通过
+ * overlay 覆盖；未覆盖时随界面语言使用本地化默认值。
  */
 export const BUILTIN_PAGE_ACTION_IDS = ['explain', 'translate', 'summarize'] as const;
 
@@ -156,6 +156,8 @@ export interface BuiltinActionOverlay {
   enabled?: boolean;
   /** 覆盖按钮文本；缺省 / 空串 = 回落 i18n 文案（跟随界面语言）。 */
   label?: string;
+  /** 覆盖 system 提示词模板；缺省 / 空串 = 回落 i18n 默认提示词。 */
+  systemPrompt?: string;
   /** 页面生效范围；缺省 = 不限制（所有页面）。 */
   pages?: PageScope;
   /** 输出后处理脚本；缺省 = 不做后处理。 */
@@ -163,26 +165,19 @@ export interface BuiltinActionOverlay {
 }
 
 /**
- * 编辑中的动作（设置页表单的形状）。内置与自定义共用一份表单，差异只体现在：
- * 内置的 `systemPrompt` 不可改（表单不展示），`kind` 决定写回配置时落到 overlay
- * 还是 custom 数组。空串即「没设置」、页面范围两个列表都空即「不限制」，写回时都会被省略。
+ * 编辑中的动作（设置页表单的形状）。内置与自定义共用一份表单，`kind` 只决定写回配置时
+ * 落到 overlay 还是 custom 数组。内置的空 prompt 即「使用本地化默认值」，页面范围两个
+ * 列表都空即「不限制」，写回时都会被省略。
  */
 export interface PageActionDraft {
   id: string;
   kind: 'builtin' | 'custom';
   label: string;
   systemPrompt: string;
+  /** 内置动作是否显式覆盖 system prompt；缺省时按内容与默认值比较 */
+  systemPromptOverridden?: boolean;
   pages: PageScope;
   transform: string;
-  /**
-   * 翻译目标语言（BCP-47；空串 = 跟随界面语言）。**只有内置「翻译」动作用它**——它是
-   * 那个动作的专属参数，故随表单一起缓冲、一起保存。
-   *
-   * 注意它不落在 `pageActionsConfig` 里，而是继续写回
-   * `pageInteractionSettings.translateTarget`：那个 key 早于本次改动就已发布，是既有的
-   * 持久化契约，只搬 UI 位置、不搬存储位置。
-   */
-  translateTarget?: string;
 }
 
 /** 划词动作的全量配置。 */
@@ -200,8 +195,8 @@ export const PAGE_ACTION_PORT = 'cebian-page-action';
 
 /**
  * 内容脚本 → background 的动作请求（经 PAGE_ACTION_PORT 端口发送）。只带原始素材，
- * 由 background 侧按 actionId 查定义、解析 params、构造提示词（「转换在 handler」）。
- * `params` 泛化预留给将来的自定义动作参数；v1 内置动作的参数由 background 读设置解析。
+ * 由 background 侧按 actionId 查定义，并把 params 与运行时环境变量合并后渲染提示词。
+ * `params` 泛化预留给将来的自定义动作参数。
  */
 export interface PageActionRequest {
   actionId: PageActionId;
