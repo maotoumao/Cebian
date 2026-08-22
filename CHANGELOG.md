@@ -40,11 +40,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - AI 回复流式输出时改为按块增量渲染，公式与代码高亮不再随每个字符全量重渲染，长回复输出更流畅 ([#61](https://github.com/maotoumao/Cebian/issues/61))
 - AI 回复的流式更新现在按 80 毫秒窗口合并、只传输新增内容（此前每个模型输出片段都全量重发整条消息），长回复与工具调用期间的 CPU 占用大幅降低，打字机效果保持连贯
 - 技能的 `matched-url` 改用与扩展其它部分一致的 Chrome match pattern 语法（如 `https://github.com/*`），不再用 picomatch glob；旧写法仍能向 AI 传达意图，新技能建议改用新语法
+- 代码编辑器在 macOS 上的块注释快捷键改为 `Ctrl-Shift-A`，避免与使用 `Alt-A` 输入特殊字符的键盘布局冲突；整行选择与扩大语法选择现在也会按移动方向自然扩展
 
 - The Firefox build now uses the browser's built-in data consent mechanism to disclose that user-submitted chats, page context, browsing activity, bookmarks, and authentication information are sent to user-configured AI/MCP services, and now requires Firefox 140 or later
 - Streaming responses now render incrementally block by block, so formulas and code highlighting no longer re-render on every character, making long responses smoother ([#61](https://github.com/maotoumao/Cebian/issues/61))
 - Streaming updates are now coalesced into 80 ms windows and carry only newly generated content (previously every model output chunk re-sent the entire message), greatly reducing CPU usage during long responses and tool calls while keeping the typing effect smooth
 - A skill's `matched-url` now uses the same Chrome match-pattern syntax as the rest of the extension (e.g. `https://github.com/*`) instead of picomatch globs; older globs still convey intent to the AI, but new skills should use the new syntax
+- The code editor's block-comment shortcut on macOS is now `Ctrl-Shift-A`, avoiding conflicts with keyboard layouts that use `Alt-A` for special characters; whole-line and parent-syntax selections now also extend naturally in the direction of movement
 
 ### 修复 / Fixed
 
