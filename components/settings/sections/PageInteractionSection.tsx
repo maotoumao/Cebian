@@ -1,13 +1,10 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Check, ChevronDown } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ModelSelector } from '@/components/chat/ModelSelector';
-import { PagePatternsEditor } from '@/components/settings/page-interaction/PagePatternsEditor';
+import { PageScopeEditor } from '@/components/settings/page-interaction/PageScopeEditor';
 import { ToolbarActionList } from '@/components/settings/page-interaction/ToolbarActionList';
 import { ToolbarActionEditor } from '@/components/settings/page-interaction/ToolbarActionEditor';
 import type { SettingsOutletContext } from '@/components/settings/SettingsLayout';
@@ -22,6 +19,7 @@ import {
   type PageInteractionSettings,
 } from '@/lib/persistence/storage';
 import { listPageActions } from '@/lib/page-actions/actions';
+import { resolvePageScope, type PageScope } from '@/lib/page-actions/match';
 import {
   deleteCustomAction,
   moveAction,
@@ -30,109 +28,30 @@ import {
   setActionEnabled,
 } from '@/lib/page-actions/edit-config';
 import { isBuiltinPageActionId, type PageActionDraft, type PageActionsConfig } from '@/lib/page-actions/types';
-import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 
-// 翻译目标语言的 BCP-47 代码。标签在渲染时由 Intl.DisplayNames 用「各语言本名
-// （endonym）」生成，故源码只含 ASCII 代码，无需为语言名维护三语翻译，任何界面语言
-// 下都显示成该语言自己的写法。空串（跟随界面语言）作为单独首项在选择器里处理。
-const TRANSLATE_TARGETS = [
-  'en', 'zh-Hans', 'zh-Hant', 'ja', 'ko', 'fr', 'de', 'es', 'ru', 'pt', 'it', 'ar',
-] as const;
-
-/** 用目标语言自身显示其语言名（endonym）；不支持时回退代码本身。 */
-function endonym(code: string): string {
-  try {
-    return new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code;
-  } catch {
-    return code;
-  }
-}
-
-/** 翻译目标语言选择器：Popover + 列表，首项为「跟随界面语言」（写回空串）。 */
-function TranslateTargetSelector({
-  value,
-  onSelect,
-}: {
-  value: string;
-  onSelect: (target: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const currentLabel = value
-    ? endonym(value)
-    : t('settings.pageInteraction.translate.auto');
-
-  const renderRow = (rowValue: string, label: string) => (
-    <button
-      key={rowValue || 'auto'}
-      className={cn(
-        'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none',
-        'hover:bg-accent hover:text-accent-foreground',
-        value === rowValue && 'bg-accent/50',
-      )}
-      onClick={() => {
-        onSelect(rowValue);
-        setOpen(false);
-      }}
-    >
-      {label}
-      <Check
-        className={cn('ml-auto size-4', value === rowValue ? 'opacity-100' : 'opacity-0')}
-      />
-    </button>
-  );
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="min-w-32 justify-between">
-          {currentLabel}
-          <ChevronDown data-icon />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-44 p-1" align="end">
-        <div className="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
-          {renderRow('', t('settings.pageInteraction.translate.auto'))}
-          {TRANSLATE_TARGETS.map((code) => renderRow(code, endonym(code)))}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-/** 「在这些页面隐藏」字段：标签 + 说明 + 规则列表。悬浮球与工具条各挂一份（两块 UI
- *  的干扰场景不同，用户要求分开配置），故抽出来避免同一段结构写两遍。 */
-function HiddenPagesField({
-  patterns,
+/** 悬浮球 / 工具条的生效范围字段。两块 UI 的干扰场景不同（用户要求分开配置），故各挂
+ *  一份；缩进一级表示它从属上面那个开关。 */
+function PageScopeField({
+  scope,
   onChange,
   disabled,
 }: {
-  patterns: string[];
-  onChange: (next: string[]) => void;
+  scope: PageScope;
+  onChange: (next: PageScope) => void;
   disabled: boolean;
 }) {
-  const labelId = useId();
   return (
-    <div className={cn('space-y-1.5 pl-1', disabled && 'pointer-events-none opacity-50')}>
-      <Label id={labelId} className="text-xs font-normal text-muted-foreground">
-        {t('settings.pageInteraction.hiddenPages.label')}
-      </Label>
-      <PagePatternsEditor
-        patterns={patterns}
-        onChange={onChange}
-        disabled={disabled}
-        labelledBy={labelId}
-      />
-      <p className="text-xs text-muted-foreground">
-        {t('settings.pageInteraction.hiddenPages.hint')}
-      </p>
+    <div className="pl-1">
+      <PageScopeEditor scope={scope} onChange={onChange} disabled={disabled} />
     </div>
   );
 }
 
 /**
- * 页面交互设置的主面板：两块 UI 的显示开关与隐藏页面、工具条模型（复用聊天的
- * `ModelSelector`，`inheritOption` 提供「跟随主模型」）、翻译目标语言、工具条动作列表。
+ * 页面交互设置的主面板：两块 UI 的显示开关与页面生效范围、工具条模型（复用聊天的
+ * `ModelSelector`，`inheritOption` 提供「跟随主模型」）、工具条动作列表。
+ * 翻译目标语言不在这里——它是「翻译」动作的专属参数，住在那个动作的编辑页。
  */
 function PageInteractionPanel({ onEditAction }: { onEditAction: (id: string) => void }) {
   const [stored, setStored] = useStorageItem(pageInteractionSettings, undefined);
@@ -175,9 +94,9 @@ function PageInteractionPanel({ onEditAction }: { onEditAction: (id: string) => 
             className="shrink-0"
           />
         </div>
-        <HiddenPagesField
-          patterns={settings.ballHiddenPages}
-          onChange={(next) => patch({ ballHiddenPages: next })}
+        <PageScopeField
+          scope={settings.ballPages}
+          onChange={(next) => patch({ ballPages: next })}
           disabled={!settings.showFloatingBall}
         />
       </div>
@@ -199,9 +118,9 @@ function PageInteractionPanel({ onEditAction }: { onEditAction: (id: string) => 
             className="shrink-0"
           />
         </div>
-        <HiddenPagesField
-          patterns={settings.toolbarHiddenPages}
-          onChange={(next) => patch({ toolbarHiddenPages: next })}
+        <PageScopeField
+          scope={settings.toolbarPages}
+          onChange={(next) => patch({ toolbarPages: next })}
           disabled={!settings.showSelectionToolbar}
         />
       </div>
@@ -223,21 +142,6 @@ function PageInteractionPanel({ onEditAction }: { onEditAction: (id: string) => 
               label: t('settings.pageInteraction.model.followMain'),
               onSelect: () => patch({ toolbarModel: undefined }),
             }}
-          />
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0 space-y-1">
-          <Label className="text-sm">{t('settings.pageInteraction.translate.label')}</Label>
-          <p className="text-xs text-muted-foreground">
-            {t('settings.pageInteraction.translate.hint')}
-          </p>
-        </div>
-        <div className="shrink-0">
-          <TranslateTargetSelector
-            value={settings.translateTarget}
-            onSelect={(target) => patch({ translateTarget: target })}
           />
         </div>
       </div>
@@ -265,8 +169,14 @@ function PageInteractionPanel({ onEditAction }: { onEditAction: (id: string) => 
 /** 编辑页的「新建」占位段：URL 里出现 `action/new` 表示还没落库的新动作。 */
 const NEW_ACTION_SEGMENT = 'new';
 
-/** 按 id 从配置取出可编辑草稿；动作不存在返回 null。 */
-function draftFor(config: PageActionsConfig, actionId: string): PageActionDraft | null {
+/** 按 id 从配置取出可编辑草稿；动作不存在返回 null。
+ *  `translateTarget` 只给内置「翻译」动作带上——它是那个动作的专属参数，值来自
+ *  `pageInteractionSettings`（既有持久化 key，只搬 UI 不搬存储）。 */
+function draftFor(
+  config: PageActionsConfig,
+  actionId: string,
+  translateTarget: string,
+): PageActionDraft | null {
   const action = listPageActions(config).find((a) => a.id === actionId);
   if (!action) return null;
   return {
@@ -276,8 +186,9 @@ function draftFor(config: PageActionsConfig, actionId: string): PageActionDraft 
     // 故这里回读原始 overlay 值而不是解析后的显示名。
     label: rawLabel(config, action.id, action.kind),
     systemPrompt: config.custom.find((a) => a.id === action.id)?.systemPrompt ?? '',
-    pages: [...action.pages],
+    pages: resolvePageScope(action.pages),
     transform: action.transform ?? '',
+    ...(action.id === 'translate' ? { translateTarget } : {}),
   };
 }
 
@@ -290,6 +201,9 @@ function draftFor(config: PageActionsConfig, actionId: string): PageActionDraft 
  */
 function ActionEditorRoute({ actionId, onBack }: { actionId: string; onBack: () => void }) {
   const [storedActions, setStoredActions] = useStorageItem(pageActionsConfig, undefined);
+  // 翻译动作的目标语言仍存在 pageInteractionSettings（已发布的持久化 key），编辑页只是
+  // 把它的控件收拢过来，故这里也要读写那一份设置。
+  const [storedSettings, setStoredSettings] = useStorageItem(pageInteractionSettings, undefined);
   const [initial, setInitial] = useState<PageActionDraft | null>(null);
   const [gone, setGone] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -299,16 +213,20 @@ function ActionEditorRoute({ actionId, onBack }: { actionId: string; onBack: () 
     mountedRef.current = false;
   }, []);
 
-  const loaded = storedActions !== undefined;
+  // 两份 storage 都得等到真正加载完：任一还是 undefined 就先不建草稿。
+  const loaded = storedActions !== undefined && storedSettings !== undefined;
 
   useEffect(() => {
     if (!loaded || initial || gone) return;
     const config = resolvePageActionsConfig(storedActions);
+    const settings = resolvePageInteractionSettings(storedSettings);
     const draft =
-      actionId === NEW_ACTION_SEGMENT ? newActionDraft(config) : draftFor(config, actionId);
+      actionId === NEW_ACTION_SEGMENT
+        ? newActionDraft(config)
+        : draftFor(config, actionId, settings.translateTarget);
     if (draft) setInitial(draft);
     else setGone(true);
-  }, [loaded, storedActions, actionId, initial, gone]);
+  }, [loaded, storedActions, storedSettings, actionId, initial, gone]);
 
   // 动作不存在（多端删除 / 手改数据 / 陈旧链接）：回列表。导航放 effect 里做，
   // render 期调 navigate 会触发 React 的「渲染时更新另一个组件」告警。
@@ -332,6 +250,15 @@ function ActionEditorRoute({ actionId, onBack }: { actionId: string; onBack: () 
     setSaving(true);
     try {
       await setStoredActions(saveActionDraft(config, draft));
+      // 翻译目标语言是另一份 storage item，跟着同一次保存写回。
+      //
+      // 「有没有改过」拿**表单初值**比，不能拿 storedSettings 比：useStorageItem 的 setValue
+      // 是先乐观更新本地 state 再落库，若上一次落库失败，本地已是新值，再比就会得出「没改」
+      // 而跳过写入——用户看到保存成功，storage 里还是旧值。
+      if (draft.translateTarget !== undefined && draft.translateTarget !== initial.translateTarget) {
+        const settings = resolvePageInteractionSettings(storedSettings);
+        await setStoredSettings({ ...settings, translateTarget: draft.translateTarget });
+      }
       if (mountedRef.current) onBack();
     } catch (err) {
       // 写入失败就留在编辑页，别把用户刚填的内容随卸载一起丢掉。

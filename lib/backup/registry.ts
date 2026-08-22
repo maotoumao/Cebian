@@ -322,7 +322,7 @@ export const BACKUP_REGISTRY: BackupEntry<any>[] = [
   // 记忆系统设置（仅开关，无密钥）。merge 恢复时保留本地开关状态（无 fillMissing）。
   entry({ item: memorySettings, storageClass: 'settings' }),
   entry({ item: memoryOrganizeState, storageClass: 'exclude' }),
-  // 页面交互设置（悬浮球 / 划词工具条开关 + 工具条模型 + 翻译目标 + 隐藏页面；无密钥）。
+  // 页面交互设置（悬浮球 / 划词工具条开关 + 工具条模型 + 翻译目标 + 页面生效范围；无密钥）。
   entry({ item: pageInteractionSettings, storageClass: 'settings' }),
   // 划词动作配置（内置覆盖层 + 自定义动作；提示词与后处理脚本均非密钥）。
   entry({

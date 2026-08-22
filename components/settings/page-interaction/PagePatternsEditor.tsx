@@ -15,8 +15,8 @@ interface PagePatternsEditorProps {
 }
 
 /**
- * 页面匹配规则列表编辑器（match pattern）。悬浮球 / 工具条的「隐藏页面」与单个划词
- * 动作的「仅在这些页面显示」共用。
+ * 页面匹配规则列表编辑器（match pattern）：一个 `PageScope` 里 include / exclude 各挂
+ * 一份，由 PageScopeEditor 组装；悬浮球、工具条与每个划词动作三层都用同一份。
  *
  * 只在「添加」时落库，已添加的规则是只读条目 + 移除按钮——不做行内实时编辑，因为
  * 调用方每次 onChange 都直接写 storage，逐字符写入既嘈杂又会把半截非法规则存进去。

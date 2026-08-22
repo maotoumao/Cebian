@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { matchesAnyPagePattern, validatePagePattern } from '@/lib/page-actions/match';
+import {
+  isUnrestrictedPageScope,
+  matchesAnyPagePattern,
+  matchesPageScope,
+  resolvePageScope,
+  validatePagePattern,
+} from '@/lib/page-actions/match';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -64,5 +70,67 @@ describe('matchesAnyPagePattern', () => {
   it('URL 本身不可解析 → false', () => {
     expect(matchesAnyPagePattern('', ['<all_urls>'])).toBe(false);
     expect(matchesAnyPagePattern('not a url', ['<all_urls>'])).toBe(false);
+  });
+});
+
+describe('matchesPageScope', () => {
+  const scope = (include: string[] = [], exclude: string[] = []) => ({ include, exclude });
+
+  it('两个列表都空 = 所有页面生效', () => {
+    expect(matchesPageScope('https://example.com/', scope())).toBe(true);
+  });
+
+  it('只配 include = 白名单', () => {
+    const s = scope(['https://example.com/*']);
+    expect(matchesPageScope('https://example.com/x', s)).toBe(true);
+    expect(matchesPageScope('https://other.com/', s)).toBe(false);
+  });
+
+  it('只配 exclude = 黑名单', () => {
+    const s = scope([], ['https://example.com/*']);
+    expect(matchesPageScope('https://example.com/x', s)).toBe(false);
+    expect(matchesPageScope('https://other.com/', s)).toBe(true);
+  });
+
+  it('exclude 优先于 include', () => {
+    const s = scope(['https://example.com/*'], ['https://example.com/docs/*']);
+    expect(matchesPageScope('https://example.com/blog', s)).toBe(true);
+    expect(matchesPageScope('https://example.com/docs/intro', s)).toBe(false);
+  });
+
+  it('exclude 命中但 include 不命中 → 依然不生效（两条都不满足）', () => {
+    const s = scope(['https://a.com/*'], ['https://b.com/*']);
+    expect(matchesPageScope('https://b.com/x', s)).toBe(false);
+    expect(matchesPageScope('https://c.com/x', s)).toBe(false);
+  });
+});
+
+describe('resolvePageScope / isUnrestrictedPageScope', () => {
+  it('缺省补齐成两个空列表，且是复制而非共享引用', () => {
+    expect(resolvePageScope(undefined)).toEqual({ include: [], exclude: [] });
+    const include = ['https://a.com/*'];
+    const resolved = resolvePageScope({ include });
+    expect(resolved.exclude).toEqual([]);
+    expect(resolved.include).not.toBe(include);
+  });
+
+  it('两个列表都空才算「没做限制」', () => {
+    expect(isUnrestrictedPageScope({ include: [], exclude: [] })).toBe(true);
+    expect(isUnrestrictedPageScope({ include: ['https://a.com/*'], exclude: [] })).toBe(false);
+    expect(isUnrestrictedPageScope({ include: [], exclude: ['https://a.com/*'] })).toBe(false);
+  });
+});
+
+describe('resolvePageScope — 兼容未发布的旧形状', () => {
+  it('裸数组按 include 解析（旧动作配置里数组就是「仅在这些页面」）', () => {
+    expect(resolvePageScope(['https://a.com/*'])).toEqual({
+      include: ['https://a.com/*'],
+      exclude: [],
+    });
+  });
+
+  it('裸数组也是复制，不与入参共享引用', () => {
+    const legacy = ['https://a.com/*'];
+    expect(resolvePageScope(legacy).include).not.toBe(legacy);
   });
 });

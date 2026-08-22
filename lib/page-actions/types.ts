@@ -1,7 +1,12 @@
 // 页面交互（悬浮球 + 划词工具条）跨上下文消息契约。
 //
+// 页面生效范围（PageScope）的形状与判定住在同目录的 match.ts——它同时服务悬浮球 /
+// 工具条的设置与单个动作的配置，不专属于动作。
+//
 // 内容脚本 / 侧边栏 ↔ background 走独立于 AGENT_PORT 的一次性 runtime 消息通道。
 // 这里只放「与执行上下文无关」的消息形状与守卫，供三边共享。
+
+import type { PageScope } from './match';
 
 /** 页面交互 runtime 消息的统一 kind 标记（区分于 recorder 等其它 runtime 消息）。 */
 export const PAGE_ACTION_KIND = 'cebian_page_action';
@@ -139,8 +144,8 @@ export interface CustomPageAction {
   enabled?: boolean;
   /** system 提示词模板。 */
   systemPrompt: string;
-  /** 仅在这些页面显示（match pattern）；缺省 / 空 = 所有页面。 */
-  pages?: string[];
+  /** 页面生效范围；缺省 = 不限制（所有页面）。 */
+  pages?: PageScope;
   /** 输出后处理脚本（函数体，入参 text / vars，返回字符串）；缺省 = 不做后处理。 */
   transform?: string;
 }
@@ -151,8 +156,8 @@ export interface BuiltinActionOverlay {
   enabled?: boolean;
   /** 覆盖按钮文本；缺省 / 空串 = 回落 i18n 文案（跟随界面语言）。 */
   label?: string;
-  /** 仅在这些页面显示；缺省 / 空 = 所有页面。 */
-  pages?: string[];
+  /** 页面生效范围；缺省 = 不限制（所有页面）。 */
+  pages?: PageScope;
   /** 输出后处理脚本；缺省 = 不做后处理。 */
   transform?: string;
 }
@@ -160,15 +165,24 @@ export interface BuiltinActionOverlay {
 /**
  * 编辑中的动作（设置页表单的形状）。内置与自定义共用一份表单，差异只体现在：
  * 内置的 `systemPrompt` 不可改（表单不展示），`kind` 决定写回配置时落到 overlay
- * 还是 custom 数组。空串 / 空数组即「没设置」，写回时会被省略。
+ * 还是 custom 数组。空串即「没设置」、页面范围两个列表都空即「不限制」，写回时都会被省略。
  */
 export interface PageActionDraft {
   id: string;
   kind: 'builtin' | 'custom';
   label: string;
   systemPrompt: string;
-  pages: string[];
+  pages: PageScope;
   transform: string;
+  /**
+   * 翻译目标语言（BCP-47；空串 = 跟随界面语言）。**只有内置「翻译」动作用它**——它是
+   * 那个动作的专属参数，故随表单一起缓冲、一起保存。
+   *
+   * 注意它不落在 `pageActionsConfig` 里，而是继续写回
+   * `pageInteractionSettings.translateTarget`：那个 key 早于本次改动就已发布，是既有的
+   * 持久化契约，只搬 UI 位置、不搬存储位置。
+   */
+  translateTarget?: string;
 }
 
 /** 划词动作的全量配置。 */

@@ -22,14 +22,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - 官网首页与安装文档新增 Firefox 附加组件商店入口
 - AI 回复中的 LaTeX 数学公式现在渲染为真正的公式（支持行内 `$...$`、`\(...\)` 与块级 `$$...$$`、`\[...\]`），深浅色主题下均清晰可读；块级公式悬停可复制 LaTeX 源码；朗读时公式读作其 LaTeX 源码，货币金额（如 $5）不会被误认成公式 ([#61](https://github.com/maotoumao/Cebian/issues/61))
-- 悬浮球与划词工具条现在可以按页面隐藏：在「设置 → 页面交互」里各自维护一份页面规则（Chrome match pattern，如 `*://*.example.com/*`），命中的页面不再显示对应 UI
-- 划词工具条的动作现在可以自己配置：内置的解释 / 翻译 / 总结可改按钮文本、限定生效页面、调整顺序或关掉；也可以新建自己的动作，用 `{{选中文本}}` 等变量写提示词模板（可用变量：选中文本、选区周边文本、页面 URL、页面标题、当前日期、界面语言）
+- 悬浮球、划词工具条与每个工具条动作现在都能限定生效页面：在「设置 → 页面交互」里各自配置「仅在这些页面生效」与「但排除这些页面」（Chrome match pattern，如 `*://*.example.com/*`；留空即所有页面，排除优先）
+- 划词工具条的动作现在可以自己配置：内置的解释 / 翻译 / 总结可改按钮文本、限定生效页面、调整顺序或关掉；也可以新建自己的动作，用 `{{选中文本}}` 等变量写提示词模板（可用变量：选中文本、选区周边文本、页面 URL、页面标题、当前日期、界面语言）。翻译的目标语言也收进了「翻译」这个动作自己的设置里
 - 划词动作支持输出后处理脚本：写一小段 JavaScript 对 AI 的输出做加工（入参 `text` 与 `vars`，返回要显示的字符串）。脚本在一次性沙箱中执行——拿不到任何浏览器扩展 API，跑完或超时（5 秒）即销毁，不会影响其它功能；出错时照常显示原始输出。脚本仍能访问网络，故只运行你自己信得过的脚本
 
 - Added a Firefox Add-ons store link to the website homepage and installation guide
 - LaTeX math in AI responses now renders as real formulas (inline `$...$` / `\(...\)` and block `$$...$$` / `\[...\]`), clearly readable in both light and dark themes; hover a block formula to copy its LaTeX source; read-aloud speaks the LaTeX source, and currency amounts (e.g. $5) are no longer mistaken for math ([#61](https://github.com/maotoumao/Cebian/issues/61))
-- The floating ball and the selection toolbar can now be hidden per page: keep a separate list of page rules for each under Settings → Page interaction (Chrome match patterns such as `*://*.example.com/*`); matching pages no longer show that UI
-- Selection toolbar actions are now configurable: rename the built-in Explain / Translate / Summarize buttons, scope them to certain pages, reorder them or turn them off — and add your own actions with a prompt template using variables such as `{{selected_text}}` (available: selected text, surrounding text, page URL, page title, current date, interface language)
+- The floating ball, the selection toolbar and every toolbar action can now be scoped to specific pages: each has its own "show only on these pages" and "except on these pages" lists under Settings → Page interaction (Chrome match patterns such as `*://*.example.com/*`; empty means every page, and exceptions win)
+- Selection toolbar actions are now configurable: rename the built-in Explain / Translate / Summarize buttons, scope them to certain pages, reorder them or turn them off — and add your own actions with a prompt template using variables such as `{{selected_text}}` (available: selected text, surrounding text, page URL, page title, current date, interface language). The translation target language now lives in the Translate action's own settings
 - Selection actions can post-process their output with a script: a small piece of JavaScript that reshapes the AI output (receives `text` and `vars`, returns the string to display). It runs in a throwaway sandbox — no access to any browser extension APIs, torn down as soon as it finishes or times out (5 s) so it cannot affect anything else; on failure the original output is shown as usual. Scripts can still reach the network, so only run ones you trust
 
 ### 变更 / Changed

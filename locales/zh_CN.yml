@@ -144,9 +144,13 @@ settings:
       followMain: "与对话模型相同"
   pageInteraction:
     title: "页面交互"
-    hiddenPages:
-      label: "在这些页面隐藏"
-      hint: "使用 Chrome match pattern，例如 *://*.example.com/*。查询参数与片段不参与匹配。"
+    pageScope:
+      include: "仅在这些页面生效"
+      includeHint: "留空则在所有页面生效。"
+      exclude: "但排除这些页面"
+      excludeHint: "优先于上面那份列表。"
+      addExclude: "添加排除规则"
+      syntax: "使用 Chrome match pattern，例如 *://*.example.com/*。查询参数与片段不参与匹配。"
     pagePattern:
       placeholder: "*://*.example.com/*"
       # $1 = 该行的 match pattern
@@ -180,8 +184,7 @@ settings:
       promptHint: "告诉模型拿选中文本做什么。输入 $1 可插入变量。"
       # $1 / $2 = 模板变量名，渲染成字面量 {{name}}
       promptPlaceholder: "例如：提取 $1 的要点，用 $2 回答。"
-      pages: "仅在这些页面显示"
-      pagesHint: "留空则在所有页面显示。"
+      pages: "生效范围"
       transform: "输出后处理脚本（可选）"
       transformHint: "在生成完毕的输出上运行的 JavaScript。入参 text 与 vars，返回要显示的字符串。出错时显示原始输出。脚本在一次性沙箱中执行、拿不到扩展 API，但仍能访问网络——只运行你信得过的脚本。"
       transformPlaceholder: "return text.trim()"

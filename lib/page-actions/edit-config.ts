@@ -7,6 +7,7 @@
 // 只包含用户真正改过的东西——既省空间，也让「用户到底改了什么」在备份 JSON 里一眼可见。
 
 import { listPageActionIds } from './actions';
+import { isUnrestrictedPageScope, type PageScope } from './match';
 import {
   isBuiltinPageActionId,
   newCustomPageActionId,
@@ -30,9 +31,16 @@ function newActionDraft(config: PageActionsConfig): PageActionDraft {
     kind: 'custom',
     label: '',
     systemPrompt: '',
-    pages: [],
+    pages: { include: [], exclude: [] },
     transform: '',
   };
+}
+
+/** 只在范围真有限制时给出可落库的副本；没做任何限制则 undefined（与空 label / 空脚本
+ *  同理，不落库）。 */
+function pageScopeIfRestricted(scope: PageScope): PageScope | undefined {
+  if (isUnrestrictedPageScope(scope)) return undefined;
+  return { include: [...scope.include], exclude: [...scope.exclude] };
 }
 
 /** 内置动作的 overlay：只留用户真正改过的字段，全空则整条删掉。 */
@@ -42,12 +50,13 @@ function overlayFrom(
 ): BuiltinActionOverlay | undefined {
   const label = draft.label.trim();
   const transform = draft.transform.trim();
+  const pages = pageScopeIfRestricted(draft.pages);
   const next: BuiltinActionOverlay = {
     // enabled 由列表上的开关维护，编辑页只是原样带过去。只保留 false——`enabled: true`
     // 与默认完全等价，留着就成了「看起来改过其实没改」的空壳。
     ...(previous?.enabled === false ? { enabled: false } : {}),
     ...(label ? { label } : {}),
-    ...(draft.pages.length ? { pages: [...draft.pages] } : {}),
+    ...(pages ? { pages } : {}),
     ...(transform ? { transform } : {}),
   };
   return Object.keys(next).length > 0 ? next : undefined;
@@ -67,6 +76,7 @@ function saveActionDraft(
   }
 
   const transform = draft.transform.trim();
+  const pages = pageScopeIfRestricted(draft.pages);
   const existing = config.custom.find((a) => a.id === draft.id);
   const next: CustomPageAction = {
     id: draft.id,
@@ -74,7 +84,7 @@ function saveActionDraft(
     systemPrompt: draft.systemPrompt,
     // enabled 由列表上的开关维护；省略即启用，故只有关掉状态需要落库。
     ...(existing?.enabled === false ? { enabled: false } : {}),
-    ...(draft.pages.length ? { pages: [...draft.pages] } : {}),
+    ...(pages ? { pages } : {}),
     ...(transform ? { transform } : {}),
   };
   const custom = existing

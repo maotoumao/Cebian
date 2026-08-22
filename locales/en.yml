@@ -148,9 +148,13 @@ settings:
       followMain: "Same as conversation model"
   pageInteraction:
     title: "Page interaction"
-    hiddenPages:
-      label: "Hide on these pages"
-      hint: "Chrome match patterns, e.g. *://*.example.com/*. Query strings and fragments are ignored."
+    pageScope:
+      include: "Show only on these pages"
+      includeHint: "Leave empty to apply on every page."
+      exclude: "Except on these pages"
+      excludeHint: "Takes precedence over the list above."
+      addExclude: "Add an exception"
+      syntax: "Chrome match patterns, e.g. *://*.example.com/*. Query strings and fragments are ignored."
     pagePattern:
       placeholder: "*://*.example.com/*"
       # $1 = the match pattern on that row
@@ -184,8 +188,7 @@ settings:
       promptHint: "Tells the model what to do with the selected text. Type $1 to insert a variable."
       # $1 / $2 = template variable names, rendered literally as {{name}}
       promptPlaceholder: "e.g. Extract the key points from $1 and reply in $2."
-      pages: "Show only on these pages"
-      pagesHint: "Leave empty to show on every page."
+      pages: "Where it applies"
       transform: "Post-process script (optional)"
       transformHint: "JavaScript run on the finished output. Receives text and vars, returns the string to display. On error the original output is shown. Runs in a throwaway sandbox with no access to extension APIs, but it can still reach the network — only run scripts you trust."
       transformPlaceholder: "return text.trim()"

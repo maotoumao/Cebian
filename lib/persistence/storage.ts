@@ -2,8 +2,9 @@ import { storage } from '#imports';
 // 合法档位由 pi 定义（运行时消费方），Cebian 只持久化其中一个值 → 直接复用其类型，
 // 避免与 pi-agent-core 的定义漂移（compaction / agent state 早已用其 7 档 off~max）
 import type { ThinkingLevel } from '@earendil-works/pi-agent-core';
-// 划词动作配置的形状归属其概念（lib/page-actions），这里只声明持久化位置。
+// 划词动作配置与页面范围的形状归属其概念（lib/page-actions），这里只声明持久化位置。
 import type { PageActionsConfig } from '@/lib/page-actions/types';
+import { resolvePageScope, type PageScope } from '@/lib/page-actions/match';
 
 // ─── Provider credential types ───
 
@@ -297,10 +298,10 @@ export interface PageInteractionSettings {
   toolbarModel?: ModelIdentity;
   /** 翻译目标语言 BCP-47 代码；空串 = 跟随界面语言 */
   translateTarget: string;
-  /** 悬浮球在这些页面隐藏（match pattern，见 lib/page-actions/match.ts）。空 = 不隐藏 */
-  ballHiddenPages: string[];
-  /** 划词工具条在这些页面隐藏。与悬浮球各存一份——两块 UI 的干扰场景不同 */
-  toolbarHiddenPages: string[];
+  /** 悬浮球的页面生效范围（include 空 = 所有页面，exclude 优先扣除） */
+  ballPages: PageScope;
+  /** 划词工具条的页面生效范围。与悬浮球各存一份——两块 UI 的干扰场景不同 */
+  toolbarPages: PageScope;
 }
 
 /** 页面交互设置默认值（新装机 fallback + 旧装机字段回填共用单一真理源）。 */
@@ -308,20 +309,51 @@ const DEFAULT_PAGE_INTERACTION: PageInteractionSettings = {
   showFloatingBall: true,
   showSelectionToolbar: true,
   translateTarget: '',
-  ballHiddenPages: [],
-  toolbarHiddenPages: [],
+  ballPages: { include: [], exclude: [] },
+  toolbarPages: { include: [], exclude: [] },
 };
 
-/** 取规范的页面交互设置：补齐旧装机 / 部分写入缺失的字段。读设置的唯一入口。
- *  数组字段复制一份返回，避免调用方就地改动污染默认值常量。 */
+/**
+ * 未发布的开发版本里，两块 UI 的范围各是一份「隐藏页面」列表。读取时按 exclude 映射
+ * 过来，免得开发期配过的规则静默失效（发布用户没有这份数据）。
+ *
+ * 这层兼容只在**读**路径上：备份采集 / 恢复原样读写值，未编辑过的数据会一直是旧形状，
+ * 故它得留着，除非哪天真写一次持久化迁移。
+ */
+interface LegacyHiddenPages {
+  ballHiddenPages?: string[];
+  toolbarHiddenPages?: string[];
+}
+
+/**
+ * 取规范的页面交互设置：补齐旧装机 / 部分写入缺失的字段。读设置的唯一入口。
+ *
+ * 两点要紧：
+ * 1. 版本判据是「存的值里**有没有**新字段」，而不是「新字段是否为空」。用户把范围清空
+ *    也是一种明确选择，若按「空就回读旧列表」处理，旧规则会被一次次复活、永远删不掉。
+ * 2. 返回值显式只含规范字段，把旧字段丢掉——主面板是整个对象写回 storage 的，带着旧
+ *    字段就会把它一直存下去。
+ */
 export function resolvePageInteractionSettings(
   s: Partial<PageInteractionSettings> | undefined,
 ): PageInteractionSettings {
   const merged = { ...DEFAULT_PAGE_INTERACTION, ...s };
+  const legacy = s as LegacyHiddenPages | undefined;
+  const scopeOf = (
+    key: 'ballPages' | 'toolbarPages',
+    legacyHidden: string[] | undefined,
+  ): PageScope =>
+    s && Object.hasOwn(s, key)
+      ? resolvePageScope(merged[key])
+      : { include: [], exclude: [...(legacyHidden ?? [])] };
+
   return {
-    ...merged,
-    ballHiddenPages: [...merged.ballHiddenPages],
-    toolbarHiddenPages: [...merged.toolbarHiddenPages],
+    showFloatingBall: merged.showFloatingBall,
+    showSelectionToolbar: merged.showSelectionToolbar,
+    ...(merged.toolbarModel ? { toolbarModel: merged.toolbarModel } : {}),
+    translateTarget: merged.translateTarget,
+    ballPages: scopeOf('ballPages', legacy?.ballHiddenPages),
+    toolbarPages: scopeOf('toolbarPages', legacy?.toolbarHiddenPages),
   };
 }
 

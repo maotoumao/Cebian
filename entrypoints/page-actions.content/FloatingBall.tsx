@@ -15,7 +15,7 @@ import {
   DEFAULT_FLOATING_BALL_POSITION,
 } from '@/lib/persistence/storage';
 import { toggleSidePanel } from '@/lib/page-actions/channel';
-import { matchesAnyPagePattern } from '@/lib/page-actions/match';
+import { matchesPageScope } from '@/lib/page-actions/match';
 import { t } from '@/lib/i18n';
 import { useCurrentUrl } from './useCurrentUrl';
 
@@ -161,14 +161,14 @@ function BallButton() {
 
 /**
  * FloatingBall — 页面右 / 左侧的悬浮球，内容为扩展图标。
- * 受 `pageInteractionSettings.showFloatingBall` 与 `ballHiddenPages` 实时控制：关闭或
- * 当前页命中隐藏规则时不挂载按钮（连同其拖拽监听一并卸载）。
+ * 受 `pageInteractionSettings.showFloatingBall` 与 `ballPages`（页面生效范围）实时控制：
+ * 关闭或当前页不在范围内时不挂载按钮（连同其拖拽监听一并卸载）。
  */
 export function FloatingBall() {
   const [stored] = useStorageItem(pageInteractionSettings, undefined);
   const settings = resolvePageInteractionSettings(stored);
   const url = useCurrentUrl();
   if (!settings.showFloatingBall) return null;
-  if (matchesAnyPagePattern(url, settings.ballHiddenPages)) return null;
+  if (!matchesPageScope(url, settings.ballPages)) return null;
   return <BallButton />;
 }

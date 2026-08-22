@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CodeMirrorEditor } from '@/components/editor/CodeMirrorEditor';
-import { PagePatternsEditor } from './PagePatternsEditor';
+import { PageScopeEditor } from './PageScopeEditor';
+import { TranslateTargetSelector } from './TranslateTargetSelector';
 import { useIsDark } from '@/hooks/useIsDark';
 import type { PageActionDraft } from '@/lib/page-actions/types';
 import { t } from '@/lib/i18n';
@@ -26,12 +27,13 @@ interface ToolbarActionEditorProps {
  * 又会把半成品配置推给正在浏览的页面。
  *
  * 内置动作只暴露外观 / 生效范围（名称、页面规则、后处理脚本），**不展示提示词**
- * ——它定义在代码里且不可改，展示出来只会让人以为能改。
+ * ——它定义在代码里且不可改，展示出来只会让人以为能改。个别内置动作有自己的专属参数
+ * （目前只有「翻译」的目标语言），按 `draft` 上有没有对应字段决定是否渲染——为一个字段
+ * 建通用的参数描述符体系是过度设计。
  */
 export function ToolbarActionEditor({ initial, onSave, saving, onBack }: ToolbarActionEditorProps) {
   const [draft, setDraft] = useState<PageActionDraft>(initial);
   const isDark = useIsDark();
-  const pagesLabelId = useId();
   const promptLabelId = useId();
   const transformLabelId = useId();
 
@@ -106,18 +108,29 @@ export function ToolbarActionEditor({ initial, onSave, saving, onBack }: Toolbar
         </div>
       )}
 
+      {draft.translateTarget !== undefined && (
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0 space-y-1">
+            <Label className="text-sm">{t('settings.pageInteraction.translate.label')}</Label>
+            <p className="text-xs text-muted-foreground">
+              {t('settings.pageInteraction.translate.hint')}
+            </p>
+          </div>
+          <div className="shrink-0">
+            <TranslateTargetSelector
+              value={draft.translateTarget}
+              onSelect={(target) => setDraft({ ...draft, translateTarget: target })}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="space-y-1.5">
-        <Label id={pagesLabelId} className="text-sm">
-          {t('settings.pageInteraction.actions.pages')}
-        </Label>
-        <PagePatternsEditor
-          patterns={draft.pages}
+        <Label className="text-sm">{t('settings.pageInteraction.actions.pages')}</Label>
+        <PageScopeEditor
+          scope={draft.pages}
           onChange={(pages) => setDraft({ ...draft, pages })}
-          labelledBy={pagesLabelId}
         />
-        <p className="text-xs text-muted-foreground">
-          {t('settings.pageInteraction.actions.pagesHint')}
-        </p>
       </div>
 
       <div className="space-y-1.5">

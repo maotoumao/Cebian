@@ -144,9 +144,13 @@ settings:
       followMain: "與對話模型相同"
   pageInteraction:
     title: "頁面互動"
-    hiddenPages:
-      label: "在這些頁面隱藏"
-      hint: "使用 Chrome match pattern，例如 *://*.example.com/*。查詢參數與片段不參與比對。"
+    pageScope:
+      include: "僅在這些頁面生效"
+      includeHint: "留空則在所有頁面生效。"
+      exclude: "但排除這些頁面"
+      excludeHint: "優先於上面那份清單。"
+      addExclude: "新增排除規則"
+      syntax: "使用 Chrome match pattern，例如 *://*.example.com/*。查詢參數與片段不參與比對。"
     pagePattern:
       placeholder: "*://*.example.com/*"
       # $1 = 該列的 match pattern
@@ -180,8 +184,7 @@ settings:
       promptHint: "告訴模型拿選取文字做什麼。輸入 $1 可插入變數。"
       # $1 / $2 = 模板變數名，渲染成字面量 {{name}}
       promptPlaceholder: "例如：擷取 $1 的要點，用 $2 回答。"
-      pages: "僅在這些頁面顯示"
-      pagesHint: "留空則在所有頁面顯示。"
+      pages: "生效範圍"
       transform: "輸出後處理指令稿（選填）"
       transformHint: "在產生完畢的輸出上執行的 JavaScript。參數為 text 與 vars，回傳要顯示的字串。出錯時顯示原始輸出。指令稿在一次性沙箱中執行、拿不到擴充功能 API，但仍能存取網路——只執行你信得過的指令稿。"
       transformPlaceholder: "return text.trim()"

@@ -14,6 +14,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import type { ResolvedPageAction } from '@/lib/page-actions/actions';
+import { isUnrestrictedPageScope } from '@/lib/page-actions/match';
 import { t } from '@/lib/i18n';
 
 interface ToolbarActionListProps {
@@ -29,6 +30,10 @@ interface ToolbarActionListProps {
 /**
  * 工具条动作列表：内置与自定义混排一列，行上直接启停 / 调序 / 进编辑，自定义可删。
  * 顺序即工具条上的显示顺序，所以这里不做分组——用户看到的就是实际排布。
+ *
+ * 行内的 ChevronRight 放在「进编辑」那个按钮**内部**并靠右（而不是整行最右）：它标示的
+ * 是「点这块进编辑」，摆在按钮外面就成了看着能点、点了没反应；而 Switch 与删除是另外两个
+ * 独立控件，本不该被它涵盖。同时它保持 aria-hidden，无障碍名字由行按钮的 aria-label 给。
  */
 export function ToolbarActionList({
   actions,
@@ -83,11 +88,12 @@ export function ToolbarActionList({
                   ? t('settings.pageInteraction.actions.builtin')
                   : t('settings.pageInteraction.actions.custom')}
               </Badge>
-              {action.pages.length > 0 && (
+              {!isUnrestrictedPageScope(action.pages) && (
                 <Badge variant="outline" className="shrink-0 text-[10px]">
                   {t('settings.pageInteraction.actions.pageScoped')}
                 </Badge>
               )}
+              <ChevronRight className="ml-auto size-4 shrink-0 text-muted-foreground" aria-hidden />
             </button>
 
             <Switch
@@ -133,8 +139,6 @@ export function ToolbarActionList({
                 </AlertDialogContent>
               </AlertDialog>
             )}
-
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           </li>
         ))}
       </ul>

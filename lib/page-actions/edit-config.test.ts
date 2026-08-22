@@ -22,7 +22,7 @@ function draft(over: Partial<PageActionDraft> = {}): PageActionDraft {
     kind: 'custom',
     label: 'Extract',
     systemPrompt: 'do it',
-    pages: [],
+    pages: { include: [], exclude: [] },
     transform: '',
     ...over,
   };
@@ -69,12 +69,25 @@ describe('saveActionDraft — 自定义动作', () => {
     expect(next.custom[0]).not.toHaveProperty('transform');
   });
 
-  it('pages / transform 有内容则写入，且数组是复制的', () => {
-    const pages = ['https://a.com/*'];
+  it('pages / transform 有内容则写入，且范围是复制的', () => {
+    const pages = { include: ['https://a.com/*'], exclude: [] };
     const next = saveActionDraft(config(), draft({ pages, transform: 'return text' }));
     expect(next.custom[0].pages).toEqual(pages);
     expect(next.custom[0].pages).not.toBe(pages);
     expect(next.custom[0].transform).toBe('return text');
+  });
+
+  it('只配了 exclude 也算有限制，照样落库', () => {
+    const next = saveActionDraft(
+      config(),
+      draft({ pages: { include: [], exclude: ['https://a.com/*'] } }),
+    );
+    expect(next.custom[0].pages).toEqual({ include: [], exclude: ['https://a.com/*'] });
+  });
+
+  it('两个列表都空 = 没做限制 → 不落库', () => {
+    const next = saveActionDraft(config(), draft({ pages: { include: [], exclude: [] } }));
+    expect(next.custom[0]).not.toHaveProperty('pages');
   });
 
   it('不改入参', () => {
@@ -92,10 +105,18 @@ describe('saveActionDraft — 内置动作', () => {
   });
 
   it('全部字段清空 → 整条 overlay 删除（回到默认）', () => {
-    const before = config({ builtin: { explain: { label: 'X', pages: ['https://a.com/*'] } } });
+    const before = config({
+      builtin: { explain: { label: 'X', pages: { include: ['https://a.com/*'], exclude: [] } } },
+    });
     const next = saveActionDraft(
       before,
-      draft({ id: 'explain', kind: 'builtin', label: '', pages: [], transform: '' }),
+      draft({
+        id: 'explain',
+        kind: 'builtin',
+        label: '',
+        pages: { include: [], exclude: [] },
+        transform: '',
+      }),
     );
     expect(next.builtin.explain).toBeUndefined();
   });

@@ -7,7 +7,7 @@
 
 import { t } from '@/lib/i18n';
 import { replaceTemplateVars } from '@/lib/ai-config/template';
-import { matchesAnyPagePattern } from './match';
+import { matchesPageScope, resolvePageScope, type PageScope } from './match';
 import {
   BUILTIN_PAGE_ACTION_IDS,
   isBuiltinPageActionId,
@@ -126,8 +126,8 @@ export interface ResolvedPageAction {
   kind: 'builtin' | 'custom';
   /** 是否显示在工具条上（缺省即 true 已在此归一）。 */
   enabled: boolean;
-  /** 仅在这些页面显示；空数组 = 所有页面。 */
-  pages: string[];
+  /** 页面生效范围（已归一：两个列表都在，空 include = 所有页面）。 */
+  pages: PageScope;
   /** 输出后处理脚本（函数体）；缺省 = 不做后处理。 */
   transform?: string;
   /** LLM 的 system 提示词（含动作指令）。 */
@@ -143,7 +143,7 @@ function resolveCustom(action: CustomPageAction): ResolvedPageAction {
     kind: 'custom',
     label: action.label,
     enabled: action.enabled !== false,
-    pages: action.pages ?? [],
+    pages: resolvePageScope(action.pages),
     renderSystemPrompt: (params) =>
       replaceTemplateVars(action.systemPrompt, stringParams(params)),
     renderUserIntent: (text) => text,
@@ -165,7 +165,7 @@ function resolveBuiltin(def: PageActionDef, config: PageActionsConfig): Resolved
     // 用户没起名（或清空了）就回落到跟随界面语言的内置文案。
     label: label || def.getLabel(),
     enabled: overlay?.enabled !== false,
-    pages: overlay?.pages ?? [],
+    pages: resolvePageScope(overlay?.pages),
     ...(overlay?.transform ? { transform: overlay.transform } : {}),
   };
 }
@@ -178,12 +178,6 @@ export function stringParams(params: PageActionParams): Record<string, string> {
     if (typeof v === 'string') out[k] = v;
   }
   return out;
-}
-
-/** 动作是否在当前页显示：pages 为空 = 所有页面，非空 = 只在命中的页面。 */
-function showsOnPage(pages: string[], url: string): boolean {
-  if (pages.length === 0) return true;
-  return matchesAnyPagePattern(url, pages);
 }
 
 /**
@@ -253,11 +247,14 @@ export function listPageActions(config: PageActionsConfig): ResolvedPageAction[]
 
 /**
  * 当前页该显示哪些动作、按什么顺序——工具条渲染的唯一入口：
- * 全量列表里滤掉被关掉的与页面规则不命中的。
+ * 全量列表里滤掉被关掉的与页面范围不命中的。
+ *
+ * 动作范围是在**工具条范围之内**再收窄：工具条自身不在生效范围时整条都不渲染
+ * （见 SelectionToolbar），故这里只判动作自己的范围，两层是天然的「与」关系。
  */
 export function visibleToolbarActions(
   config: PageActionsConfig,
   url: string,
 ): ResolvedPageAction[] {
-  return listPageActions(config).filter((a) => a.enabled && showsOnPage(a.pages, url));
+  return listPageActions(config).filter((a) => a.enabled && matchesPageScope(url, a.pages));
 }

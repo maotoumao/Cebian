@@ -57,8 +57,10 @@ describe('visibleToolbarActions — 内置 overlay', () => {
     expect(blank.label.length).toBeGreaterThan(0);
   });
 
-  it('overlay 带 pages 时只在命中页显示', () => {
-    const c = config({ builtin: { translate: { pages: ['https://other.com/*'] } } });
+  it('overlay 的 include 只在命中页显示', () => {
+    const c = config({
+      builtin: { translate: { pages: { include: ['https://other.com/*'], exclude: [] } } },
+    });
     expect(visibleToolbarActions(c, PAGE).map((a) => a.id)).toEqual(['explain', 'summarize']);
     expect(visibleToolbarActions(c, 'https://other.com/x').map((a) => a.id)).toContain('translate');
   });
@@ -84,7 +86,10 @@ describe('visibleToolbarActions — 自定义动作', () => {
   it('enabled=false 不显示；pages 不命中不显示', () => {
     expect(visibleToolbarActions(config({ custom: [custom({ enabled: false })] }), PAGE)).toHaveLength(3);
     expect(
-      visibleToolbarActions(config({ custom: [custom({ pages: ['https://nope.com/*'] })] }), PAGE),
+      visibleToolbarActions(
+        config({ custom: [custom({ pages: { include: ['https://nope.com/*'], exclude: [] } })] }),
+        PAGE,
+      ),
     ).toHaveLength(3);
   });
 
@@ -103,6 +108,34 @@ describe('visibleToolbarActions — 自定义动作', () => {
     ).slice(-1);
     // page_url 传了对象 → 视为没给值（内置变量缺失即空串）。
     expect(action.renderSystemPrompt({ page_url: { a: 1 }, context: 'ctx' })).toBe('|ctx');
+  });
+});
+
+describe('visibleToolbarActions — 页面范围的两个方向', () => {
+  it('exclude 命中即不显示（即使 include 为空 = 本来所有页面都显示）', () => {
+    const c = config({
+      builtin: { explain: { pages: { include: [], exclude: ['https://example.com/*'] } } },
+    });
+    expect(visibleToolbarActions(c, PAGE).map((a) => a.id)).toEqual(['translate', 'summarize']);
+    expect(visibleToolbarActions(c, 'https://other.com/').map((a) => a.id)).toContain('explain');
+  });
+
+  it('exclude 优先于 include：只在某站生效但排除其中某段路径', () => {
+    const c = config({
+      builtin: {
+        explain: {
+          pages: {
+            include: ['https://example.com/*'],
+            exclude: ['https://example.com/docs/*'],
+          },
+        },
+      },
+    });
+    expect(visibleToolbarActions(c, 'https://example.com/blog').map((a) => a.id)).toContain(
+      'explain',
+    );
+    // PAGE 是 https://example.com/docs/intro —— 命中 include 也照样被 exclude 扣掉。
+    expect(visibleToolbarActions(c, PAGE).map((a) => a.id)).not.toContain('explain');
   });
 });
 

@@ -18,7 +18,7 @@ import {
 } from '@/lib/persistence/storage';
 import { visibleToolbarActions } from '@/lib/page-actions/actions';
 import type { PageActionId } from '@/lib/page-actions/types';
-import { matchesAnyPagePattern } from '@/lib/page-actions/match';
+import { matchesPageScope } from '@/lib/page-actions/match';
 import { t } from '@/lib/i18n';
 import { copyText } from './clipboard';
 import { gatherPageVars } from './context';
@@ -294,8 +294,8 @@ function actionIcon(id: string, size: number) {
 /**
  * SelectionToolbar — 划词工具条：选中文本时锚定在选区附近，提供复制 + 一组可配置动作
  * （内置解释 / 翻译 / 总结，加用户自定义动作），左侧把手可拖拽移动。
- * 受 `pageInteractionSettings`（总开关 + 隐藏页面）与 `pageActionsConfig`（动作启停 /
- * 改名 / 页面规则 / 排序）实时控制。点动作后展开内联结果卡（ResultCard）。
+ * 受 `pageInteractionSettings`（总开关 + 页面生效范围）与 `pageActionsConfig`（动作启停 /
+ * 改名 / 页面范围 / 排序）实时控制。点动作后展开内联结果卡（ResultCard）。
  */
 export function SelectionToolbar() {
   const [stored] = useStorageItem(pageInteractionSettings, undefined);
@@ -303,9 +303,10 @@ export function SelectionToolbar() {
   const settings = resolvePageInteractionSettings(stored);
   const url = useCurrentUrl();
 
-  // 命中隐藏规则时连选区监听一起停掉（enabled=false 会清空锚点），不只是不渲染。
+  // 不在生效范围时连选区监听一起停掉（enabled=false 会清空锚点），不只是不渲染。
+  // 工具条整条不渲染，故动作各自的范围天然是在这之内再收窄。
   const enabled =
-    settings.showSelectionToolbar && !matchesAnyPagePattern(url, settings.toolbarHiddenPages);
+    settings.showSelectionToolbar && matchesPageScope(url, settings.toolbarPages);
   const actions = useMemo(
     () => visibleToolbarActions(resolvePageActionsConfig(storedActions), url),
     [storedActions, url],
@@ -336,6 +337,17 @@ export function SelectionToolbar() {
     },
     [],
   );
+
+  // 工具条被关掉 / 移出生效范围时，关掉已打开的结果卡：留着它会继续跑流式请求，
+  // 也让「工具条不在范围就整条不渲染」这个约定不成立。卸载 ResultCard 即断端口取消。
+  useEffect(() => {
+    if (!enabled) setAction(null);
+  }, [enabled]);
+
+  // 当前动作因 URL 变化不再命中自己的页面范围（或被删 / 被关）时，同样关掉卡片。
+  useEffect(() => {
+    setAction((prev) => (prev && !actions.some((a) => a.id === prev.id) ? null : prev));
+  }, [actions]);
 
   // 新选区（文本变化）时重置拖拽位置，让工具条重新锚定选区。
   const selectionText = anchor?.text ?? null;
@@ -410,6 +422,10 @@ export function SelectionToolbar() {
     },
     [anchor],
   );
+
+  // 不在生效范围时整条都不渲染——包括已打开的结果卡。放在所有 hooks 之后，
+  // 与下面清空 action 的 effect 一起保证卡片不会在范围外残留、后台流式也随卸载取消。
+  if (!enabled) return null;
 
   // 结果卡打开时只展示卡片（隐藏工具条）；关闭后若选区仍在则工具条重现。
   if (action) {
