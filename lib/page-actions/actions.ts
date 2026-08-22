@@ -21,7 +21,7 @@ type PageActionParams = Record<string, unknown>;
 
 interface PageActionDef {
   id: PageActionId;
-  /** 缺省按钮文本（内置动作跟随界面语言；用户 overlay 可覆盖）。 */
+  /** 按钮文本（内置动作固定跟随界面语言）。 */
   getLabel(): string;
   /** 本地化的缺省 system 提示词模板。 */
   getSystemPrompt(): string;
@@ -83,7 +83,7 @@ function getBuiltinDefaultLabel(id: BuiltinPageActionId): string {
  */
 export interface ResolvedPageAction {
   id: PageActionId;
-  /** 最终显示文本（内置的界面文案已与用户 overlay 合并完）。 */
+  /** 最终显示文本（内置动作固定使用界面文案）。 */
   label: string;
   kind: 'builtin' | 'custom';
   /** 是否显示在工具条上（缺省即 true 已在此归一）。 */

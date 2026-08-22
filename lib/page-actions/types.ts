@@ -154,7 +154,7 @@ export interface CustomPageAction {
 export interface BuiltinActionOverlay {
   /** 是否显示在工具条上。缺省 = true。 */
   enabled?: boolean;
-  /** 覆盖按钮文本；缺省 / 空串 = 回落 i18n 文案（跟随界面语言）。 */
+  /** 旧版本的按钮文本覆盖，仅兼容读取，运行时忽略。 */
   label?: string;
   /** 覆盖 system 提示词模板；缺省 / 空串 = 回落 i18n 默认提示词。 */
   systemPrompt?: string;

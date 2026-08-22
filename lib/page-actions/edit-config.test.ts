@@ -221,6 +221,42 @@ describe('saveActionDraft — 内置动作', () => {
     const reset = saveActionDraft(overridden, resetDraft);
     expect(reset.builtin.explain).toBeUndefined();
   });
+
+  it('保存时只清理旧名称覆盖，保留其它设置与顺序', () => {
+    const pages = { include: ['https://example.com/*'], exclude: [] };
+    const before = config({
+      builtin: {
+        explain: {
+          enabled: false,
+          label: 'Legacy',
+          systemPrompt: 'Custom prompt',
+          pages,
+          transform: 'function transform(text) { return text; }',
+        },
+      },
+      order: ['translate', 'explain', 'summarize'],
+    });
+    const next = saveActionDraft(
+      before,
+      draft({
+        id: 'explain',
+        kind: 'builtin',
+        label: 'pageActions.toolbar.explain',
+        systemPrompt: 'Custom prompt',
+        systemPromptOverridden: true,
+        pages,
+        transform: 'function transform(text) { return text; }',
+      }),
+    );
+
+    expect(next.builtin.explain).toEqual({
+      enabled: false,
+      systemPrompt: 'Custom prompt',
+      pages,
+      transform: 'function transform(text) { return text; }',
+    });
+    expect(next.order).toEqual(['translate', 'explain', 'summarize']);
+  });
 });
 
 describe('setActionEnabled', () => {
