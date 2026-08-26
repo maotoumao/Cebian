@@ -68,4 +68,22 @@ describe('listUsableModelGroups / hasUsableModel', () => {
     };
     expect(hasUsableModel(verified, NO_CUSTOM)).toBe(true);
   });
+
+  it('orcarouter：填了 key 就列出本地目录模型', () => {
+    const creds: ProviderCredentials = {
+      orcarouter: { authType: 'apiKey', apiKey: 'sk-orca-x', verified: true },
+    };
+    const groups = listUsableModelGroups(creds, NO_CUSTOM);
+    const group = groups.find((g) => g.provider === 'orcarouter');
+    expect(group).toBeDefined();
+    expect(group!.models.map((m) => m.id)).toContain('orcarouter/auto');
+    expect(hasUsableModel(creds, NO_CUSTOM)).toBe(true);
+  });
+
+  it('orcarouter：空 key → 不可选', () => {
+    const creds: ProviderCredentials = {
+      orcarouter: { authType: 'apiKey', apiKey: '', verified: true },
+    };
+    expect(hasUsableModel(creds, NO_CUSTOM)).toBe(false);
+  });
 });

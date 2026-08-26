@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
 import { isCustomProvider } from "@/lib/providers/custom-models";
+import { ORCAROUTER_MODELS, ORCAROUTER_PROVIDER } from "@/lib/providers/orcarouter";
 import { t } from "@/lib/i18n";
 import type { ApiKeyCredential } from "@/lib/persistence/storage";
 
@@ -42,7 +43,8 @@ export function ProviderApiKeyItem({
 
   const cheapestModel = useMemo(() => {
     try {
-      const models = modelsProp ?? (isCustomProvider(provider) ? [] : (getBuiltinModels(provider as BuiltinProvider) as Model<Api>[]));
+      const models = modelsProp
+        ?? (provider === ORCAROUTER_PROVIDER ? ORCAROUTER_MODELS : (isCustomProvider(provider) ? [] : (getBuiltinModels(provider as BuiltinProvider) as Model<Api>[])));
       if (models.length === 0) return undefined;
 
       return models.reduce((min, m) =>

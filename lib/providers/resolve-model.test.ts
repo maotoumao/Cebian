@@ -86,6 +86,18 @@ describe('resolveModel — built-in provider', () => {
     expect(model).not.toBeNull();
     expect(model!.headers?.['HTTP-Referer']).toBeUndefined();
   });
+
+  it('orcarouter 从本地目录解析，且带 Cebian 归因头', () => {
+    const model = resolveModel({ provider: 'orcarouter', modelId: 'orcarouter/auto' }, NO_CREDS, NO_CUSTOM);
+    expect(model).not.toBeNull();
+    expect(model!.baseUrl).toBe('https://api.orcarouter.ai/v1');
+    expect(model!.headers?.['HTTP-Referer']).toBe('https://cebian.catcat.work');
+    expect(model!.headers?.['X-Title']).toBe('Cebian');
+  });
+
+  it('orcarouter 下未知 modelId → null', () => {
+    expect(resolveModel({ provider: 'orcarouter', modelId: 'nope' }, NO_CREDS, NO_CUSTOM)).toBeNull();
+  });
 });
 
 describe('resolveModel — github-copilot baseUrl', () => {

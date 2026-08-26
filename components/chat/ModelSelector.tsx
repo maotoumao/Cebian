@@ -6,6 +6,7 @@ import { Check, ChevronDown, Settings } from 'lucide-react';
 
 import type { ModelIdentity, ProviderCredentials, CustomProviderConfig } from '@/lib/persistence/storage';
 import { isCustomProvider, findCustomProvider } from '@/lib/providers/custom-models';
+import { findOrcaRouterModel } from '@/lib/providers/orcarouter';
 import { listUsableModelGroups } from '@/lib/providers/usable-models';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -63,6 +64,10 @@ export function ModelSelector({
     }
 
     // Built-in provider
+    if (activeModel.provider === 'orcarouter') {
+      const orcaRouterModel = findOrcaRouterModel(activeModel.modelId);
+      if (orcaRouterModel) return orcaRouterModel.name;
+    }
     try {
       const models = getBuiltinModels(activeModel.provider as BuiltinProvider) as Model<Api>[];
       return models.find(m => m.id === activeModel.modelId)?.name ?? activeModel.modelId;

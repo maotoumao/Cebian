@@ -2,6 +2,7 @@ import { getBuiltinModels, type BuiltinProvider } from '@earendil-works/pi-ai/pr
 import type { Api, Model } from '@earendil-works/pi-ai';
 import type { ProviderCredential, CustomProviderConfig } from '@/lib/persistence/storage';
 import { isCustomProvider, findCustomProvider, getCustomModels } from '@/lib/providers/custom-models';
+import { ORCAROUTER_MODELS, ORCAROUTER_PROVIDER } from '@/lib/providers/orcarouter';
 import { t } from '@/lib/i18n';
 
 interface ProviderSummaryProps {
@@ -20,6 +21,10 @@ export function ProviderSummary({ provider, credential, customProviders }: Provi
       models = getCustomModels(config);
       displayName = config.name;
     }
+  } else if (provider === ORCAROUTER_PROVIDER) {
+    // OrcaRouter's catalog lives in Cebian, not in pi-ai's generated catalog.
+    models = ORCAROUTER_MODELS;
+    displayName = 'OrcaRouter';
   } else {
     try {
       models = getBuiltinModels(provider as BuiltinProvider) as Model<Api>[];

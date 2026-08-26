@@ -30,6 +30,7 @@ export const APIKEY_PROVIDERS = [
   { provider: 'nvidia', label: 'NVIDIA NIM' },
   { provider: 'openai', label: 'OpenAI', pinned: true },
   { provider: 'openrouter', label: 'OpenRouter', pinned: true },
+  { provider: 'orcarouter', label: 'OrcaRouter' },
   { provider: 'together', label: 'Together AI' },
   { provider: 'vercel-ai-gateway', label: 'Vercel AI Gateway' },
   { provider: 'xai', label: 'xAI' },

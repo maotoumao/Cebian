@@ -2,6 +2,7 @@ import { getBuiltinModels, type BuiltinProvider } from '@earendil-works/pi-ai/pr
 import type { Api, Model } from '@earendil-works/pi-ai';
 import type { ProviderCredentials, CustomProviderConfig } from '@/lib/persistence/storage';
 import { isCustomProvider, getCustomModels, customProviderKey } from '@/lib/providers/custom-models';
+import { ORCAROUTER_MODELS, ORCAROUTER_PROVIDER } from '@/lib/providers/orcarouter';
 
 /** 一组可选模型：同一 provider 下的全部模型 + 展示用 label。 */
 export interface ModelGroup {
@@ -42,6 +43,11 @@ export function listUsableModelGroups(
     // 自定义的已在上面处理
     if (isCustomProvider(provider)) continue;
     if (seen.has(provider)) continue;
+    if (provider === ORCAROUTER_PROVIDER) {
+      // OrcaRouter's catalog lives in Cebian, not in pi-ai's generated catalog.
+      groups.push({ provider, label: provider, models: ORCAROUTER_MODELS });
+      continue;
+    }
     try {
       const models = getBuiltinModels(provider as BuiltinProvider) as Model<Api>[];
       if (models.length > 0) {

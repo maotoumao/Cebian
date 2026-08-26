@@ -7,6 +7,7 @@ import type {
 } from '@/lib/persistence/storage';
 import { isCustomProvider, findCustomModel } from '@/lib/providers/custom-models';
 import { getCopilotBaseUrl } from '@/lib/providers/oauth';
+import { findOrcaRouterModel } from '@/lib/providers/orcarouter';
 
 /**
  * 把一个模型身份（provider key + modelId）解析成可用的 pi-ai 运行时 `Model`。
@@ -17,7 +18,7 @@ import { getCopilotBaseUrl } from '@/lib/providers/oauth';
  *
  * 解析不出（未知内置 provider / 自定义模型查无 / modelId 不存在）时返回 null，由调用
  * 方决定如何「诚实报错」。custom provider 查表、copilot OAuth baseUrl、openrouter 归因
- * 头三条特例都在此处理，保证无论身份来自全局还是会话都一致。
+ * 头、orcarouter 本地目录四条特例都在此处理，保证无论身份来自全局还是会话都一致。
  */
 export function resolveModel(
   identity: ModelIdentity,
@@ -28,6 +29,10 @@ export function resolveModel(
 
   if (isCustomProvider(identity.provider)) {
     model = findCustomModel(customProviders, identity.provider, identity.modelId) ?? undefined;
+  } else if (identity.provider === 'orcarouter') {
+    // OrcaRouter's native catalog lives in Cebian (see orcarouter.ts), not in
+    // pi-ai's generated catalog, so resolve it separately.
+    model = findOrcaRouterModel(identity.modelId);
   } else {
     try {
       const models = getBuiltinModels(identity.provider as BuiltinProvider) as Model<Api>[];
