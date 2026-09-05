@@ -33,7 +33,7 @@ import {
 } from '@/lib/agent/message-helpers';
 import { getToolLabel } from '@/lib/tools/labels';
 import { uiToolRegistry } from '@/lib/tools/ui-registry';
-import { isCompactionSummary } from '@/lib/agent/compaction';
+import { isCompactionSummary } from '@/lib/agent/compaction-summary';
 import { isPermissionRequest } from '@/lib/agent/tool-permissions';
 import { useBackgroundAgent } from '@/hooks/useBackgroundAgent';
 import { useStickToBottom } from '@/hooks/useStickToBottom';

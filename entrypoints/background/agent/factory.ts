@@ -17,7 +17,7 @@ import type { Api, Model, Message } from '@earendil-works/pi-ai';
 import { streamSimple } from '@earendil-works/pi-ai/compat';
 import type { ThinkingLevel } from '@/lib/persistence/storage';
 import { resolveProviderApiKey } from '../providers/credentials';
-import { getRetainedTail, isCompactionSummary, type CompactionSummaryMessage } from '@/lib/agent/compaction';
+import { getRetainedTail, isCompactionSummary, type CompactionSummaryMessage } from '@/lib/agent/compaction-summary';
 import { sanitizeAgentMessages } from '@/lib/agent/message-helpers';
 
 // ─── Agent factory ───

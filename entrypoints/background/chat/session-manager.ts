@@ -28,14 +28,16 @@ import { resolveProviderApiKey } from '../providers/credentials';
 import {
   COMPACTION_SETTINGS,
   findCompactionCutPoint,
-  getRetainedTail,
   runCompaction,
-  createCompactionSummaryMessage,
-  isCompactionSummary,
   usableCompactionTarget,
-  type CompactionSummaryMessage,
   type CompactionTarget,
 } from '@/lib/agent/compaction';
+import {
+  createCompactionSummaryMessage,
+  getRetainedTail,
+  isCompactionSummary,
+  type CompactionSummaryMessage,
+} from '@/lib/agent/compaction-summary';
 import { appendSessionMessage, sessionStore } from './session-store';
 import type { SessionTreeMeta } from '@/lib/persistence/session-tree';
 import {

@@ -25,7 +25,7 @@
  *   `branch_summary` → 不进消息流（分支摘要的呈现由分支导航子任务另行处理）。
  */
 import type { AgentMessage, Entry } from '@earendil-works/pi-agent-core';
-import { getRetainedTail, isCompactionSummary, type CompactionSummaryMessage } from './compaction';
+import { getRetainedTail, isCompactionSummary, type CompactionSummaryMessage } from './compaction-summary';
 import {
   isPermissionRequest,
   PERMISSION_DECISION_CUSTOM_TYPE,
