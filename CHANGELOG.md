@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## 1.7.0 - 2026-09-05
+
 ### 新增 / Added
 
 - VFS 文件浏览器升级为通用预览器：HTML 文件在独立的沙箱页里直接渲染成网页（内联脚本与 CDN 脚本都能跑，但拿不到扩展 API 和 Cebian 的数据），页头可随时切到源码；PDF 直接按页阅读，底部有页码与缩放；源代码按语言高亮并带行号；SVG 既能看图也能看源码。Firefox 不支持沙箱页，HTML 预览退化为不运行脚本的静态渲染 ([#48](https://github.com/maotoumao/Cebian/issues/48))
