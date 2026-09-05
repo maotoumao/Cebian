@@ -21,8 +21,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### 新增 / Added
 
 - VFS 文件浏览器升级为通用预览器：HTML 文件在独立的沙箱页里直接渲染成网页（内联脚本与 CDN 脚本都能跑，但拿不到扩展 API 和 Cebian 的数据），页头可随时切到源码；PDF 直接按页阅读，底部有页码与缩放；源代码按语言高亮并带行号；SVG 既能看图也能看源码。Firefox 不支持沙箱页，HTML 预览退化为不运行脚本的静态渲染 ([#48](https://github.com/maotoumao/Cebian/issues/48))
+- 新增 `artifact` 技能（随 Release 附件提供，设置页 → 技能 → 导入即可）：教 agent 在用户想要「一个能打开看的东西」时——报表、仪表盘、数据可视化、可交互小工具、原型稿、落地页、小游戏——产出单文件 HTML 写进会话工作区并给出链接，在 VFS 预览器里直接渲染；内含沙箱约束说明、设计准则与起步骨架
 
 - The VFS file browser is now a general-purpose previewer: HTML files render as a live page inside an isolated sandbox (inline and CDN scripts run, but cannot reach the extension APIs or Cebian's data), with a Source toggle in the header; PDFs open as scrollable pages with a page indicator and zoom; source code is syntax-highlighted with line numbers; SVGs can be viewed as an image or as source. Firefox has no sandbox pages, so HTML preview there falls back to a static render without scripts ([#48](https://github.com/maotoumao/Cebian/issues/48))
+- New `artifact` skill (shipped as a release attachment; import it from Settings → Skills): teaches the agent to answer "I want something I can open" — reports, dashboards, data visualizations, interactive tools, mockups, landing pages, small games — with a single self-contained HTML file written to the session workspace and linked back, rendering directly in the VFS previewer; includes the sandbox constraints, design fundamentals and a starter skeleton
 
 ### 变更 / Changed
 

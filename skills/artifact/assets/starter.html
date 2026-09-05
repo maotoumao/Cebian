@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en"><!-- set lang to the content language -->
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Two to four words that NAME the page, like a product or document. Not a description. -->
+  <title>Page Name</title>
+  <!-- Fonts: any https:// font host works in the preview; Google Fonts is the convenient one.
+       Replace the families; always keep a real fallback stack below. -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@600&family=IBM+Plex+Sans:wght@400;500&display=swap">
+  <style>
+    /* ── Tokens: write your 3-line design plan here first, then fill these in. ──
+       Light palette lives on :root; the dark block below redefines ONLY tokens. */
+    :root {
+      --bg: #fbfaf7;          /* page ground — a chosen neutral, not pure grey */
+      --fg: #1f1d1a;
+      --muted: #6b6560;
+      --line: #dcd7cf;
+      --surface: #ffffff;
+      --accent: #b3541e;      /* one accent; semantic colors are separate */
+      --good: #2f7d4f;
+      --warn: #b8860b;
+      --bad: #b23a3a;
+
+      --font-display: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+      --font-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+      /* Type scale — stay on it. */
+      --text-xs: 12px; --text-sm: 13px; --text-md: 15px; --text-lg: 18px; --text-xl: 24px; --text-2xl: 32px;
+      --measure: 65ch;
+      --radius: 8px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #14130f;
+        --fg: #ece8e1;
+        --muted: #9a938b;
+        --line: #33302a;
+        --surface: #1d1b16;
+        --accent: #e0854a;
+        --good: #5fb37f;
+        --warn: #d9a441;
+        --bad: #e06666;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { color-scheme: light dark; }
+    body {
+      margin: 0;
+      background: var(--bg);          /* explicit: the preview ground is plain white whatever the reader's theme */
+      color: var(--fg);
+      font: var(--text-md)/1.6 var(--font-body);
+      -webkit-font-smoothing: antialiased;
+    }
+    h1, h2, h3 { font-family: var(--font-display); line-height: 1.15; text-wrap: balance; margin: 0; }
+    h1 { font-size: var(--text-2xl); }
+    h2 { font-size: var(--text-xl); }
+    h3 { font-size: var(--text-lg); }
+    p { margin: 0; max-width: var(--measure); }
+    a { color: var(--accent); }
+    .eyebrow { font-size: var(--text-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+    .num { font-variant-numeric: tabular-nums; }
+
+    /* Layout: a page column plus sibling groups laid out with gap, never per-element margins. */
+    .page { max-width: 960px; margin: 0 auto; padding: 40px 24px 64px; display: grid; gap: 32px; }
+    .stack { display: grid; gap: 12px; }
+    .row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+    .scroll-x { overflow-x: auto; }   /* wide tables / code / diagrams scroll here, never the body */
+    img { max-width: 100%; }
+
+    /* Spend border / fill / shadow by role. One lifted surface, not a card on everything. */
+    .surface { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 20px; }
+
+    table { border-collapse: collapse; width: 100%; font-size: var(--text-sm); }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 500; }
+
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <!-- The page must read correctly from this static HTML alone (Firefox previews without scripts).
+         Put real content here; let the script below enhance it. -->
+    <header class="stack">
+      <span class="eyebrow">Eyebrow that encodes something true</span>
+      <h1>Page Name</h1>
+      <p>One sentence saying what this page shows and who it is for.</p>
+    </header>
+
+    <section class="stack">
+      <h2>Section</h2>
+      <div class="surface scroll-x">
+        <table>
+          <thead><tr><th>Item</th><th class="num">Value</th></tr></thead>
+          <tbody>
+            <tr><td>Example row (example data)</td><td class="num">1,234</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Data as one compact JSON block; render from it instead of repeating it in markup. -->
+  <script type="application/json" id="data">
+    []
+  </script>
+
+  <script>
+    // Sandbox rules: no localStorage / sessionStorage / cookies / IndexedDB (they throw);
+    // libraries only from absolute https:// URLs, placed above this script; no relative paths.
+    // Keep state in variables. Guard everything: one uncaught error at the top kills the script.
+    (function () {
+      const data = JSON.parse(document.getElementById('data').textContent);
+      // Enhance the static content here.
+      void data;
+    })();
+  </script>
+</body>
+</html>
