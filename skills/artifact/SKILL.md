@@ -14,7 +14,7 @@ compatibility: >
   Requires the Cebian VFS tools (fs_create_file, fs_edit_file, fs_read_file) and
   the VFS file preview page, which renders .html files inside a sandbox.
 metadata:
-  author: cebian
+  author: maotoumao
   version: "1.0.0"
 ---
 
