@@ -58,6 +58,8 @@
     "dexie": "^4.4.5",
     "fflate": "^0.8.3",
     "front-matter": "^4.0.2",
+    "highlight.js": "^11.11.1",
+    "lowlight": "^3.3.0",
     "lucide-react": "^1.41.0",
     "pdfjs-dist": "^6.3.289",
     "picomatch": "^4.0.7",

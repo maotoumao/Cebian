@@ -844,7 +844,34 @@ vfs:
   # $1 = path, $2 = error message
   inlineLoadFailed: "$1 — $2"
   preview: "Preview"
-  viewSource: "View source"
+  source: "Source"
+  viewMode: "View mode"
+  location: "Location"
+  # Semantic root anchors shown in the breadcrumb instead of raw paths
+  roots:
+    workspaces: "Workspaces"
+    cebian: "Cebian"
+  copyPath: "Copy path"
+  pathCopied: "Path copied"
+  showCollapsed: "Show collapsed folders"
+  sandboxPreview: "Sandboxed preview"
+  sandboxPreviewHint: "Rendered in an isolated sandbox page. Scripts can run, but cannot reach the extension APIs or anything Cebian stores."
+  staticPreview: "Static preview"
+  staticPreviewHint: "This browser cannot run scripts inside the preview. The page is rendered without JavaScript."
+  # $1 = current page, $2 = total pages
+  pageIndicator: "Page $1 of $2"
+  # $1 = total pages
+  pageCount:
+    0: "No pages"
+    1: "1 page"
+    n: "$1 pages"
+  zoomIn: "Zoom in"
+  zoomOut: "Zoom out"
+  # $1 = number of entries in the folder
+  itemCount:
+    0: "Empty"
+    1: "1 item"
+    n: "$1 items"
   # $1 = path
   pathNotFound: "Path not found: $1"
   unknownError: "Unknown error"
@@ -871,6 +898,8 @@ permission:
 
 # ─── Errors (toasts, thrown messages) ───
 errors:
+  pdfEncrypted: "This PDF is password-protected and cannot be previewed. Use Download instead."
+  pdfRenderFailed: "This PDF could not be rendered. Use Download instead."
   pagePattern:
     invalid: "Not a valid match pattern."
     duplicate: "This pattern is already in the list."

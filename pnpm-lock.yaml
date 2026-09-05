@@ -86,6 +86,12 @@ importers:
       front-matter:
         specifier: ^4.0.2
         version: 4.0.2
+      highlight.js:
+        specifier: ^11.11.1
+        version: 11.11.1
+      lowlight:
+        specifier: ^3.3.0
+        version: 3.3.0
       lucide-react:
         specifier: ^1.41.0
         version: 1.41.0(react@19.2.8)

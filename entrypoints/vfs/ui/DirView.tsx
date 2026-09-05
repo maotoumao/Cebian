@@ -1,7 +1,8 @@
 import { ArrowUp, ChevronRight, Folder } from 'lucide-react';
 import { t } from '@/lib/i18n';
 import type { SessionLabelRow } from '@/lib/persistence/db';
-import { fileExtension, formatSize, navigateTo, parentOf, pickFileIcon } from '../lib/path-utils';
+import { formatBytes } from '@/lib/utils';
+import { fileExtension, navigateTo, parentOf, pickFileIcon } from '../lib/path-utils';
 import { formatWorkspaceEntry, formatWorkspaceBanner } from '../lib/session-labels';
 import type { DirEntry } from '../types';
 
@@ -104,7 +105,7 @@ export function DirView({
               )}
               {!entry.isDir && (
                 <span className="shrink-0 text-xs text-muted-foreground/60 tabular-nums">
-                  {formatSize(entry.size)}
+                  {formatBytes(entry.size)}
                 </span>
               )}
               {entry.isDir && (

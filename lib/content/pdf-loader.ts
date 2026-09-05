@@ -16,9 +16,9 @@
  * `UnknownErrorException: API version does not match Worker version`
  * when they drift.
  *
- * Designed to be called from the offscreen document. Calling from a
- * Service Worker context will fail because pdf.js needs DOM-only APIs
- * (DOMMatrix, OffscreenCanvas, etc.).
+ * 供任何带 DOM 的扩展文档调用：offscreen document（pdf 工具）与 VFS 页面
+ * （PDF 预览）都是正式调用方。不能从 Service Worker 调用——pdf.js 需要
+ * DOMMatrix / OffscreenCanvas 等 DOM-only API。
  */
 
 // `?url` import: Vite resolves the file inside `node_modules/pdfjs-dist/...`

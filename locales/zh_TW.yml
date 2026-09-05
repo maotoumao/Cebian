@@ -831,7 +831,34 @@ vfs:
   # $1 = 路徑，$2 = 錯誤文字
   inlineLoadFailed: "$1 — $2"
   preview: "預覽"
-  viewSource: "檢視原始碼"
+  source: "原始碼"
+  viewMode: "檢視模式"
+  location: "目前位置"
+  # 麵包屑裡代替原始路徑顯示的根目錄錨點
+  roots:
+    workspaces: "工作區"
+    cebian: "Cebian"
+  copyPath: "複製路徑"
+  pathCopied: "已複製路徑"
+  showCollapsed: "顯示收合的層級"
+  sandboxPreview: "沙箱預覽"
+  sandboxPreviewHint: "在獨立的沙箱頁中渲染。腳本可以執行，但無法存取擴充功能 API 或 Cebian 儲存的其他資料。"
+  staticPreview: "靜態預覽"
+  staticPreviewHint: "目前的瀏覽器無法在預覽中執行腳本，頁面以無 JavaScript 的方式渲染。"
+  # $1 = 目前頁，$2 = 總頁數
+  pageIndicator: "第 $1 / $2 頁"
+  # $1 = 總頁數
+  pageCount:
+    0: "0 頁"
+    1: "1 頁"
+    n: "$1 頁"
+  zoomIn: "放大"
+  zoomOut: "縮小"
+  # $1 = 資料夾內的項目數
+  itemCount:
+    0: "空"
+    1: "1 個項目"
+    n: "$1 個項目"
   # $1 = 路徑
   pathNotFound: "路徑不存在：$1"
   unknownError: "未知錯誤"
@@ -858,6 +885,8 @@ permission:
 
 # ─── 錯誤（toast、抛出的錯誤訊息）───
 errors:
+  pdfEncrypted: "這個 PDF 有密碼保護，無法預覽。請改用下載。"
+  pdfRenderFailed: "這個 PDF 無法渲染。請改用下載。"
   pagePattern:
     invalid: "頁面比對規則格式錯誤。"
     duplicate: "該規則已存在。"

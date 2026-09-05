@@ -18,6 +18,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 新增 / Added
+
+- VFS 文件浏览器升级为通用预览器：HTML 文件在独立的沙箱页里直接渲染成网页（内联脚本与 CDN 脚本都能跑，但拿不到扩展 API 和 Cebian 的数据），页头可随时切到源码；PDF 直接按页阅读，底部有页码与缩放；源代码按语言高亮并带行号；SVG 既能看图也能看源码。Firefox 不支持沙箱页，HTML 预览退化为不运行脚本的静态渲染 ([#48](https://github.com/maotoumao/Cebian/issues/48))
+
+- The VFS file browser is now a general-purpose previewer: HTML files render as a live page inside an isolated sandbox (inline and CDN scripts run, but cannot reach the extension APIs or Cebian's data), with a Source toggle in the header; PDFs open as scrollable pages with a page indicator and zoom; source code is syntax-highlighted with line numbers; SVGs can be viewed as an image or as source. Firefox has no sandbox pages, so HTML preview there falls back to a static render without scripts ([#48](https://github.com/maotoumao/Cebian/issues/48))
+
+### 变更 / Changed
+
+- VFS 页面的路径栏改为按语义显示：`/workspaces` 显示为「工作区」，`~/.cebian` 显示为「Cebian」，会话目录用会话标题代替 UUID（悬停可见 UUID），超过四层的路径把中间层级折叠成「…」下拉。需要真实路径时用页头新增的「复制路径」一键复制 ([#48](https://github.com/maotoumao/Cebian/issues/48))
+- VFS 文件页去掉了内容外框：文件名进入路径栏，行数、大小、页数等元信息与预览/源码切换、复制、下载一起收进页头，正文直接铺满页面。Markdown 与纯文本保留阅读宽度居中，代码全宽不换行 ([#48](https://github.com/maotoumao/Cebian/issues/48))
+
+- The VFS page's path bar now reads semantically: `/workspaces` shows as "Workspaces", `~/.cebian` as "Cebian", conversation folders show the conversation title instead of the UUID (hover to see it), and paths deeper than four levels collapse the middle into a "…" menu. When you need the real path, the new Copy path button in the header copies it in one click ([#48](https://github.com/maotoumao/Cebian/issues/48))
+- The VFS file page drops the framed content box: the file name lives in the path bar, metadata such as lines, size and page count sits in the header next to the Preview/Source toggle, copy and download, and the content fills the page. Markdown and plain text keep a centered reading width; code runs full width without wrapping ([#48](https://github.com/maotoumao/Cebian/issues/48))
+
 ## 1.6.0 - 2026-08-31
 
 ### 新增 / Added

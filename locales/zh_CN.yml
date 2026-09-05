@@ -832,7 +832,34 @@ vfs:
   # $1 = 路径，$2 = 错误文本
   inlineLoadFailed: "$1 — $2"
   preview: "预览"
-  viewSource: "查看源码"
+  source: "源码"
+  viewMode: "视图模式"
+  location: "当前位置"
+  # 面包屑里代替裸路径显示的根目录锚点
+  roots:
+    workspaces: "工作区"
+    cebian: "Cebian"
+  copyPath: "复制路径"
+  pathCopied: "已复制路径"
+  showCollapsed: "显示折叠的层级"
+  sandboxPreview: "沙箱预览"
+  sandboxPreviewHint: "在独立的沙箱页中渲染。脚本可以运行，但无法访问扩展 API 或 Cebian 存储的其他数据。"
+  staticPreview: "静态预览"
+  staticPreviewHint: "当前浏览器不能在预览中运行脚本，页面以无 JavaScript 的方式渲染。"
+  # $1 = 当前页，$2 = 总页数
+  pageIndicator: "第 $1 / $2 页"
+  # $1 = 总页数
+  pageCount:
+    0: "0 页"
+    1: "1 页"
+    n: "$1 页"
+  zoomIn: "放大"
+  zoomOut: "缩小"
+  # $1 = 文件夹内的条目数
+  itemCount:
+    0: "空"
+    1: "1 项"
+    n: "$1 项"
   # $1 = 路径
   pathNotFound: "路径不存在：$1"
   unknownError: "未知错误"
@@ -859,6 +886,8 @@ permission:
 
 # ─── 错误（toast、抛出的错误信息）───
 errors:
+  pdfEncrypted: "这个 PDF 有密码保护，无法预览。请改用下载。"
+  pdfRenderFailed: "这个 PDF 无法渲染。请改用下载。"
   pagePattern:
     invalid: "页面匹配规则格式错误。"
     duplicate: "该规则已存在。"

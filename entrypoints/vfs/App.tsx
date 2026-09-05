@@ -1,35 +1,38 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
-import { Download, Loader2 } from 'lucide-react';
 import { vfs } from '@/lib/persistence/vfs';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { themePreference } from '@/lib/persistence/storage';
 import { downloadFile } from '@/lib/utils';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
+import { Spinner } from '@/components/ui/spinner';
 import { t } from '@/lib/i18n';
 import { applyTheme, resolveTheme } from './lib/theme';
-import { MAX_PREVIEW_BYTES, classifyFile, fileExtension, getHashPath, isWorkspacesRoot, navigateTo, workspaceUuidOf } from './lib/path-utils';
-import { mimeFor } from '@/lib/content/mime';
+import { dualViewTypeOf, getHashPath, navigateTo, sessionUuidOf, workspaceUuidOf } from './lib/path-utils';
 import { zipDirectory, zipNameFor } from './lib/download';
-import { resolveWorkspaceLabels } from './lib/session-labels';
+import { buildCrumbs } from './lib/breadcrumb';
+import { loadView, releaseView } from './lib/load-view';
 import { Breadcrumbs } from './ui/Breadcrumbs';
 import { DirView } from './ui/DirView';
 import { FileView } from './ui/FileView';
-import type { FileMedia, ViewState } from './types';
+import { Toolbar } from './ui/Toolbar';
+import type { DualViewType, ViewMode, ViewState } from './types';
+
+const BRAND_ICON = browser.runtime.getURL('/icon/32.png' as never);
 
 export default function App() {
   const [theme] = useStorageItem(themePreference, 'system');
   const [themeReady, setThemeReady] = useState(false);
-  const [view, setView] = useState<ViewState>({ kind: 'loading' });
-  // Global busy flag for the download button. Kept outside `view` because a
-  // download started on `/prompts` MUST keep running even if the user
-  // navigates away mid-zip (decision A: don't interrupt explicit downloads).
-  // The handler captures its target path from the closure at click time, so
-  // the in-flight task is independent of subsequent view changes.
+  const [view, setView] = useState<ViewState>({ kind: 'loading', path: getHashPath() });
+  // 下载忙碌标志放在 `view` 之外：在 `/prompts` 上发起的打包即使用户中途导航走了也
+  // 必须继续（显式下载不打断）。handler 在点击时从闭包捕获目标路径，与后续 view 无关。
   const [isDownloading, setIsDownloading] = useState(false);
+  // 预览 / 源码切换按文件类型各自记忆：连续浏览多个 .md 时保持用户选的视图，
+  // 切到别的双视图类型互不影响。内存态，不持久化。
+  const [viewModes, setViewModes] = useState<Partial<Record<DualViewType, ViewMode>>>({});
 
-  // ── Theme sync ──
+  // ── 主题同步 ──
   useEffect(() => {
     themePreference.getValue().then((val) => {
       applyTheme(resolveTheme(val ?? 'system'));
@@ -50,146 +53,65 @@ export default function App() {
     return () => mq.removeEventListener('change', handler);
   }, [theme]);
 
-  // ── Load path from hash ──
+  // ── 按 hash 加载路径 ──
   //
-  // Two pieces of cross-call state live in refs:
-  //
-  // 1. `loadIdRef` — every call to loadPath() captures a monotonically
-  //    increasing id at entry and re-checks it after each await. A rapid
-  //    sequence of hashchange events (or a hashchange that fires while a
-  //    previous load is still resolving) would otherwise let a stale
-  //    setView win the race. The old `let stale` flag only flipped on
-  //    effect unmount, so it could not protect against this.
-  //
-  // 2. `blobUrlRef` — image/video/audio media is exposed as `URL.createObjectURL`.
-  //    We revoke the previous URL before issuing a new one (and on unmount)
-  //    to keep memory bounded across many navigations.
+  // 两份跨调用状态放在 ref 里：
+  //   1. `loadIdRef`：每次 loadPath 进入时取一个递增 id，await 之后重新核对；连续多次
+  //      hashchange（或上一次尚未完成时又来一次）不会让过期结果覆盖新结果。
+  //   2. `heldRef`：当前持有外部资源（blob URL / pdf.js 文档）的视图，换视图前 / 卸载时
+  //      经 `releaseView` 释放，内存有界。
   const loadIdRef = useRef(0);
-  const blobUrlRef = useRef<string | null>(null);
+  const heldRef = useRef<ViewState | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!themeReady) return;
 
-    function revokeBlobUrl() {
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
-        blobUrlRef.current = null;
+    function releaseHeld() {
+      if (heldRef.current) {
+        releaseView(heldRef.current);
+        heldRef.current = null;
       }
     }
 
     async function loadPath() {
       const myId = ++loadIdRef.current;
-      const p = getHashPath();
-      revokeBlobUrl();
-      setView({ kind: 'loading' });
-
-      try {
-        const st = await vfs.stat(p);
-        if (myId !== loadIdRef.current) return;
-
-        if (st.isDirectory()) {
-          const names = await vfs.readdir(p);
-          if (myId !== loadIdRef.current) return;
-          const entries = await Promise.all(
-            names.map(async (name) => {
-              const childPath = p === '/' ? `/${name}` : `${p}/${name}`;
-              try {
-                const childStat = await vfs.stat(childPath);
-                return { name, isDir: childStat.isDirectory(), size: childStat.size };
-              } catch {
-                return { name, isDir: false, size: 0 };
-              }
-            }),
-          );
-          if (myId !== loadIdRef.current) return;
-
-          // 工作区根 `/workspaces`：把 UUID 子目录翻译成「会话标题 · 日期」。
-          // 工作区目录 `/workspaces/<uuid>`：解析顶部信息条。两者共用一次批量查库。
-          if (isWorkspacesRoot(p)) {
-            const uuids = entries.filter((e) => e.isDir).map((e) => e.name);
-            const workspaceLabels = await resolveWorkspaceLabels(uuids);
-            if (myId !== loadIdRef.current) return;
-            setView({ kind: 'dir', path: p, entries, workspaceLabels });
-            return;
-          }
-          const uuid = workspaceUuidOf(p);
-          if (uuid) {
-            const labels = await resolveWorkspaceLabels([uuid]);
-            if (myId !== loadIdRef.current) return;
-            setView({ kind: 'dir', path: p, entries, workspaceRow: labels.get(uuid) });
-            return;
-          }
-
-          setView({ kind: 'dir', path: p, entries });
-          return;
-        }
-
-        // File branch. One blanket size guard for every type — a 50 MB
-        // markdown file is just as painful to render as a 50 MB image,
-        // and the placeholder still lets the user fall back to Download.
-        if (st.size > MAX_PREVIEW_BYTES) {
-          setView({ kind: 'file', path: p, media: { type: 'tooLarge', size: st.size } });
-          return;
-        }
-
-        const name = p.split('/').pop() ?? '';
-        const ext = fileExtension(name);
-        const klass = classifyFile(name);
-        let media: FileMedia;
-
-        if (klass === 'text' || klass === 'markdown') {
-          const raw = (await vfs.readFile(p, 'utf8')) as unknown as string;
-          if (myId !== loadIdRef.current) return;
-          media = { type: klass, content: raw, size: st.size };
-        } else if (klass === 'image' || klass === 'video' || klass === 'audio') {
-          const data = (await vfs.readFile(p)) as unknown as Uint8Array;
-          if (myId !== loadIdRef.current) return;
-          const mime = mimeFor(ext);
-          // `as BlobPart` for the same reason as the download path: the TS
-          // DOM lib types Uint8Array<ArrayBufferLike> which BlobPart's
-          // ArrayBufferView constraint won't accept directly, but the vfs
-          // always hands us a plain ArrayBuffer-backed view.
-          const url = URL.createObjectURL(new Blob([data as BlobPart], { type: mime }));
-          blobUrlRef.current = url;
-          media = { type: klass, mime, size: st.size, url };
-        } else if (klass === 'binary') {
-          // No read — just surface size. Download still works independently.
-          media = { type: 'binary', size: st.size };
-        } else {
-          // Exhaustiveness guard — matches FileView's pattern. If
-          // classifyFile's return union ever grows, TS will flag this.
-          const _exhaustive: never = klass;
-          throw new Error(`unreachable file class: ${_exhaustive}`);
-        }
-
-        setView({ kind: 'file', path: p, media });
-      } catch (err: any) {
-        if (myId !== loadIdRef.current) return;
-        const message =
-          err?.code === 'ENOENT'
-            ? t('vfs.pathNotFound', [p])
-            : err?.message ?? t('vfs.unknownError');
-        setView({ kind: 'error', path: p, message });
+      // 作废上一次仍在飞的加载：结果会被 loadIdRef 丢弃，abort 让它别再做重活。
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const path = getHashPath();
+      // 加载态继承上一视图的会话标签（仍在同一会话内时），面包屑不会闪成「未知会话」。
+      setView((prev) => ({
+        kind: 'loading',
+        path,
+        session: prev.session?.id === sessionUuidOf(path) ? prev.session : undefined,
+      }));
+      const next = await loadView(path, controller.signal);
+      if (myId !== loadIdRef.current) {
+        // 已被更新的导航作废：把这次加载创建的资源直接释放。
+        releaseView(next);
+        return;
       }
+      releaseHeld();
+      heldRef.current = next;
+      setView(next);
     }
 
     loadPath();
     window.addEventListener('hashchange', loadPath);
     return () => {
-      // Invalidate any in-flight load and revoke the last blob URL so we
-      // don't leak object URLs across remounts.
       loadIdRef.current++;
-      revokeBlobUrl();
+      abortRef.current?.abort();
+      releaseHeld();
       window.removeEventListener('hashchange', loadPath);
     };
   }, [themeReady]);
 
-  // ── Download (file or zipped folder) ──
+  // ── 下载（文件或打包的文件夹）──
   //
-  // Snapshots `view` into a const before the first await so a concurrent
-  // hashchange that flips us to a different path can't redirect the
-  // download to the wrong content. We intentionally do NOT abort on
-  // navigation — see the `isDownloading` declaration comment.
+  // 第一个 await 之前把 `view` 快照成常量，避免并发 hashchange 把下载导向别的路径。
+  // 有意不在导航时中止——见 `isDownloading` 的声明注释。
   async function handleDownload() {
     if (isDownloading) return;
     const snapshot = view;
@@ -200,13 +122,9 @@ export default function App() {
       if (snapshot.kind === 'file') {
         const data = (await vfs.readFile(snapshot.path)) as unknown as Uint8Array;
         const name = snapshot.path.split('/').pop() || 'file';
-        // Wrap in Blob — `downloadFile` accepts ArrayBuffer/Blob/string but
-        // not Uint8Array directly. The `as BlobPart` cast is required: the
-        // current TS DOM lib types `Uint8Array<ArrayBufferLike>` which
-        // includes SharedArrayBuffer, but BlobPart only accepts plain
-        // ArrayBuffer-backed views. The vfs always hands us regular
-        // ArrayBuffer, so the cast is sound. Generic octet-stream mime
-        // keeps the browser from rewriting the extension (e.g. .md → .txt).
+        // 包成 Blob——`downloadFile` 接受 ArrayBuffer/Blob/string 而不直接接受 Uint8Array。
+        // `as BlobPart` 见 load-view.ts 同处注释。通用 octet-stream 防止浏览器改写扩展名
+        // （如 .md → .txt）。
         downloadFile(name, new Blob([data as BlobPart], { type: 'application/octet-stream' }), 'application/octet-stream');
       } else {
         const data = await zipDirectory(snapshot.path);
@@ -220,83 +138,77 @@ export default function App() {
     }
   }
 
-  // ── Render ──
+  // ── 渲染 ──
+
+  // 加载态且没有继承到会话标签时，会话段只显示短 ID（标签还没查回来，不是会话已删）。
+  const crumbs = useMemo(
+    () =>
+      buildCrumbs(
+        view.path,
+        view.kind === 'dir' ? true : view.kind === 'file' ? false : undefined,
+        view.kind === 'loading' && !view.session ? 'pending' : view.session,
+      ),
+    [view],
+  );
+  const dualType: DualViewType | null = view.kind === 'file' ? dualViewTypeOf(view.media) : null;
+  const mode: ViewMode = (dualType ? viewModes[dualType] : undefined) ?? 'preview';
 
   if (!themeReady) return null;
 
-  const currentPath = view.kind !== 'loading' ? view.path : getHashPath();
-
+  // 主区域是滚动容器；填满型视图（媒体 / 占位 / HTML 预览）用 absolute inset-0 铺满它，
+  // PDF 视图为了做 IntersectionObserver 的 root 自带一层滚动容器。
   return (
     <TooltipProvider delayDuration={300}>
       <div className="flex flex-col h-screen bg-background text-foreground">
-        {/* Header */}
-        <header className="flex items-center gap-4 px-5 py-3 border-b border-border shrink-0">
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-base font-semibold tracking-tight">VFS</span>
-            <span className="text-xs text-muted-foreground/50 font-mono">cebian</span>
-          </div>
+        <header className="flex items-center gap-3 pl-3 pr-3.5 h-[46px] border-b border-border shrink-0">
+          <img src={BRAND_ICON} alt="Cebian" title="Cebian" className="size-6 rounded-md shrink-0" />
           <div className="h-4 w-px bg-border shrink-0" />
           <div className="flex-1 min-w-0">
-            <Breadcrumbs path={currentPath} />
+            <Breadcrumbs crumbs={crumbs} />
           </div>
-          {/* Keep the button mounted while a download is in flight, even if
-           *  `view` has flipped to `loading` because the user navigated
-           *  away — otherwise the spinner unmounts and the user loses the
-           *  busy indicator until the download finishes. Hidden only on
-           *  `error` (nothing to download) and on a clean `loading` state
-           *  with no active download. */}
-          {(view.kind === 'file' || view.kind === 'dir' || isDownloading) && (
-            <button
-              onClick={handleDownload}
-              disabled={isDownloading}
-              title={isDownloading ? t('vfs.zipping') : t('common.download')}
-              aria-label={isDownloading ? t('vfs.zipping') : t('common.download')}
-              className="shrink-0 size-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
-            >
-              {isDownloading ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Download className="size-4" />
-              )}
-            </button>
-          )}
+          <Toolbar
+            view={view}
+            mode={dualType ? mode : undefined}
+            onModeChange={(next) => dualType && setViewModes((prev) => ({ ...prev, [dualType]: next }))}
+            isDownloading={isDownloading}
+            onDownload={handleDownload}
+          />
         </header>
 
-        {/* Main content */}
-        <main className="flex-1 min-h-0 overflow-y-auto">
-          <div className="max-w-3xl mx-auto px-5 py-5">
-            {view.kind === 'loading' && (
-              <div className="flex items-center justify-center py-20">
-                <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-              </div>
-            )}
+        <main className="flex-1 min-h-0 overflow-auto relative">
+          {view.kind === 'loading' && (
+            <div className="flex items-center justify-center py-20">
+              <Spinner className="size-5 text-primary" aria-label={t('common.loading')} />
+            </div>
+          )}
 
-            {view.kind === 'dir' && (
+          {view.kind === 'dir' && (
+            <div className="max-w-3xl mx-auto px-5 py-5">
               <DirView
                 path={view.path}
                 entries={view.entries}
                 workspaceLabels={view.workspaceLabels}
-                workspaceRow={view.workspaceRow}
+                workspaceRow={workspaceUuidOf(view.path) ? view.session : undefined}
               />
-            )}
+            </div>
+          )}
 
-            {view.kind === 'file' && <FileView path={view.path} media={view.media} />}
+          {view.kind === 'file' && <FileView path={view.path} media={view.media} mode={mode} />}
 
-            {view.kind === 'error' && (
-              <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
-                  <span className="text-destructive text-lg">!</span>
-                </div>
-                <p className="text-sm text-muted-foreground">{view.message}</p>
-                <button
-                  onClick={() => navigateTo('/')}
-                  className="mt-2 text-xs text-primary hover:underline"
-                >
-                  {t('vfs.backToRoot')}
-                </button>
+          {view.kind === 'error' && (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
+                <span className="text-destructive text-lg">!</span>
               </div>
-            )}
-          </div>
+              <p className="text-sm text-muted-foreground">{view.message}</p>
+              <button
+                onClick={() => navigateTo('/')}
+                className="mt-2 text-xs text-primary hover:underline"
+              >
+                {t('vfs.backToRoot')}
+              </button>
+            </div>
+          )}
         </main>
         <Toaster theme={resolveTheme(theme)} />
       </div>

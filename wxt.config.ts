@@ -92,6 +92,11 @@ export default defineConfig({
     //
     // Splitting per-entry would require WXT-level support that doesn't
     // exist; accept the shared widening as a one-time trust trade-off.
+    //
+    // 第三个 sandbox 页 `vfs-preview.html`（entrypoints/vfs-preview.sandbox/）也在这条
+    // 策略之下：它渲染的是用户自己 VFS 里的 HTML 文件，**不注入** 内层 meta CSP，预览内容
+    // 直接享有这里放宽后的脚本 / 网络能力。这是有意为之——「预览 HTML」的前提就是让它
+    // 像一个普通网页那样跑起来；隔离仍靠不透明 origin（无 chrome.* / 无扩展存储）保证。
     content_security_policy: manifestVersion === 2
       ? "script-src 'self'; object-src 'self';"
       : {
