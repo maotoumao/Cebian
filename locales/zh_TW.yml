@@ -127,24 +127,28 @@ settings:
   nav:
     aria: "設定導覽"
     providers: "AI 供應商"
-    instructions: "指引"
+    mcp: "MCP 伺服器"
+    chat: "對話"
     prompts: "提示詞"
     skills: "技能"
     memory: "記憶"
-    mcp: "MCP 伺服器"
     pageInteraction: "頁面互動"
-    backup: "備份與復原"
-    storage: "檔案系統"
-    advanced: "進階"
+    data: "資料"
     about: "關於"
+    group:
+      connect: "連線"
+      customize: "自訂"
+      system: "系統"
   providers:
     title: "AI 供應商"
-  storage:
-    title: "檔案系統"
-    used: "已用空間"
-    usedError: "無法計算"
-    openBrowser: "開啟檔案瀏覽器"
-    description: "按對話瀏覽 AI 產生的檔案。瀏覽器是唯讀的，需要匯出時用其中的下載按鈕。"
+  data:
+    title: "資料"
+    storage:
+      title: "本機儲存空間"
+      used: "已用空間"
+      usedError: "無法計算"
+      openBrowser: "開啟檔案瀏覽器"
+      description: "按對話瀏覽 AI 產生的檔案。瀏覽器是唯讀的，需要匯出時用其中的下載按鈕。"
   about:
     title: "關於"
     tagline: "AI 瀏覽器側邊欄助手"
@@ -167,12 +171,6 @@ settings:
       xiaohongshuHandle: "一只猫头猫"
       x: "X"
       xHandle: "@maotoumao0_0"
-  advanced:
-    title: "進階"
-    compaction:
-      label: "上下文壓縮模型"
-      hint: "對話過長時用來自動壓縮歷史的模型，預設與對話模型相同。"
-      followMain: "與對話模型相同"
   pageInteraction:
     title: "頁面互動"
     pageScope:
@@ -232,11 +230,67 @@ settings:
       label: "工具列模型"
       hint: "劃詞工具列使用的模型。通常選擇速度快、成本低的模型即可，預設與對話模型相同。"
       followMain: "與對話模型相同"
-  instructions:
-    title: "指引"
-    label: "自訂指引"
-    hint: "追加在預設規則之後，用於調整回覆語言、風格或角色。無法覆蓋工具協定與安全規則。"
-    placeholder: "例如：\n- 用中文回覆\n- 回答盡量簡潔\n- 討論程式碼時預設使用 TypeScript"
+  chat:
+    title: "對話"
+    instructions:
+      label: "自訂指引"
+      hint: "追加在預設規則之後，用於調整回覆語言、風格或角色。無法覆蓋工具協定與安全規則。"
+      placeholder: "例如：\n- 用中文回覆\n- 回答盡量簡潔\n- 討論程式碼時預設使用 TypeScript"
+    compaction:
+      label: "上下文壓縮模型"
+      hint: "對話過長時用來自動壓縮歷史的模型，預設與對話模型相同。"
+      followMain: "與對話模型相同"
+    search:
+      title: "網路搜尋"
+      hint: "設定搜尋引擎的嘗試順序，第一個啟用的引擎為首選。AI 可依適用情境優先選擇其他引擎；搜尋遭到攔截、沒有結果或執行失敗時，Cebian 會依序嘗試其餘已啟用的引擎。"
+      preferred: "首選"
+      custom: "自訂"
+      modified: "已修改"
+      allDisabled: "所有引擎均已停用。請至少啟用一個引擎，以使用網路搜尋。"
+      create: "新增引擎"
+      # $1 = 引擎名稱
+      more: "查看「$1」的更多操作"
+      # $1 = 引擎名稱
+      edit: "編輯「$1」"
+      # $1 = 引擎名稱
+      moveUp: "上移「$1」"
+      # $1 = 引擎名稱
+      moveDown: "下移「$1」"
+      # $1 = 引擎名稱
+      resetDefault: "還原「$1」的預設值"
+      # $1 = 引擎名稱
+      delete: "刪除「$1」"
+      deleteConfirmTitle: "刪除這個引擎？"
+      # $1 = 引擎名稱
+      deleteConfirmDescription: "刪除「$1」後無法復原。"
+      editBuiltin: "內建引擎"
+      editCustom: "自訂引擎"
+      name: "名稱"
+      namePlaceholder: "例如：Kagi"
+      url: "搜尋網址"
+      # $1 = 搜尋詞佔位符字面值（「{query}」）
+      urlHint: "在搜尋網址中用 $1 表示搜尋詞。Cebian 會自動編碼並填入搜尋詞。"
+      # $1 = 範例搜尋詞，$2 = 填好後的網址
+      urlPreview: "搜尋「$1」時開啟的網址：$2"
+      script: "擷取腳本"
+      scriptHint: "定義完整的 extract 函式，從搜尋結果頁擷取標題、連結與摘要。回傳物件中的 status 為 empty 時，Cebian 會短暫重試；為 blocked 時，會切換引擎；為 ok 時，會讀取 results 陣列。results 為空時也會切換引擎。"
+      generateSelectorPlaceholder: "結果容器的選擇器，例如 #results"
+      generate: "產生範本"
+      when: "適用情境（選填）"
+      whenHint: "說明哪些搜尋適合優先使用此引擎，供 AI 選擇時參考。"
+      whenPlaceholder: "例如：中文查詢"
+      engines:
+        bing:
+          name: "Bing"
+        brave:
+          name: "Brave"
+        google:
+          name: "Google"
+        duckduckgo:
+          name: "DuckDuckGo"
+        baidu:
+          name: "百度"
+          when: "中文查詢"
   prompts:
     title: "提示詞"
     newBody: "（在此處撰寫你的提示詞）"
@@ -731,6 +785,8 @@ tools:
     search: "正在 PDF 內搜尋 \"$1\""
     # $1 = action 名稱
     unknown: "pdf: $1"
+  # $1 = 搜尋詞（截斷）
+  webSearch: "正在進行網路搜尋「$1」"
   # $1 = 技能名稱
   runSkill: "正在執行技能腳本 $1"
   # $1 = MCP 伺服器 slug（展示形式），$2 = 遠端工具名
@@ -893,6 +949,12 @@ errors:
   modelUnavailable: "所選模型已無法使用，請重新選擇。"
   pageActionGone: "找不到該操作。"
   pageActionSaveFailed: "儲存失敗，請重試。"
+  searchEngineGone: "找不到該搜尋引擎。"
+  searchEngineSaveFailed: "儲存搜尋引擎設定失敗，請重試。"
+  # $1 = 搜尋詞佔位符字面值（「{query}」）
+  searchEngineUrlMissingPlaceholder: "搜尋網址必須包含 $1，用於填入搜尋詞。"
+  searchEngineUrlInvalid: "請輸入以 http:// 或 https:// 開頭的完整搜尋網址。"
+  searchEngineScriptInvalid: "腳本必須定義一個名為 extract 的函式。"
   oauth:
     cancelled: "已取消"
     timeout: "授權逾時"

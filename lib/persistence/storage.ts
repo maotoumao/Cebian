@@ -5,6 +5,7 @@ import type { ThinkingLevel } from '@earendil-works/pi-agent-core';
 // 划词动作配置与页面范围的形状归属其概念（lib/page-actions），这里只声明持久化位置。
 import type { PageActionsConfig } from '@/lib/page-actions/types';
 import { resolvePageScope, type PageScope } from '@/lib/page-actions/match';
+import type { SearchEnginesConfig } from '@/lib/search/types';
 
 // ─── Provider credential types ───
 
@@ -380,6 +381,31 @@ export function resolvePageActionsConfig(
 export const pageActionsConfig = storage.defineItem<PageActionsConfig>(
   'local:pageActionsConfig',
   { fallback: { ...DEFAULT_PAGE_ACTIONS_CONFIG } },
+);
+
+/**
+ * 联网搜索引擎配置：内置引擎的覆盖层（启停 / 改地址 / 改抽取脚本 / 改适用场景）、
+ * 用户自定义引擎与回退顺序。形状归属其概念（lib/search），这里只声明持久化位置。
+ */
+export const DEFAULT_SEARCH_ENGINES_CONFIG: SearchEnginesConfig = {
+  builtin: {},
+  custom: [],
+};
+
+/** 取规范的搜索引擎配置：补齐缺失字段并复制集合，读配置的唯一入口。 */
+export function resolveSearchEnginesConfig(
+  c: Partial<SearchEnginesConfig> | undefined,
+): SearchEnginesConfig {
+  return {
+    builtin: { ...(c?.builtin ?? {}) },
+    custom: [...(c?.custom ?? [])],
+    ...(c?.order ? { order: [...c.order] } : {}),
+  };
+}
+
+export const searchEnginesConfig = storage.defineItem<SearchEnginesConfig>(
+  'local:searchEnginesConfig',
+  { fallback: { ...DEFAULT_SEARCH_ENGINES_CONFIG } },
 );
 
 /**

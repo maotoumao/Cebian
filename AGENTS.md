@@ -98,6 +98,8 @@ The current concept/capability folders and their boundaries:
 | `browser/` | chrome / CDP / page injection (tab-actions, mobile-emulation, element-picker) | content scripts must NOT import |
 | `ui/` | needs `document` / React / toast (dialog, clipboard) | background must NOT import |
 | `content/` | file-format helpers (mime, frontmatter, pdf-loader) | pure |
+| `page-actions/` | 悬浮球 / 划词工具条的动作配置与消息契约（内容脚本 + 侧边栏 + background 共用） | — |
+| `search/` | 联网搜索引擎配置与抽取契约（`web_search` 工具与设置页共用；默认引擎脚本随概念走） | — |
 | `ai-config/` `backup/` `mcp/` `recorder/` `tools/` | established domains | — |
 | `shims/` | third-party patches (not our concept) | — |
 

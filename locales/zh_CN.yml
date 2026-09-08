@@ -127,24 +127,28 @@ settings:
   nav:
     aria: "设置导航"
     providers: "AI 提供商"
-    instructions: "指引"
+    mcp: "MCP 服务器"
+    chat: "对话"
     prompts: "提示词"
     skills: "技能"
     memory: "记忆"
-    mcp: "MCP 服务器"
     pageInteraction: "页面交互"
-    backup: "备份与恢复"
-    storage: "文件系统"
-    advanced: "高级"
+    data: "数据"
     about: "关于"
+    group:
+      connect: "连接"
+      customize: "定制"
+      system: "系统"
   providers:
     title: "AI 提供商"
-  storage:
-    title: "文件系统"
-    used: "已用空间"
-    usedError: "无法计算"
-    openBrowser: "打开文件浏览器"
-    description: "按会话浏览 AI 生成的文件。浏览器是只读的，需要导出时用其中的下载按钮。"
+  data:
+    title: "数据"
+    storage:
+      title: "本机存储"
+      used: "已用空间"
+      usedError: "无法计算"
+      openBrowser: "打开文件浏览器"
+      description: "按会话浏览 AI 生成的文件。浏览器是只读的，需要导出时用其中的下载按钮。"
   about:
     title: "关于"
     tagline: "AI 浏览器侧边栏助手"
@@ -167,12 +171,6 @@ settings:
       xiaohongshuHandle: "一只猫头猫"
       x: "X"
       xHandle: "@maotoumao0_0"
-  advanced:
-    title: "高级"
-    compaction:
-      label: "上下文压缩模型"
-      hint: "对话过长时用来自动压缩历史的模型，默认与对话模型相同。"
-      followMain: "与对话模型相同"
   pageInteraction:
     title: "页面交互"
     pageScope:
@@ -232,11 +230,67 @@ settings:
       label: "工具条模型"
       hint: "划词工具条使用的模型。通常选择速度快、成本低的模型即可，默认与对话模型相同。"
       followMain: "与对话模型相同"
-  instructions:
-    title: "指引"
-    label: "自定义指引"
-    hint: "追加到默认规则之后，用于调整回复语言、风格或角色。无法覆盖工具协议和安全规则。"
-    placeholder: "例如：\n- 用中文回复\n- 回答尽量简洁\n- 讨论代码时默认使用 TypeScript"
+  chat:
+    title: "对话"
+    instructions:
+      label: "自定义指引"
+      hint: "追加到默认规则之后，用于调整回复语言、风格或角色。无法覆盖工具协议和安全规则。"
+      placeholder: "例如：\n- 用中文回复\n- 回答尽量简洁\n- 讨论代码时默认使用 TypeScript"
+    compaction:
+      label: "上下文压缩模型"
+      hint: "对话过长时用来自动压缩历史的模型，默认与对话模型相同。"
+      followMain: "与对话模型相同"
+    search:
+      title: "联网搜索"
+      hint: "设置搜索引擎的尝试顺序，第一个启用的引擎为首选。AI 可根据适用场景优先选择其他引擎；搜索被拦截、没有结果或执行失败时，Cebian 会按顺序尝试其余已启用的引擎。"
+      preferred: "首选"
+      custom: "自定义"
+      modified: "已修改"
+      allDisabled: "所有引擎均已停用。请至少启用一个引擎，以使用联网搜索。"
+      create: "添加引擎"
+      # $1 = 引擎名称
+      more: "查看「$1」的更多操作"
+      # $1 = 引擎名称
+      edit: "编辑「$1」"
+      # $1 = 引擎名称
+      moveUp: "上移「$1」"
+      # $1 = 引擎名称
+      moveDown: "下移「$1」"
+      # $1 = 引擎名称
+      resetDefault: "恢复「$1」的默认值"
+      # $1 = 引擎名称
+      delete: "删除「$1」"
+      deleteConfirmTitle: "删除这个引擎？"
+      # $1 = 引擎名称
+      deleteConfirmDescription: "删除「$1」后无法恢复。"
+      editBuiltin: "内置引擎"
+      editCustom: "自定义引擎"
+      name: "名称"
+      namePlaceholder: "例如：Kagi"
+      url: "搜索地址"
+      # $1 = 搜索词占位符字面量（“{query}”）
+      urlHint: "在搜索地址中用 $1 表示搜索词。Cebian 会自动编码并填入搜索词。"
+      # $1 = 示例搜索词，$2 = 填好后的地址
+      urlPreview: "搜索「$1」时打开的地址：$2"
+      script: "抽取脚本"
+      scriptHint: "定义完整的 extract 函数，从搜索结果页提取标题、链接和摘要。返回对象中的 status 为 empty 时，Cebian 会短暂重试；为 blocked 时，会切换引擎；为 ok 时，会读取 results 数组。results 为空时也会切换引擎。"
+      generateSelectorPlaceholder: "结果容器的选择器，例如 #results"
+      generate: "生成模板"
+      when: "适用场景（可选）"
+      whenHint: "说明哪些搜索适合优先使用此引擎，供 AI 选择时参考。"
+      whenPlaceholder: "例如：中文查询"
+      engines:
+        bing:
+          name: "Bing"
+        brave:
+          name: "Brave"
+        google:
+          name: "Google"
+        duckduckgo:
+          name: "DuckDuckGo"
+        baidu:
+          name: "百度"
+          when: "中文查询"
   prompts:
     title: "提示词"
     newBody: "（在此处编写你的提示词）"
@@ -731,6 +785,8 @@ tools:
     search: "正在 PDF 内检索 \"$1\""
     # $1 = action 名称
     unknown: "pdf: $1"
+  # $1 = 搜索词（截断）
+  webSearch: "正在联网搜索「$1」"
   # $1 = 技能名称
   runSkill: "正在执行技能脚本 $1"
   # $1 = MCP 服务器 slug（展示形式），$2 = 远端工具名
@@ -894,6 +950,12 @@ errors:
   modelUnavailable: "所选模型已不可用，请重新选择。"
   pageActionGone: "找不到该操作。"
   pageActionSaveFailed: "保存失败，请重试。"
+  searchEngineGone: "找不到该搜索引擎。"
+  searchEngineSaveFailed: "保存搜索引擎设置失败，请重试。"
+  # $1 = 搜索词占位符字面量（“{query}”）
+  searchEngineUrlMissingPlaceholder: "搜索地址必须包含 $1，用于填入搜索词。"
+  searchEngineUrlInvalid: "请输入以 http:// 或 https:// 开头的完整搜索地址。"
+  searchEngineScriptInvalid: "脚本要定义一个名为 extract 的函数。"
   oauth:
     cancelled: "已取消"
     timeout: "授权超时"

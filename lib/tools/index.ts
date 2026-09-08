@@ -18,10 +18,13 @@ import { fsSearchTool } from './fs-search';
 import { fsSaveUrlTool } from './fs-save-url';
 import { createSessionRunSkillTool } from './run-skill';
 import { chromeApiTool } from './chrome-api-tool';
+import { createWebSearchTool } from './web-search';
 import { SessionToolContext } from './session-context';
 import { TOOL_ASK_USER } from '@/lib/tools/names';
 import { getMCPManager } from '@/lib/mcp/manager';
 import { createMCPAgentTool } from './mcp-tool';
+import { resolveSearchEnginesConfig, searchEnginesConfig } from '@/lib/persistence/storage';
+import { enabledSearchEngines } from '@/lib/search/engines';
 
 /** Non-interactive tools shared by all sessions. `runSkillTool` is intentionally
  *  NOT here —— 每个 session 用 `createSessionRunSkillTool(sessionId)` 拿到
@@ -71,18 +74,21 @@ export async function discoverMCPTools(): Promise<AgentTool<any>[]> {
 }
 
 /**
- * Build the full tool array for a session = interactive tools + shared + MCP +
- * the per-session `run_skill` instance (sessionId-bound so its vfs writes land
- * in the session's workspace).
+ * Build the full tool array for a session = interactive tools + shared + the
+ * per-session `run_skill` instance (sessionId-bound so its vfs writes land in
+ * the session's workspace) + `web_search`（按当前引擎配置构造，描述里列出启用的
+ * 引擎）+ MCP.
  *
- * Used both at session creation and when MCP config changes mid-session.
+ * Used both at session creation and when MCP / search-engine config changes
+ * mid-session.
  */
 export async function buildSessionToolArray(
   ctx: SessionToolContext,
 ): Promise<AgentTool<any>[]> {
-  const mcpTools = await discoverMCPTools();
+  const [mcpTools, searchConfig] = await Promise.all([discoverMCPTools(), searchEnginesConfig.getValue()]);
   const runSkill = createSessionRunSkillTool(ctx.sessionId);
-  return [...ctx.getInteractiveTools(), ...sharedTools, runSkill, ...mcpTools];
+  const webSearch = createWebSearchTool(enabledSearchEngines(resolveSearchEnginesConfig(searchConfig)));
+  return [...ctx.getInteractiveTools(), ...sharedTools, runSkill, webSearch, ...mcpTools];
 }
 
 /**

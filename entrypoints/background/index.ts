@@ -47,8 +47,8 @@ export default defineBackground(() => {
   );
   // 自动整理调度：注册周期 alarm（检查廉价，满足够久/够多/空闲才真跑）。
   setupOrganizeSchedule();
-  // 订阅 MCP 服务端变更，把刷新后的工具集推给所有活跃会话。
-  sessionManager.watchMCPTools();
+  // 订阅 MCP 服务端 / 搜索引擎配置变更，把刷新后的工具集推给所有活跃会话。
+  sessionManager.watchToolConfig();
 
   // Dev-only: seed a custom provider from .env.local if configured.
   // No-op in production builds and when WXT_DEV_API_KEY is empty.

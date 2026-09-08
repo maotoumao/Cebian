@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as storageModule from '@/lib/persistence/storage';
 import type { MCPServerConfig, CustomProviderConfig } from '@/lib/persistence/storage';
 import type { CustomPageAction, PageActionsConfig } from '@/lib/page-actions/types';
+import type { CustomSearchEngine, SearchEnginesConfig } from '@/lib/search/types';
 import {
   BACKUP_REGISTRY,
   registeredStorageKeys,
@@ -316,5 +317,46 @@ describe('pageActionsConfig 合并补缺', () => {
     const merged = fillMissing({ builtin: {}, custom: [] }, backup);
     merged.order!.push('translate');
     expect(backup.order).toEqual(['explain']);
+  });
+});
+
+describe('searchEnginesConfig 合并补缺', () => {
+  const fillMissing = BACKUP_REGISTRY.find(
+    (e) => e.item.key === 'local:searchEnginesConfig',
+  )!.fillMissing! as (local: SearchEnginesConfig, backup: SearchEnginesConfig) => SearchEnginesConfig;
+
+  const custom = (id: string, name: string): CustomSearchEngine => ({
+    id,
+    name,
+    urlTemplate: 'https://example.com/?q={query}',
+    extract: 'function extract() { return { status: "ok", results: [] }; }',
+  });
+
+  it('自定义引擎按 id 只增不减：本地保留，备份里本地没有的补入', () => {
+    const merged = fillMissing(
+      { builtin: {}, custom: [custom('custom-aaaaaaaa', 'local')] },
+      { builtin: {}, custom: [custom('custom-aaaaaaaa', 'backup'), custom('custom-bbbbbbbb', 'added')] },
+    );
+    expect(merged.custom.map((e) => e.id)).toEqual(['custom-aaaaaaaa', 'custom-bbbbbbbb']);
+    expect(merged.custom[0].name).toBe('local');
+  });
+
+  it('内置覆盖层逐 id 补缺：本地改过的保留，本地没碰过的从备份补入', () => {
+    const merged = fillMissing(
+      { builtin: { bing: { enabled: false } }, custom: [] },
+      { builtin: { bing: { enabled: true }, google: { when: 'x' } }, custom: [] },
+    );
+    expect(merged.builtin.bing).toEqual({ enabled: false });
+    expect(merged.builtin.google).toEqual({ when: 'x' });
+  });
+
+  it('order 本地优先，本地没排过才采用备份的', () => {
+    expect(
+      fillMissing({ builtin: {}, custom: [] }, { builtin: {}, custom: [], order: ['google', 'bing'] }).order,
+    ).toEqual(['google', 'bing']);
+    expect(
+      fillMissing({ builtin: {}, custom: [], order: ['baidu'] }, { builtin: {}, custom: [], order: ['google'] }).order,
+    ).toEqual(['baidu']);
+    expect(fillMissing({ builtin: {}, custom: [] }, { builtin: {}, custom: [] }).order).toBeUndefined();
   });
 });

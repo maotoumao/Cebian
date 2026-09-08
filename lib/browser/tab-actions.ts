@@ -133,6 +133,59 @@ export function waitForNavigation(tabId: number, timeout: number): Promise<strin
   });
 }
 
+/** `navigateAndWait` 里「先见到 loading 再认 complete」的宽限：过了还没见到就接受下一个 complete。 */
+const NAVIGATE_LOADING_GRACE_MS = 2_000;
+
+/**
+ * 把一个**已有**标签页导航到 `url` 并等这次导航完成。
+ *
+ * 与 `waitForNavigation` 的区别：那边的 catch-up 分支会把上一页遗留的 `complete` 当成
+ * 本次完成——对停在旧结果页上的复用 tab 来说，`tabs.update` 返回时状态还是旧页的
+ * `complete`，立刻返回就会读到上一次的内容。这里先挂监听再发起导航，并要求先观察到
+ * 本次 `loading`（或 url 变化）才接受 `complete`；万一浏览器把事件合并了，宽限期后退回
+ * 接受下一个 `complete`（或此刻已是 complete）。tab 被关掉 / 超时都 reject。
+ */
+export function navigateAndWait(tabId: number, url: string, timeout: number): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    let sawLoading = false;
+    const cleanup = () => {
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      chrome.tabs.onRemoved.removeListener(onRemoved);
+      clearTimeout(timer);
+      clearTimeout(grace);
+    };
+    const settle = (fn: (v: any) => void, value: any) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      fn(value);
+    };
+
+    const timer = setTimeout(() => settle(reject, new Error(`Navigation timeout: ${timeout}ms`)), timeout);
+    const grace = setTimeout(() => {
+      if (sawLoading) return;
+      sawLoading = true;
+      chrome.tabs.get(tabId).then(
+        (tab) => { if (tab.status === 'complete') settle(resolve, undefined); },
+        (e) => settle(reject, e),
+      );
+    }, NAVIGATE_LOADING_GRACE_MS);
+    const onUpdated = (updatedTabId: number, info: chrome.tabs.OnUpdatedInfo) => {
+      if (updatedTabId !== tabId) return;
+      if (info.status === 'loading' || info.url !== undefined) sawLoading = true;
+      if (info.status === 'complete' && sawLoading) settle(resolve, undefined);
+    };
+    const onRemoved = (removedTabId: number) => {
+      if (removedTabId === tabId) settle(reject, new Error('Tab was closed during navigation'));
+    };
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    chrome.tabs.onRemoved.addListener(onRemoved);
+
+    chrome.tabs.update(tabId, { url }).catch((e) => settle(reject, e));
+  });
+}
+
 // ─── Page injectability ───
 
 import { RESTRICTED_URL_PREFIXES } from '@/lib/recorder/constants';

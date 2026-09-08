@@ -100,13 +100,14 @@ function skippedSummary(result: RestoreResult): string {
 type CreateTarget = 'local' | 'webdav';
 
 /**
- * BackupSection — 设置里的「备份与恢复」区块，含本地备份与 WebDAV 两块。
+ * BackupPanel — 「数据」设置节里的「备份与恢复」区块，含本地备份与 WebDAV 两块。
+ *（不带滚动容器，由 DataSection 提供页面外框。）
  *
  * 创建（CreateBackupDialog）与恢复（RestorePreviewDialog）的弹窗 / 流程为两块共用：
  * 创建按 `createTarget` 决定下载到本地还是上传到 WebDAV；恢复无论来自本地文件还是
  * WebDAV 快照，都先把字节喂给 `beginRestore` 走同一套预览 + 策略 + 强确认。
  */
-export function BackupSection() {
+export function BackupPanel() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createTarget, setCreateTarget] = useState<CreateTarget>('local');
   const [restoreOpen, setRestoreOpen] = useState(false);
@@ -362,14 +363,14 @@ export function BackupSection() {
   }, []);
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6">
-      <h2 className="text-base font-semibold">{t('settings.backup.title')}</h2>
+    <div className="space-y-4">
+      <h3 className="text-sm font-medium">{t('settings.backup.title')}</h3>
 
       {/* Local backup */}
       <section className="space-y-3 rounded-lg border border-border p-4">
         <div className="flex items-center gap-2">
           <DatabaseBackup className="size-4 text-muted-foreground" />
-          <h3 className="text-sm font-medium">{t('settings.backup.local.title')}</h3>
+          <h4 className="text-sm font-medium">{t('settings.backup.local.title')}</h4>
         </div>
         <p className="text-xs text-muted-foreground">{t('settings.backup.local.description')}</p>
         <div className="flex flex-wrap gap-2">
@@ -400,7 +401,7 @@ export function BackupSection() {
       <section className="space-y-3 rounded-lg border border-border p-4">
         <div className="flex items-center gap-2">
           <Cloud className="size-4 text-muted-foreground" />
-          <h3 className="text-sm font-medium">{t('settings.backup.webdav.title')}</h3>
+          <h4 className="text-sm font-medium">{t('settings.backup.webdav.title')}</h4>
         </div>
         <p className="text-xs text-muted-foreground">{t('settings.backup.webdav.description')}</p>
 

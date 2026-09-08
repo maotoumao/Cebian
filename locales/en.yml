@@ -131,24 +131,28 @@ settings:
   nav:
     aria: "Settings navigation"
     providers: "AI providers"
-    instructions: "Instructions"
+    mcp: "MCP Servers"
+    chat: "Chat"
     prompts: "Prompts"
     skills: "Skills"
     memory: "Memory"
-    mcp: "MCP Servers"
     pageInteraction: "Page interaction"
-    backup: "Backup & Restore"
-    storage: "Filesystem"
-    advanced: "Advanced"
+    data: "Data"
     about: "About"
+    group:
+      connect: "Connect"
+      customize: "Customize"
+      system: "System"
   providers:
     title: "AI providers"
-  storage:
-    title: "Filesystem"
-    used: "Used space"
-    usedError: "Couldn't calculate"
-    openBrowser: "Open file browser"
-    description: "Browse files the AI created, organized by conversation. The browser is read-only — use the download button there to export."
+  data:
+    title: "Data"
+    storage:
+      title: "Local storage"
+      used: "Used space"
+      usedError: "Couldn't calculate"
+      openBrowser: "Open file browser"
+      description: "Browse files the AI created, organized by conversation. The browser is read-only — use the download button there to export."
   about:
     title: "About"
     tagline: "AI browser sidebar assistant"
@@ -171,12 +175,6 @@ settings:
       xiaohongshuHandle: "一只猫头猫"
       x: "X"
       xHandle: "@maotoumao0_0"
-  advanced:
-    title: "Advanced"
-    compaction:
-      label: "Context compaction model"
-      hint: "The model used to automatically compact overly long conversations. Defaults to the conversation model."
-      followMain: "Same as conversation model"
   pageInteraction:
     title: "Page interaction"
     pageScope:
@@ -236,11 +234,67 @@ settings:
       label: "Toolbar model"
       hint: "The model used by all toolbar actions. A fast, low-cost model is usually enough. Defaults to the conversation model."
       followMain: "Same as conversation model"
-  instructions:
-    title: "Instructions"
-    label: "Custom instructions"
-    hint: "Appended after the default rules. Use it to adjust language, tone, or persona. Cannot override tool protocols or safety rules."
-    placeholder: "e.g.\n- Reply in English\n- Keep answers concise\n- Default to TypeScript when discussing code"
+  chat:
+    title: "Chat"
+    instructions:
+      label: "Custom instructions"
+      hint: "Appended after the default rules. Use it to adjust language, tone, or persona. Cannot override tool protocols or safety rules."
+      placeholder: "e.g.\n- Reply in English\n- Keep answers concise\n- Default to TypeScript when discussing code"
+    compaction:
+      label: "Context compaction model"
+      hint: "The model used to automatically compact overly long conversations. Defaults to the conversation model."
+      followMain: "Same as conversation model"
+    search:
+      title: "Web search"
+      hint: "Set the order in which search engines are tried; the first enabled engine is preferred. The AI may pick another engine first based on its best-for hint. When a search is blocked, returns nothing, or fails, Cebian tries the remaining enabled engines in order."
+      preferred: "Preferred"
+      custom: "Custom"
+      modified: "Modified"
+      allDisabled: "All engines are disabled. Enable at least one to use web search."
+      create: "Add engine"
+      # $1 = engine name
+      more: "Show more actions for \"$1\""
+      # $1 = engine name
+      edit: "Edit \"$1\""
+      # $1 = engine name
+      moveUp: "Move \"$1\" up"
+      # $1 = engine name
+      moveDown: "Move \"$1\" down"
+      # $1 = engine name
+      resetDefault: "Restore defaults for \"$1\""
+      # $1 = engine name
+      delete: "Delete \"$1\""
+      deleteConfirmTitle: "Delete this engine?"
+      # $1 = engine name
+      deleteConfirmDescription: "Deleting \"$1\" cannot be undone."
+      editBuiltin: "Built-in engine"
+      editCustom: "Custom engine"
+      name: "Name"
+      namePlaceholder: "e.g. Kagi"
+      url: "Search URL"
+      # $1 = the literal query placeholder ("{query}")
+      urlHint: "Use $1 for the search terms in the URL. Cebian encodes and inserts the terms automatically."
+      # $1 = sample search terms, $2 = the resulting URL
+      urlPreview: "URL for \"$1\": $2"
+      script: "Extraction script"
+      scriptHint: "Define a complete extract function that reads titles, links and snippets from the results page. In the returned object, status empty makes Cebian retry briefly, blocked makes it switch engines, and ok makes it read the results array. An empty results array also switches engines."
+      generateSelectorPlaceholder: "Results container selector, e.g. #results"
+      generate: "Generate template"
+      when: "Best for (optional)"
+      whenHint: "Describe which searches should use this engine first, to help the AI choose."
+      whenPlaceholder: "e.g. Chinese queries"
+      engines:
+        bing:
+          name: "Bing"
+        brave:
+          name: "Brave"
+        google:
+          name: "Google"
+        duckduckgo:
+          name: "DuckDuckGo"
+        baidu:
+          name: "Baidu"
+          when: "Chinese queries"
   prompts:
     title: "Prompts"
     newBody: "(Write your prompt here)"
@@ -744,6 +798,8 @@ tools:
     search: "Searching PDF for \"$1\""
     # $1 = action name
     unknown: "pdf: $1"
+  # $1 = search query (truncated)
+  webSearch: "Searching the web for \"$1\""
   # $1 = skill name
   runSkill: "Running skill script $1"
   # $1 = MCP server slug (display form), $2 = remote tool name
@@ -906,6 +962,12 @@ errors:
   modelUnavailable: "The selected model is no longer available. Pick another one."
   pageActionGone: "This action no longer exists."
   pageActionSaveFailed: "Could not save the action."
+  searchEngineGone: "This search engine no longer exists."
+  searchEngineSaveFailed: "Could not save the search engine settings. Try again."
+  # $1 = the literal query placeholder ("{query}")
+  searchEngineUrlMissingPlaceholder: "The search URL must contain $1 for the search terms."
+  searchEngineUrlInvalid: "Enter a complete search URL starting with http:// or https://."
+  searchEngineScriptInvalid: "The script must define a function named extract."
   oauth:
     cancelled: "Cancelled"
     timeout: "Authorization timed out"

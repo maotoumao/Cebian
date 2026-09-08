@@ -1,0 +1,95 @@
+---
+title: Web search
+description: Choose which search engines the AI uses, in what order, and how to add your own.
+group: guides
+order: 3.5
+placeholder: false
+---
+
+import QA from '@/components/docs/QA.astro';
+import QAItem from '@/components/docs/QAItem.astro';
+
+When a question needs information beyond the current page, Cebian calls the `web_search` tool: it opens a search engine in a background tab, reads the results, and hands the model a list of titles, links and snippets.
+
+Which engines to use, which one to try first, and where to fall back when one is blocked is all up to you.
+
+## How it works
+
+By default, enabled engines are tried in list order. The model may choose an engine first based on its "Best for" hint; the remaining engines keep their list order:
+
+1. The search terms are filled into the engine's URL template and opened in a background tab.
+2. Once the page has loaded, the engine's *extraction script* runs inside the results page and returns structured results.
+3. The first engine that returns results wins. If an engine reports that it is blocked (a captcha, for example), returns nothing, or its script fails, the next one takes over.
+4. If no usable results are retrieved, the tool reports each engine's outcome: no results, blocked, failed, or not tried because the time budget ran out. The model uses these outcomes to explain what happened and choose the next step.
+
+Cebian reuses the search tab when possible and creates it without switching away from your active tab. It creates another tab if the previous one was closed, navigated to another website, or can no longer be used; restarting the extension's background process may also create a new tab. You can switch to the search tab at any time.
+
+## Order and on/off
+
+The settings live under **Settings → Chat → Web search**.
+
+- The list order is the fallback order; the first enabled engine is marked **Preferred**. Use the "⋯" menu on a row to move it up or down.
+- Use the switch to turn an engine off. If Google is unreachable where you are, turn it off or move it to the end.
+- Bing, Brave, Google, DuckDuckGo and Baidu are built in. Baidu has the default hint "Chinese queries", which helps the model decide whether to try it first.
+
+## Editing a built-in engine
+
+Click a row to open the editor. You can change the search URL, the extraction script and the "best for" hint. The name follows the UI language and cannot be changed.
+
+Built-in engines with changes to their search URL, extraction script or best-for hint are marked **Modified**. Choose "Restore defaults" in the "⋯" menu to restore them immediately, or click **Reset** in the editor and then **Save**. Both keep the engine's enabled state and list position.
+
+When a search engine redesigns its results page and the script stops working, you do not have to wait for a new Cebian release: fix the script yourself.
+
+## Adding a custom engine
+
+Click **Add engine** and fill in:
+
+- **Name**: shown in the list, e.g. `Kagi`.
+- **Search URL**: use `{query}` where the search terms go, e.g. `https://kagi.com/search?q={query}`. Cebian URL-encodes the terms before inserting them.
+- **Extraction script**: JavaScript that runs inside the results page, see below.
+- **Best for** (optional): one line about when the model should prefer this engine. It becomes part of the tool description.
+
+You do not need to write the script from scratch. Enter the results container's CSS selector (for example `#results`) in the field above the script editor and click **Generate template**. This replaces the script currently in the editor; adjust the selectors for result items, titles and snippets to match the page. You can also ask Cebian in a chat to inspect the engine's results page and help write the script, then paste it into the editor.
+
+## The extraction script
+
+The script must define a complete `extract` function. It runs inside the search results page:
+
+```js
+function extract({ document, query }) {
+  const root = document.querySelector('#results');
+  if (!root) return { status: 'empty', results: [] };
+
+  const results = [...root.querySelectorAll('.result')].map((el) => {
+    const a = el.querySelector('a[href]');
+    if (!a) return null;
+    return {
+      title: a.textContent.trim(),
+      url: a.href,
+      snippet: el.querySelector('.snippet')?.textContent?.trim() ?? '',
+    };
+  }).filter(Boolean);
+
+  return { status: 'ok', results };
+}
+```
+
+The three values of `status`:
+
+- `ok`: the results container is there and `results` holds what was found. An empty array means the engine genuinely has no results.
+- `empty`: the results container has not appeared yet. Some engines render results after the page has loaded, so Cebian retries a few times briefly.
+- `blocked`: a captcha or interstitial was detected. Cebian does not retry and moves to the next engine.
+
+Each result needs a `title` and a `url` (http or https; relative URLs are resolved against the current page); `snippet` is optional. Entries that do not match are dropped.
+
+Some engines wrap result links in redirect URLs (Bing's `bing.com/ck/…`, for instance). The built-in scripts show how to unwrap them.
+
+## Q&A
+
+<QA>
+	<QAItem q="A CAPTCHA appeared during a search. What now?">Cebian continues with other engines, so the search tab may already have left the CAPTCHA page. If the CAPTCHA is still visible in that tab, complete it and retry. If an engine is frequently blocked, move it down the list or disable it.</QAItem>
+	<QAItem q="Why does search open a browser tab?">Search engines tend to block bare requests from extensions, and such requests carry neither your login state nor your region settings. So Cebian loads the results page in a real tab and runs the extraction script there to read the rendered content. New search tabs are created inactive, so Cebian does not switch away from the tab you are viewing.</QAItem>
+	<QAItem q="What happens if every engine is turned off?">The model gets a clear error asking you to enable at least one engine in Settings.</QAItem>
+	<QAItem q="Can a site's security policy block the script?">Yes. When Cebian detects a Content Security Policy (CSP) restriction, it first retries in an isolated execution environment. If that is also blocked, Chrome can try a debugger-based execution path; Firefox does not provide that path. If no available path succeeds, Cebian records the reason and tries the next engine.</QAItem>
+	<QAItem q="Is this configuration included in backups?">Yes. Engine order, on/off state, your edits to built-in engines and custom engines are all part of the backup under Settings → Data.</QAItem>
+</QA>

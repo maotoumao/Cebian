@@ -8,6 +8,7 @@
 import type { WxtStorageItem } from 'wxt/utils/storage';
 import type { RestoreStrategy } from './types';
 import type { PageActionsConfig } from '@/lib/page-actions/types';
+import type { SearchEnginesConfig } from '@/lib/search/types';
 import {
   lastSelectedModel,
   compactionModel,
@@ -26,6 +27,7 @@ import {
   memoryOrganizeState,
   pageInteractionSettings,
   pageActionsConfig,
+  searchEnginesConfig,
   floatingBallPosition,
   pendingSidePanelHandoff,
   type MCPServerConfig,
@@ -338,6 +340,21 @@ export const BACKUP_REGISTRY: BackupEntry<any>[] = [
       return {
         builtin: { ...backup.builtin, ...local.builtin },
         custom: fillMissingById(local.custom ?? [], backup.custom ?? [], (a) => a.id),
+        ...(order ? { order: [...order] } : {}),
+      };
+    },
+  }),
+  // 搜索引擎配置（内置覆盖层 + 自定义引擎 + 顺序；地址模板与抽取脚本均非密钥）。
+  // 合并语义与 pageActionsConfig 相同：自定义按 id 补缺、内置覆盖层逐 id 补缺、
+  // order 本地优先、本地缺失才采用备份的。
+  entry({
+    item: searchEnginesConfig,
+    storageClass: 'settings',
+    fillMissing: (local: SearchEnginesConfig, backup: SearchEnginesConfig) => {
+      const order = local.order ?? backup.order;
+      return {
+        builtin: { ...backup.builtin, ...local.builtin },
+        custom: fillMissingById(local.custom ?? [], backup.custom ?? [], (e) => e.id),
         ...(order ? { order: [...order] } : {}),
       };
     },

@@ -3,7 +3,7 @@
 // 上传 / 下载 / 删除。
 //
 // 这一层只做传输，不认识备份语义：每个快照的内容就是 archive.ts 产出的 zip 字节，
-// 由调用方（BackupSection）负责打包 / 解包。XML 解析用页面环境的 DOMParser；
+// 由调用方（BackupPanel）负责打包 / 解包。XML 解析用页面环境的 DOMParser；
 // background SW 没有 DOMParser，这也是整条编排放在页面跑的原因之一（见技术设计）。
 
 import type { WebDavConfig } from '@/lib/persistence/storage';

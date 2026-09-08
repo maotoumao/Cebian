@@ -55,7 +55,7 @@ without updating this skill first.
 ```
 common      # generic verbs/labels reused across UI (send, cancel, save, ...)
 chat        # /chat/* page (input, message, tools)
-settings    # /settings/* page (layout, providers, instructions, prompts, skills, advanced, about)
+settings    # /settings/* page (layout, providers, chat, prompts, skills, data, about)
 provider    # provider sub-components (oauth, apiKey, custom)
 tools       # agent tool runtime labels (shown in ToolCard while a tool runs)
 vfs         # standalone VFS browser entrypoint (entrypoints/vfs)

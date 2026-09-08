@@ -44,3 +44,5 @@ export const TOOL_FS_SAVE_URL = 'fs_save_url' as const;
 export const TOOL_RUN_SKILL = 'run_skill' as const;
 /** Tool that calls Chrome browser APIs directly via structured parameters */
 export const TOOL_CHROME_API = 'chrome_api' as const;
+/** 联网搜索：按用户配置的引擎顺序在后台标签页里搜索并返回结构化结果 */
+export const TOOL_WEB_SEARCH = 'web_search' as const;

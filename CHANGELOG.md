@@ -18,6 +18,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 新增 / Added
+
+- 新增「设置 → 对话 → 联网搜索」：可调整 Bing、Brave、Google、DuckDuckGo、百度的顺序与启停，修改搜索地址、抽取脚本和适用场景，也可添加自定义引擎（如 Kagi、Startpage、自建 SearXNG）。AI 改用 `web_search` 工具取得标题、链接和摘要，不再自行拼接搜索地址、逐个打开引擎结果页；工具默认按配置顺序尝试，支持优先使用指定引擎，被拦截、没有结果或执行失败时自动尝试其余引擎，都没有结果时汇总各引擎的情况 ([#63](https://github.com/maotoumao/Cebian/issues/63))
+
+- Added Settings → Chat → Web search: reorder or enable and disable Bing, Brave, Google, DuckDuckGo and Baidu; edit search URLs, extraction scripts and best-for hints; or add custom engines (Kagi, Startpage, a self-hosted SearXNG, …). The AI now uses the `web_search` tool to get titles, links and snippets instead of constructing search URLs and opening engine result pages itself. The tool follows the configured order by default, can try a specified engine first, automatically moves on after blocked searches, empty results or failures, and reports each engine's outcome when nothing usable was found ([#63](https://github.com/maotoumao/Cebian/issues/63))
+
+### 变更 / Changed
+
+- 设置页导航从 11 个平行入口收成 3 组 9 项：「连接」（AI 提供商、MCP 服务器）、「定制」（对话、提示词、技能、记忆、页面交互）、「系统」（数据、关于）。原「指引」与「高级」合并为「对话」，原「备份与恢复」与「文件系统」合并为「数据」，各项的具体设置不变。窄屏侧边栏里当前分节的图标会展开显示名称，组与组之间用分隔线区分；宽屏左栏显示分组标题。旧的 `#/instructions`、`#/advanced`、`#/backup`、`#/storage` 链接会自动跳到合并后的新分节
+
+- The Settings navigation collapses 11 flat entries into 3 groups of 9: Connect (AI providers, MCP servers), Customize (Chat, Prompts, Skills, Memory, Page interaction) and System (Data, About). The former Instructions and Advanced sections merge into Chat, and Backup & Restore plus Filesystem merge into Data; every individual setting stays as it was. In the narrow sidepanel the active section's icon expands to show its name and groups are separated by dividers; the wide layout shows group headings in the sidebar. Old `#/instructions`, `#/advanced`, `#/backup` and `#/storage` links redirect to the merged sections
+
 ## 1.7.0 - 2026-09-05
 
 ### 新增 / Added

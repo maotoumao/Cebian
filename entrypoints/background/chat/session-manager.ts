@@ -73,6 +73,7 @@ import {
   lastSelectedThinkingLevel,
   userInstructions as userInstructionsStorage,
   memorySettings,
+  searchEnginesConfig,
   type ModelIdentity,
   type ThinkingLevel,
 } from '@/lib/persistence/storage';
@@ -193,16 +194,23 @@ class SessionManager {
   private keepAliveHeld = false;
   /** Subscription to MCPManager change notifications; pushes refreshed tools into every live session. */
   private mcpUnsubscribe?: () => void;
+  /** 搜索引擎配置的 storage watch；变更后重建各会话的 `web_search`（描述里列的引擎会变）。 */
+  private searchEnginesUnwatch?: () => void;
 
   /**
-   * 订阅 MCPManager 变更，把刷新后的工具集推给所有活跃会话。由 background 启动序列
-   * 调用一次；幂等
+   * 订阅会影响工具集的配置变更（MCP 服务端、搜索引擎），把刷新后的工具集推给所有活跃
+   * 会话。由 background 启动序列调用一次；幂等
    */
-  watchMCPTools(): void {
+  watchToolConfig(): void {
     // Subscribe to MCPManager so we react AFTER its internal entries map is
     // reconciled — avoids racing two independent storage watchers.
     if (!this.mcpUnsubscribe) {
       this.mcpUnsubscribe = getMCPManager().subscribe(() => {
+        void this.refreshAllSessionTools();
+      });
+    }
+    if (!this.searchEnginesUnwatch) {
+      this.searchEnginesUnwatch = searchEnginesConfig.watch(() => {
         void this.refreshAllSessionTools();
       });
     }
@@ -452,9 +460,9 @@ class SessionManager {
   }
 
   /**
-   * Rebuild every live session's tool array from current MCP config.
+   * Rebuild every live session's tool array from current MCP + search-engine config.
    * Called when the user adds, removes, enables, disables, or edits an MCP
-   * server. The agent's `state.tools` setter accepts a fresh array, so a
+   * server, or changes the search-engine list. The agent's `state.tools` setter accepts a fresh array, so a
    * mid-run update is safe — the next assistant turn picks up the new tools.
    *
    * Sessions refresh in parallel; manager-level dedup prevents fan-out reconnects.
@@ -467,7 +475,7 @@ class SessionManager {
           const tools = await buildSessionToolArray(agentSession.toolCtx);
           agentSession.agent.state.tools = tools;
         } catch (err) {
-          console.warn(`[mcp] failed to refresh tools for session ${agentSession.sessionId}:`, err);
+          console.warn(`[tools] failed to refresh tools for session ${agentSession.sessionId}:`, err);
         }
       }),
     );
@@ -1254,8 +1262,8 @@ class SessionManager {
    * The live agent is reused as-is. We truncate, then refresh the mutable
    * `state.messages` / `model` / `thinkingLevel` / `systemPrompt` fields in
    * place to pick up any settings the user changed while idle, then call
-   * `continue()`. Tools are kept current by `refreshAllSessionTools` (MCP
-   * changes), so they're not touched here. Because the agent is never torn
+   * `continue()`. Tools are kept current by `refreshAllSessionTools` (MCP /
+   * search-engine changes), so they're not touched here. Because the agent is never torn
    * down, a `cancel()` racing this flow always finds a live agent — this is
    * the root-cause fix for the historical "stop button stuck after retry"
    * bug (there is no agent-less window to get stuck in).
@@ -1431,7 +1439,7 @@ class SessionManager {
 
       // 模型 / 思考档：仅当 retry 携带 turn（用户在重试前切了模型 / 思考）且与活
       // agent 当前选择不同时才换并落库；否则保持不动——没有「空闲时改了
-      // 全局」需要补读的场景。Tools 由 `refreshAllSessionTools` 保活（MCP 变更），
+      // 全局」需要补读的场景。Tools 由 `refreshAllSessionTools` 保活（MCP / 搜索引擎变更），
       // 此处不动。model 与 thinking 各自可选、分别判断、分别落库。
       // 模型的解析已在本 try 顶部完成（见那里的注释），此处只负责应用与落库。
 
