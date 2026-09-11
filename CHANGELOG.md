@@ -26,6 +26,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### 变更 / Changed
 
+- 升级 pi-ai 到 0.85.1，沿用其 OpenAI Codex 上游模型目录，自动纳入 GPT-6 Astra 等最新模型；增加目录回归测试，避免渠道目录更新后应用继续显示旧模型
+
+- Upgraded pi-ai to 0.85.1 so OpenAI Codex uses its upstream model catalog and automatically includes current models such as GPT-6 Astra; added a regression test to catch stale channel catalogs
+
 - 设置页导航从 11 个平行入口收成 3 组 9 项：「连接」（AI 提供商、MCP 服务器）、「定制」（对话、提示词、技能、记忆、页面交互）、「系统」（数据、关于）。原「指引」与「高级」合并为「对话」，原「备份与恢复」与「文件系统」合并为「数据」，各项的具体设置不变。窄屏侧边栏里当前分节的图标会展开显示名称，组与组之间用分隔线区分；宽屏左栏显示分组标题。旧的 `#/instructions`、`#/advanced`、`#/backup`、`#/storage` 链接会自动跳到合并后的新分节
 
 - The Settings navigation collapses 11 flat entries into 3 groups of 9: Connect (AI providers, MCP servers), Customize (Chat, Prompts, Skills, Memory, Page interaction) and System (Data, About). The former Instructions and Advanced sections merge into Chat, and Backup & Restore plus Filesystem merge into Data; every individual setting stays as it was. In the narrow sidepanel the active section's icon expands to show its name and groups are separated by dividers; the wide layout shows group headings in the sidebar. Old `#/instructions`, `#/advanced`, `#/backup` and `#/storage` links redirect to the merged sections
@@ -473,3 +477,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 首个公开版本
 
 - Initial public release
+

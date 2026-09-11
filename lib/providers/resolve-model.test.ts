@@ -60,6 +60,11 @@ describe('resolveModel — custom provider', () => {
 });
 
 describe('resolveModel — built-in provider', () => {
+  it('uses the upstream Codex catalog, including the current GPT-6 model', () => {
+    const ids = (getBuiltinModels('openai-codex') as Model<Api>[]).map((model) => model.id);
+    expect(ids).toContain('gpt-6-astra');
+  });
+
   it('未知内置 provider → null', () => {
     expect(resolveModel({ provider: 'definitely-not-a-provider', modelId: 'x' }, NO_CREDS, NO_CUSTOM)).toBeNull();
   });
