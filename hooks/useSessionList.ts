@@ -10,7 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { sessionListChannel } from '@/lib/agent/session-list-channel';
 import type { SessionPlacement } from '@/lib/persistence/db';
-import type { SessionMeta } from '@/lib/ipc/protocol';
+import type { SessionMeta, SessionWriteOp } from '@/lib/ipc/protocol';
 import { t } from '@/lib/i18n';
 
 /** 拉列表的兜底超时：后台没响应时也要把 loading 收掉，不能让面板一直转圈。 */
@@ -45,6 +45,21 @@ interface SessionListApi {
   remove: (sessionIds: string[]) => boolean;
   /** 置顶 / 归档 / 恢复普通。同样先本地乐观更新，再发请求。 */
   setPlacement: (sessionIds: string[], placement: SessionPlacement) => boolean;
+  /** 改标题（调用方已 trim 且非空）。同样先本地乐观更新，再发请求。 */
+  rename: (sessionId: string, title: string) => boolean;
+}
+
+/** 各类写失败的提示文案；null = 提示由别处负责（rename 由 useBackgroundAgent 常驻 toast，
+ *  这里只刷新列表）。用查表而非 if 链：协议新增一种 op 而这里漏配时 tsc 直接报错。 */
+const WRITE_FAILED_MESSAGE: Record<SessionWriteOp, (() => string) | null> = {
+  delete: () => t('common.session.deleteFailed'),
+  placement: () => t('common.session.placementFailed'),
+  rename: null,
+};
+
+/** 把某个会话的标题就地改成 `title`。乐观更新与 `session_renamed` 广播共用。 */
+function applyTitle(sessions: SessionMeta[], sessionId: string, title: string): SessionMeta[] {
+  return sessions.map((s) => (s.id === sessionId ? { ...s, title } : s));
 }
 
 /** `active` 为 true 时订阅列表并拉取一次；转 false 时退订。 */
@@ -76,11 +91,15 @@ export function useSessionList(active: boolean): SessionListApi {
     // 库里并不存在的状态上（比如少掉几条其实还在的会话）。同时如实告诉用户没成。
     const unsubscribeWriteFailed = sessionListChannel.subscribeWriteFailed((op, ids, message) => {
       console.warn('[history] session write failed:', op, ids, message);
-      toast.error(op === 'delete' ? t('common.session.deleteFailed') : t('common.session.placementFailed'));
+      const describe = WRITE_FAILED_MESSAGE[op];
+      if (describe) toast.error(describe());
       sessionListChannel.refresh();
     });
     const unsubscribePlacement = sessionListChannel.subscribePlacement((ids, placement) => {
       setSessions((prev) => applyPlacement(prev, ids, placement, Date.now()));
+    });
+    const unsubscribeRenamed = sessionListChannel.subscribeRenamed((id, title) => {
+      setSessions((prev) => applyTitle(prev, id, title));
     });
     // 后台拉列表失败：立刻收掉 loading，不让面板干转到超时。
     const unsubscribeError = sessionListChannel.subscribeError((message) => {
@@ -95,6 +114,7 @@ export function useSessionList(active: boolean): SessionListApi {
       unsubscribeDeleted();
       unsubscribeWriteFailed();
       unsubscribePlacement();
+      unsubscribeRenamed();
       unsubscribeError();
       setLoading(false);
     };
@@ -118,5 +138,11 @@ export function useSessionList(active: boolean): SessionListApi {
     return true;
   }, []);
 
-  return { sessions, loading, remove, setPlacement };
+  const rename = useCallback((sessionId: string, title: string) => {
+    if (!sessionListChannel.rename(sessionId, title)) return false;
+    setSessions((prev) => applyTitle(prev, sessionId, title));
+    return true;
+  }, []);
+
+  return { sessions, loading, remove, setPlacement, rename };
 }

@@ -340,6 +340,7 @@ export function AgentMessage({
   meta,
   copyText,
   onRetry,
+  onFork,
   branch,
 }: {
   children?: ReactNode;
@@ -347,11 +348,13 @@ export function AgentMessage({
   showHeader?: boolean;
   /** Meta is rendered as soon as `!isStreaming`; the copy button inside the
    * row is gated on `copyText` (skipped for pure tool-call turns). */
-  meta?: Omit<MessageMetaProps, 'text' | 'onRetry' | 'branchSwitcher'>;
+  meta?: Omit<MessageMetaProps, 'text' | 'onRetry' | 'onFork' | 'branchSwitcher'>;
   copyText?: string;
   /** When provided, a retry button is shown in the meta row. Caller decides
    *  eligibility (last turn-closing assistant, agent idle). */
   onRetry?: () => void;
+  /** 提供时在操作行显示「分叉」按钮（issue #60）。资格由调用方判定（收尾回复且已落树）。 */
+  onFork?: () => void;
   /** 当前回复存在并列版本时，在操作行最左侧展示分支导航。 */
   branch?: BranchSwitcherProps;
 }) {
@@ -374,12 +377,13 @@ export function AgentMessage({
           />
         )}
       </div>
-      {!isStreaming && (meta || copyText || onRetry || branch) && (
+      {!isStreaming && (meta || copyText || onRetry || onFork || branch) && (
         <MessageMetaRow
           {...(meta ?? {})}
           text={copyText}
           getSpeakText={() => extractSpeakText(contentRef.current)}
           onRetry={onRetry}
+          onFork={onFork}
           branchSwitcher={branch ? <BranchSwitcher {...branch} /> : undefined}
         />
       )}

@@ -23,7 +23,6 @@ import {
   CEBIAN_MEMORIES_COMMIT_MARKER,
 } from '@/lib/persistence/vfs-paths';
 import {
-  copyDirInto,
   readDirManifest,
   readDirFiles,
   removeDir,
@@ -194,7 +193,7 @@ export async function runOrganize(): Promise<OrganizeOutcome> {
     // 先抓 m0 再复制：复制过程中若有写入，m0 ≠ 提交时的 M_now → 一并触发丢弃。
     const m0 = await readDirManifest(LIVE);
     if (Object.keys(m0).length === 0) return { status: 'skipped', reason: 'empty' };
-    await copyDirInto(LIVE, STAGING);
+    await vfs.copyDir(LIVE, STAGING);
 
     // 4. 整理 agent 在 staging 干活。运行出错/中断 → 不提交（staging 可能只改了一半）。
     if (!(await runOrganizeAgent(model, Object.keys(m0).length))) {

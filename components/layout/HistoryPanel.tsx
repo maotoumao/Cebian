@@ -14,6 +14,7 @@ import { useSessionList } from '@/hooks/useSessionList';
 import { COLLAPSED_BUCKETS, groupSessions } from '@/components/layout/history-grouping';
 import { rangeBetween, visibleOrder } from '@/components/layout/history-selection';
 import { HistorySessionRow } from '@/components/layout/HistorySessionRow';
+import { toast } from 'sonner';
 import { showConfirm } from '@/lib/ui/dialog';
 import { t } from '@/lib/i18n';
 
@@ -41,7 +42,7 @@ function formatRelativeTime(timestamp: number): string {
 export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }: HistoryPanelProps) {
   // 列表 + 删除 + 置顶/归档都走 useSessionList 持有的那一条长连接端口。列表带着后台才
   // 知道的 `isRunning`（DB 不知道哪些 agent 正在流式），所以不能直接读库。
-  const { sessions, loading, remove, setPlacement } = useSessionList(open);
+  const { sessions, loading, remove, setPlacement, rename } = useSessionList(open);
 
   // 分组边界只随列表变化重算（`Date.now()` 不进依赖）；每行的相对时间则在每次渲染时
   // 现算，免得面板长时间开着而时间文案冻在最后一次列表更新的时刻。
@@ -117,6 +118,12 @@ export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }
     [sessions, selectedIds],
   );
 
+  // 分叉会话的来源标题查表（issue #60）：源会话已删时查不到，行上退化为通用提示。
+  const titleById = useMemo(
+    () => new Map(sessions.map((s) => [s.id, s.title] as const)),
+    [sessions],
+  );
+
   const enterSelection = (sessionId: string) => {
     setSelectedIds(new Set([sessionId]));
     anchorRef.current = sessionId;
@@ -162,6 +169,11 @@ export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }
     if (!remove(ids)) return;
     for (const id of ids) onDeleteSession?.(id);
     if (selectionMode) exitSelection();
+  };
+
+  /** 行内改名提交。请求没发出去（端口断了）要出声，否则输入框一收、什么都没发生。 */
+  const renameSession = (id: string, title: string) => {
+    if (!rename(id, title)) toast.error(t('chat.session.notConnected'));
   };
 
   /** 置顶 / 归档的切换：整批都已经是该状态就取消（回到普通），否则设成它。 */
@@ -273,6 +285,9 @@ export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }
                           key={session.id}
                           session={session}
                           relativeTime={formatRelativeTime(session.updatedAt)}
+                          forkSourceTitle={
+                            session.parentSessionId ? titleById.get(session.parentSessionId) : undefined
+                          }
                           selectionMode={selectionMode}
                           selected={selectedIds?.has(session.id) ?? false}
                           onOpen={onSelectSession}
@@ -281,6 +296,7 @@ export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }
                           onTogglePin={(s) => togglePlacement([s], 'pinned')}
                           onToggleArchive={(s) => togglePlacement([s], 'archived')}
                           onDelete={(id) => deleteSessions([id])}
+                          onRename={renameSession}
                         />
                       ))}
                     </div>

@@ -96,6 +96,15 @@ common:
       n: "$1 chats and their workspace files will be permanently removed. This cannot be undone."
     deleteFailed: "Could not delete. The chat is still there."
     placementFailed: "Could not update the chat. Nothing changed."
+    # Fork-source marker on a forked chat in the history list (issue #60). $1 = source chat title
+    forkedFrom: "Forked from \"$1\""
+    # Same marker when the source chat has been deleted
+    forkedFromUnknown: "Forked from a deleted chat"
+    # aria-label of the clickable fork-source marker (opens the source chat). $1 = source chat title
+    openForkSource: "Open source chat \"$1\""
+    renameFailed: "Could not rename. The title is unchanged."
+    # aria-label of the clickable header title (opens inline rename). $1 = chat title
+    renameChat: "Rename \"$1\""
     # $1 = message count
     messageCount:
       0: "No messages"
@@ -243,6 +252,11 @@ settings:
     compaction:
       label: "Context compaction model"
       hint: "The model used to automatically compact overly long conversations. Defaults to the conversation model."
+      followMain: "Same as conversation model"
+    autoTitle:
+      label: "Auto-generate chat titles"
+      hint: "After the first reply, replace the default title (the first message, truncated) with a short AI-generated title."
+      model: "Title model"
       followMain: "Same as conversation model"
     search:
       title: "Web search"
@@ -688,6 +702,8 @@ chat:
     # Branch switcher ("‹ n/m ›") tooltips on messages with sibling versions.
     prevBranch: "Previous version"
     nextBranch: "Next version"
+    # Tooltip/aria-label for the fork button on a turn-closing assistant reply (issue #60).
+    fork: "Fork"
   compaction:
     # Label on the divider marking where earlier context was folded into a summary.
     divider: "Earlier context compacted"
@@ -696,6 +712,9 @@ chat:
   session:
     loading: "Loading session…"
     modelError: "Model returned an error"
+    # Toast after forking a chat (issue #60). $1 = chat title (the fork keeps the source title, so this names the source)
+    forked: "New chat forked from \"$1\""
+    forkFailed: "Fork failed"
     # Shown inside an assistant bubble when the user cancelled the run
     # (either mid-stream or while a retry was rebuilding). Stays neutral
     # — cancelling isn't an error, just a stopped attempt.

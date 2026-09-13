@@ -11,7 +11,8 @@
 import { stream } from '@earendil-works/pi-ai/compat';
 import type { Api, Model, UserMessage, AssistantMessage } from '@earendil-works/pi-ai';
 import { resolveModel } from '@/lib/providers/resolve-model';
-import { languageName, oneLine, truncate } from '@/lib/utils';
+import { languageName } from '@/lib/utils';
+import { defaultSessionTitle } from '@/lib/agent/session-title';
 import {
   providerCredentials,
   customProviders,
@@ -149,11 +150,6 @@ const EMPTY_USAGE = {
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 };
 
-/** 会话标题：选中原文压成一行再截断；全空白则回落扩展名。 */
-function makeTitle(text: string): string {
-  return truncate(oneLine(text), 48) || 'Cebian';
-}
-
 /**
  * 「在侧边栏继续」（做法2）：把一次划词交互固化成一条真实会话（user 干净意图 +
  * assistant 已生成结果两条历史），写 pending 交接标记供侧边栏跳转。续聊用主模型
@@ -205,7 +201,7 @@ export async function materializeHandoff(
   await sessionStore.createWithMessages(
     {
       id: sessionId,
-      title: makeTitle(req.text),
+      title: defaultSessionTitle(req.text),
       model: identity.modelId,
       provider: identity.provider,
       userInstructions: '',

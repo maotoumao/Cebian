@@ -29,9 +29,8 @@ import {
   COMPACTION_SETTINGS,
   findCompactionCutPoint,
   runCompaction,
-  usableCompactionTarget,
-  type CompactionTarget,
 } from '@/lib/agent/compaction';
+import { usableModelTarget, type ModelTarget } from '@/lib/providers/model-target';
 import {
   createCompactionSummaryMessage,
   getRetainedTail,
@@ -65,11 +64,16 @@ import {
 } from '@/lib/agent/tool-permissions';
 import type { BroadcastMessage, TurnSettings } from '@/lib/ipc/protocol';
 import { replaceUserText, truncateForRetry, sanitizeAgentMessages } from '@/lib/agent/message-helpers';
+import { collectTitleSource, defaultSessionTitle } from '@/lib/agent/session-title';
+import { generateSessionTitle } from './title-generator';
+import { broadcastAll } from '../ipc/port-registry';
 import {
   providerCredentials,
   customProviders as customProvidersStorage,
   lastSelectedModel,
   compactionModel,
+  autoTitleSettings,
+  resolveAutoTitleSettings,
   lastSelectedThinkingLevel,
   userInstructions as userInstructionsStorage,
   memorySettings,
@@ -146,6 +150,18 @@ interface AgentSession {
    * to abandon the turn. Cleared back to `undefined` when compaction ends.
    */
   compactionController?: AbortController;
+  /**
+   * 首轮结束后的自动标题生成在途时持有。`destroySession` 中 abort，让删掉的会话不会
+   * 被迟到的生成结果「复活」一条标题写入（rename 对不存在的行返回 false，双保险）。
+   */
+  titleController?: AbortController;
+  /**
+   * 首轮自动标题已经向模型发过请求（不论成败）——「只生成一次」的明确标记，不靠标题文本
+   * 比对推断。只活在内存：SW 被回收后重建的会话对象不带它，此时若首次调用失败、用户又重试
+   * 首轮，会再调一次模型。这是有意的取舍——为一个罕见路径多付一次廉价调用，不值得给会话行
+   * 加持久字段。
+   */
+  titleAttempted?: true;
   modelKey: string;
   /**
    * 活 agent 当前挂的是「兜底模型」——会话行里的模型身份解析不出（被下架 / provider
@@ -535,30 +551,95 @@ class SessionManager {
   }
 
   /**
-   * 解析压缩（摘要）该用哪个模型 + 凭证。读全局 `compactionModel` 配置：
-   * - 未配置（null）→ 跟随主模型 `fallback`（默认语义）。
-   * - 配置了但解析不出（模型被删 / provider 没了）或无可用凭证 → console.warn
-   *   后静默回退主模型。压缩是后台增益，绝不因配错而中断本轮发送。
+   * 解析一个「辅助任务」（压缩摘要 / 自动标题）该用哪个模型 + 凭证：
+   * - `configuredId` 为 null → 跟随主模型 `fallback`（默认语义）。
+   * - 配置了但解析不出（模型被删 / provider 没了）或无可用凭证 → console.warn 后静默
+   *   回退主模型。辅助任务是后台增益，绝不因配错而中断本轮发送。
    *
-   * 返回 `{ model, apiKey }`；apiKey 可能为 undefined（连主模型都无凭证），由
-   * maybeCompact 现有的「无 key 则裸发」分支处理。
+   * 返回 `{ model, apiKey }`；apiKey 可能为 undefined（连主模型都无凭证），由调用方处理
+   * （压缩走「无 key 则裸发」，标题直接放弃）。`tag` 只用于日志前缀。
    */
-  private async resolveCompactionModel(fallback: Model<Api>): Promise<CompactionTarget> {
-    const configuredId = await compactionModel.getValue();
+  private async resolveAuxiliaryModel(
+    configuredId: ModelIdentity | null,
+    fallback: Model<Api>,
+    tag: string,
+  ): Promise<ModelTarget> {
     if (configuredId) {
       const resolved = await this.resolveSessionModel(configuredId);
       if (!resolved) {
-        console.warn('[compaction] configured model cannot be resolved (possibly deleted), falling back to main model', configuredId);
+        console.warn(`[${tag}] configured model cannot be resolved (possibly deleted), falling back to main model`, configuredId);
       } else {
         const apiKey = await resolveProviderApiKey(resolved.model.provider);
-        const usable = usableCompactionTarget({ model: resolved.model, apiKey });
+        const usable = usableModelTarget({ model: resolved.model, apiKey });
         if (usable) return usable;
-        console.warn('[compaction] configured model has no usable credentials, falling back to main model', configuredId);
+        console.warn(`[${tag}] configured model has no usable credentials, falling back to main model`, configuredId);
       }
     }
     // 回退主模型（未配置 / 解析失败 / 无凭证）：此刻才解析主模型凭证，避免配置可用时
     // 对主 provider 做无谓的 OAuth 刷新。
     return { model: fallback, apiKey: await resolveProviderApiKey(fallback.provider) };
+  }
+
+  /** 压缩（摘要）模型：读全局 `compactionModel` 配置后走辅助模型解析。 */
+  private async resolveCompactionModel(fallback: Model<Api>): Promise<ModelTarget> {
+    return this.resolveAuxiliaryModel(await compactionModel.getValue(), fallback, 'compaction');
+  }
+
+  /**
+   * 首轮结束后自动生成标题（设置可开关 / 选模型）。只在「transcript 恰有一条 user 消息、
+   * 本轮产出了正文、行标题仍是默认的首句截断」时跑一次；用户在首轮中已改名则让位。
+   * 不占 phase（不阻塞下一轮发送、不改 isRunning），但要自己持 keepalive——agent_end
+   * 已把 phase 置回 idle，否则 SW 可能在补全返回前被回收。失败只 warn，保留默认标题。
+   */
+  private async maybeGenerateTitle(agentSession: AgentSession, messages: AgentMessage[]): Promise<void> {
+    // 已发过请求（只生成一次）或有一次在途（首轮重试得快）：都不再来。
+    if (!agentSession.sessionCreated || agentSession.titleAttempted || agentSession.titleController) return;
+    const source = collectTitleSource(messages);
+    if (!source) return;
+
+    // 纯同步的资格判断做完就登记 controller、持 keepalive：后面每个 await（读设置 / 读行 /
+    // 解析凭证含 OAuth 刷新 / 补全）都可能撞上 cancel / destroySession，必须可 abort；
+    // agent_end 已把 phase 置 idle、主流程的保活已放，准备阶段也不能让 SW 被回收。
+    const controller = new AbortController();
+    agentSession.titleController = controller;
+    acquireKeepAlive();
+    try {
+      const settings = resolveAutoTitleSettings(await autoTitleSettings.getValue());
+      if (!settings.enabled || controller.signal.aborted) return;
+
+      const { sessionId } = agentSession;
+      const expected = defaultSessionTitle(source.userText);
+      const before = await sessionStore.loadMeta(sessionId);
+      if (controller.signal.aborted || before?.title !== expected) return;
+
+      const target = await this.resolveAuxiliaryModel(settings.model, agentSession.agent.state.model, 'auto-title');
+      if (controller.signal.aborted) return;
+      if (!target.apiKey) {
+        // 无凭证的 provider（本地 Ollama 等）：开关看着是开的却不会生效，留条 debug 可查。
+        console.debug('[auto-title] no usable credentials for the title model, skipping');
+        return;
+      }
+
+      // 进入模型调用即消耗掉唯一的一次机会（失败也不重来：与「首轮结束生成一次」的语义一致）。
+      agentSession.titleAttempted = true;
+      const title = await generateSessionTitle({
+        model: target.model,
+        apiKey: target.apiKey,
+        userText: source.userText,
+        assistantText: source.assistantText,
+        signal: controller.signal,
+      });
+      if (!title || controller.signal.aborted) return;
+      // 生成期间用户可能已改名：条件写——事务内仍是默认标题才替换（手动改名走另一条写路径，
+      // 事务外的「读比写」不原子）。
+      if (!(await sessionStore.renameIfTitle(sessionId, expected, title))) return;
+      broadcastAll({ type: 'session_renamed', sessionId, title });
+    } catch (err) {
+      if (!controller.signal.aborted) console.warn('[auto-title] generation failed:', err);
+    } finally {
+      if (agentSession.titleController === controller) agentSession.titleController = undefined;
+      releaseKeepAlive();
+    }
   }
 
   /** Get or create the `AgentSession` for a session id.
@@ -838,6 +919,11 @@ class SessionManager {
           messages: this.annotate(agentSession, messages),
           ...(branchInfo !== undefined ? { branchInfo } : {}),
         });
+        // 首轮收尾后的自动标题：独立后台任务，不阻塞事件派发、失败不影响会话。
+        // 方法内部已 try/catch；这里再兜一层是防 try 之前的同步段抛出变成 unhandled rejection。
+        void this.maybeGenerateTitle(agentSession, messages).catch((err) => {
+          console.warn('[auto-title] unexpected failure:', err);
+        });
         break;
       }
     }
@@ -882,9 +968,7 @@ class SessionManager {
         if (!modelCfg) {
           throw new Error(t('errors.modelUnavailable'));
         }
-        const trimmed = text.trim();
-        const title = trimmed.slice(0, 50) + (trimmed.length > 50 ? '...' : '');
-        const sessionTitle = title || t('common.newChat');
+        const sessionTitle = defaultSessionTitle(text);
         try {
           await sessionStore.create({
             id: sessionId,
@@ -1745,6 +1829,8 @@ class SessionManager {
     // 分支信息须在会话出表前算（getBranchInfo 按 sessionId 查活会话）——中断的
     // retry / 编辑可能刚在树上造出新分支，撤下的 agent_end 帧要携带它
     const branchInfo = await this.getBranchInfo(sessionId).catch(() => undefined);
+    // 在途的自动标题一并取消：会话出表后 destroySession 就找不到它了。
+    agentSession.titleController?.abort();
     this.sessions.delete(sessionId);
     this.updateKeepAlive();
     // Ensure client knows the agent stopped (abort may not fire agent_end)
@@ -1836,6 +1922,7 @@ class SessionManager {
       // broadcasting.
       agentSession.compactionController?.abort();
       agentSession.prepareController?.abort();
+      agentSession.titleController?.abort();
       agentSession.unsubscribeAgent();
       agentSession.toolCtx.dispose();
       agentSession.permissionBridge.cancel();

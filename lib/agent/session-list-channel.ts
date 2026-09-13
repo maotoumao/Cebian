@@ -1,4 +1,4 @@
-// UX 侧的会话列表通道（拉列表 / 删除）。
+// UX 侧的会话列表通道（拉列表 / 删除 / 改位置 / 改名）。
 //
 // 端口由 `useBackgroundAgent` 持有——历史面板不另开端口，遵循 lib/ipc/protocol.ts
 // 顶部「一个 UI 实例只开一条端口，其它域走 channel shim 复用它」的约定。形状与
@@ -8,21 +8,20 @@
 // 每次删除又一条），请求 / 响应的配对逻辑散在各个回调里。
 
 import type { SessionPlacement } from '@/lib/persistence/db';
-import type { ClientMessage, ServerMessage, SessionMeta } from '@/lib/ipc/protocol';
-
-/** 失败的那类写操作，取自 `session_write_failed` 的 `op`——不另开一份枚举。 */
-type SessionWriteOp = Extract<ServerMessage, { type: 'session_write_failed' }>['op'];
+import type { ClientMessage, SessionMeta, SessionWriteOp } from '@/lib/ipc/protocol';
 
 type ListListener = (sessions: SessionMeta[]) => void;
 type DeletedListener = (sessionIds: string[]) => void;
 type WriteFailedListener = (op: SessionWriteOp, sessionIds: string[], message: string) => void;
 type PlacementListener = (sessionIds: string[], placement: SessionPlacement) => void;
+type RenamedListener = (sessionId: string, title: string) => void;
 type ErrorListener = (message: string) => void;
 
 const listListeners = new Set<ListListener>();
 const deletedListeners = new Set<DeletedListener>();
 const writeFailedListeners = new Set<WriteFailedListener>();
 const placementListeners = new Set<PlacementListener>();
+const renamedListeners = new Set<RenamedListener>();
 const errorListeners = new Set<ErrorListener>();
 
 /** Active port. Set by `useBackgroundAgent` on connect/disconnect. */
@@ -99,6 +98,13 @@ export const sessionListChannel = {
     }
   },
 
+  /** 某个会话改了标题（用户改名或自动生成）。同 `publishPlacement`，别的窗口改的也会到这里。 */
+  publishRenamed(sessionId: string, title: string): void {
+    for (const l of renamedListeners) {
+      try { l(sessionId, title); } catch (err) { console.warn('[sessionListChannel] renamed listener threw:', err); }
+    }
+  },
+
   /** 后台处理列表请求时出错了。订阅方据此立刻收掉 loading，不必干等超时。 */
   publishError(message: string): void {
     listInFlight = false;
@@ -130,6 +136,11 @@ export const sessionListChannel = {
     return () => { placementListeners.delete(l); };
   },
 
+  subscribeRenamed(l: RenamedListener): () => void {
+    renamedListeners.add(l);
+    return () => { renamedListeners.delete(l); };
+  },
+
   subscribeError(l: ErrorListener): () => void {
     errorListeners.add(l);
     return () => { errorListeners.delete(l); };
@@ -148,5 +159,10 @@ export const sessionListChannel = {
   /** 设置一批会话的列表位置。Returns true if the message was posted. */
   setPlacement(sessionIds: string[], placement: SessionPlacement): boolean {
     return post({ type: 'session_set_placement', sessionIds, placement } satisfies ClientMessage);
+  },
+
+  /** 改一个会话的标题（已在 UI 侧 trim；后台再归一化）。Returns true if the message was posted. */
+  rename(sessionId: string, title: string): boolean {
+    return post({ type: 'session_rename', sessionId, title } satisfies ClientMessage);
   },
 };

@@ -1,8 +1,11 @@
 // 历史列表的一行。从 HistoryPanel 拆出来，因为多选模式让「一行长什么样」自成一档：
 // 普通态是点开会话 + 悬停操作，选择态是勾选框 + 点行即勾选。
 
-import { Archive, ArchiveRestore, CheckSquare, Ellipsis, Pin, PinOff, Trash2 } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Archive, ArchiveRestore, CheckSquare, Ellipsis, GitFork, Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { InlineRenameInput } from '@/components/common/InlineRenameInput';
+import { MAX_SESSION_TITLE_LENGTH } from '@/lib/agent/session-title';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
@@ -18,6 +21,9 @@ interface HistorySessionRowProps {
   session: SessionMeta;
   /** 相对时间，由父组件统一格式化（一次渲染共用同一个「现在」）。 */
   relativeTime: string;
+  /** 分叉来源会话的标题（issue #60）。仅当 `session.parentSessionId` 存在时有意义：
+   *  undefined = 源会话已不在列表（被删），标记退化为不可点的提示。 */
+  forkSourceTitle?: string;
   selectionMode: boolean;
   selected: boolean;
   /** 普通态：打开会话。选择态：切换勾选（带 shiftKey 表示区间选择）。 */
@@ -27,11 +33,58 @@ interface HistorySessionRowProps {
   onTogglePin: (session: SessionMeta) => void;
   onToggleArchive: (session: SessionMeta) => void;
   onDelete: (sessionId: string) => void;
+  /** 行内改名提交（已 trim 且与原标题不同）。 */
+  onRename: (sessionId: string, title: string) => void;
+}
+
+/**
+ * 分叉来源标记（issue #60）：源会话仍在时是一个可点的小按钮（跳到源会话），源会话已删
+ * 或处于选择态时退化为纯提示图标——选择态下整行都是勾选命中区，不该再有别的导航。
+ */
+function ForkSourceMarker({
+  parentSessionId,
+  sourceTitle,
+  onOpen,
+}: {
+  parentSessionId: string;
+  sourceTitle: string | undefined;
+  /** 缺省 = 不可点（选择态 / 源已删）。 */
+  onOpen?: (sessionId: string) => void;
+}) {
+  const hint = sourceTitle !== undefined
+    ? t('common.session.forkedFrom', [sourceTitle])
+    : t('common.session.forkedFromUnknown');
+  if (!onOpen || sourceTitle === undefined) {
+    return (
+      <span role="img" aria-label={hint} title={hint} className="shrink-0 text-muted-foreground">
+        <GitFork aria-hidden className="size-3" />
+      </span>
+    );
+  }
+  // 悬停提示沿用本文件其它按钮的 title 属性；可访问名用动作式文案（按钮说明「做什么」）。
+  return (
+    <Button
+      variant="ghost"
+      size="icon-xs"
+      className="size-5 shrink-0 text-muted-foreground hover:text-foreground"
+      aria-label={t('common.session.openForkSource', [sourceTitle])}
+      title={hint}
+      // 行本身是 role="button"：点击 / 键盘事件就地拦下，否则会顺带打开当前会话。
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen(parentSessionId);
+      }}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <GitFork className="size-3" />
+    </Button>
+  );
 }
 
 export function HistorySessionRow({
   session,
   relativeTime,
+  forkSourceTitle,
   selectionMode,
   selected,
   onOpen,
@@ -40,9 +93,15 @@ export function HistorySessionRow({
   onTogglePin,
   onToggleArchive,
   onDelete,
+  onRename,
 }: HistorySessionRowProps) {
   const pinned = session.pinnedAt != null;
   const archived = session.archivedAt != null;
+  const [renaming, setRenaming] = useState(false);
+  // 从菜单进入改名：`onSelect` 触发时菜单还开着、焦点锁仍生效，此刻挂输入框会被立刻抢回焦点
+  // （blur → 退出编辑）；关闭时 Radix 又会把焦点还给触发按钮。所以 onSelect 只记意图，等
+  // onCloseAutoFocus（焦点锁已解除）阻止默认的焦点恢复后，再真正进入编辑态。
+  const renameFromMenuRef = useRef(false);
 
   const activate = (shiftKey: boolean) => {
     if (selectionMode) onToggleSelect(session.id, shiftKey);
@@ -86,7 +145,28 @@ export function HistorySessionRow({
             />
           )}
           {pinned && <Pin aria-hidden className="size-3 shrink-0 text-muted-foreground" />}
-          <div className="text-sm font-medium truncate min-w-0">{session.title}</div>
+          {session.parentSessionId && (
+            <ForkSourceMarker
+              parentSessionId={session.parentSessionId}
+              sourceTitle={forkSourceTitle}
+              onOpen={selectionMode ? undefined : onOpen}
+            />
+          )}
+          {renaming ? (
+            <InlineRenameInput
+              initial={session.title}
+              ariaLabel={t('common.rename')}
+              maxLength={MAX_SESSION_TITLE_LENGTH}
+              onCommit={(next) => {
+                setRenaming(false);
+                onRename(session.id, next);
+              }}
+              onCancel={() => setRenaming(false)}
+              className="flex-1 text-sm font-medium"
+            />
+          ) : (
+            <div className="text-sm font-medium truncate min-w-0">{session.title}</div>
+          )}
         </div>
         <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
           {session.model && <span>{session.model}</span>}
@@ -128,7 +208,25 @@ export function HistorySessionRow({
                 <Ellipsis className="size-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44 max-w-[calc(100vw-1rem)]">
+            <DropdownMenuContent
+              align="end"
+              className="w-44 max-w-[calc(100vw-1rem)]"
+              onCloseAutoFocus={(e) => {
+                if (renameFromMenuRef.current) {
+                  renameFromMenuRef.current = false;
+                  e.preventDefault();
+                  setRenaming(true);
+                }
+              }}
+            >
+              <DropdownMenuItem
+                onSelect={() => {
+                  renameFromMenuRef.current = true;
+                }}
+              >
+                <Pencil />
+                <span className="min-w-0 break-words">{t('common.rename')}</span>
+              </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => onToggleArchive(session)}>
                 {archived ? <ArchiveRestore /> : <Archive />}
                 <span className="min-w-0 break-words">

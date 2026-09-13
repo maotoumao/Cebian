@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import {
+  autoTitleSettings,
   memorySettings,
   memoryOrganizeState,
+  resolveAutoTitleSettings,
   resolveOrganizeSettings,
   resolvePageInteractionSettings,
 } from '@/lib/persistence/storage';
@@ -11,6 +13,24 @@ import {
 // 只在 key 整体缺失时生效、不补「已存在但缺字段」的旧值，故读整理配置统一走
 // resolveOrganizeSettings。运行结果态另存 memoryOrganizeState（与用户配置分离，防读改写覆盖）。
 const DEFAULTS = { auto: false, intervalDays: 14, minNewMemories: 30 };
+
+describe('resolveAutoTitleSettings', () => {
+  it('缺失 / 空对象 → 默认开、跟随主模型', () => {
+    expect(resolveAutoTitleSettings(undefined)).toEqual({ enabled: true, model: null });
+    expect(resolveAutoTitleSettings({})).toEqual({ enabled: true, model: null });
+  });
+
+  it('部分字段 → 缺的补默认、有的保留', () => {
+    expect(resolveAutoTitleSettings({ enabled: false })).toEqual({ enabled: false, model: null });
+    const model = { provider: 'p', modelId: 'm' };
+    expect(resolveAutoTitleSettings({ model })).toEqual({ enabled: true, model });
+  });
+
+  it('storage fallback 与默认值一致', async () => {
+    fakeBrowser.reset();
+    expect(await autoTitleSettings.getValue()).toEqual({ enabled: true, model: null });
+  });
+});
 
 describe('resolveOrganizeSettings', () => {
   it('organize 缺失 → 全默认', () => {

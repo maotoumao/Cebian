@@ -12,6 +12,8 @@ import {
   sessionTreeDb,
   updateSessionPlacement,
   updateSessionSettings,
+  updateSessionTitle,
+  updateSessionTitleIf,
   type SessionBackupRecord,
   type SessionPlacement,
   type SessionRecord,
@@ -94,6 +96,15 @@ class SessionStore {
     return (await this.open(id))?.record;
   }
 
+  /** `load` 的轻量版：只读 meta 行（不打开树、不投影 transcript）。自动标题比对「用户
+   *  是否已改名」用。 */
+  async loadMeta(id: string): Promise<Omit<SessionRecord, 'messages'> | undefined> {
+    const row = await getSession(id);
+    if (!row) return undefined;
+    const { messages: _messages, ...meta } = row;
+    return meta;
+  }
+
   /** 新会话建行（空树）。id 已存在时抛 pi 的 SessionError('already_exists')。 */
   async create(fields: CreateSessionFields): Promise<void> {
     await this.repo.create(fields);
@@ -117,6 +128,35 @@ class SessionStore {
     await this.repo.delete({ id } as SessionTreeMeta);
   }
 
+  /**
+   * 从源会话的某条 message entry 处分叉出新会话（issue #60）：复制根→`entryId`（含）的
+   * 整条路径到一个新 id，标题 / 模型 / 思考档 / userInstructions 沿用源会话的当前值，
+   * `parentSessionId` 记源会话。源树不动——fork 走源会话存储的串行写队列，与在途追加
+   * 天然有序，调用方无需先 flush。目标 entry 不是 message 时 repo 抛
+   * `SessionError('invalid_fork_target')`，原样上抛。
+   *
+   * 设置字段显式取自 `sessions` 行而非让 repo 从 storage 快照默认继承：模型 / 思考档
+   * 的切换只写行（`updateSessionSettings`），storage 的 meta 是打开时的快照，会过期。
+   *
+   * 返回新会话的 id 与标题（供 IPC 回包与 UI 跳转）。
+   */
+  async fork(sourceId: string, entryId: string): Promise<{ id: string; title: string }> {
+    const row = await getSession(sourceId);
+    if (!row) throw new Error(`Session not found: ${sourceId}`);
+    const forked = await this.repo.fork({ id: sourceId } as SessionTreeMeta, {
+      scope: 'branch',
+      entryId,
+      position: 'at',
+      title: row.title,
+      model: row.model,
+      provider: row.provider,
+      userInstructions: row.userInstructions,
+      thinkingLevel: row.thinkingLevel,
+    });
+    const { id, title } = await forked.getMetadata();
+    return { id, title };
+  }
+
   /** 把会话的模型 / 思考档落库（background 是唯一写者，故经由此处）。 */
   async updateSettings(
     id: string,
@@ -128,6 +168,16 @@ class SessionStore {
   /** 批量设置会话在历史列表里的位置（置顶 / 归档 / 普通）。单条 = 长度 1 的数组。 */
   async updatePlacement(ids: string[], placement: SessionPlacement): Promise<void> {
     await updateSessionPlacement(ids, placement);
+  }
+
+  /** 改标题（已归一化的合法标题；不动 updatedAt）。返回是否命中了会话行。 */
+  async rename(id: string, title: string): Promise<boolean> {
+    return updateSessionTitle(id, title);
+  }
+
+  /** 条件改标题：当前标题仍是 `expectedTitle` 才写（事务内比对）。自动标题避让手动改名用。 */
+  async renameIfTitle(id: string, expectedTitle: string, title: string): Promise<boolean> {
+    return updateSessionTitleIf(id, expectedTitle, title);
   }
 
   /**

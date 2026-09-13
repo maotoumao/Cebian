@@ -1,6 +1,6 @@
 // 记忆整理事务的 VFS 原语（IO 层；纯决策在 organize-plan.ts）。整理 manager 编排它们：
-// 复制 live→staging、读指纹/内容（喂 plan 的比对/diff、validate 的校验）、清目录、把
-// staging 整体替换进 live（提交）。
+// 读指纹/内容（喂 plan 的比对/diff、validate 的校验）、清目录、把 staging 整体替换进
+// live（提交）。live→staging 的复制直接用通用的 `vfs.copyDir`。
 //
 // 全部按 walkFiles 递归遍历并以 relPath 为键——这样整理 agent 万一在 staging 里留下
 // 嵌套或非 .md 文件，也会带着含 `/` 的 relPath 出现在校验输入里被拒（守 top-level .md
@@ -39,13 +39,6 @@ export async function readDirFiles(dir: string): Promise<Record<string, string>>
     }
   }
   return out;
-}
-
-/** 把 src 下全部常规文件复制进 dest（保留相对路径，writeFile 自动建父目录）。 */
-export async function copyDirInto(src: string, dest: string): Promise<void> {
-  for (const { relPath } of await vfs.walkFiles(src)) {
-    await vfs.copyFile(`${src}/${relPath}`, `${dest}/${relPath}`);
-  }
 }
 
 /** 递归删除目录（含其本身）；不存在也不报错。 */

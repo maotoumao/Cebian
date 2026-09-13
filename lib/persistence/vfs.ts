@@ -383,6 +383,31 @@ async function copyFile(src: string, dest: string): Promise<void> {
   await writeFile(dest, data as Uint8Array);
 }
 
+/**
+ * 把 `src` 下全部常规文件复制到 `dest`（保留相对路径；`writeFile` 自动建父目录）。
+ *
+ * - `src` 不存在（ENOENT）视为空目录、直接返回——会话工作区是懒创建的（首次 writeFile
+ *   才出现），调用方不必先探测。其它 stat 错误照常上抛，不吞成「不存在」；`src` 若是
+ *   文件，`walkFiles` 会以 ENOTDIR 抛出。
+ * - 只复制常规文件（沿用 {@link walkFiles} 的口径）：空子目录不会在 `dest` 重建。
+ * - `dest` 已有的同名文件会被覆盖，其余文件保留（不是「替换整个目录」——需要那种语义
+ *   的调用方自己先 rm）。
+ */
+async function copyDir(src: string, dest: string): Promise<void> {
+  await ensureDefaults();
+  src = normalizePath(src);
+  dest = normalizePath(dest);
+  try {
+    await pfs().stat(src);
+  } catch (e: any) {
+    if (e.code === 'ENOENT') return;
+    throw e;
+  }
+  for (const { relPath } of await walkFiles(src)) {
+    await copyFile(`${src}/${relPath}`, `${dest}/${relPath}`);
+  }
+}
+
 /** {@link walkFiles} 返回的一个常规文件条目。 */
 export interface VfsFileEntry {
   /** 相对遍历根的 POSIX 路径，无前导斜杠。 */
@@ -495,6 +520,7 @@ export const vfs = {
   exists,
   appendFile,
   copyFile,
+  copyDir,
   walkFiles,
   onChange,
 };

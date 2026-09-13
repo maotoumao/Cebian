@@ -1,5 +1,8 @@
-import { Sun, Moon, SunMoon, Settings, SquarePen, History } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Sun, Moon, SunMoon, Settings, SquarePen, History, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { InlineRenameInput } from '@/components/common/InlineRenameInput';
+import { MAX_SESSION_TITLE_LENGTH } from '@/lib/agent/session-title';
 import {
   Tooltip,
   TooltipContent,
@@ -16,9 +19,18 @@ interface HeaderProps {
   onOpenSettings: () => void;
   onNewChat: () => void;
   onOpenHistory: () => void;
+  /** 提供时标题可点击进入行内改名（仅已有会话且标题非空时由 App 传入）。 */
+  onRename?: (title: string) => void;
 }
 
-export function Header({ title, isNewChat, theme, onToggleTheme, onOpenSettings, onNewChat, onOpenHistory }: HeaderProps) {
+export function Header({ title, isNewChat, theme, onToggleTheme, onOpenSettings, onNewChat, onOpenHistory, onRename }: HeaderProps) {
+  const [renaming, setRenaming] = useState(false);
+  // 编辑途中入口被收回（切到新会话 / 设置）：退出编辑态，别让输入框悬在一个不能改名的页面上。
+  useEffect(() => {
+    if (!onRename) setRenaming(false);
+  }, [onRename]);
+  const renameLabel = t('common.rename');
+
   return (
     <header className="flex items-center justify-between px-5 py-4 border-b border-border bg-background/80 backdrop-blur-xl z-10">
       <div className="flex items-center gap-2">
@@ -41,9 +53,34 @@ export function Header({ title, isNewChat, theme, onToggleTheme, onOpenSettings,
         </Tooltip>
       </div>
 
-      <span className="flex-1 text-center text-sm font-medium truncate px-2">
-        {title || (isNewChat ? 'Cebian' : '')}
-      </span>
+      {renaming && title ? (
+        <InlineRenameInput
+          initial={title}
+          ariaLabel={renameLabel}
+          maxLength={MAX_SESSION_TITLE_LENGTH}
+          onCommit={(next) => {
+            setRenaming(false);
+            onRename?.(next);
+          }}
+          onCancel={() => setRenaming(false)}
+          className="flex-1 mx-2 text-center text-sm font-medium"
+        />
+      ) : onRename && title ? (
+        <button
+          type="button"
+          onClick={() => setRenaming(true)}
+          title={renameLabel}
+          aria-label={t('common.session.renameChat', [title])}
+          className="group flex-1 min-w-0 flex items-center justify-center gap-1 px-2 text-sm font-medium"
+        >
+          <span className="truncate">{title}</span>
+          <Pencil aria-hidden className="size-3 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+      ) : (
+        <span className="flex-1 text-center text-sm font-medium truncate px-2">
+          {title || (isNewChat ? 'Cebian' : '')}
+        </span>
+      )}
 
       <div className="flex gap-2">
         <Tooltip>

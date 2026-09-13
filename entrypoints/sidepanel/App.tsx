@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, matchPath, useNavigate, useLocation } from 'react-router-dom';
+import { toast } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 import { DialogOutlet } from '@/components/dialogs/outlet';
@@ -10,6 +11,8 @@ import { HistoryPanel } from '@/components/layout/HistoryPanel';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { useChangelogOnUpdate } from '@/hooks/useChangelogOnUpdate';
 import { themePreference } from '@/lib/persistence/storage';
+import { sessionListChannel } from '@/lib/agent/session-list-channel';
+import { t } from '@/lib/i18n';
 import { ChatPage } from './pages/chat';
 import { useSidePanelToggle } from './useSidePanelToggle';
 import { useSidePanelHandoff } from './useSidePanelHandoff';
@@ -115,6 +118,19 @@ function App() {
     }
   }, [location.pathname, navigate]);
 
+  // 页头改名：当前路由上的会话 id（/chat/new 不可改名）。走 sessionListChannel 复用同一条
+  // 端口。**不做乐观更新**：页头由后台成功后的 session_renamed 广播驱动（hook →
+  // sessionTitle → onTitleChange）；失败时页头自然停在旧标题上，这就是回滚——历史面板
+  // 关着时它的失败 toast 没人听，页头若乐观改了就再没机会纠正。
+  const currentSessionId = matchPath('/chat/:sessionId', location.pathname)?.params.sessionId;
+  const canRename = !!currentSessionId && currentSessionId !== 'new' && chatTitle !== '';
+  const handleRenameTitle = useCallback((title: string) => {
+    if (!currentSessionId || currentSessionId === 'new') return;
+    if (!sessionListChannel.rename(currentSessionId, title)) {
+      toast.error(t('chat.session.notConnected'));
+    }
+  }, [currentSessionId]);
+
   // 退出设置：回到进设置前的聊天路由（记不到则 /chat/new 兜底）。
   const handleExitSettings = useCallback(() => {
     navigate(lastChatPathRef.current, { replace: true });
@@ -128,6 +144,7 @@ function App() {
         {!location.pathname.startsWith('/settings') && (
           <Header
             title={chatTitle}
+            onRename={canRename ? handleRenameTitle : undefined}
             isNewChat={location.pathname === '/chat/new'}
             theme={theme}
             onToggleTheme={toggleTheme}

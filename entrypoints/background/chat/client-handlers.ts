@@ -1,5 +1,5 @@
 // chat 域的客户端消息 handler：会话订阅 / 发送 / 取消 / 重试 / 工具与授权裁决 /
-// 历史列表与删除，以及「最后一个 viewer 断连后延迟取消 agent」的 grace-cancel 策略。
+// 历史列表、删除、分叉与改名，以及「最后一个 viewer 断连后延迟取消 agent」的 grace-cancel 策略。
 //
 // grace-cancel 住在这里而不是 `viewers.ts`：viewers 只放路由状态与投递，若它自己调
 // `sessionManager.cancel()` 会与 session-manager 成运行时环（session-manager 广播要经
@@ -13,6 +13,8 @@ import { flushStreamOps } from './stream-broadcast';
 import { registerClientHandlers, type ClientHandlerMap } from '../ipc/client-router';
 import { onPortDisconnect, post, broadcastAll } from '../ipc/port-registry';
 import { vfs } from '@/lib/persistence/vfs';
+import { workspaceRootForSession } from '@/lib/persistence/vfs-paths';
+import { normalizeSessionTitle } from '@/lib/agent/session-title';
 import { isValidSessionId } from '@/lib/utils';
 
 // ─── Grace cancel ───
@@ -286,7 +288,7 @@ const chatClientHandlers: ClientHandlerMap = {
         // other VFS error and continue with DB deletion — a leaked workspace
         // is recoverable via the VFS browser; an orphan session row would
         // be more confusing.
-        const workspacePath = `/workspaces/${sessionId}`;
+        const workspacePath = workspaceRootForSession(sessionId);
         try {
           await vfs.rm(workspacePath, { recursive: true, force: true });
         } catch (err) {
@@ -365,6 +367,78 @@ const chatClientHandlers: ClientHandlerMap = {
         error: 'invalid session id',
       });
     }
+  },
+
+  /**
+   * 从一条 assistant 消息处分叉出新会话（issue #60）。顺序：建新会话（树路径复制）→
+   * best-effort 复制工作区 → 回 `session_forked`。
+   *
+   * 工作区复制失败不让分叉失败：会话行与树已落库，此时报错会让用户以为没分叉成功、
+   * 再点一次得到两个副本；缺文件是可恢复的（VFS 浏览器可见），与 session_delete 对
+   * 工作区清理的 best-effort 口径一致。不动源会话的活 agent：fork 不改源树，源会话
+   * 运行中也可分叉。
+   */
+  async session_fork(port, msg) {
+    const { sessionId, entryId } = msg;
+    const fail = (error: string) =>
+      post(port, { type: 'session_fork_failed', sourceSessionId: sessionId, error });
+
+    // entryId 也要校验：`createForkMutations` 对缺省的 entryId 会退到「分叉整条当前分支」，
+    // 畸形载荷不能悄悄变成另一种语义。
+    if (!isValidSessionId(sessionId) || typeof entryId !== 'string' || entryId === '') {
+      console.warn('[session_fork] rejecting malformed request:', sessionId, entryId);
+      fail('invalid session or entry id');
+      return;
+    }
+    let forked: { id: string; title: string };
+    try {
+      forked = await sessionStore.fork(sessionId, entryId);
+    } catch (err) {
+      console.warn('[session_fork] failed:', err);
+      fail(err instanceof Error ? err.message : String(err));
+      return;
+    }
+    const srcWorkspace = workspaceRootForSession(sessionId);
+    const dstWorkspace = workspaceRootForSession(forked.id);
+    try {
+      await vfs.copyDir(srcWorkspace, dstWorkspace);
+    } catch (err) {
+      console.warn(`[session_fork] failed to copy workspace ${srcWorkspace} → ${dstWorkspace}:`, err);
+    }
+    post(port, { type: 'session_forked', sessionId: forked.id, title: forked.title });
+  },
+
+  /**
+   * 改会话标题（页头 / 历史面板共用）。归一化在后台做：空标题视为非法而不是回退默认
+   * 标题——UI 已把「清空」当取消，这里是纵深防御。失败只回发起端口 `session_write_failed`
+   * 让它撤销乐观更新；成功广播 `session_renamed`，别的窗口跟着改。不动 updatedAt。
+   */
+  async session_rename(port, msg) {
+    const { sessionId } = msg;
+    const fail = (error: string) =>
+      post(port, { type: 'session_write_failed', op: 'rename', sessionIds: [sessionId], error });
+
+    if (!isValidSessionId(sessionId)) {
+      console.warn('[session_rename] rejecting non-UUID sessionId:', sessionId);
+      fail('invalid session id');
+      return;
+    }
+    const title = typeof msg.title === 'string' ? normalizeSessionTitle(msg.title) : null;
+    if (!title) {
+      fail('invalid title');
+      return;
+    }
+    try {
+      if (!(await sessionStore.rename(sessionId, title))) {
+        fail('session not found');
+        return;
+      }
+    } catch (err) {
+      console.warn('[session_rename] failed:', err);
+      fail(err instanceof Error ? err.message : String(err));
+      return;
+    }
+    broadcastAll({ type: 'session_renamed', sessionId, title });
   },
 };
 

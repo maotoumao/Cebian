@@ -1,4 +1,4 @@
-import { RotateCcw } from 'lucide-react';
+import { GitFork, RotateCcw, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -19,13 +19,35 @@ export interface MessageMetaProps {
    *  before any retry button. */
   text?: string;
   /** When provided (alongside `text`), a read-aloud button is rendered after
-   *  any retry button. Lazily yields the message's plain text. */
+   *  the retry / fork buttons. Lazily yields the message's plain text. */
   getSpeakText?: () => string;
   /** When provided, a retry button is rendered next to the copy button.
    *  The caller decides eligibility (last turn-closing assistant, agent idle, etc.). */
   onRetry?: () => void;
+  /** 提供时在重试之后渲染「分叉」按钮（issue #60）：从这条回复处另开一条独立会话。 */
+  onFork?: () => void;
   /** 分支导航放在全部消息操作之前，作为操作行最左侧内容。 */
   branchSwitcher?: ReactNode;
+}
+
+/** 操作行里的图标按钮（重试 / 分叉）：ghost 小按钮 + tooltip，aria-label 与 tooltip 同文。 */
+function MetaActionButton({ icon: Icon, label, onClick }: { icon: LucideIcon; label: string; onClick: () => void }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7 text-muted-foreground hover:text-foreground"
+          onClick={onClick}
+          aria-label={label}
+        >
+          <Icon className="size-3.5" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
 }
 
 function formatTokens(n: number): string {
@@ -43,7 +65,7 @@ function formatTokens(n: number): string {
  */
 export function MessageMetaRow({
   modelLabel, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, text, getSpeakText, onRetry,
-  branchSwitcher,
+  onFork, branchSwitcher,
 }: MessageMetaProps) {
   const parts: string[] = [];
   if (modelLabel) parts.push(modelLabel);
@@ -72,9 +94,7 @@ export function MessageMetaRow({
     parts.push(t('chat.message.tokensInOut', [inLabel, formatTokens(out)]));
   }
 
-  if (parts.length === 0 && !text && !onRetry && !branchSwitcher) return null;
-
-  const retryLabel = t('chat.message.retry');
+  if (parts.length === 0 && !text && !onRetry && !onFork && !branchSwitcher) return null;
 
   // `ml-auto` on the meta span pushes it to the right whether or not the
   // left-side action buttons are rendered. With `justify-between`, lone
@@ -85,22 +105,8 @@ export function MessageMetaRow({
     <div className="mt-2 flex items-center gap-1 text-[0.7rem] text-muted-foreground/70">
       {branchSwitcher}
       {text && <CopyButton text={text} />}
-      {onRetry && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 text-muted-foreground hover:text-foreground"
-              onClick={onRetry}
-              aria-label={retryLabel}
-            >
-              <RotateCcw className="size-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{retryLabel}</TooltipContent>
-        </Tooltip>
-      )}
+      {onRetry && <MetaActionButton icon={RotateCcw} label={t('chat.message.retry')} onClick={onRetry} />}
+      {onFork && <MetaActionButton icon={GitFork} label={t('chat.message.fork')} onClick={onFork} />}
       {text && getSpeakText && <SpeakButton getText={getSpeakText} />}
       {parts.length > 0 && <span className="ml-auto font-mono">{parts.join(' · ')}</span>}
     </div>

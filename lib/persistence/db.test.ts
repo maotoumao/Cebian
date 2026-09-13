@@ -8,6 +8,8 @@ import {
   getSessionMutations,
   toSessionRecord,
   updateSessionPlacement,
+  updateSessionTitle,
+  updateSessionTitleIf,
   isValidSessionLike,
   type SessionBackupRecord,
   type SessionRecord,
@@ -113,6 +115,20 @@ describe('toSessionRecord', () => {
     expect(out.messages).toBe(base.messages);
   });
 
+  it('parentSessionId：UUID 形态透传；缺失 / 空串 / 畸形 / 非字符串整个不写键', () => {
+    const forked = toSessionRecord({
+      ...base,
+      ...({ parentSessionId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' } as object),
+    } as SessionRecordLike);
+    expect(forked.parentSessionId).toBe('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+
+    expect('parentSessionId' in toSessionRecord({ ...base })).toBe(false);
+    for (const bad of ['', 'not-a-uuid', '../etc', 42, null, {}]) {
+      const out = toSessionRecord({ ...base, ...({ parentSessionId: bad } as object) } as SessionRecordLike);
+      expect('parentSessionId' in out).toBe(false);
+    }
+  });
+
   // 置顶 / 归档必须能过备份恢复这一关：toSessionRecord 是逐字段重建的，漏补就会被
   // 静默丢弃（tsc 拦不住可选字段）。
   it('置顶 / 归档时间戳原样透传', () => {
@@ -206,6 +222,28 @@ describe('updateSessionPlacement', () => {
   it('空 id 列表 → 无操作', async () => {
     await updateSessionPlacement([], 'pinned');
     expect('pinnedAt' in (await getRow(A))).toBe(false);
+  });
+
+  // 改名与置顶 / 归档同理：改的是「叫什么」，不是「有新内容」。
+  describe('updateSessionTitle', () => {
+    it('改标题、不动 updatedAt；返回是否命中行', async () => {
+      expect(await updateSessionTitle(A, '新标题')).toBe(true);
+      const row = await getRow(A);
+      expect(row.title).toBe('新标题');
+      expect(row.updatedAt).toBe(base.updatedAt);
+      // 改成同名：Dexie 4 按匹配行计数，同名更新也算命中
+      expect(await updateSessionTitle(A, '新标题')).toBe(true);
+      expect(await updateSessionTitle('6f9619ff-8b86-d011-b42d-00cf4fc964ff', 'x')).toBe(false);
+    });
+
+    it('条件改名：当前标题不等于期望值 → 不写、返回 false；相等 → 写入', async () => {
+      await updateSessionTitle(A, '用户改的');
+      expect(await updateSessionTitleIf(A, '默认标题', 'AI 标题')).toBe(false);
+      expect((await getRow(A)).title).toBe('用户改的');
+      expect(await updateSessionTitleIf(A, '用户改的', 'AI 标题')).toBe(true);
+      expect((await getRow(A)).title).toBe('AI 标题');
+      expect(await updateSessionTitleIf('6f9619ff-8b86-d011-b42d-00cf4fc964ff', 'x', 'y')).toBe(false);
+    });
   });
 });
 

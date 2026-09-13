@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { ArrowDown } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -113,6 +114,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     retry,
     editMessage,
     switchBranch,
+    forkSession,
     subscribe: portSubscribe,
     unsubscribe: portUnsubscribe,
     resolveTool,
@@ -136,6 +138,12 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     onSessionSettings: useCallback((provider: string, model: string, thinkingLevel: string) => {
       seedTurnFromSession(provider, model, thinkingLevel);
     }, [seedTurnFromSession]),
+    // 分叉成功（issue #60）：提示来源后进入新会话。不用 replace——浏览器返回要能回到
+    // 源会话。新 id 与 activeSessionIdRef 不同，订阅 effect 会对它发普通 subscribe。
+    onSessionForked: useCallback((sessionId: string, title: string) => {
+      toast.success(t('chat.session.forked', [title]));
+      navigate(`/chat/${sessionId}`);
+    }, [navigate]),
   });
 
   const { messages, branchInfo, isAgentRunning, isCompacting, sessionId: activeSessionId, sessionTitle, lastError } = state;
@@ -230,6 +238,11 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
   const handleSwitchBranch = useCallback((targetEntryId: string) => {
     switchBranch(targetEntryId);
   }, [switchBranch]);
+
+  // 分叉（issue #60）：从某条已落树的 assistant 回复处另开一条独立会话。
+  const handleFork = useCallback((entryId: string) => {
+    forkSession(entryId);
+  }, [forkSession]);
 
   // 编辑已发送的 user 消息（issue #44）：以新文案从该消息重新生成，同样携带本轮
   // 选中的模型 / 思考档。发送后强制回底，与 handleSend 一致。
@@ -419,6 +432,15 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
               const onRetry = canRetry
                 ? () => handleRetry(isLast ? undefined : turnUserEntryId)
                 : undefined;
+              // 分叉入口：只在收尾回复上、且消息已落树（有 entryId）时提供。不要求 agent
+              // 空闲——fork 不动源树，正在生成的最后一轮本就不是 isTurnClosing。
+              // 另外排除消息体里还带 toolCall 的回复（stopReason 为 length / error /
+              // aborted 时可能出现）：fork 以该 entry 为叶、不复制其后的 toolResult，
+              // 新会话里这些调用会显示成永远 running 的工具卡。
+              const forkEntryId = msg.entryId;
+              const onFork = isTurnClosing && toolCalls.length === 0 && forkEntryId !== undefined
+                ? () => handleFork(forkEntryId)
+                : undefined;
               const branch = msg.entryId ? branchInfo[msg.entryId] : undefined;
 
               return (
@@ -429,6 +451,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                   meta={meta}
                   copyText={copyText}
                   onRetry={onRetry}
+                  onFork={onFork}
                   branch={branch
                     ? {
                       index: branch.index,

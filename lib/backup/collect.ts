@@ -12,11 +12,10 @@ import {
   sessionFileKey,
   SKILLS_PROMPTS_ROOTS,
   MEMORIES_ROOTS,
-  workspaceRootForSession,
   vfsKeyToPath,
   isUnderAnyRoot,
 } from './payload-format';
-import { WORKSPACES_ROOT } from '@/lib/persistence/vfs-paths';
+import { WORKSPACES_ROOT, workspaceRootForSession } from '@/lib/persistence/vfs-paths';
 import {
   BACKUP_FORMAT_VERSION,
   type BackupOptions,

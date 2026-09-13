@@ -2,6 +2,7 @@
 // Replaces useAgentLifecycle + useSessionManager.
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import {
   CLIENT_PORT,
   type BranchEntryInfo,
@@ -68,6 +69,9 @@ export interface AgentPortCallbacks {
    *  会话行）。这里把该会话的 provider / model / 思考档单独回传，供上层回填本地的
    *  turn 草稿——与 `onSessionLoaded` 对齐，修复「发消息后进设置再返回模型被重置」。 */
   onSessionSettings?: (provider: string, model: string, thinkingLevel: string) => void;
+  /** `session_fork` 成功（issue #60）：`sessionId` 是**新**会话。上层据此跳转；hook 本身
+   *  不切换 `state.sessionId`——新会话内容在后台，由路由变化触发的普通 subscribe 拉取。 */
+  onSessionForked?: (sessionId: string, title: string) => void;
 }
 
 // ─── Hook ───
@@ -93,6 +97,13 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
 
   const portRef = useRef<chrome.runtime.Port | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  // 分叉在途标记（issue #60）：分叉要复制树路径与整个工作区、不是瞬时的，而按钮没有
+  // 乐观隐藏，双击会建出两个副本。回包（成功 / 失败）或端口断开时清掉。
+  const forkPendingRef = useRef(false);
+  // 本次 subscribe 之后收到的当前会话改名。冷加载快照（session_loaded / 首帧 session_state）
+  // 是后台在收到 subscribe 时读的行，若别的窗口在这之后改了名，广播先到、快照后到，快照里的
+  // 旧标题会把新名盖回去——快照到达时若已有更新的改名，以改名为准。
+  const renamedSinceSubscribeRef = useRef<{ sessionId: string; title: string } | null>(null);
   const connectedWaitersRef = useRef<Set<(connected: boolean) => void>>(new Set());
   const scheduleRetryRef = useRef<(() => void) | null>(null);
   // 流式副本漂移时的重同步：重发 subscribe 拉权威快照（session_state）。
@@ -129,6 +140,9 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
       switch (msg.type) {
         case 'connected': {
           retryCount = 0;
+          // 新端口上不可能收到旧端口的分叉回包：无论旧端口是怎么失效的（onDisconnect
+          // 或发送抛错后被置空），都在这里复位在途标记，避免分叉被永久拒绝。
+          forkPendingRef.current = false;
           setState(prev => ({ ...prev, connected: true, lastError: null }));
           const waiters = Array.from(connectedWaitersRef.current);
           connectedWaitersRef.current.clear();
@@ -161,7 +175,13 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
             // Title is only included on initial subscribe (loaded from DB);
             // mid-stream rebuild broadcasts omit it, so preserve the existing
             // value rather than wiping the header.
-            ...(msg.title !== undefined ? { sessionTitle: msg.title } : {}),
+            ...(msg.title !== undefined
+              ? {
+                  sessionTitle: renamedSinceSubscribeRef.current?.sessionId === msg.sessionId
+                    ? renamedSinceSubscribeRef.current.title
+                    : msg.title,
+                }
+              : {}),
             messages: msg.messages,
             // 分支信息只在结构可能变化的帧携带；缺省帧保持现值，避免切换器闪没
             branchInfo: msg.branchInfo ?? prev.branchInfo,
@@ -244,6 +264,19 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           callbacksRef.current.onSessionCreated?.(msg.sessionId, msg.title);
           break;
 
+        case 'session_forked':
+          forkPendingRef.current = false;
+          callbacksRef.current.onSessionForked?.(msg.sessionId, msg.title);
+          break;
+
+        case 'session_fork_failed':
+          forkPendingRef.current = false;
+          // 不写 lastError：那条会被渲染成「本轮对话出错」的错误条并清掉运行态，而分叉
+          // 失败与正在进行的对话无关，toast 一下即可。
+          console.warn('[AgentPort] session_fork failed:', msg.error);
+          toast.error(t('chat.session.forkFailed'));
+          break;
+
         case 'session_loaded':
           if (!isCurrentSession(msg.sessionId)) break;
           setPendingTools(new Map());
@@ -252,7 +285,9 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
             setState(prev => ({
               ...prev,
               sessionId: msg.session!.id,
-              sessionTitle: msg.session!.title,
+              sessionTitle: renamedSinceSubscribeRef.current?.sessionId === msg.session!.id
+                ? renamedSinceSubscribeRef.current.title
+                : msg.session!.title,
               messages: msg.session!.messages,
               branchInfo: msg.session!.branchInfo ?? {},
               isAgentRunning: false,
@@ -271,11 +306,23 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           break;
 
         case 'session_write_failed':
+          // 改名的失败提示放在这条常驻路径上：页头改名时历史面板通常关着，channel 那头
+          // 没有订阅者。useSessionList 对 rename 只做列表刷新、不再 toast，避免重复。
+          if (msg.op === 'rename') toast.error(t('common.session.renameFailed'));
           sessionListChannel.publishWriteFailed(msg.op, msg.sessionIds, msg.error);
           break;
 
         case 'session_placement_changed':
           sessionListChannel.publishPlacement(msg.sessionIds, msg.placement);
+          break;
+
+        case 'session_renamed':
+          // 当前会话被改名（本窗口或别的窗口）：更新页头；同时转给历史面板同步列表项。
+          if (isCurrentSession(msg.sessionId)) {
+            renamedSinceSubscribeRef.current = { sessionId: msg.sessionId, title: msg.title };
+            setState(prev => ({ ...prev, sessionTitle: msg.title }));
+          }
+          sessionListChannel.publishRenamed(msg.sessionId, msg.title);
           break;
 
         case 'session_list_error':
@@ -362,6 +409,8 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           recorderChannel.setPort(null);
           mcpAppResourceChannel.setPort(null);
           sessionListChannel.setPort(null);
+          // 在途分叉的回包随端口一起丢了，别让标记把后续分叉永久卡死。
+          forkPendingRef.current = false;
           setState(prev => ({ ...prev, connected: false }));
         }
         scheduleRetry();
@@ -572,6 +621,28 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     postMessage({ type: 'switch_branch', sessionId, targetEntryId });
   }, [postMessage]);
 
+  /** 从当前会话的某条 assistant 消息处分叉出新会话（issue #60）。无乐观状态：新会话
+   *  在后台建好后以 `session_forked` 回来，由 onSessionForked 跳转。同一时刻只允许一个
+   *  分叉在途（见 forkPendingRef）。 */
+  const forkSession = useCallback((entryId: string) => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId) return;
+    if (!portRef.current) {
+      toast.error(t('chat.session.notConnected'));
+      return;
+    }
+    if (forkPendingRef.current) return;
+    forkPendingRef.current = true;
+    try {
+      postMessage({ type: 'session_fork', sessionId, entryId });
+    } catch (err) {
+      // 端口已死（SW 重启 / 断连）：这次没发出去，标记必须收回，重连由 onDisconnect 驱动。
+      forkPendingRef.current = false;
+      console.warn('[AgentPort] session_fork post failed:', err);
+      toast.error(t('chat.session.notConnected'));
+    }
+  }, [postMessage]);
+
   const retry = useCallback((
     turn?: TurnSettings,
     entryId?: string,
@@ -627,6 +698,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
       setPendingPermissions(new Map());
     }
     sessionIdRef.current = sessionId;
+    renamedSinceSubscribeRef.current = null;
     setState(prev => isSessionChange
       ? {
           ...prev,
@@ -709,6 +781,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     retry,
     editMessage,
     switchBranch,
+    forkSession,
     subscribe,
     unsubscribe,
     resolveTool,

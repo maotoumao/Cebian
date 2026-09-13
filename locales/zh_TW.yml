@@ -92,6 +92,15 @@ common:
       n: "這 $1 個對話及其工作區檔案將被永久刪除，且無法復原。"
     deleteFailed: "刪除失敗，對話仍在。"
     placementFailed: "更新失敗，未做變更。"
+    # 歷史清單裡分叉對話的來源標記（issue #60）。$1 = 來源對話標題
+    forkedFrom: "分叉自「$1」"
+    # 來源對話已被刪除時的同款標記
+    forkedFromUnknown: "分叉自已刪除的對話"
+    # 可點的來源標記按鈕的 aria-label（開啟來源對話）。$1 = 來源對話標題
+    openForkSource: "開啟來源對話「$1」"
+    renameFailed: "重新命名失敗，標題未變更。"
+    # 頁首可點標題的 aria-label（進入列內改名）。$1 = 對話標題
+    renameChat: "重新命名「$1」"
     # $1 = 訊息數
     messageCount:
       0: "尚無訊息"
@@ -239,6 +248,11 @@ settings:
     compaction:
       label: "上下文壓縮模型"
       hint: "對話過長時用來自動壓縮歷史的模型，預設與對話模型相同。"
+      followMain: "與對話模型相同"
+    autoTitle:
+      label: "自動產生對話標題"
+      hint: "首輪回覆結束後，用 AI 產生的簡短標題取代預設標題（首則訊息截斷）。"
+      model: "產生標題的模型"
       followMain: "與對話模型相同"
     search:
       title: "網路搜尋"
@@ -680,6 +694,8 @@ chat:
     # 存在並列版本的訊息上「‹ n/m ›」分支切換器的 tooltip
     prevBranch: "上一個版本"
     nextBranch: "下一個版本"
+    # 收尾 assistant 回覆上分叉按鈕的 tooltip / aria-label（issue #60）
+    fork: "分叉"
   compaction:
     # 歷史壓縮分割條上的標籤
     divider: "先前上下文已壓縮"
@@ -688,6 +704,9 @@ chat:
   session:
     loading: "載入工作階段…"
     modelError: "模型回傳錯誤"
+    # 分叉成功後的提示（issue #60）。$1 = 對話標題（分叉沿用來源標題，故即來源對話標題）
+    forked: "已從「$1」分叉出新對話"
+    forkFailed: "分叉失敗"
     # 使用者中途點停後，在 assistant 氣泡裡顯示的提示。
     # 保持中性語氣——不是錯誤，只是沒跑完。
     cancelled: "已取消"

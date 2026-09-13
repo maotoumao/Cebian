@@ -24,3 +24,9 @@ export const CEBIAN_MEMORIES_COMMIT_MARKER = '~/.cebian/.memories-committing';
 
 /** Standard entry file for a skill package. */
 export const SKILL_ENTRY_FILE = 'SKILL.md';
+
+/** 某个会话的工作区目录（`/workspaces/{sessionId}`）。会话删除 / 分叉 / 备份采集
+ *  共用，避免各处手拼路径漂移。 */
+export function workspaceRootForSession(sessionId: string): string {
+  return `${WORKSPACES_ROOT}/${sessionId}`;
+}

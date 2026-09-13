@@ -15,6 +15,7 @@
  */
 
 import { normalizePath } from '@/lib/persistence/vfs';
+import { workspaceRootForSession } from '@/lib/persistence/vfs-paths';
 import { isValidSessionId } from '@/lib/utils';
 import { parsePermission } from './permissions';
 
@@ -75,7 +76,7 @@ export function sessionSkillRoot(sessionId: string, skill: string): string {
   if (!isValidSkillName(skill)) {
     throw new Error(`Invalid skill name for vfs scope: ${skill}`);
   }
-  return normalizePath(`/workspaces/${sessionId}/${skill}`);
+  return normalizePath(`${workspaceRootForSession(sessionId)}/${skill}`);
 }
 
 /**

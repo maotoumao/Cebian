@@ -133,6 +133,31 @@ export const compactionModel = storage.defineItem<ModelIdentity | null>(
   { fallback: null },
 );
 
+/** 自动生成会话标题：首轮结束后用一次短补全把「首句截断」换成简短标题。
+ *  `model: null` = 跟随对话主模型（默认）。 */
+export interface AutoTitleSettings {
+  /** 总开关。默认开。 */
+  enabled: boolean;
+  /** 生成用模型；null 跟随对话主模型。解析失败时后台静默回退主模型。 */
+  model: ModelIdentity | null;
+}
+
+const DEFAULT_AUTO_TITLE: AutoTitleSettings = { enabled: true, model: null };
+
+/** 取规范的自动标题设置：旧值缺字段时补默认（WXT fallback 只在 key 整体缺失时生效，
+ *  同 `resolveOrganizeSettings` 的理由）。所有读取自动标题设置的地方都走这里。 */
+export function resolveAutoTitleSettings(s: Partial<AutoTitleSettings> | null | undefined): AutoTitleSettings {
+  return {
+    enabled: s?.enabled ?? DEFAULT_AUTO_TITLE.enabled,
+    model: s?.model ?? DEFAULT_AUTO_TITLE.model,
+  };
+}
+
+export const autoTitleSettings = storage.defineItem<AutoTitleSettings>(
+  'local:autoTitleSettings',
+  { fallback: { ...DEFAULT_AUTO_TITLE } },
+);
+
 export const customProviders = storage.defineItem<CustomProviderConfig[]>(
   'local:customProviders',
   { fallback: [] },

@@ -47,6 +47,9 @@ export interface SessionRecord extends SessionRecordLike {
   /** v1→v2 树化迁移失败的标记：该行的 mutation 日志缺失，原始数据仍在 `messages`
    *  遗留字段，读路径（session-store.open）会懒重试转换。正常行不携带此字段。 */
   treeMigrationFailed?: true;
+  /** 分叉来源会话 id（issue #60）：由 `DexieSessionRepo.fork` 写入，非分叉会话不携带。
+   *  源会话被删后仍保留原值——它只是「出身」记录，UI 需容忍悬空引用。 */
+  parentSessionId?: string;
 }
 
 /**
@@ -79,6 +82,13 @@ export function toSessionRecord(input: SessionRecordLike): SessionRecord {
   // 重新走树化转换，旧库的失败标记不应传染到新库。
   const pinnedAt = asTimestamp(s.pinnedAt);
   const archivedAt = asTimestamp(s.archivedAt);
+  // 分叉来源：必须是 UUID 形态的会话 id 才透传（与本文件对 id 的要求一致——它指向的是
+  // 另一行会话，将来可能被拼进工作区路径），其余当作「不是分叉」整个不写键。悬空（源
+  // 会话已删）是允许的，这里不查存在性。
+  const parentSessionId =
+    typeof s.parentSessionId === 'string' && isValidSessionId(s.parentSessionId)
+      ? s.parentSessionId
+      : undefined;
   return {
     id: input.id,
     title: asString(s.title, ''),
@@ -95,6 +105,7 @@ export function toSessionRecord(input: SessionRecordLike): SessionRecord {
     // 互斥兜底：坏备份可能两个都带，此时置顶优先（更「显眼」的那个不至于被藏起来）。
     ...(pinnedAt !== undefined ? { pinnedAt } : {}),
     ...(pinnedAt === undefined && archivedAt !== undefined ? { archivedAt } : {}),
+    ...(parentSessionId !== undefined ? { parentSessionId } : {}),
   };
 }
 
@@ -308,6 +319,31 @@ export async function updateSessionSettings(
   if (Object.keys(patch).length === 0) return;
   patch.updatedAt = Date.now();
   await db.sessions.update(id, patch);
+}
+
+/**
+ * 条件改标题：只在当前标题仍等于 `expectedTitle` 时才写入（单个 rw 事务内读比写）。
+ * 自动生成标题用它避让用户的手动改名——两条写路径互不串行，「先读再比再写」在事务外不原子。
+ * 返回是否真的写了。
+ */
+export async function updateSessionTitleIf(id: string, expectedTitle: string, title: string): Promise<boolean> {
+  return db.transaction('rw', db.sessions, async () => {
+    const row = await db.sessions.get(id);
+    if (!row || row.title !== expectedTitle) return false;
+    await db.sessions.update(id, { title });
+    return true;
+  });
+}
+
+/**
+ * 改会话标题（用户改名 / 自动生成标题共用）。与置顶 / 归档同理**不动 `updatedAt`**：
+ * 改名不是「有新内容」，不该把会话顶到历史列表最前。标题校验（非空、长度上限）由
+ * 调用方用 `normalizeSessionTitle` 完成，这里只负责写。返回是否命中了会话行。
+ */
+export async function updateSessionTitle(id: string, title: string): Promise<boolean> {
+  // Dexie 4 的 update 计数是「匹配到的行数」（Collection.modify 返回 keys.length），改成同名
+  // 也计 1，故可直接据此判定行是否存在。
+  return (await db.sessions.update(id, { title })) > 0;
 }
 
 /**

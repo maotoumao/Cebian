@@ -21,14 +21,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### 新增 / Added
 
 - 新增「设置 → 对话 → 联网搜索」：可调整 Bing、Brave、Google、DuckDuckGo、百度的顺序与启停，修改搜索地址、抽取脚本和适用场景，也可添加自定义引擎（如 Kagi、Startpage、自建 SearXNG）。AI 改用 `web_search` 工具取得标题、链接和摘要，不再自行拼接搜索地址、逐个打开引擎结果页；工具默认按配置顺序尝试，支持优先使用指定引擎，被拦截、没有结果或执行失败时自动尝试其余引擎，都没有结果时汇总各引擎的情况 ([#63](https://github.com/maotoumao/Cebian/issues/63))
+- 支持从历史任意一轮的收尾 assistant 回复处分叉出独立的新会话：回复操作行新增「分叉」按钮，新会话保留截至该回复（含）的完整上下文，并复制分叉时的工作区文件，标题、模型、思考档沿用源会话且此后互不影响；历史面板给分叉会话标注来源，点击可回到源会话 ([#60](https://github.com/maotoumao/Cebian/issues/60))
+- 支持给会话改名：点击页头标题、或在历史面板的会话菜单里选「重命名」，即可行内编辑（Enter 保存、Esc 取消），各窗口的页头与历史列表同步更新；改名不会改变会话在历史列表里的顺序
+- 新增「设置 → 对话 → 自动生成会话标题」（默认开启）：首轮回复结束后，用 AI 生成的简短标题替换「首条消息截断」的默认标题；可关闭，也可指定生成标题所用的模型（默认与对话模型相同）。首轮期间已手动改名的会话不会被覆盖
 
 - Added Settings → Chat → Web search: reorder or enable and disable Bing, Brave, Google, DuckDuckGo and Baidu; edit search URLs, extraction scripts and best-for hints; or add custom engines (Kagi, Startpage, a self-hosted SearXNG, …). The AI now uses the `web_search` tool to get titles, links and snippets instead of constructing search URLs and opening engine result pages itself. The tool follows the configured order by default, can try a specified engine first, automatically moves on after blocked searches, empty results or failures, and reports each engine's outcome when nothing usable was found ([#63](https://github.com/maotoumao/Cebian/issues/63))
+- Fork an independent new chat from any turn-closing assistant reply in the history: a Fork button in the reply's action row creates a chat that keeps the full context up to and including that reply and copies the workspace files as they are at fork time, inheriting the source chat's title, model and thinking level while staying independent from then on; the history panel marks forked chats with their source, which opens the source chat on click ([#60](https://github.com/maotoumao/Cebian/issues/60))
+- Rename chats: click the title in the header, or pick "Rename" from a chat's menu in the history panel, to edit it inline (Enter saves, Esc cancels); the header and history lists in every window update together, and renaming does not change the chat's position in the history list
+- Added Settings → Chat → Auto-generate chat titles (on by default): after the first reply, the default "first message, truncated" title is replaced with a short AI-generated one; it can be turned off, and the model used for titles can be chosen (defaults to the conversation model). Chats renamed by hand during the first turn are left alone
 
 ### 变更 / Changed
 
 - 设置页导航从 11 个平行入口收成 3 组 9 项：「连接」（AI 提供商、MCP 服务器）、「定制」（对话、提示词、技能、记忆、页面交互）、「系统」（数据、关于）。原「指引」与「高级」合并为「对话」，原「备份与恢复」与「文件系统」合并为「数据」，各项的具体设置不变。窄屏侧边栏里当前分节的图标会展开显示名称，组与组之间用分隔线区分；宽屏左栏显示分组标题。旧的 `#/instructions`、`#/advanced`、`#/backup`、`#/storage` 链接会自动跳到合并后的新分节
+- 新会话的默认标题统一为「首条消息压成一行后取前 50 字」，超长以 … 结尾（此前侧边栏用 `...`、划词「在侧边栏继续」取 48 字）
 
 - The Settings navigation collapses 11 flat entries into 3 groups of 9: Connect (AI providers, MCP servers), Customize (Chat, Prompts, Skills, Memory, Page interaction) and System (Data, About). The former Instructions and Advanced sections merge into Chat, and Backup & Restore plus Filesystem merge into Data; every individual setting stays as it was. In the narrow sidepanel the active section's icon expands to show its name and groups are separated by dividers; the wide layout shows group headings in the sidebar. Old `#/instructions`, `#/advanced`, `#/backup` and `#/storage` links redirect to the merged sections
+- The default title of a new chat is now consistently the first message collapsed to one line and cut to 50 characters, ending in … when truncated (previously the sidepanel used `...` and "Continue in sidepanel" cut at 48)
 
 ## 1.7.0 - 2026-09-05
 

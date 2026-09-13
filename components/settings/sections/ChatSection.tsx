@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { ModelSelector } from '@/components/chat/ModelSelector';
 import { SearchEngineList } from '@/components/settings/search/SearchEngineList';
@@ -9,8 +10,10 @@ import { SearchEngineEditor } from '@/components/settings/search/SearchEngineEdi
 import type { SettingsOutletContext } from '@/components/settings/SettingsLayout';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import {
+  autoTitleSettings,
   compactionModel,
   providerCredentials,
+  resolveAutoTitleSettings,
   customProviders as customProvidersStorage,
   userInstructions as userInstructionsStorage,
   searchEnginesConfig,
@@ -69,15 +72,21 @@ function SearchEnginesPanel({ onEditEngine }: { onEditEngine: (id: string) => vo
 }
 
 /**
- * 「对话」主面板：每次对话怎么运作。三块内容都只影响对话本身，故合为一节：
+ * 「对话」主面板：每次对话怎么运作。四块内容都只影响对话本身，故合为一节：
  * - 自定义指引：追加到系统提示词末尾的用户规则。
  * - 压缩模型：上下文压缩（摘要）专用模型。`null` = 跟随对话主模型（默认）；复用聊天的
  *   `ModelSelector`，通过 `inheritOption` 提供「与对话模型相同」首项（写回 null）。
+ * - 自动标题：首轮结束后用一次短补全替换默认标题（可关；model null = 跟随对话主模型）。
  * - 联网搜索：`web_search` 工具用哪些引擎、按什么顺序回退。
  */
 function ChatPanel({ onEditEngine }: { onEditEngine: (id: string) => void }) {
   const [currentInstructions, setCurrentInstructions] = useStorageItem(userInstructionsStorage, '');
   const [model, setModel] = useStorageItem(compactionModel, null);
+  // undefined = storage 还没读出来。这一帧不能让开关可操作：拿默认值整对象回写会把用户已选的
+  // 标题模型抹掉（同 SearchEnginesPanel 的守卫）。归一化交给 resolveAutoTitleSettings。
+  const [autoTitleRaw, setAutoTitle] = useStorageItem(autoTitleSettings, undefined);
+  const autoTitleLoaded = autoTitleRaw !== undefined;
+  const autoTitle = resolveAutoTitleSettings(autoTitleRaw);
   const [providers] = useStorageItem(providerCredentials, {});
   const [customProviderList] = useStorageItem(customProvidersStorage, []);
 
@@ -123,6 +132,41 @@ function ChatPanel({ onEditEngine }: { onEditEngine: (id: string) => void }) {
             }}
           />
         </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0 space-y-1">
+            <Label htmlFor="auto-title-enabled" className="text-sm">{t('settings.chat.autoTitle.label')}</Label>
+            <p className="text-xs text-muted-foreground">
+              {t('settings.chat.autoTitle.hint')}
+            </p>
+          </div>
+          <Switch
+            id="auto-title-enabled"
+            checked={autoTitle.enabled}
+            disabled={!autoTitleLoaded}
+            onCheckedChange={(enabled) => setAutoTitle({ ...autoTitle, enabled })}
+            className="shrink-0"
+          />
+        </div>
+        {autoTitleLoaded && autoTitle.enabled && (
+          <div className="flex items-center justify-between gap-4">
+            <Label className="text-xs text-muted-foreground">{t('settings.chat.autoTitle.model')}</Label>
+            <div className="shrink-0">
+              <ModelSelector
+                activeModel={autoTitle.model}
+                configuredProviders={providers}
+                customProviders={customProviderList}
+                onSelect={(provider, modelId) => setAutoTitle({ ...autoTitle, model: { provider, modelId } })}
+                inheritOption={{
+                  label: t('settings.chat.autoTitle.followMain'),
+                  onSelect: () => setAutoTitle({ ...autoTitle, model: null }),
+                }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <SearchEnginesPanel onEditEngine={onEditEngine} />

@@ -85,27 +85,8 @@ export function findCompactionCutPoint(
   return userIndices[userIndices.length - 1];
 }
 
-// ─── 压缩模型选择 ───
-
-/** 压缩调用最终要用的「模型 + 凭证」。`apiKey` 可能为 undefined（连主模型都没
- *  凭证），由调用方按现有「无 key 则本轮裸发」分支处理。 */
-export interface CompactionTarget {
-  model: Model<Api>;
-  apiKey: string | undefined;
-}
-
-/**
- * 配置的压缩目标可用（解析成功且凭证可用）就返回它，否则返回 null
- * 表示「回退主模型」。
- *
- * 纯函数——读配置、解析 model、取 key 这些 IO 留在调用方（session-manager 的
- * `resolveCompactionModel`），这里只做「配置是否可用」的判定，便于独立单测。
- */
-export function usableCompactionTarget(
-  configured: CompactionTarget | null,
-): CompactionTarget | null {
-  return configured && configured.apiKey ? configured : null;
-}
+// 压缩用哪个模型 + 凭证的判定（ModelTarget / usableModelTarget）在 lib/providers/model-target.ts，
+// 与自动标题共用；本模块只负责切点与摘要生成。
 
 // ─── 摘要生成（带重试） ───
 
