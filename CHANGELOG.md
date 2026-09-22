@@ -18,6 +18,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 新增 / Added
+
+- 新增「设置 → 对话 → 自动压缩超长对话」：可开关自动压缩，并用滑杆调整触发阈值（占模型上下文窗口的百分比，默认 80%）。此前触发点写死为「窗口 − 16384 token」，换算成百分比会随窗口漂移——128k 模型 87%、1M 模型要到 98.4% 才压，基本等于压不到就已经撑爆 ([#72](https://github.com/maotoumao/Cebian/issues/72))
+- 输入框右下角新增上下文用量环：一眼看出当前会话占了模型上下文窗口的多少，点开显示已用 / 总量、自动压缩的触发比例；用量逼近压缩点时环会变色。数字与自动压缩用的是同一套估算，界面上的占用就是压缩判据比较的那个值
+
+- Added Settings → Chat → Auto-compact long chats: a switch for automatic compaction plus a slider for the trigger threshold (a percentage of the model's context window, 80% by default). The trigger used to be hard-coded at "window − 16384 tokens", which drifts with window size — 87% on a 128k model but 98.4% on a 1M one, so large-window models would blow past the limit before compaction ever ran ([#72](https://github.com/maotoumao/Cebian/issues/72))
+- Added a context-usage ring next to the composer: see at a glance how much of the model's context window the current chat is using, and click it for the exact amount and the threshold at which earlier history is compacted. The ring changes colour as usage approaches that threshold. It reports the same estimate automatic compaction uses, so the number on screen is exactly the one the threshold is compared against
+
+### 修复 / Fixed
+
+- 修复长会话在上下文写满后彻底卡死、已完成的工作全部白费的问题：AI 连续调用工具收集内容时，现在会在轮次中途自动压缩上下文，而不是只在用户发下一条消息前才压；压缩摘要生成失败时也不再原样重发整段超长上下文（那必然再次报错），改为丢弃最早的历史并在对话里标出；确实压不动时 AI 会主动暂停并说明原因，而不是反复报错。另外修正了中文内容的上下文用量估算——此前按英文经验值估算，中文被低估 2.7–4 倍，导致压缩触发过晚 ([#72](https://github.com/maotoumao/Cebian/issues/72))
+
+- Fixed long chats wedging permanently once the context filled up, losing all the work already done. While the AI is making back-to-back tool calls, the context is now compacted mid-turn instead of only before the user's next message; when summarization fails, the over-long context is no longer resent verbatim (which could only fail again) — the earliest history is dropped and marked in the transcript instead; and when nothing can be compacted any further the AI pauses itself and explains why instead of failing over and over. Context-usage estimates for Chinese text were also corrected — they previously used an English-tuned heuristic that underestimated Chinese by 2.7–4×, so compaction triggered far too late ([#72](https://github.com/maotoumao/Cebian/issues/72))
+
 ## 1.7.1 - 2026-09-15
 
 ### 新增 / Added

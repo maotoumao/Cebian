@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { assertJsonSerializable, type AgentMessage } from '@earendil-works/pi-agent-core';
-import { extractSlashPrompt, extractUserText, replaceUserText, sanitizeAgentMessages } from './message-helpers';
+import {
+  extractSlashPrompt,
+  extractUserText,
+  replaceUserText,
+  sanitizeAgentMessages,
+  truncateForRetry,
+} from './message-helpers';
 
 // 用 `as unknown as AgentMessage[]` 构造违反类型契约的运行时数据（这正是本函数要兜的场景）。
 const asMessages = (arr: unknown[]) => arr as unknown as AgentMessage[];
@@ -355,5 +361,30 @@ describe('sanitizeAgentMessages · 深度', () => {
     };
     const [out] = sanitizeAgentMessages(asMessages([toolResult]));
     expect(Object.hasOwn((out as any).details, 'structured')).toBe(true);
+  });
+});
+
+describe('truncateForRetry', () => {
+  const user = (text: string) => ({ role: 'user', content: text });
+  const assistant = (text: string) => ({ role: 'assistant', content: text });
+  const summary = () => ({ role: 'compactionSummary', summary: 's' });
+
+  it('截到最后一条 user（含），丢掉其后的 assistant / toolResult', () => {
+    const messages = [user('a'), assistant('b'), user('c'), assistant('d')];
+    expect(truncateForRetry(messages)).toEqual([user('a'), assistant('b'), user('c')]);
+  });
+
+  it('没有 user 消息时返回 null', () => {
+    expect(truncateForRetry([assistant('a')])).toBeNull();
+  });
+
+  it('返回值必须是连续前缀：轮内压缩追加在末尾的摘要一并切掉，不做特判', () => {
+    // 调用方拿 truncated.length 当树上保留的前缀长度用（回卷 lane / 裁 entryIds /
+    // 压水位线），塞一条位置对不上的摘要进来会让内存转录与树彻底错位。语义上也该切：
+    // retry 丢弃的是整轮，摘要摘的正是这一轮的内容。
+    const messages = [user('a'), assistant('b'), summary(), assistant('c')];
+    const truncated = truncateForRetry(messages);
+    expect(truncated).toEqual([user('a')]);
+    expect(truncated).toEqual(messages.slice(0, truncated!.length));
   });
 });

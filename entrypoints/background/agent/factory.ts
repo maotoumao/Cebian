@@ -17,7 +17,12 @@ import type { Api, Model, Message } from '@earendil-works/pi-ai';
 import { streamSimple } from '@earendil-works/pi-ai/compat';
 import type { ThinkingLevel } from '@/lib/persistence/storage';
 import { resolveProviderApiKey } from '../providers/credentials';
-import { getRetainedTail, isCompactionSummary, type CompactionSummaryMessage } from '@/lib/agent/compaction-summary';
+import {
+  getRetainedTail,
+  isCompactionSummary,
+  renderSummaryForLlm,
+  type CompactionSummaryMessage,
+} from '@/lib/agent/compaction-summary';
 import { sanitizeAgentMessages } from '@/lib/agent/message-helpers';
 
 // ─── Agent factory ───
@@ -42,6 +47,18 @@ interface CreateAgentOptions {
    * authorization before certain tools run (see `lib/agent/tool-permissions.ts`).
    */
   beforeToolCall?: AgentOptions['beforeToolCall'];
+  /**
+   * 每完成一个 turn、发起下一次请求之前调用，可返回替换后的 context。会话用它做
+   * **轮内压缩**——压缩此前只在新一轮 user 消息之前做，单轮内跑上百次工具调用的会话
+   * 一次都轮不到（issue #72）。pi 明确为长耗时准备工作留了这个钩子。
+   */
+  prepareNextTurnWithContext?: AgentOptions['prepareNextTurnWithContext'];
+  /**
+   * 每个 turn 结束后调用，返回 true 则收尾本次 run。排在
+   * `prepareNextTurnWithContext` 之前，会话用它在「上下文到顶却压不动」时主动停轮，
+   * 把控制权交回用户，而不是继续跑到 provider 返回 400。
+   */
+  shouldStopAfterTurn?: AgentOptions['shouldStopAfterTurn'];
 }
 
 function createCebianAgent(options: CreateAgentOptions): Agent {
@@ -52,6 +69,8 @@ function createCebianAgent(options: CreateAgentOptions): Agent {
     messages = [],
     tools: agentTools,
     beforeToolCall,
+    prepareNextTurnWithContext,
+    shouldStopAfterTurn,
   } = options;
 
   const agentOptions: AgentOptions = {
@@ -63,9 +82,9 @@ function createCebianAgent(options: CreateAgentOptions): Agent {
       messages,
     },
 
-    // 把 AgentMessage 转换为发给 LLM 的 Message。compactionSummary 降级成一条
-    // user 消息（用 <summary> 包裹 + 一句「仅供参考、勿直接回应」），其余自定义
-    // 类型一律过滤掉，只保留 user / assistant / toolResult。
+    // 把 AgentMessage 转换为发给 LLM 的 Message。compactionSummary 降级成一条 user
+    // 消息（文本由 renderSummaryForLlm 渲染），其余自定义类型一律过滤掉，只保留
+    // user / assistant / toolResult。
     convertToLlm: (msgs: AgentMessage[]): Message[] => {
       const out: Message[] = [];
       // 送入 pi 前把消息整形回类型契约（null text/thinking/name → ''）。否则 pi 的 token
@@ -73,15 +92,9 @@ function createCebianAgent(options: CreateAgentOptions): Agent {
       // 这类坏消息就会整轮抛「reading 'length'」（issue #43）
       for (const m of sanitizeAgentMessages(msgs)) {
         if (isCompactionSummary(m)) {
-          out.push({
-            role: 'user',
-            content:
-              `<summary>\n${m.summary}\n</summary>\n\n` +
-              'The block above is a compressed summary of earlier conversation, ' +
-              'provided for context only. Do not respond to it directly; ' +
-              'continue with the messages that follow.',
-            timestamp: m.timestamp,
-          });
+          // 摘要 / 丢弃标记的文本形态统一由 renderSummaryForLlm 决定（纯函数，有单测守着
+          // 「空摘要不能发成 <summary></summary>」这条静默不变式）。
+          out.push({ role: 'user', content: renderSummaryForLlm(m), timestamp: m.timestamp });
           continue;
         }
         if (['user', 'assistant', 'toolResult'].includes((m as Message).role)) {
@@ -125,6 +138,11 @@ function createCebianAgent(options: CreateAgentOptions): Agent {
     // convertToLlm 里特判——上面的 user/assistant/toolResult 白名单已把它
     // 连同其它自定义类型一并过滤，不会发给 provider。
     beforeToolCall,
+
+    // 轮内的上下文管理：先判停轮、再做压缩（pi 的 loop 顺序就是
+    // `turn_end → shouldStopAfterTurn → prepareNextTurn → 下一次请求`）。
+    ...(shouldStopAfterTurn ? { shouldStopAfterTurn } : {}),
+    ...(prepareNextTurnWithContext ? { prepareNextTurnWithContext } : {}),
   };
 
   return new Agent(agentOptions);

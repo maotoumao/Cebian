@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { ModelSelector } from '@/components/chat/ModelSelector';
@@ -12,8 +13,11 @@ import { useStorageItem } from '@/hooks/useStorageItem';
 import {
   autoTitleSettings,
   compactionModel,
+  compactionSettings,
   providerCredentials,
   resolveAutoTitleSettings,
+  resolveCompactionSettings,
+  type CompactionSettings,
   customProviders as customProvidersStorage,
   userInstructions as userInstructionsStorage,
   searchEnginesConfig,
@@ -71,17 +75,147 @@ function SearchEnginesPanel({ onEditEngine }: { onEditEngine: (id: string) => vo
   );
 }
 
+/** 压缩阈值滑杆的取值范围：低于 50% 压得过于频繁，高于 95% 就失去了提前量。 */
+const THRESHOLD_MIN = 50;
+const THRESHOLD_MAX = 95;
+const THRESHOLD_STEP = 5;
+
+/**
+ * 压缩阈值行：滑杆 + 百分比读数。
+ *
+ * 拖动期间显示本地草稿值，松手（`onValueCommit`）才写 storage——受控 Slider 若等
+ * storage 回程再更新会拖不动。写入落定后由 effect 撤掉草稿，交回 `percent` 作真相；
+ * 外部（另一个窗口 / 恢复备份）改了阈值同样能把草稿冲掉。
+ *
+ * 草稿放在本组件而不是上层：压缩总开关被外部关掉时整行随之卸载，未松手的拖动值一并
+ * 消失；否则重新开启会显示一个从未保存过的旧值。
+ */
+function CompactionThresholdRow({
+  percent,
+  onCommit,
+}: {
+  percent: number;
+  onCommit: (percent: number) => void;
+}) {
+  const [draft, setDraft] = useState<number | null>(null);
+  const value = draft ?? percent;
+  useEffect(() => { setDraft(null); }, [percent]);
+  // Radix 的 role="slider" 在 Thumb 上，Label 的 htmlFor 指不到它；改用 aria-labelledby
+  // 把可见 Label 关联过去（转发逻辑见 components/ui/slider.tsx）。
+  const labelId = useId();
+  const valueText = t('settings.chat.compaction.threshold.value', [String(value)]);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-4">
+        <Label id={labelId} className="text-xs text-muted-foreground">
+          {t('settings.chat.compaction.threshold.label')}
+        </Label>
+        <span className="shrink-0 text-xs tabular-nums" aria-hidden="true">{valueText}</span>
+      </div>
+      <Slider
+        value={[value]}
+        min={THRESHOLD_MIN}
+        max={THRESHOLD_MAX}
+        step={THRESHOLD_STEP}
+        aria-labelledby={labelId}
+        aria-valuetext={valueText}
+        onValueChange={([next]) => setDraft(next)}
+        onValueCommit={([next]) => onCommit(next)}
+      />
+      <p className="text-xs text-muted-foreground">
+        {t('settings.chat.compaction.threshold.hint')}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * 「上下文压缩」区块：总开关 + 触发阈值 + 压缩专用模型。
+ *
+ * 开关与阈值同属 `compactionSettings`；模型是独立存储项 `compactionModel`（既有持久化
+ * key，不并入——改 key 会静默丢掉用户已有的配置）。模型 `null` = 跟随对话主模型，复用
+ * 聊天的 `ModelSelector`，由 `inheritOption` 提供「与对话模型相同」首项。
+ *
+ * 写入沿用 `SearchEnginesPanel` 的做法：直接写 storage、让 watch 把成功落盘的值推回界面，
+ * 而不是 `useStorageItem` 的乐观 setter——乐观更新在写失败时会让开关/滑杆停在假值，后台
+ * 却还在用旧配置，且用户看不到任何提示。
+ */
+function CompactionPanel() {
+  // undefined = storage 还没读出来。这一帧不能让开关可操作：拿默认值整对象回写会把用户
+  // 已存的阈值抹掉（同 SearchEnginesPanel 的守卫）。归一化交给 resolveCompactionSettings。
+  const [stored] = useStorageItem(compactionSettings, undefined);
+  const loaded = stored !== undefined;
+  const settings = resolveCompactionSettings(stored);
+  const [model, setModel] = useStorageItem(compactionModel, null);
+  const [providers] = useStorageItem(providerCredentials, {});
+  const [customProviderList] = useStorageItem(customProvidersStorage, []);
+
+  const write = (next: CompactionSettings) => {
+    void compactionSettings.setValue(next).catch((err) => {
+      console.warn('[compaction] update settings failed:', err);
+      toast.error(t('errors.compactionSettingsSaveFailed'));
+    });
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0 space-y-1">
+          <Label htmlFor="compaction-auto" className="text-sm">{t('settings.chat.compaction.auto.label')}</Label>
+          <p className="text-xs text-muted-foreground">
+            {t('settings.chat.compaction.auto.hint')}
+          </p>
+        </div>
+        <Switch
+          id="compaction-auto"
+          checked={settings.enabled}
+          disabled={!loaded}
+          onCheckedChange={(enabled) => write({ ...settings, enabled })}
+          className="shrink-0"
+        />
+      </div>
+      {loaded && settings.enabled && (
+        <>
+          <CompactionThresholdRow
+            percent={settings.thresholdPercent}
+            onCommit={(thresholdPercent) => write({ ...settings, thresholdPercent })}
+          />
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0 space-y-1">
+              <Label className="text-xs text-muted-foreground">{t('settings.chat.compaction.model.label')}</Label>
+              <p className="text-xs text-muted-foreground">
+                {t('settings.chat.compaction.model.hint')}
+              </p>
+            </div>
+            <div className="shrink-0">
+              <ModelSelector
+                activeModel={model}
+                configuredProviders={providers}
+                customProviders={customProviderList}
+                onSelect={(provider, modelId) => setModel({ provider, modelId })}
+                inheritOption={{
+                  label: t('settings.chat.compaction.model.followMain'),
+                  onSelect: () => setModel(null),
+                }}
+              />
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /**
  * 「对话」主面板：每次对话怎么运作。四块内容都只影响对话本身，故合为一节：
  * - 自定义指引：追加到系统提示词末尾的用户规则。
- * - 压缩模型：上下文压缩（摘要）专用模型。`null` = 跟随对话主模型（默认）；复用聊天的
- *   `ModelSelector`，通过 `inheritOption` 提供「与对话模型相同」首项（写回 null）。
+ * - 上下文压缩：总开关 + 触发阈值 + 压缩专用模型，见 `CompactionPanel`。
  * - 自动标题：首轮结束后用一次短补全替换默认标题（可关；model null = 跟随对话主模型）。
  * - 联网搜索：`web_search` 工具用哪些引擎、按什么顺序回退。
  */
 function ChatPanel({ onEditEngine }: { onEditEngine: (id: string) => void }) {
   const [currentInstructions, setCurrentInstructions] = useStorageItem(userInstructionsStorage, '');
-  const [model, setModel] = useStorageItem(compactionModel, null);
   // undefined = storage 还没读出来。这一帧不能让开关可操作：拿默认值整对象回写会把用户已选的
   // 标题模型抹掉（同 SearchEnginesPanel 的守卫）。归一化交给 resolveAutoTitleSettings。
   const [autoTitleRaw, setAutoTitle] = useStorageItem(autoTitleSettings, undefined);
@@ -113,26 +247,7 @@ function ChatPanel({ onEditEngine }: { onEditEngine: (id: string) => void }) {
         </p>
       </div>
 
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0 space-y-1">
-          <Label className="text-sm">{t('settings.chat.compaction.label')}</Label>
-          <p className="text-xs text-muted-foreground">
-            {t('settings.chat.compaction.hint')}
-          </p>
-        </div>
-        <div className="shrink-0">
-          <ModelSelector
-            activeModel={model}
-            configuredProviders={providers}
-            customProviders={customProviderList}
-            onSelect={(provider, modelId) => setModel({ provider, modelId })}
-            inheritOption={{
-              label: t('settings.chat.compaction.followMain'),
-              onSelect: () => setModel(null),
-            }}
-          />
-        </div>
-      </div>
+      <CompactionPanel />
 
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-4">

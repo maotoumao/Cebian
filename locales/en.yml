@@ -250,9 +250,18 @@ settings:
       hint: "Appended after the default rules. Use it to adjust language, tone, or persona. Cannot override tool protocols or safety rules."
       placeholder: "e.g.\n- Reply in English\n- Keep answers concise\n- Default to TypeScript when discussing code"
     compaction:
-      label: "Context compaction model"
-      hint: "The model used to automatically compact overly long conversations. Defaults to the conversation model."
-      followMain: "Same as conversation model"
+      auto:
+        label: "Auto-compact long chats"
+        hint: "Summarize earlier history when the context approaches the model's limit, so a long chat keeps going instead of failing."
+      threshold:
+        label: "Compaction threshold"
+        hint: "Compact once the estimated context reaches this share of the model's context window."
+        # $1 = threshold percentage
+        value: "$1%"
+      model:
+        label: "Compaction model"
+        hint: "The model used to summarize earlier history. Defaults to the conversation model."
+        followMain: "Same as conversation model"
     autoTitle:
       label: "Auto-generate chat titles"
       hint: "After the first reply, replace the default title (the first message, truncated) with a short AI-generated title."
@@ -704,9 +713,21 @@ chat:
     nextBranch: "Next version"
     # Tooltip/aria-label for the fork button on a turn-closing assistant reply (issue #60).
     fork: "Fork"
+  contextUsage:
+    # Accessible name / tooltip on the ring next to the composer. $1 = percent used.
+    label: "Context used: $1%"
+    title: "Context used"
+    # $1 = estimated tokens used, $2 = the model's context window (both already abbreviated, e.g. 42.3K)
+    amount: "$1 of $2 tokens"
+    # $1 = the configured compaction threshold, as a percentage
+    threshold: "Earlier history is compacted automatically at $1%."
+    compactionOff: "Automatic compaction is turned off."
+    estimateNote: "Estimated — the exact count depends on the provider's tokenizer."
   compaction:
     # Label on the divider marking where earlier context was folded into a summary.
     divider: "Earlier context compacted"
+    # Same divider, but for when summarizing failed and the earlier context was dropped outright.
+    droppedDivider: "Earlier context dropped (could not be summarized)"
     # Bottom status bar shown while the compaction LLM call is in flight.
     status: "Compacting context…"
   session:
@@ -719,6 +740,9 @@ chat:
     # (either mid-stream or while a retry was rebuilding). Stays neutral
     # — cancelling isn't an error, just a stopped attempt.
     cancelled: "Cancelled"
+    # Shown when the agent pauses itself because the context is full and the
+    # history cannot be compacted any further. Tells the user what to do next.
+    contextLimitPaused: "Paused: the context is full and what remains cannot be compacted any further. Start a new chat, fork from an earlier reply, or switch to a model with a larger context window."
     # `lastError` toast shown by the chat composer when send/retry is
     # attempted before the chrome.runtime port has connected (typically
     # right after SW wakes up or after a disconnect-retry).
@@ -981,6 +1005,7 @@ errors:
   modelUnavailable: "The selected model is no longer available. Pick another one."
   pageActionGone: "This action no longer exists."
   pageActionSaveFailed: "Could not save the action."
+  compactionSettingsSaveFailed: "Could not save the compaction settings. Try again."
   searchEngineGone: "This search engine no longer exists."
   searchEngineSaveFailed: "Could not save the search engine settings. Try again."
   # $1 = the literal query placeholder ("{query}")

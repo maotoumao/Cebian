@@ -146,7 +146,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     }, [navigate]),
   });
 
-  const { messages, branchInfo, isAgentRunning, isCompacting, sessionId: activeSessionId, sessionTitle, lastError } = state;
+  const { messages, branchInfo, isAgentRunning, isCompacting, sessionId: activeSessionId, sessionTitle, lastError, contextUsage } = state;
 
   // Mirror activeSessionId into a ref so the subscribe-effect can read the
   // latest value WITHOUT re-running when activeSessionId changes. Putting
@@ -284,7 +284,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
           {!sessionLoading && messages.map((msg, idx) => {
             if (isCompactionSummary(msg)) {
               return (
-                <CompactionDivider key={`compact-${idx}`} />
+                <CompactionDivider key={`compact-${idx}`} dropped={msg.dropped} />
               );
             }
 
@@ -657,6 +657,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
         thinkingLevel={turnThinking}
         onModelChange={handleModelChange}
         onThinkingChange={handleThinkingChange}
+        contextUsage={contextUsage}
       />
     </>
   );

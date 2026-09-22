@@ -15,7 +15,8 @@
  *
  * 各 entry 类型的投影：
  * - `message` → 原样透出（含 user / assistant / toolResult 与未知自定义 role）；
- * - `compaction` → 一条 `compactionSummary` 自定义消息；非空 `retainedTail`
+ * - `compaction` → 一条 `compactionSummary` 自定义消息（`details.dropped` 还原成
+ *   消息上的 `dropped` 标志）；非空 `retainedTail`
  *   会挂回消息（transformContext 依赖它重建「摘要 + 保留区」的 LLM 视图），
  *   entry 之前的原文消息仍在链上，故 retainedTail 不展开成独立消息；
  * - `custom(permissionRequest)` → 一条 `permissionRequest` 消息；若其后有对应的
@@ -43,10 +44,29 @@ interface ProjectedBranch {
   entryIds: string[];
 }
 
+/**
+ * compaction entry 的 `details`（pi 给每条目留的结构化侧信道）。Cebian 只用它记一件事：
+ * 这条 entry 是「早期历史被直接丢弃」的兜底标记，而不是一段真摘要。
+ *
+ * 必须单独有个字段、且必须跟着 entry 落库：`summary` 不能兼任——丢弃标记可能带着上一段
+ * 仍然有效的摘要（见 `createDroppedHistoryMessage`），空与非空都不足以区分它和普通摘要。
+ * 冷加载时这个标志一旦丢失，没带旧摘要的那种标记就会被当成正常摘要发给模型
+ * （`<summary></summary>`，等于骗它说早期上下文已经交代过），UI 分隔条也会说错话。
+ */
+interface CompactionEntryDetails {
+  dropped?: true;
+}
+
 /** 一条消息在树上的 entry 形态（不含 id / seq / parentId / timestamp 的 body）。 */
 type EntryBody =
   | { type: 'message'; message: AgentMessage }
-  | { type: 'compaction'; summary: string; retainedTail: AgentMessage[]; tokensBefore: number }
+  | {
+      type: 'compaction';
+      summary: string;
+      retainedTail: AgentMessage[];
+      tokensBefore: number;
+      details?: CompactionEntryDetails;
+    }
   | { type: 'custom'; customType: string; data: unknown };
 
 /** 消息 → entry body（投影的逆映射，归一化 compactionSummary 的脏字段）。 */
@@ -57,6 +77,7 @@ function messageToEntryBody(msg: AgentMessage): EntryBody {
       summary: typeof msg.summary === 'string' ? msg.summary : '',
       retainedTail: getRetainedTail(msg),
       tokensBefore: Number.isFinite(msg.tokensBefore) ? msg.tokensBefore : 0,
+      ...(msg.dropped ? { details: { dropped: true } as const } : {}),
     };
   }
   if (isPermissionRequest(msg)) {
@@ -85,12 +106,14 @@ function projectEntries(entries: readonly Entry[]): ProjectedBranch {
         entryIds.push(entry.id);
         break;
       case 'compaction': {
+        const dropped = (entry.details as CompactionEntryDetails | undefined)?.dropped === true;
         const summary: CompactionSummaryMessage = {
           role: 'compactionSummary',
           summary: entry.summary,
           tokensBefore: entry.tokensBefore,
           timestamp: entry.timestamp,
           ...(entry.retainedTail.length > 0 ? { retainedTail: entry.retainedTail } : {}),
+          ...(dropped ? ({ dropped: true } as const) : {}),
         };
         messages.push(summary);
         entryIds.push(entry.id);

@@ -246,9 +246,18 @@ settings:
       hint: "追加在預設規則之後，用於調整回覆語言、風格或角色。無法覆蓋工具協定與安全規則。"
       placeholder: "例如：\n- 用中文回覆\n- 回答盡量簡潔\n- 討論程式碼時預設使用 TypeScript"
     compaction:
-      label: "上下文壓縮模型"
-      hint: "對話過長時用來自動壓縮歷史的模型，預設與對話模型相同。"
-      followMain: "與對話模型相同"
+      auto:
+        label: "自動壓縮超長對話"
+        hint: "上下文接近模型上限時，把較早的歷史壓成摘要，讓長對話能繼續，而不是直接報錯中斷。"
+      threshold:
+        label: "壓縮閾值"
+        hint: "上下文估算佔模型上下文視窗達到該比例時觸發壓縮。"
+        # $1 = 閾值百分比
+        value: "$1%"
+      model:
+        label: "壓縮模型"
+        hint: "用來把較早歷史壓成摘要的模型，預設與對話模型相同。"
+        followMain: "與對話模型相同"
     autoTitle:
       label: "自動產生對話標題"
       hint: "首輪回覆結束後，用 AI 產生的簡短標題取代預設標題（首則訊息截斷）。"
@@ -696,9 +705,21 @@ chat:
     nextBranch: "下一個版本"
     # 收尾 assistant 回覆上分叉按鈕的 tooltip / aria-label（issue #60）
     fork: "分叉"
+  contextUsage:
+    # 輸入框旁進度環的無障礙名稱 / 停留提示。$1 = 已用百分比
+    label: "上下文已用 $1%"
+    title: "上下文用量"
+    # $1 = 已用 token（已縮寫，如 42.3K），$2 = 模型上下文視窗
+    amount: "$1 / $2 Token"
+    # $1 = 設定裡的壓縮閾值百分比
+    threshold: "達到 $1% 時自動壓縮較早的歷史。"
+    compactionOff: "未開啟自動壓縮。"
+    estimateNote: "為估算值，實際計數取決於模型自己的分詞器。"
   compaction:
     # 歷史壓縮分割條上的標籤
     divider: "先前上下文已壓縮"
+    # 摘要沒產生出來、先前上下文被直接丟棄時的同款分隔條
+    droppedDivider: "先前上下文摘要失敗，已丟棄"
     # 壓縮 LLM 調用進行中的底部狀態條
     status: "正在壓縮上下文…"
   session:
@@ -710,6 +731,8 @@ chat:
     # 使用者中途點停後，在 assistant 氣泡裡顯示的提示。
     # 保持中性語氣——不是錯誤，只是沒跑完。
     cancelled: "已取消"
+    # 上下文已滿且再也壓縮不動時，AI 自行暫停的提示，順帶告訴使用者下一步能做什麼
+    contextLimitPaused: "已暫停：上下文已滿，剩下的內容無法再壓縮。請開啟新對話、從較早的回覆分叉，或改用上下文視窗更大的模型。"
     # 背景端口還沒連上時（通常發生在 SW 剛唤醒 / 斷線重連期間）點發送/重試會看到這條
     notConnected: "尚未連接到背景服務，請稍後再試"
     # 自動重連多次失敗後提示。語氣是「還在試」，不保證能連上
@@ -968,6 +991,7 @@ errors:
   modelUnavailable: "所選模型已無法使用，請重新選擇。"
   pageActionGone: "找不到該操作。"
   pageActionSaveFailed: "儲存失敗，請重試。"
+  compactionSettingsSaveFailed: "儲存上下文壓縮設定失敗，請重試。"
   searchEngineGone: "找不到該搜尋引擎。"
   searchEngineSaveFailed: "儲存搜尋引擎設定失敗，請重試。"
   # $1 = 搜尋詞佔位符字面值（「{query}」）

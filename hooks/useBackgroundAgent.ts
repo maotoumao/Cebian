@@ -8,6 +8,7 @@ import {
   type BranchEntryInfo,
   type BroadcastMessage,
   type ClientMessage,
+  type ContextUsage,
   type ServerMessage,
   type SessionSnapshot,
   type TurnSettings,
@@ -42,6 +43,8 @@ export interface AgentPortState {
   connected: boolean;
   /** Last error message from the agent, cleared on next prompt. */
   lastError: string | null;
+  /** 当前上下文占用；后台在全量边界后单独补帧下发。`null` = 还没收到过。 */
+  contextUsage: ContextUsage | null;
 }
 
 // ─── Pending interactive tool info (for UI rendering) ───
@@ -86,6 +89,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     sessionTitle: '',
     connected: false,
     lastError: null,
+    contextUsage: null,
   });
 
   const [pendingTools, setPendingTools] = useState<Map<string, PendingToolInfo>>(new Map());
@@ -197,6 +201,11 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
         case 'agent_start':
           if (!isCurrentSession(msg.sessionId)) break;
           setState(prev => ({ ...prev, isAgentRunning: true, isCompacting: false }));
+          break;
+
+        case 'context_usage':
+          if (!isCurrentSession(msg.sessionId)) break;
+          setState(prev => ({ ...prev, contextUsage: msg.contextUsage }));
           break;
 
         case 'stream_ops':
@@ -708,6 +717,8 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           isCompacting: false,
           sessionTitle: '',
           lastError: null,
+          // 不清的话切过去的一瞬间会显示上一个会话的占用，等后台补帧才纠正。
+          contextUsage: null,
         }
       : { ...prev, sessionId });
     postMessage({ type: 'subscribe', sessionId });
@@ -724,6 +735,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
       sessionTitle: '',
       connected: true,
       lastError: null,
+      contextUsage: null,
     });
     setPendingTools(new Map());
     setPendingPermissions(new Map());

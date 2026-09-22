@@ -117,6 +117,9 @@ const chatClientHandlers: ClientHandlerMap = {
           pendingPermissions: fresh.pendingPermissions,
           ...(branchInfo !== undefined ? { branchInfo } : {}),
         });
+        // 订阅快照本身是同步拼的，占用要先读一次 storage——单独补一帧，新开的窗口
+        // 不用等到下一次 message_end 才画出占用环。
+        sessionManager.pushContextUsage(msg.sessionId);
       } else {
         // Agent finished during the await — fall through to DB-based
         // session_loaded using the snapshot we already loaded.
@@ -125,6 +128,7 @@ const chatClientHandlers: ClientHandlerMap = {
           sessionId: msg.sessionId,
           session: loaded ? toSessionSnapshot(loaded) : null,
         });
+        if (loaded) sessionManager.pushStoredContextUsage(msg.sessionId, loaded.record);
       }
     } else {
       // Agent not running — load from DB. Session not found → session: null.
@@ -134,6 +138,9 @@ const chatClientHandlers: ClientHandlerMap = {
         sessionId: msg.sessionId,
         session: loaded ? toSessionSnapshot(loaded) : null,
       });
+      // 冷加载也要能看到占用环：会话在最后一个观众离开约 60s 后就被回收、SW 也会闲置
+      // 终止，所以「关掉侧边栏过一会儿再点开长会话」走的正是这条路。
+      if (loaded) sessionManager.pushStoredContextUsage(msg.sessionId, loaded.record);
     }
   },
 

@@ -12,6 +12,7 @@ import type { SearchEnginesConfig } from '@/lib/search/types';
 import {
   lastSelectedModel,
   compactionModel,
+  compactionSettings,
   autoTitleSettings,
   customProviders,
   userInstructions,
@@ -278,6 +279,7 @@ function entry<T>(e: BackupEntry<T>): BackupEntry<any> {
 export const BACKUP_REGISTRY: BackupEntry<any>[] = [
   entry({ item: lastSelectedModel, storageClass: 'settings' }),
   entry({ item: compactionModel, storageClass: 'settings' }),
+  entry({ item: compactionSettings, storageClass: 'settings' }),
   entry({ item: autoTitleSettings, storageClass: 'settings' }),
   entry({
     item: customProviders,

@@ -10,8 +10,10 @@ import { ModelSelector } from '@/components/chat/ModelSelector';
 import { ThinkingLevelSelector } from '@/components/chat/ThinkingLevelSelector';
 import { RecordButton } from '@/components/chat/RecordButton';
 import { MicButton } from '@/components/chat/MicButton';
+import { ContextUsageIndicator } from '@/components/chat/ContextUsageIndicator';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { providerCredentials, customProviders as customProvidersStorage, type ThinkingLevel, type ModelIdentity } from '@/lib/persistence/storage';
+import type { ContextUsage } from '@/lib/ipc/protocol';
 import { getSupportedThinkingLevels, clampThinkingLevel } from '@earendil-works/pi-ai';
 import { resolveModel } from '@/lib/providers/resolve-model';
 import { isUsableModel } from '@/lib/providers/usable-models';
@@ -60,6 +62,8 @@ interface ChatInputProps {
   thinkingLevel: ThinkingLevel;
   onModelChange: (model: ModelIdentity) => void;
   onThinkingChange: (level: ThinkingLevel) => void;
+  /** 当前上下文占用；`null`（还没收到后台快照）时不渲染占用环。 */
+  contextUsage: ContextUsage | null;
 }
 
 /** 暴露给父组件的 imperative handle：允许欢迎页等外部入口填入文本并聚焦输入框，
@@ -69,7 +73,7 @@ export interface ChatInputHandle {
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
-  { onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId, model: currentModel, thinkingLevel: currentThinkingLevel, onModelChange, onThinkingChange },
+  { onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId, model: currentModel, thinkingLevel: currentThinkingLevel, onModelChange, onThinkingChange, contextUsage },
   ref,
 ) {
   const [value, setValue] = useState('');
@@ -1158,6 +1162,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           </div>
 
           <div className="flex items-center gap-1">
+            <ContextUsageIndicator usage={contextUsage} />
             {speech.supported && (
               <MicButton
                 state={speech.state}

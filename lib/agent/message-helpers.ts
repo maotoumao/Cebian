@@ -184,6 +184,14 @@ export function extractUserAttachments(msg: Message): ParsedUserAttachments {
  * Returns `null` when no user message exists — callers should treat this as
  * "nothing to retry" (the UI normally prevents this, but defensive).
  *
+ * 轮内压缩会把摘要追加在最后一条 user **之后**，这里照样把它切掉——**不要**特判保留。
+ * 两个理由：一是返回值必须是原数组的**连续前缀**，调用方拿 `truncated.length` 当作树上
+ * 保留的前缀长度去回卷 lane、裁 `entryIds`、压水位线，塞一条位置对不上的摘要进来会让
+ * 内存转录与树彻底错位（摘要被误附上别人的 entryId、且永远不会落树）；二是语义上本来
+ * 就该切掉——retry 丢弃的是整轮，而那条摘要摘的正是这一轮里的内容，它的 `retainedTail`
+ * 指向的也是同一批被丢弃的消息，留下来只会让模型从被撤销的工具结果接着往下写。切掉后
+ * 上下文比压缩前更小，不存在「retry 把超长上下文重新发出去」的问题。
+ *
  * Shared by the background `retry()` and the sidepanel's optimistic UI update
  * so both sides truncate identically — multi-window reconciliation never flickers.
  */

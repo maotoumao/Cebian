@@ -24,6 +24,7 @@ import type { SlashPrompt } from '@/lib/ai-config/slash-prompt';
 import type { RecordedSession } from '@/lib/recorder/types';
 import type { MCPResourceContents } from '@/lib/mcp/client';
 import type { PermissionRequest } from '@/lib/agent/tool-permissions';
+import type { ContextUsage } from '@/lib/agent/compaction';
 import type { BranchEntryInfo } from '@/lib/agent/session-projection';
 
 // ─── Port name ───
@@ -203,6 +204,7 @@ export type StreamOp =
 /** 一个分支点的信息（定义与构建见 lib/agent/session-projection.ts 的
  *  buildBranchInfo）。键是当前分支上 entry 的 id，仅含兄弟数 ≥2 的分支点（稀疏）。 */
 export type { BranchEntryInfo } from '@/lib/agent/session-projection';
+export type { ContextUsage } from '@/lib/agent/compaction';
 
 /** `session_loaded` 携带的会话快照：会话行字段 + 带 entryId 标注的 transcript +
  *  分支点信息。 */
@@ -267,6 +269,10 @@ export type ServerMessage =
        *  携带最新分支结构。 */
       branchInfo?: Record<string, BranchEntryInfo>;
     }
+  /** 上下文占用快照。独立成帧而不是挂在 message_end / agent_end 上：算它要先读一次
+   *  storage，而那两帧必须同步发出（晚一帧会被流式帧盖掉）。前端只更新占用、不动消息。
+   *  推送点：message_end / agent_end / subscribe / 切分支 / 换模型。 */
+  | { type: 'context_usage'; sessionId: string; contextUsage: ContextUsage }
   | { type: 'error'; sessionId: string | null; error: string }
   | { type: 'tool_pending'; sessionId: string; toolName: string; toolCallId: string; args: any }
   | { type: 'tool_resolved'; sessionId: string; toolName: string }

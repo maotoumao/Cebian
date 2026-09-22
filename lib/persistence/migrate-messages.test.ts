@@ -177,6 +177,38 @@ describe('messagesToMutations', () => {
     expect(entriesToMessages(entries)).toEqual(messages);
   });
 
+  it('dropped 标记经树往返不丢：否则冷加载后会被当成正常摘要发给模型', () => {
+    // 丢弃标记的 summary 本来就是空串，标志一旦丢失，它就退化成一条空摘要——
+    // 模型会收到 <summary></summary>，以为早期上下文已经交代过；UI 分隔条也会说错话。
+    const retained = [
+      { role: 'user', content: '保留的问题', timestamp: T + 10 },
+    ] as unknown as AgentMessage[];
+    const droppedMsg = {
+      role: 'compactionSummary',
+      summary: '',
+      tokensBefore: 1_234,
+      timestamp: T + 11,
+      retainedTail: retained,
+      dropped: true,
+    } as unknown as AgentMessage;
+    const messages = [...retained, droppedMsg];
+    const entries = replayMainBranch(messagesToMutations(messages, T));
+    expect(entriesToMessages(entries)).toEqual(messages);
+  });
+
+  it('普通摘要不会凭空多出 dropped 字段', () => {
+    const summaryMsg = {
+      role: 'compactionSummary',
+      summary: '正常摘要',
+      tokensBefore: 10,
+      timestamp: T + 1,
+      retainedTail: [],
+    } as unknown as AgentMessage;
+    const entries = replayMainBranch(messagesToMutations([summaryMsg], T));
+    const [projected] = entriesToMessages(entries) as unknown as Array<Record<string, unknown>>;
+    expect('dropped' in projected).toBe(false);
+  });
+
   it('timestamp 缺失时回退兜底值；空历史返回空日志（无 lane mutation）', () => {
     const noTs = [{ role: 'user', content: 'hi' }] as unknown as AgentMessage[];
     const mutations = messagesToMutations(noTs, T + 42);

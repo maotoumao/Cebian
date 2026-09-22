@@ -133,6 +133,65 @@ export const compactionModel = storage.defineItem<ModelIdentity | null>(
   { fallback: null },
 );
 
+/**
+ * 上下文压缩的触发设置。压缩「用哪个模型」是另一个存储项（`compactionModel`，见上）——
+ * 两者没有合并，因为 `local:compactionModel` 已是既有的持久化 key，改名会静默丢掉用户配置。
+ *
+ * - `enabled`：压缩总开关。关掉后对话超长会直接撞 provider 的上下文上限。
+ * - `thresholdPercent`：上下文估算占模型窗口的百分比，超过即触发压缩。此前写死为
+ *   「窗口 − 16384 token」，换算成百分比会随窗口漂移（128k 窗口 87%、1M 窗口 98.4%），
+ *   大窗口模型几乎压不到就已经撑爆；改成百分比后各档窗口的触发点一致。
+ */
+export interface CompactionSettings {
+  enabled: boolean;
+  /** 1–99 的整数，由 {@link resolveCompactionSettings} 保证。 */
+  thresholdPercent: number;
+}
+
+const DEFAULT_COMPACTION: CompactionSettings = { enabled: true, thresholdPercent: 80 };
+const MIN_THRESHOLD_PERCENT = 1;
+const MAX_THRESHOLD_PERCENT = 99;
+
+/**
+ * 把任意来源的阈值收成 1–99 的整数；数字与「数字字符串」之外的一律退回默认。
+ *
+ * 不能直接 `Number(x)` 后判 `isFinite`：`Number(null)` / `Number('')` / `Number([])` 都是 0，
+ * 会被当成合法输入夹到 1，于是「字段坏掉」静默变成「每轮都压缩」。
+ */
+function clampThresholdPercent(raw: unknown): number {
+  const numeric =
+    typeof raw === 'number'
+      ? raw
+      : typeof raw === 'string' && raw.trim() !== ''
+        ? Number(raw)
+        : Number.NaN;
+  if (!Number.isFinite(numeric)) return DEFAULT_COMPACTION.thresholdPercent;
+  return Math.min(MAX_THRESHOLD_PERCENT, Math.max(MIN_THRESHOLD_PERCENT, Math.round(numeric)));
+}
+
+/**
+ * 取规范的压缩设置：旧值缺字段时补默认（WXT fallback 只在 key 整体缺失时生效，同
+ * `resolveAutoTitleSettings` 的理由），并把阈值夹回 1–99 的整数。
+ *
+ * 这里必须真的校验值域而不只是补缺，因为这个存储项参与备份恢复：恢复流程会把备份文件
+ * 里的 JSON 原样写回，一个手改出来的 `120` 会让触发点超过窗口、压缩永不触发，直接退回
+ * issue #72 的症状；`0` 或负数则每轮都压。设置页的滑杆范围只是展示区间，不能当防线。
+ * 所有读取压缩设置的地方都走这里。
+ */
+export function resolveCompactionSettings(
+  s: Partial<CompactionSettings> | null | undefined,
+): CompactionSettings {
+  return {
+    enabled: typeof s?.enabled === 'boolean' ? s.enabled : DEFAULT_COMPACTION.enabled,
+    thresholdPercent: clampThresholdPercent(s?.thresholdPercent),
+  };
+}
+
+export const compactionSettings = storage.defineItem<CompactionSettings>(
+  'local:compactionSettings',
+  { fallback: { ...DEFAULT_COMPACTION } },
+);
+
 /** 自动生成会话标题：首轮结束后用一次短补全把「首句截断」换成简短标题。
  *  `model: null` = 跟随对话主模型（默认）。 */
 export interface AutoTitleSettings {

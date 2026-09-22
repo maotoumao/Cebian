@@ -16,25 +16,26 @@ import {
   type AgentEvent,
   type AgentMessage,
   type Session,
-  estimateContextTokens,
-  shouldCompact,
 } from '@earendil-works/pi-agent-core';
+import type { AgentContext, AgentLoopTurnUpdate } from '@earendil-works/pi-agent-core';
 import type { Api, AssistantMessage, Message, Model } from '@earendil-works/pi-ai';
 import { clampThinkingLevel } from '@earendil-works/pi-ai';
 import { createCebianAgent } from '../agent/factory';
 import { composeUserMessage, composeSystemPrompt } from '../agent/prompt-composer';
 import type { SlashPrompt } from '@/lib/ai-config/slash-prompt';
 import { resolveProviderApiKey } from '../providers/credentials';
+import type { SessionRecord } from '@/lib/persistence/db';
 import {
-  COMPACTION_SETTINGS,
-  findCompactionCutPoint,
+  measureContextUsage,
+  planCompaction,
   runCompaction,
+  type CompactionDecision,
+  type CompactionPlan,
 } from '@/lib/agent/compaction';
 import { usableModelTarget, type ModelTarget } from '@/lib/providers/model-target';
 import {
   createCompactionSummaryMessage,
-  getRetainedTail,
-  isCompactionSummary,
+  createDroppedHistoryMessage,
   type CompactionSummaryMessage,
 } from '@/lib/agent/compaction-summary';
 import { appendSessionMessage, sessionStore } from './session-store';
@@ -62,7 +63,7 @@ import {
   type PermissionDecision,
   type ToolGate,
 } from '@/lib/agent/tool-permissions';
-import type { BroadcastMessage, TurnSettings } from '@/lib/ipc/protocol';
+import type { BroadcastMessage, ContextUsage, TurnSettings } from '@/lib/ipc/protocol';
 import { replaceUserText, truncateForRetry, sanitizeAgentMessages } from '@/lib/agent/message-helpers';
 import { collectTitleSource, defaultSessionTitle } from '@/lib/agent/session-title';
 import { generateSessionTitle } from './title-generator';
@@ -72,6 +73,9 @@ import {
   customProviders as customProvidersStorage,
   lastSelectedModel,
   compactionModel,
+  compactionSettings,
+  resolveCompactionSettings,
+  type CompactionSettings,
   autoTitleSettings,
   resolveAutoTitleSettings,
   lastSelectedThinkingLevel,
@@ -85,7 +89,7 @@ import { getMCPManager } from '@/lib/mcp/manager';
 import { resolveModel } from '@/lib/providers/resolve-model';
 import { t } from '@/lib/i18n';
 import { acquireKeepAlive, releaseKeepAlive } from '../lifecycle/keepalive';
-import { broadcastToViewers } from './viewers';
+import { broadcastToViewers, hasViewer } from './viewers';
 import { queueStreamEvent, snapshotStreamingTail, dropStreamBroadcast } from './stream-broadcast';
 
 // ─── Types ───
@@ -181,6 +185,13 @@ interface AgentSession {
    */
   permissionBridge: InteractiveBridge<PermissionRequest, PermissionDecision>;
   unsubscribeAgent: () => void;
+  /** 占用刷新是否已在途。用于合并同一会话的连发刷新，见 `pushContextUsage`。 */
+  contextUsagePending?: boolean;
+  /**
+   * 轮内压缩是否正在进行。轮首压缩靠 `phase === 'compacting'` 表达，但轮内压缩发生在
+   * run 中途、phase 必须保持 `running`，所以单独用这个标志点亮界面的「正在压缩」。
+   */
+  compactingInTurn: boolean;
   /**
    * 会话树句柄（transcript 的持久化真相）。行不存在的会话（`sessionCreated=false`）
    * 没有树，所有树操作按 `sessionCreated` 守卫跳过。
@@ -258,7 +269,7 @@ class SessionManager {
       sessionId: agentSession.sessionId,
       messages: this.annotate(agentSession, agentSession.agent.state.messages),
       isRunning: agentSession.phase !== 'idle',
-      isCompacting: agentSession.phase === 'compacting',
+      isCompacting: agentSession.phase === 'compacting' || agentSession.compactingInTurn,
       pendingTools: this.getPendingToolSnapshot(agentSession),
       pendingPermissions: this.getPendingPermissions(agentSession),
     });
@@ -396,6 +407,9 @@ class SessionManager {
       pendingPermissions: this.getPendingPermissions(agentSession),
       ...(branchInfo !== undefined ? { branchInfo } : {}),
     });
+    // 换了分支就是换了一整条消息序列，占用随之变化；这条路径不跑 agent，没有后续
+    // message_end 会来纠正，不补的话环会一直停在另一条分支的数字上。
+    this.pushContextUsage(sessionId);
   }
 
   /**
@@ -788,6 +802,11 @@ class SessionManager {
       messages,
       tools: sessionTools,
       beforeToolCall,
+      // 轮内上下文管理。两者都按 sessionId 反查 AgentSession（同 beforeToolCall 的
+      // 做法）——agent 先于 AgentSession 构造，这里还拿不到它的引用。
+      prepareNextTurnWithContext: (turn, signal) =>
+        this.compactMidTurn(sessionId, turn.context, signal),
+      shouldStopAfterTurn: (_turn, signal) => this.shouldStopForContext(sessionId, signal),
     });
 
     const agentSession: AgentSession = {
@@ -800,6 +819,7 @@ class SessionManager {
       toolCtx,
       permissionBridge,
       unsubscribeAgent: () => {},
+      compactingInTurn: false,
       tree: loaded?.tree,
       // 水位线与投影对齐表：冷加载的全部消息都已在树上
       committedCount: messages.length,
@@ -888,6 +908,8 @@ class SessionManager {
         const messages = [...agent.state.messages];
         broadcastToViewers(sessionId, { type: 'message_end', sessionId, messages: this.annotate(agentSession, messages) });
         void this.syncTail(agentSession);
+        // 占用指示：单独一帧异步补发，不让读设置 + 估算挡住上面这条定稿广播。
+        this.pushContextUsage(sessionId);
         break;
       }
 
@@ -919,6 +941,7 @@ class SessionManager {
           messages: this.annotate(agentSession, messages),
           ...(branchInfo !== undefined ? { branchInfo } : {}),
         });
+        this.pushContextUsage(sessionId);
         // 首轮收尾后的自动标题：独立后台任务，不阻塞事件派发、失败不影响会话。
         // 方法内部已 try/catch；这里再兜一层是防 try 之前的同步段抛出变成 unhandled rejection。
         void this.maybeGenerateTitle(agentSession, messages).catch((err) => {
@@ -1115,16 +1138,23 @@ class SessionManager {
         timestamp: Date.now(),
       } as AgentMessage;
 
+      // 压缩设置在进入下面的 idle 门之前读完，读完再做一次与上面同款的存活性检查。
+      // 不能把这个 await 挪进 maybeCompact：从「判定该不该压缩」到「同步占住
+      // phase='compacting'」之间一旦出现 await，两个并发 prompt 会各自通过 idle 门、
+      // 先后进入压缩并互相覆盖 compactionController——取消只找得到后一个，而任一路的
+      // finally 都会把它清掉，于是另一路变成不可取消的孤儿。
+      const compaction = resolveCompactionSettings(await compactionSettings.getValue());
+      if (this.sessions.get(sessionId) !== agentSession) return;
+
       // Before a fresh turn, compact the transcript if the context is over
       // threshold (state layer: generate + insert summary + persist +
       // broadcast). Gated on `phase === 'idle'`: a stale prompt arriving
       // mid-run (phase 'running', no pending tool) must NOT enter compaction
       // and clobber the phase machine — compaction is strictly a
-      // start-of-turn step. Returns true iff the compaction was cancelled
-      // mid-flight, in which case the user's stop click means we abandon this
-      // turn and don't dispatch to the model.
+      // start-of-turn step. 返回 true = 放弃本轮（压缩中被取消，或上下文已满且压不动，
+      // 后者已把用户消息连同说明提交进转录），此时不再派发给模型。
       if (agentSession.phase === 'idle') {
-        const cancelled = await this.maybeCompact(agentSession, pendingUserMessage);
+        const cancelled = await this.maybeCompact(agentSession, pendingUserMessage, compaction);
         if (cancelled) return;
       }
       await agentSession.agent.prompt(enriched, images.length > 0 ? images : undefined);
@@ -1145,67 +1175,56 @@ class SessionManager {
    * Flow:
    * 1. Estimate context tokens (last assistant `usage.totalTokens` +
    *    trailing char/4) and bail if under threshold.
-   * 2. Find a cut point aligned to a user turn-start (excludes toolResult
-   *    mid-turn — this is the root-cause fix for issue #9's orphan toolResult
-   *    → provider 400).
+   * 2. Find a cut point at a user turn-start, falling back to a turn-internal
+   *    assistant boundary (never a toolResult — orphaning one is the root cause
+   *    of issue #9's provider 400; the assistant fallback is what lets a
+   *    single-prompt, tool-heavy session compact at all — issue #72).
    * 3. Roll the summary: the summarized region is the delta *since the
    *    last summary*, and the previous summary text is fed to `generateSummary`
    *    as `previousSummary` for an UPDATE-style merge. Multiple summaries
    *    accumulate physically; `transformContext` only ever sends the last one.
-   * 4. On success, append the new summary at the tail (retained region copied
-   *    into its `retainedTail`) and sync to the session tree. On failure
-   *    (after one internal retry), skip the summary and send anyway — the
-   *    turn-start-aligned cut guarantees no 400.
+   * 4. Append a marker at the tail (retained region copied into its
+   *    `retainedTail`) and sync to the session tree. On success that marker
+   *    carries the summary; when summarization fails (after one internal retry)
+   *    it is a `dropped` marker instead, so the earlier history still leaves the
+   *    LLM view. Sending the full transcript on failure is not an option — the
+   *    context is already over the window, so it would 400 again every turn and
+   *    wedge the session for good (issue #72).
    *
    * Concurrency: runs under `phase === 'compacting'` with a dedicated
    * `compactionController`. `cancel()` aborts it; the top-of-`prompt()` guard
    * drops concurrent prompts. Keep-alive is held automatically because
    * `phase !== 'idle'`.
    *
+   * @param settings 压缩设置，由调用方在进入 idle 门之前读好传进来——本方法从入口到
+   *        「占住 `phase = 'compacting'`」或「走 stuck 分支返回 true」之间不允许有 await，
+   *        否则并发 prompt 会互相覆盖 `compactionController`（详见调用处注释）。stuck 分支
+   *        自身的 await 发生在决策之后，最坏只是两条并发 prompt 的运行态指示闪一帧。
    * @param pendingUserMessage 本轮「待投递」的用户消息。压缩成功不消费它；压缩中
    *        被取消时由 `commitCompactionCancel` 把它连同 aborted 标记补进 state，
    *        使取消后界面与普通取消一致（用户气泡 + 「已取消」）。
-   * @returns `true` iff the compaction was cancelled and the caller should
-   *          abandon the turn; `false` otherwise (no-op skip or success).
+   * @returns `true` 表示调用方应放弃本轮：压缩中被取消，或上下文已满且压不动
+   *          （此时本轮用户消息已连同说明一起提交进转录）。`false` = 照常发送
+   *          （跳过压缩，或压缩已完成）。
    */
-  private async maybeCompact(agentSession: AgentSession, pendingUserMessage: AgentMessage): Promise<boolean> {
-    if (!COMPACTION_SETTINGS.enabled) return false;
-
+  private async maybeCompact(
+    agentSession: AgentSession,
+    pendingUserMessage: AgentMessage,
+    settings: CompactionSettings,
+  ): Promise<boolean> {
     const { sessionId } = agentSession;
-    // 估算 / 切点 / 摘要 / 回写都基于这份消息：先整形回类型契约（null text/thinking/name
-    // → ''），否则 estimateContextTokens / findCompactionCutPoint 对 assistant 块取 .length
-    // 会崩（issue #43）。copy-on-write：无坏数据时返回同一引用、零分配（仅一次线性扫描）；
-    // 有坏数据时顺带把治好的版本随摘要回写进 state
-    const messages = sanitizeAgentMessages(agentSession.agent.state.messages);
-    const model = agentSession.agent.state.model;
-
-    // 滚动摘要的工作序列：定位上一条摘要，「自上次摘要以来」的活跃上下文 =
-    // 上次的保留区副本（retainedTail，其原文在 state 里位于摘要之前）+ 摘要之后
-    // 的新消息；无摘要时 = 全量。估算 / 切点 / 待摘要区间都基于这个序列——它就是
-    // transformContext 发给 LLM 的内容（摘要本体除外），保证阈值判断与真实负载
-    // 一致，也保证上一轮保留区会被并入下一轮摘要而不是被静默丢弃。
-    let lastSummaryIdx = -1;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (isCompactionSummary(messages[i])) {
-        lastSummaryIdx = i;
-        break;
-      }
+    const decision = this.currentCompactionDecision(agentSession, settings);
+    // stuck：上下文已超阈值，而压缩救不了场（没有可切的切点，或切完保留区自己仍塞不进
+    // 窗口）。此时裸发必然 400，
+    // 而且用户每发一条新消息就再 400 一次——会话看起来还能输入，实则彻底卡住。
+    // 把用户这条消息连同一条说明一起提交进转录，然后放弃本轮：至少输入不会凭空消失，
+    // 界面也讲清楚了为什么发不出去、下一步该怎么办。
+    if (decision.kind === 'stuck') {
+      return await this.commitContextLimitPause(agentSession, pendingUserMessage);
     }
-    const lastSummary =
-      lastSummaryIdx >= 0 ? (messages[lastSummaryIdx] as CompactionSummaryMessage) : null;
-    const sinceLast = lastSummary
-      ? [...getRetainedTail(lastSummary), ...messages.slice(lastSummaryIdx + 1)]
-      : messages;
-
-    // token 估算：与 LLM 视图同形（摘要 + 自上次摘要以来的序列）；优先读最后一条
-    // assistant 的真实 usage，尾部按 char/4 估算。
-    const { tokens } = estimateContextTokens(lastSummary ? [lastSummary, ...sinceLast] : messages);
-    if (!shouldCompact(tokens, model.contextWindow, COMPACTION_SETTINGS)) return false;
-
-    // 切点对齐到 user turn-start（排除 toolResult 中间），修 issue #9。
-    // cut <= 0：无 user 可切 / 从头保留即 no-op（其前没有可摘要的历史），跳过。
-    const cut = findCompactionCutPoint(sinceLast, COMPACTION_SETTINGS.keepRecentTokens);
-    if (cut <= 0) return false;
+    if (decision.kind !== 'compact') return false;
+    const plan = decision.plan;
+    const messages = plan.messages;
 
     // 进入 compacting 阶段：占用非 idle 状态（自动保活 + 阻止并发 prompt）。
     // 这一步在「任何 await 之前」同步完成，把可取消的忙碌态原子地占住——否则在
@@ -1227,58 +1246,23 @@ class SessionManager {
     });
 
     try {
-      // 解析压缩模型：配置了专用小模型且凭证可用就用它，否则回退主模型（静默）。
-      const { model: compactModel, apiKey } = await this.resolveCompactionModel(model);
-      // 取消优先：解析期间被 cancel，丢弃压缩并让调用方放弃本轮。
-      if (signal.aborted) return await this.commitCompactionCancel(agentSession, pendingUserMessage);
-      // 无凭证无法发起独立的摘要请求，本轮裸发、下一轮再尝试压缩（不致 400：
-      // transformContext 仍会带上已有的最后一条摘要）。
-      if (!apiKey) return false;
-
-      // 待摘要区间 = sinceLast 的切点之前（含上一轮保留区副本，避免其被丢出上下文），
-      // 旧摘要文本作为 previousSummary 喂给 generateSummary 做 UPDATE 合并。
-      const previousSummary = lastSummary?.summary;
-      const messagesToSummarize = sinceLast.slice(0, cut);
-
-      const summary = await runCompaction({
-        messagesToSummarize,
-        model: compactModel,
-        apiKey,
-        previousSummary,
-        signal,
-        thinkingLevel: agentSession.agent.state.thinkingLevel,
-      });
-
+      const marker = await this.summarizeForPlan(agentSession, plan, signal);
       // 取消：丢弃这次压缩，不插摘要，并通知调用方放弃本轮发送。
       if (signal.aborted) return await this.commitCompactionCancel(agentSession, pendingUserMessage);
+      // 无凭证：摘要请求发不出去，本轮裸发（详见 summarizeForPlan 的注释）。
+      if (!marker) return false;
 
-      if (summary) {
-        // 摘要**尾部追加**（树是 append-only，摘要 entry 落在链尾）：保留区
-        // （切点之后的消息）以副本形式挂在 retainedTail 上，原始消息全保留。
-        // LLM 视图由 transformContext 重建为「摘要 + retainedTail + 其后消息」，
-        // 与旧的中段插入形态等价；随后 agent.prompt() 追加的本轮 user 消息
-        // 排在摘要之后，retry 的「截到最后一条 user」仍会保住摘要。
-        const updated = [
-          ...messages,
-          createCompactionSummaryMessage(summary, tokens, sinceLast.slice(cut)),
-        ];
-        agentSession.agent.state.messages = updated;
-        // 等落树（旧「persist + flush」语义）：SW 在广播后立刻被杀也不丢摘要。
-        // 失败已在链上记录，吞掉——压缩是增益路径，不因落库失败中断本轮发送
-        await this.syncTail(agentSession).catch(() => undefined);
-        broadcastToViewers(sessionId, {
-          type: 'session_state',
-          sessionId,
-          // 同样带上待投递的用户消息，避免摘要插入后到 agent.prompt() 之间
-          // 这一帧用户气泡闪掉。agent.prompt() 随后会 append 真实的同内容消息。
-          messages: this.annotate(agentSession, [...updated, pendingUserMessage]),
-          isRunning: true,
-          isCompacting: true,
-          pendingTools: [],
-        });
-      }
-      // summary 为 null → 降级：runCompaction 内部已重试一次，这里不插摘要、
-      // 照常发送。findCompactionCutPoint 的 turn-start 对齐保证不会 400。
+      const updated = await this.applyCompaction(agentSession, plan, marker);
+      broadcastToViewers(sessionId, {
+        type: 'session_state',
+        sessionId,
+        // 同样带上待投递的用户消息，避免摘要插入后到 agent.prompt() 之间
+        // 这一帧用户气泡闪掉。agent.prompt() 随后会 append 真实的同内容消息。
+        messages: this.annotate(agentSession, [...updated, pendingUserMessage]),
+        isRunning: true,
+        isCompacting: true,
+        pendingTools: [],
+      });
       return false;
     } finally {
       agentSession.compactionController = undefined;
@@ -1288,6 +1272,331 @@ class SessionManager {
         this.updateKeepAlive();
       }
     }
+  }
+
+  /**
+   * 量一次当前上下文占用，由 `pushContextUsage` 经独立帧下发给前端画占用环。
+   *
+   * 与压缩判据共用 `measureContextUsage`，保证界面上的数字就是压缩真正用的那个。
+   *
+   * **取样顺序是个不变式**：`agent.state` 必须在 `await getValue()` **之后**才读。这样
+   * 「广播顺序 == 状态取样顺序」，先发起但后完成的刷新不会拿着旧消息覆盖新数字，调用方
+   * 也就不需要序号。谁要是把 state 提到 await 之前取样，乱序就会让界面停在过期值。
+   */
+  private async currentContextUsage(agentSession: AgentSession): Promise<ContextUsage> {
+    const settings = resolveCompactionSettings(await compactionSettings.getValue());
+    const state = agentSession.agent.state;
+    return measureContextUsage({
+      messages: state.messages,
+      settings,
+      contextWindow: state.model.contextWindow,
+      systemPrompt: state.systemPrompt,
+      tools: state.tools,
+    });
+  }
+
+  /**
+   * 补发一帧占用指示。
+   *
+   * 独立成帧：`message_end` / `agent_end` 必须同步发出（晚一帧会被流式帧盖掉），而算占用
+   * 要先读一次 storage。失败就跳过——占用指示是纯展示，不该因为读设置出错而打断对话。
+   */
+  pushContextUsage(sessionId: string): void {
+    const agentSession = this.sessions.get(sessionId);
+    if (!agentSession) return;
+    // 没人看就不算：侧边栏关着、agent 在后台继续跑是支持的场景，这时每条 message_end
+    // 都去读一次设置 + 全扫一遍消息、再广播给零个端口，纯浪费。
+    if (!hasViewer(sessionId)) return;
+    // 在途就跳过：工具密集的一轮里 message_end 会连发上百次，而指示器只需人眼粒度。
+    // 跳过的那些帧不会丢信息——最后一次刷新拿到的永远是最新状态（`agent_end` 也一定
+    // 会再推一次收尾）。
+    if (agentSession.contextUsagePending) return;
+    agentSession.contextUsagePending = true;
+    void (async () => {
+      try {
+        const contextUsage = await this.currentContextUsage(agentSession);
+        // 读设置期间会话可能已被销毁 / 同 id 重建：别给新会话的观众发旧会话的数字。
+        if (this.sessions.get(sessionId) !== agentSession) return;
+        broadcastToViewers(sessionId, { type: 'context_usage', sessionId, contextUsage });
+      } catch (err) {
+        console.warn('[context-usage] broadcast failed:', err);
+      } finally {
+        agentSession.contextUsagePending = false;
+      }
+    })();
+  }
+
+  /**
+   * 按**持久化记录**算一次占用并下发，用于后台没有活 agent 的冷加载订阅。
+   *
+   * 为什么要单独一条路径：会话在最后一个观众离开约 60 秒后就被回收，SW 自己也会闲置
+   * 终止。于是「关掉侧边栏过一会儿再点开一个长会话」——恰恰是最想看用量的时刻——
+   * 走的是从 DB 读的分支，`pushContextUsage` 因为没有活 agent 直接返回，环根本不出现。
+   *
+   * 与活会话那条路的差别：拿不到 systemPrompt / 工具表（那要先把 agent 建起来）。
+   * 历史消息里通常有 assistant 的真实 usage 锚点，而锚点本就含前缀，差值可以忽略；
+   * 没有锚点时会偏低一点，属于安全的一侧。
+   */
+  pushStoredContextUsage(sessionId: string, record: SessionRecord): void {
+    if (!hasViewer(sessionId)) return;
+    void (async () => {
+      try {
+        const settings = resolveCompactionSettings(await compactionSettings.getValue());
+        // 期间会话可能已经被拉起（用户紧接着发了消息）：那条路更准，让给它。
+        if (this.sessions.has(sessionId) || !hasViewer(sessionId)) return;
+        const identity = record.provider && record.model
+          ? { provider: record.provider, modelId: record.model }
+          : undefined;
+        const resolved = await this.resolveSessionModel(identity);
+        if (!resolved || this.sessions.has(sessionId)) return;
+        const contextUsage = measureContextUsage({
+          messages: record.messages as AgentMessage[],
+          settings,
+          contextWindow: resolved.model.contextWindow,
+        });
+        broadcastToViewers(sessionId, { type: 'context_usage', sessionId, contextUsage });
+      } catch (err) {
+        console.warn('[context-usage] stored broadcast failed:', err);
+      }
+    })();
+  }
+
+  /** 按当前 agent 状态算一次压缩决策（纯函数 `planCompaction` 的会话态适配器）。 */
+  private currentCompactionDecision(
+    agentSession: AgentSession,
+    settings: CompactionSettings,
+  ): CompactionDecision {
+    const state = agentSession.agent.state;
+    return planCompaction({
+      messages: state.messages,
+      settings,
+      contextWindow: state.model.contextWindow,
+      systemPrompt: state.systemPrompt,
+      tools: state.tools,
+    });
+  }
+
+  /**
+   * 按计划生成摘要，返回待追加的标记消息。
+   *
+   * 摘要成功 → 摘要标记；失败（内部已按块重试）→「早期历史已丢弃」的兜底标记。为什么
+   * 失败也必须截：裸发一段本来就超窗的上下文必然再次 400，下一轮再压、再失败、再 400，
+   * 会话就此永久卡死——正是 issue #72 里「无法继续、也无法让 AI 把收集的内容整理成
+   * 文档」的成因。宁可丢掉早期历史，也要让会话还能往下走。
+   *
+   * 返回 `null` 有两种情况，调用方都应按「本轮不压缩、照常发送」处理：
+   * - 被取消（调用方自行按 signal 走取消路径）；
+   * - 无凭证。OAuth 刷新失败 / 凭证被删时发不出独立的摘要请求。这一路仍保留着卡死的
+   *   可能，但缺凭证多半是暂时的（刷一次 token 就好），为此永久丢掉用户的历史不划算。
+   */
+  private async summarizeForPlan(
+    agentSession: AgentSession,
+    plan: CompactionPlan,
+    signal: AbortSignal | undefined,
+  ): Promise<CompactionSummaryMessage | null> {
+    // 解析压缩模型：配置了专用小模型且凭证可用就用它，否则回退主模型（静默）。
+    const { model: compactModel, apiKey } =
+      await this.resolveCompactionModel(agentSession.agent.state.model);
+    if (signal?.aborted || !apiKey) return null;
+
+    // 旧摘要文本作为 previousSummary 喂给 generateSummary 做 UPDATE 合并。
+    const previousSummary = plan.lastSummary?.summary;
+    const summary = await runCompaction({
+      messagesToSummarize: plan.messagesToSummarize,
+      model: compactModel,
+      apiKey,
+      previousSummary,
+      signal,
+      thinkingLevel: agentSession.agent.state.thinkingLevel,
+    });
+    if (signal?.aborted) return null;
+
+    return summary
+      ? createCompactionSummaryMessage(summary, plan.tokensBefore, plan.retainedTail)
+      // 带上 previousSummary：这一轮失败的是「旧摘要 + 新内容 → 新摘要」的合并，旧摘要
+      // 本身仍然有效。不带的话 transformContext 只认最后一条摘要，那段早已压好的历史
+      // 会跟着一起被扔掉。
+      : createDroppedHistoryMessage(plan.tokensBefore, plan.retainedTail, previousSummary ?? '');
+  }
+
+  /**
+   * 把摘要标记落到会话状态与树上，返回更新后的完整消息序列（供调用方广播）。
+   *
+   * 标记**尾部追加**（树是 append-only，entry 落在链尾）：保留区以副本形式挂在
+   * `retainedTail` 上，原始消息全保留。LLM 视图由 `transformContext` 重建为
+   * 「摘要 + retainedTail + 其后消息」。
+   */
+  private async applyCompaction(
+    agentSession: AgentSession,
+    plan: CompactionPlan,
+    marker: CompactionSummaryMessage,
+  ): Promise<AgentMessage[]> {
+    const updated = [...plan.messages, marker];
+    agentSession.agent.state.messages = updated;
+    // 等落树（旧「persist + flush」语义）：SW 在广播后立刻被杀也不丢摘要。
+    // 失败已在链上记录，吞掉——压缩是增益路径，不因落库失败中断本轮发送。
+    await this.syncTail(agentSession).catch(() => undefined);
+    return updated;
+  }
+
+  /**
+   * 轮内压缩：agent loop 每完成一个 turn、发起下一次请求之前跑一次。
+   *
+   * 这是 issue #72 的主因修复。此前压缩**只**在新一轮 user 消息进来之前做，而
+   * #72 的现场是「一句指令 + 上百次工具调用」——整段跑在同一个 turn 里，压缩一次
+   * 都没机会执行，上下文从零涨到撑爆。pi 专门为此留了 `prepareNextTurnWithContext`
+   * 钩子（其源码注释即写着 "Preparation can be long-running (for example, compaction)"）。
+   *
+   * 两份消息数组要一起更新：`agent.state.messages` 由 `createContextSnapshot` 在 run
+   * 开始时 slice 过一份给 loop，二者内容同步但**不是同一个数组**。所以这里既把标记
+   * push 进 state（负责持久化与 UI），又把同一条消息接到返回的 context 上（负责下一次
+   * 真实请求）。返回 `undefined` = 不改动，loop 沿用原 context。
+   *
+   * 取消沿用 run 自己的 signal：用户点停止 → 摘要请求 abort → 返回 undefined，loop
+   * 随即按正常取消收尾，不需要单独的 compactionController。
+   */
+  private async compactMidTurn(
+    sessionId: string,
+    context: AgentContext,
+    signal: AbortSignal | undefined,
+  ): Promise<AgentLoopTurnUpdate | undefined> {
+    const agentSession = this.sessions.get(sessionId);
+    if (!agentSession) return undefined;
+    const settings = resolveCompactionSettings(await compactionSettings.getValue());
+    if (signal?.aborted || this.sessions.get(sessionId) !== agentSession) return undefined;
+    const decision = this.currentCompactionDecision(agentSession, settings);
+    if (decision.kind !== 'compact') return undefined;
+
+    try {
+      // phase 仍是 running（run 还在进行中），只额外点亮「正在压缩」的界面状态。
+      // 放在 try 里：广播若抛出，finally 仍会把标志复位，否则它会一直卡在 true。
+      agentSession.compactingInTurn = true;
+      this.broadcastCompactingState(agentSession, agentSession.agent.state.messages, true);
+      const marker = await this.summarizeForPlan(agentSession, decision.plan, signal);
+      if (!marker || signal?.aborted) return undefined;
+      // 会话在摘要期间被拆除：别再往已删除的会话写入、也别广播。
+      if (this.sessions.get(sessionId) !== agentSession) return undefined;
+
+      const updated = await this.applyCompaction(agentSession, decision.plan, marker);
+      // 落库也要等，等完再查一次：这期间同样可能被 destroySession 摘掉会话。
+      if (this.sessions.get(sessionId) !== agentSession) return undefined;
+      return { context: { ...context, messages: [...context.messages, marker] } };
+    } catch (err) {
+      // 契约要求本钩子不得抛：抛出去会打断 loop 的事件序列。压缩是增益路径，失败就跳过。
+      console.warn('[compaction] mid-turn compaction failed:', err);
+      return undefined;
+    } finally {
+      agentSession.compactingInTurn = false;
+      // 必须显式广播「压缩结束」。轮首压缩靠随后的 agent_start 顺带把前端的
+      // isCompacting 复位，而轮内压缩发生在 run 中途、不会再有 agent_start——不补这一帧
+      // 的话「正在压缩」的占位会一直挂到整个 run 结束（工具密集的会话可能是几百个 turn），
+      // 期间真实输出还会被前端当成非流式。成功、无凭证、取消、抛异常都要走到这里。
+      if (this.sessions.get(sessionId) === agentSession) {
+        this.broadcastCompactingState(agentSession, agentSession.agent.state.messages, false);
+      }
+    }
+  }
+
+  /**
+   * 轮内停轮判据：已经超阈值、却连切点都找不到（`stuck`）时收尾本次 run。
+   *
+   * pi 的 loop 顺序是 `turn_end → shouldStopAfterTurn → prepareNextTurn → 下一次请求`，
+   * 所以这里先于 {@link compactMidTurn} 执行，能在「压不动」的情况下把控制权交回用户，
+   * 而不是继续跑到 provider 返回 400。这正是 issue #72 里用户要的「快到上限就中断」。
+   *
+   * 停轮前补一条说明消息，否则界面上 agent 只是莫名其妙停下。契约要求本钩子不得抛。
+   */
+  private async shouldStopForContext(sessionId: string, signal: AbortSignal | undefined): Promise<boolean> {
+    try {
+      const agentSession = this.sessions.get(sessionId);
+      if (!agentSession || signal?.aborted) return false;
+      const settings = resolveCompactionSettings(await compactionSettings.getValue());
+      // 读设置期间用户点了停止：本次收尾归取消路径，别把它显示成「上下文到顶」。
+      if (signal?.aborted || this.sessions.get(sessionId) !== agentSession) return false;
+      if (this.currentCompactionDecision(agentSession, settings).kind !== 'stuck') return false;
+
+      const notice = this.buildContextLimitNotice(agentSession);
+      agentSession.agent.state.messages = [...agentSession.agent.state.messages, notice];
+      await this.syncTail(agentSession).catch(() => undefined);
+      return true;
+    } catch (err) {
+      console.warn('[compaction] stop-for-context check failed:', err);
+      return false;
+    }
+  }
+
+  /**
+   * 「上下文到顶、已暂停」的提示消息。
+   *
+   * 复用 `buildAbortedMarker` 的形状，但 `stopReason` 取 `error` 而不是 `aborted`：
+   * 前端对 aborted 一律渲染成灰色的「已取消」，对 error 才会把 `errorMessage` 原文显示
+   * 出来。这里必须把原因说清楚——用户看到 agent 停下，得知道是上下文到顶了、以及接下来
+   * 还能做什么（新建对话 / 分叉 / 换窗口更大的模型），否则就是换了个形式的卡住。用现成的 error 分支也省掉一条
+   * 新的渲染规则。
+   */
+  private buildContextLimitNotice(agentSession: AgentSession): AssistantMessage {
+    return {
+      ...this.buildAbortedMarker(agentSession),
+      stopReason: 'error',
+      errorMessage: t('chat.session.contextLimitPaused'),
+    };
+  }
+
+  /** 轮内压缩的界面状态广播（phase 仍是 running，只切 isCompacting）。 */
+  private broadcastCompactingState(
+    agentSession: AgentSession,
+    messages: AgentMessage[],
+    isCompacting: boolean,
+  ): void {
+    broadcastToViewers(agentSession.sessionId, {
+      type: 'session_state',
+      sessionId: agentSession.sessionId,
+      messages: this.annotate(agentSession, messages),
+      isRunning: true,
+      isCompacting,
+      pendingTools: [],
+    });
+  }
+
+  /**
+   * 轮首发现「压不动」时的收尾：把用户这条消息连同一条说明提交进转录，然后放弃本轮。
+   *
+   * 形状与 `commitCompactionCancel` 一致（提交 pendingUserMessage + 一条标记 + 落树 +
+   * 广播收尾），区别只在标记内容：这里不是「已取消」，而是「上下文已满且压不动」。
+   * 不这么做的话，用户每发一条消息就会把同一份超窗上下文再发一次、再 400 一次——
+   * 界面看着还能输入，实则彻底卡住，正是 issue #72 里最让人恼火的那一幕。
+   *
+   * @returns 恒为 `true` —— 调用方据此放弃本轮发送。
+   */
+  private async commitContextLimitPause(
+    agentSession: AgentSession,
+    pendingUserMessage: AgentMessage,
+  ): Promise<true> {
+    const { sessionId } = agentSession;
+    // 用身份而不是 has：会话被销毁后又以同 id 重建时，has 会放行，于是往已脱钩的
+    // agentSession 写入、却广播给新会话的观众。
+    if (this.sessions.get(sessionId) !== agentSession) return true;
+
+    const finalMessages: AgentMessage[] = [
+      ...agentSession.agent.state.messages,
+      pendingUserMessage,
+      this.buildContextLimitNotice(agentSession),
+    ];
+    agentSession.agent.state.messages = finalMessages;
+    await this.syncTail(agentSession).catch(() => undefined);
+    if (this.sessions.get(sessionId) !== agentSession) return true;
+
+    broadcastToViewers(sessionId, {
+      type: 'session_state',
+      sessionId,
+      messages: this.annotate(agentSession, finalMessages),
+      isRunning: false,
+      isCompacting: false,
+      pendingTools: [],
+    });
+    // 这条路径改了消息序列且之后不跑 agent，没有后续 message_end 会来纠正占用。
+    this.pushContextUsage(sessionId);
+    return true;
   }
 
   /**
@@ -1330,6 +1639,8 @@ class SessionManager {
       isCompacting: false,
       pendingTools: [],
     });
+    // 这条路径改了消息序列且之后不跑 agent，没有后续 message_end 会来纠正占用。
+    this.pushContextUsage(sessionId);
     return true;
   }
 
@@ -1904,7 +2215,7 @@ class SessionManager {
     return {
       messages: this.annotate(agentSession, withTail),
       isRunning: agentSession.phase !== 'idle',
-      isCompacting: agentSession.phase === 'compacting',
+      isCompacting: agentSession.phase === 'compacting' || agentSession.compactingInTurn,
       pendingTools: this.getPendingToolSnapshot(agentSession),
       pendingPermissions: this.getPendingPermissions(agentSession),
     };
