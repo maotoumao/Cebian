@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowDown } from 'lucide-react';
+import { ArrowDown, Paperclip } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,6 +38,7 @@ import { isCompactionSummary } from '@/lib/agent/compaction-summary';
 import { isPermissionRequest } from '@/lib/agent/tool-permissions';
 import { useBackgroundAgent } from '@/hooks/useBackgroundAgent';
 import { useStickToBottom } from '@/hooks/useStickToBottom';
+import { useFileDropZone, type FileDrop } from '@/hooks/useFileDropZone';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { lastSelectedModel, lastSelectedThinkingLevel as thinkingLevelStorage, providerCredentials, customProviders, type ModelIdentity, type ThinkingLevel } from '@/lib/persistence/storage';
 import { hasUsableModel } from '@/lib/providers/usable-models';
@@ -101,8 +102,15 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     void thinkingLevelStorage.setValue(l);
   }, []);
 
-  // 句柄：欢迎页示例卡片通过它把 prompt 填入输入框。
+  // 句柄：欢迎页示例卡片通过它把 prompt 填入输入框；拖放区通过它交付放下的文件。
   const inputRef = useRef<ChatInputHandle>(null);
+
+  // 整个聊天页（消息区 + 输入框）都是文件拖放区。发送进行中不接收：那一刻的附件马上要被清空。
+  const [composerDispatching, setComposerDispatching] = useState(false);
+  const handleFileDrop = useCallback(({ files, folders }: FileDrop) => {
+    inputRef.current?.addFiles(files, folders);
+  }, []);
+  const fileDrop = useFileDropZone({ enabled: !composerDispatching, onDrop: handleFileDrop });
 
   // ─── Agent port (all agent/session logic via background) ───
   const {
@@ -271,7 +279,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
   const sessionLoading = !isNewChat && routeSessionId !== activeSessionId;
 
   return (
-    <>
+    <div className="flex-1 min-h-0 relative flex flex-col" {...fileDrop.zoneProps}>
       <div className="flex-1 min-h-0 relative flex flex-col">
         <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
           <div className="flex flex-col gap-4 p-5">
@@ -658,7 +666,19 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
         onModelChange={handleModelChange}
         onThinkingChange={handleThinkingChange}
         contextUsage={contextUsage}
+        onDispatchingChange={setComposerDispatching}
       />
-    </>
+
+      {fileDrop.isOver && (
+        // 纯视觉提示：pointer-events-none 让拖放事件照常落到下面的区域上
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-2 z-50 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primary/60 bg-background/85 text-sm text-primary backdrop-blur-[1px]"
+        >
+          <Paperclip className="size-5" />
+          {t('chat.composer.dropFiles')}
+        </div>
+      )}
+    </div>
   );
 }

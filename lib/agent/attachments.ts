@@ -83,17 +83,72 @@ const IMAGE_MIME_TYPES = new Set([
   'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml',
 ]);
 
-export function getFileExtension(name: string): string {
+function getFileExtension(name: string): string {
   const dot = name.lastIndexOf('.');
   return dot >= 0 ? name.slice(dot).toLowerCase() : '';
 }
 
-export function isTextFile(name: string): boolean {
+function isTextFile(name: string): boolean {
   return TEXT_EXTENSIONS.has(getFileExtension(name));
 }
 
-export function isImageFile(file: File): boolean {
+function isImageFile(file: File): boolean {
   return IMAGE_MIME_TYPES.has(file.type);
+}
+
+// ─── File intake rules ───
+
+export type FileIntakeKind = 'image' | 'text';
+
+export type FileIntakeRejection =
+  | { file: File; reason: 'no-image-model' }
+  | { file: File; reason: 'too-large'; maxSize: number }
+  | { file: File; reason: 'unsupported' };
+
+export interface FileIntakePlan {
+  /** 通过校验、且占到了名额的文件，保持传入顺序。 */
+  accepted: Array<{ file: File; kind: FileIntakeKind }>;
+  /** 类型 / 大小 / 模型能力不合格的文件（不占名额）。 */
+  rejected: FileIntakeRejection[];
+  /** 本身合格、但名额已满而没有加入的文件数。 */
+  skipped: number;
+}
+
+/**
+ * 判定一批文件（点击上传 / 粘贴 / 拖放共用）能加入哪些附件。纯规则，不读文件内容。
+ * 按传入顺序逐个判定，只有合格的文件占名额——前面一个不支持的文件不会挤掉后面合格的。
+ */
+export function planFileIntake(
+  files: readonly File[],
+  { remaining, supportsImage }: { remaining: number; supportsImage: boolean },
+): FileIntakePlan {
+  const plan: FileIntakePlan = { accepted: [], rejected: [], skipped: 0 };
+  for (const file of files) {
+    let kind: FileIntakeKind;
+    if (isImageFile(file)) {
+      if (!supportsImage) {
+        plan.rejected.push({ file, reason: 'no-image-model' });
+        continue;
+      }
+      if (file.size > MAX_IMAGE_SIZE) {
+        plan.rejected.push({ file, reason: 'too-large', maxSize: MAX_IMAGE_SIZE });
+        continue;
+      }
+      kind = 'image';
+    } else if (isTextFile(file.name)) {
+      if (file.size > MAX_TEXT_FILE_SIZE) {
+        plan.rejected.push({ file, reason: 'too-large', maxSize: MAX_TEXT_FILE_SIZE });
+        continue;
+      }
+      kind = 'text';
+    } else {
+      plan.rejected.push({ file, reason: 'unsupported' });
+      continue;
+    }
+    if (plan.accepted.length < remaining) plan.accepted.push({ file, kind });
+    else plan.skipped++;
+  }
+  return plan;
 }
 
 // ─── Build LLM-ready content from attachments ───

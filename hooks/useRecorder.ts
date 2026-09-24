@@ -7,7 +7,7 @@
 // `stop()` returns a `Promise<void>` that resolves once the background has
 // finalized the recording. The captured session itself is NOT returned
 // from this hook — it flows through `recorderChannel.subscribeSession`
-// (see ChatInput) so that every consumer (manual stop button, send-time
+// (see useComposerAttachments) so that every consumer (manual stop button, send-time
 // auto-stop, cap-trigger) lands the session in attachments via the same
 // path. We arm a one-shot session listener internally only as the resolve
 // trigger; the BG fires it synchronously inside `recorder.stop()` so the
@@ -25,6 +25,9 @@ export interface UseRecorderResult {
    *  the latter case the button still renders as idle (clicking it just
    *  triggers a `recorder_start_rejected` toast). */
   isOwner: boolean;
+  /** 同 `isOwner`，但读 channel 的实时状态。跨 await 之后（如发送前等待文件读取）用它，
+   *  不要用闭包里那次渲染的 `isOwner`——等待期间录制可能已结束或换了归属。 */
+  isOwnerNow: () => boolean;
   /** Auto-stop reason from the background, if the recording was truncated. */
   truncated: 'event_limit' | 'time_limit' | undefined;
   /** Absolute timestamp the current/last recording started. Used for latching
@@ -36,10 +39,16 @@ export interface UseRecorderResult {
   start: () => void;
   /** Stop the active recording. Resolves once the background has finalized.
    *  The captured session is delivered via `recorderChannel.subscribeSession`
-   *  (consumed by ChatInput which appends it as a `RecordingAttachment`),
-   *  not as the return value here. Resolves immediately when not recording
+   *  (consumed by useComposerAttachments, which appends it as a `RecordingAttachment`),
+   *  not as the return value here. Resolves immediately when this instance
+   *  isn't recording (idle, or the recording belongs to another instance)
    *  or when the channel is disconnected. */
   stop: () => Promise<void>;
+}
+
+/** 当前录制是否由本实例发起。 */
+function ownsRecording(status: RecorderStatus): boolean {
+  return status.isRecording && status.initiatorInstanceId === myInstanceId;
 }
 
 // Module-level singleton: install the rejection toast subscription once,
@@ -91,16 +100,17 @@ export function useRecorder(): UseRecorderResult {
   const stop = useCallback((): Promise<void> => {
     if (pendingStopRef.current) return pendingStopRef.current;
 
-    // If the channel is disconnected or already idle, don't post a stop
-    // and don't make the caller wait.
+    // If the channel is disconnected, don't post a stop and don't make the
+    // caller wait.
     if (!recorderChannel.isConnected()) return Promise.resolve();
-    if (!recorderChannel.getStatus().isRecording) return Promise.resolve();
+    // 空闲或别的实例的录制：后台会忽略这次 stop，成品也只投递给发起方，等下去永远不会 resolve
+    if (!ownsRecording(recorderChannel.getStatus())) return Promise.resolve();
 
     const p = new Promise<void>((resolve) => {
       let done = false;
 
       // We use the session listener purely as a 'BG finished and delivered'
-      // signal. The session itself is consumed elsewhere (ChatInput's own
+      // signal. The session itself is consumed elsewhere (useComposerAttachments' own
       // subscribeSession effect appends it to attachments). The BG fires
       // its onRecordingFinished hook synchronously inside `recorder.stop()`,
       // and that delivery rides the same port as our stop ack, so it always
@@ -131,12 +141,12 @@ export function useRecorder(): UseRecorderResult {
   // Derive ownership: a recording is 'owned' iff its initiator instance id
   // matches ours. When another instance owns it, we render as idle —
   // clicking start triggers a BG rejection that we surface via toast above.
-  const isOwner =
-    status.isRecording
-    && status.initiatorInstanceId === myInstanceId;
+  const isOwner = ownsRecording(status);
+  const isOwnerNow = useCallback(() => ownsRecording(recorderChannel.getStatus()), []);
 
   return {
     isOwner,
+    isOwnerNow,
     truncated: status.truncated,
     startedAt: status.startedAt,
     start,

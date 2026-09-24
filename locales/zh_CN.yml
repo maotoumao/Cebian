@@ -611,14 +611,18 @@ chat:
     screenshotFailed: "截图失败"
     # $1 = 附件上限个数
     maxAttachments: "最多添加 $1 个附件"
-    # $1 = 实际添加的文件数
-    truncatedFiles: "仅添加前 $1 个文件，已达上限"
+    # $1 = 未添加的文件数
+    skippedAtLimit:
+      1: "已达附件上限，1 个文件未添加"
+      n: "已达附件上限，$1 个文件未添加"
     # $1 = 文件名，$2 = 体积上限（已格式化，如 “5 MB”）
     fileTooLarge: "$1 超过 $2 限制"
     # $1 = 文件名
     readFileFailed: "读取失败：$1"
     # $1 = 文件名
     unsupportedFileType: "不支持的文件类型：$1"
+    # 把文件拖到聊天页上方时显示的遮罩文字
+    dropFiles: "松开以添加附件"
     modelNoImage: "当前模型不支持多模态输入"
     imageStripped: "已移除图片附件——当前模型不支持多模态输入"
     noPrompts: "暂无 Prompt，前往 AI 配置创建"
@@ -1036,6 +1040,8 @@ errors:
   localFontsPermissionDenied: "读取本机字体的权限被拒绝。请在 Chrome 设置里允许 Cebian 使用本机字体，然后重试。"
   localFontsLoadFailed: "读取本机字体失败，请重试。"
   openTabFailed: "无法打开标签页，请重试。"
+  # $1 = 文件夹名
+  folderUnsupported: "不支持添加文件夹：$1"
   searchEngineGone: "找不到该搜索引擎。"
   searchEngineSaveFailed: "保存搜索引擎设置失败，请重试。"
   # $1 = 搜索词占位符字面量（“{query}”）

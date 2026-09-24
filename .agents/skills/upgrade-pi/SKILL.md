@@ -29,6 +29,14 @@ description: 升级pi-agent-core和pi-ai到最新版本
    - `Type` / `Static` / `TSchema`：[lib/tools/*](../../../lib/tools)、[lib/mcp/client.ts](../../../lib/mcp/client.ts) 里的 `typebox/value` 校验器。
    - agent runtime：[hooks/useBackgroundAgent.ts](../../../hooks/useBackgroundAgent.ts)、[lib/agent/](../../../lib/agent)、`AgentTool` 协议（tool 抛错=失败、返回=成功）。
 
+4. **本地模型目录补丁要随升级清理**。pi 暂停在 0.84.4 期间（harness Session 层重写未稳定），新模型靠 [lib/providers/model-catalog-patch.json](../../../lib/providers/model-catalog-patch.json) 补进内置目录，合并入口是 [lib/providers/builtin-models.ts](../../../lib/providers/builtin-models.ts)。升级 pi 后：
+   - 跑 [lib/providers/builtin-models.test.ts](../../../lib/providers/builtin-models.test.ts)，它会列出已被上游收录的补丁条目、已被上游删除的 hidden 条目，按提示逐条删除。
+   - `models` 与 `hidden` 都清空后，删除这三个文件，把调用方的 `@/lib/providers/builtin-models` import 改回 `@earendil-works/pi-ai/providers/all`（`resolve-model`、`usable-models`、`oauth/copilot` 与两份测试，`ModelSelector`、`ProviderSummary`、`ProviderApiKeyItem`）。
+   - 升级到补丁来源版本（`model-catalog-patch.json` 的 `sourceVersion`）或更新时，测试会直接要求删除整份补丁——那时上游目录已包含（或有意删除了）这些条目。
+   - 删除补丁时顺手改掉 `lib/providers/oauth/copilot.ts` 里 `enableAllCopilotModels` 注释中「pi 目录 + 本地补丁」的说法（改为「取自 pi 内置 Copilot 目录」即可）。
+   - 补丁对上游的唯一偏离：Codex 的 GPT-6 Sol / Luna 把 `thinkingLevelMap.off` 改成了 `null`（0.84.4 的 Codex 适配器选 off 时不发送 effort，0.86.0 修复）。若升到 0.86.x–0.87.0 时补丁仍在，测试会要求把它改回 `'none'`。
+   - 已知上游行为（非补丁偏离，已核实至 0.87.1，后续升级时重新核对）：Copilot 下的 GPT-6 Sol / Luna 可选「关闭思考」，但 Responses 适配器对 `github-copilot` 不发送 `effort: "none"`，由 Copilot 服务端决定；Copilot 的 Gemini 条目 `supportsReasoningEffort: false`，思考档不生效。
+
 ## 工作流
 
 1. `pnpm outdated` 看两个包的 Current / Latest。

@@ -79,6 +79,15 @@ export const recorderChannel = {
 
   /** Background delivered the recorded session after a successful stop. */
   publishSession(s: RecordedSession): void {
+    // 成品送达即说明这一轮录制已经结束。后台紧接着才广播当前状态（没有新一轮时即 idle），这之间若有人读
+    // getStatus()（如发送前等待文件读取后判断归属），会误以为还在录制，进而发出一个
+    // 后台会忽略的 stop、永远等不到成品。所以这里先就地修正同步读取用的缓存；订阅方
+    // 仍以后台随后的状态广播为准，不在这里多触发一次渲染。
+    // 只改同一轮：后台 finalize 等 detach 期间可能已有新一轮开始，迟到的旧成品不能把
+    // 新一轮标成空闲（startedAt 与状态广播同源，可作这一轮的标识）。
+    if (lastStatus.isRecording && lastStatus.startedAt === s.startedAt) {
+      lastStatus = { ...lastStatus, isRecording: false, initiatorInstanceId: null };
+    }
     for (const l of sessionListeners) {
       try { l(s); } catch (err) { console.warn('[recorderChannel] session listener threw:', err); }
     }

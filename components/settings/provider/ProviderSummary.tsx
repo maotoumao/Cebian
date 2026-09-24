@@ -1,4 +1,4 @@
-import { getBuiltinModels, type BuiltinProvider } from '@earendil-works/pi-ai/providers/all';
+import { getBuiltinModels, type BuiltinProvider } from '@/lib/providers/builtin-models';
 import type { Api, Model } from '@earendil-works/pi-ai';
 import type { ProviderCredential, CustomProviderConfig } from '@/lib/persistence/storage';
 import { isCustomProvider, findCustomProvider, getCustomModels } from '@/lib/providers/custom-models';

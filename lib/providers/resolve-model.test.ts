@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getBuiltinModels, type BuiltinProvider } from '@earendil-works/pi-ai/providers/all';
+import { getBuiltinModels, type BuiltinProvider } from '@/lib/providers/builtin-models';
 import type { Api, Model } from '@earendil-works/pi-ai';
 import { resolveModel } from '@/lib/providers/resolve-model';
 import { customProviderKey } from '@/lib/providers/custom-models';

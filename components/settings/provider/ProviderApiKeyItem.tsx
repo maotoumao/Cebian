@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { Unplug, Save } from "lucide-react";
 import { complete } from "@earendil-works/pi-ai/compat";
-import { getBuiltinModels, type BuiltinProvider } from "@earendil-works/pi-ai/providers/all";
+import { getBuiltinModels, type BuiltinProvider } from '@/lib/providers/builtin-models';
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";

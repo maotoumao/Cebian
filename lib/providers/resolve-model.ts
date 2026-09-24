@@ -1,5 +1,5 @@
 import type { Api, Model } from '@earendil-works/pi-ai';
-import { getBuiltinModels, type BuiltinProvider } from '@earendil-works/pi-ai/providers/all';
+import { getBuiltinModels, type BuiltinProvider } from '@/lib/providers/builtin-models';
 import type {
   ModelIdentity,
   ProviderCredentials,

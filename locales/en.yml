@@ -615,14 +615,18 @@ chat:
     screenshotFailed: "Screenshot failed"
     # $1 = max attachment count
     maxAttachments: "Up to $1 attachments"
-    # $1 = number of files actually added
-    truncatedFiles: "Only added the first $1 file(s); limit reached"
+    # $1 = number of files not added
+    skippedAtLimit:
+      1: "Attachment limit reached; 1 file not added"
+      n: "Attachment limit reached; $1 files not added"
     # $1 = file name, $2 = size limit (formatted, e.g. "5 MB")
     fileTooLarge: "$1 exceeds $2"
     # $1 = file name
     readFileFailed: "Failed to read: $1"
     # $1 = file name
     unsupportedFileType: "Unsupported file type: $1"
+    # Overlay shown while files are dragged over the chat page
+    dropFiles: "Drop to attach files"
     modelNoImage: "Current model doesn't support multimodal input"
     imageStripped: "Removed image attachments — the current model doesn't support multimodal input"
     noPrompts: "No prompts yet — create one from AI config"
@@ -1049,6 +1053,8 @@ errors:
   localFontsPermissionDenied: "Access to installed fonts is blocked. Allow it for Cebian in Chrome settings, then try again."
   localFontsLoadFailed: "Couldn't read installed fonts. Try again."
   openTabFailed: "Couldn't open the tab. Try again."
+  # $1 = folder name
+  folderUnsupported: "Folders can't be attached: $1"
   searchEngineGone: "This search engine no longer exists."
   searchEngineSaveFailed: "Could not save the search engine settings. Try again."
   # $1 = the literal query placeholder ("{query}")

@@ -44,3 +44,6 @@ site/mockup/
 
 # Private notes folder, never committed (root only — must NOT match site/src/content/docs/)
 /docs/
+
+# 本地临时产物（patch 等）
+/tmp/
