@@ -3,7 +3,7 @@
 // 把 `lib/speech/recognition.ts` 的纯逻辑包成 React 状态机，供 MicButton
 // 使用。职责边界：
 //  - 本 hook 只管「识别会话生命周期 + 状态」。麦克风授权的探测与引导由
-//    调用方（MicButton）用 `lib/speech/mic-permission.ts` 处理，再调用
+//    调用方（MicButton）用 `lib/ui/user-permission.ts` 处理，再调用
 //    `start()`——所以 `start()` 假定已授权。
 //  - 识别路径由 `mode` 决定，默认 `auto`：本地优先、云端兜底。本地可用走本地
 //    （隐私、离线、免费），本地不可用（如 Edge 对所有语言都 `unavailable`）退到

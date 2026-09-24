@@ -36,8 +36,9 @@ import { recorderChannel } from '@/lib/recorder/sidepanel-channel';
 import { useRecorder } from '@/hooks/useRecorder';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { appendTranscript, cleanTranscript } from '@/lib/speech/transcript';
-import { queryMicPermission, openMicPermissionPage, openSystemMicSettings } from '@/lib/speech/mic-permission';
+import { openPermissionPage, openPermissionSettings, queryPermission } from '@/lib/ui/user-permission';
 import { useMobileEmulation } from '@/hooks/useMobileEmulation';
+import { useChatAppearance } from '@/hooks/useChatAppearance';
 import { downloadFile, formatDuration, formatCompactCount, formatBytes } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 import type { PromptDispatchResult } from '@/hooks/useBackgroundAgent';
@@ -87,6 +88,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   // 文字便从标记右侧接着流，换行后第二行自动回到整宽。
   const slashPillRef = useRef<HTMLSpanElement>(null);
   const [slashPillWidth, setSlashPillWidth] = useState(0);
+  // 只用来触发重新测量高度：字号 / 字体变了，行数与行高随之变，但 value 一个字没动
+  const appearance = useChatAppearance();
   // 选中一条提示词要 await 读 VFS + 采集模板变量（页面脚本注入、剪贴板），期间用户可能
   // 已经切了会话、又点了另一条、把已挂的标记退格摘掉，或者干脆已经把消息发出去了。
   // 这四处都自增，选中落定前比对世代号，过期的结果直接丢弃。
@@ -236,8 +239,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   const handleSpeechError = useCallback((kind: string) => {
     switch (kind) {
       case 'not-allowed':
-        toast.info(t('chat.composer.voiceNeedPermission'));
-        openMicPermissionPage();
+        void openPermissionPage('microphone').then((opened) => {
+          if (opened) toast.info(t('chat.composer.voiceNeedPermission'));
+        });
         break;
       case 'language-unavailable':
         toast.error(t('chat.composer.voiceLanguageUnavailable'));
@@ -278,20 +282,22 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       speech.stop();
       return;
     }
-    const perm = await queryMicPermission();
+    const perm = await queryPermission('microphone');
     if (perm === 'granted' || perm === 'unknown') {
       // unknown：无法探测，乐观尝试；若实际未授权，识别会回 not-allowed 走引导。
       void speech.start();
       return;
     }
     if (perm === 'denied') {
-      toast.error(t('chat.composer.voiceDenied'));
-      openSystemMicSettings();
+      void openPermissionSettings('microphone').then((opened) => {
+        if (opened) toast.error(t('chat.composer.voiceDenied'));
+      });
       return;
     }
     // prompt：尚未授权，打开授权页让用户在普通标签页完成一次授权。
-    toast.info(t('chat.composer.voiceNeedPermission'));
-    openMicPermissionPage();
+    void openPermissionPage('microphone').then((opened) => {
+      if (opened) toast.info(t('chat.composer.voiceNeedPermission'));
+    });
   }, [speechActive, finalizePendingInterim, speech]);
 
   /** 输入框滚动时把标记一并带走。它绝对定位在容器上、不跟随文本滚动，不同步就会
@@ -323,7 +329,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     syncSlashPillOffset();
     // 也要盯着 `slashPillWidth`：标记挂上/摘掉会改变 `text-indent`，首行随之重排、
     // 行数可能变，但 value 一个字都没动——只看 value 的话高度就停在旧值上了。
-  }, [value, slashPillWidth, syncSlashPillOffset]);
+    // `appearance` 同理：在设置里调字号 / 字体时输入框里可能正留着草稿。
+  }, [value, slashPillWidth, syncSlashPillOffset, appearance]);
 
   // 标记宽度只能实测：提示词名字的长度、界面字体、侧边栏宽度（`max-w-[45%]` 截断）
   // 都会改变它，写死任何常量都会让首行文字与标记错位。ResizeObserver 覆盖字体加载
@@ -1122,7 +1129,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
               // `top-2 / left-3` 对齐 textarea 的 `py-2 / px-3`；字号行高与首行文字
               // 完全一致，标记的盒高因此正好是一个行框，天然坐在首行上。
               // `max-w-[45%]` 保证名字再长，首行也总还有地方写字。
-              className="pointer-events-none absolute top-2 left-3 max-w-[45%] truncate rounded-md bg-primary/10 px-1.5 font-mono text-[0.85rem] leading-relaxed text-primary"
+              className="pointer-events-none absolute top-2 left-3 max-w-[45%] truncate rounded-md bg-primary/10 px-1.5 font-mono chat-text-input leading-relaxed text-primary"
             >
               /{slashPrompt.name}
             </span>
@@ -1138,7 +1145,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             placeholder={t('chat.composer.placeholder')}
             disabled={isDispatching}
             style={slashPrompt && slashPillWidth ? { textIndent: slashPillWidth } : undefined}
-            className="w-full bg-transparent border-none outline-none resize-none text-foreground text-[0.85rem] px-3 py-2 min-h-13 max-h-37.5 leading-relaxed placeholder:text-muted-foreground/50"
+            className="w-full bg-transparent border-none outline-none resize-none text-foreground chat-text-input chat-font px-3 py-2 min-h-13 max-h-37.5 leading-relaxed placeholder:text-muted-foreground/50"
           />
         </div>
 

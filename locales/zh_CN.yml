@@ -138,6 +138,7 @@ settings:
     providers: "AI 提供商"
     mcp: "MCP 服务器"
     chat: "对话"
+    appearance: "外观"
     prompts: "提示词"
     skills: "技能"
     memory: "记忆"
@@ -239,6 +240,34 @@ settings:
       label: "工具条模型"
       hint: "划词工具条使用的模型。通常选择速度快、成本低的模型即可，默认与对话模型相同。"
       followMain: "与对话模型相同"
+  appearance:
+    title: "外观"
+    theme:
+      label: "主题"
+      system: "跟随系统"
+      light: "浅色"
+      dark: "深色"
+    fontScale:
+      label: "对话字号"
+      hint: "缩放对话中的消息和输入框，工具卡片等其余界面保持原样。"
+      # $1 = 缩放百分比
+      value: "$1%"
+    font:
+      label: "对话字体"
+      default: "默认"
+      serif: "衬线"
+      mono: "等宽"
+      custom: "自定义"
+      customHint: "从本机已安装的字体中选择。首次使用时会打开一个标签页，请求读取本机字体的权限。"
+      needPermission: "需要读取本机字体的权限——请在刚打开的标签页里授权，然后再点开字体列表。"
+      pickerPlaceholder: "选择字体…"
+      searchPlaceholder: "搜索字体…"
+      loading: "正在读取本机字体…"
+      notFound: "没有找到字体"
+    preview:
+      label: "预览"
+      question: "怎样让对话文字更易读？"
+      answer: "调整上方的字号和字体，改动会立即应用到所有对话。"
   chat:
     title: "对话"
     instructions:
@@ -981,6 +1010,16 @@ permission:
     denied: "麦克风权限被拒绝了。"
     deniedHint: "要使用语音输入，请在刚打开的 Chrome 设置页里允许 Cebian 使用麦克风。"
     deviceError: "没有找到麦克风，或无法访问。请检查设备后重试。"
+  localFonts:
+    title: "请求读取本机字体"
+    description: "自定义对话字体需要读取本机已安装的字体。点击下面的按钮，然后在浏览器弹窗中选择「允许」。"
+    allow: "允许读取字体"
+    requesting: "等待你的选择…"
+    granted: "已获得本机字体权限，此标签页将自动关闭。"
+    dismissed: "请求被关闭了，可以重新尝试。"
+    denied: "读取本机字体的权限被拒绝了。"
+    deniedHint: "要自定义对话字体，请在刚打开的 Chrome 设置页里允许 Cebian 使用本机字体。"
+    failed: "读取本机字体失败，请重试。"
 
 # ─── 错误（toast、抛出的错误信息）───
 errors:
@@ -993,6 +1032,10 @@ errors:
   pageActionGone: "找不到该操作。"
   pageActionSaveFailed: "保存失败，请重试。"
   compactionSettingsSaveFailed: "保存上下文压缩设置失败，请重试。"
+  appearanceSaveFailed: "保存外观设置失败，请重试。"
+  localFontsPermissionDenied: "读取本机字体的权限被拒绝。请在 Chrome 设置里允许 Cebian 使用本机字体，然后重试。"
+  localFontsLoadFailed: "读取本机字体失败，请重试。"
+  openTabFailed: "无法打开标签页，请重试。"
   searchEngineGone: "找不到该搜索引擎。"
   searchEngineSaveFailed: "保存搜索引擎设置失败，请重试。"
   # $1 = 搜索词占位符字面量（“{query}”）

@@ -164,6 +164,30 @@
   }
 }
 
+/* 对话区外观（设置 → 外观）。倍率与字体来自容器上的局部变量（lib/ui/chat-appearance.ts）；
+ * 没挂变量的上下文（如 VFS 预览复用 MarkdownRenderer）按 1 倍、继承字体渲染，保持原样。
+ * 每处保留自己的原始基准字号再乘倍率，而不是统一成一个字号或改用 em（嵌套会层层缩小）。 */
+@utility chat-text-body {
+  /* 用户消息、AI 回复正文 */
+  font-size: calc(0.9rem * var(--chat-text-scale, 1));
+}
+@utility chat-text-input {
+  /* 输入框（及其首行的提示词标记，二者必须同字号才能对齐） */
+  font-size: calc(0.85rem * var(--chat-text-scale, 1));
+}
+@utility chat-text-code {
+  /* Markdown 代码块与行内代码 */
+  font-size: calc(0.8rem * var(--chat-text-scale, 1));
+}
+@utility chat-text-small {
+  /* 思考过程正文、Markdown 表格。只设字号、不带行高：表格需保持与 text-xs 相同的行高
+   * calc(1/0.75)，由 MarkdownRenderer 的 table 自行补上 */
+  font-size: calc(0.75rem * var(--chat-text-scale, 1));
+}
+@utility chat-font {
+  font-family: var(--chat-font-family, inherit);
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

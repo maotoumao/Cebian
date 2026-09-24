@@ -22,15 +22,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - 新增「设置 → 对话 → 自动压缩超长对话」：可开关自动压缩，并用滑杆调整触发阈值（占模型上下文窗口的百分比，默认 80%）。此前触发点写死为「窗口 − 16384 token」，换算成百分比会随窗口漂移——128k 模型 87%、1M 模型要到 98.4% 才压，基本等于压不到就已经撑爆 ([#72](https://github.com/maotoumao/Cebian/issues/72))
 - 输入框右下角新增上下文用量环：一眼看出当前会话占了模型上下文窗口的多少，点开显示已用 / 总量、自动压缩的触发比例；用量逼近压缩点时环会变色。数字与自动压缩用的是同一套估算，界面上的占用就是压缩判据比较的那个值
+- 新增「设置 → 外观」：可调整对话字号（80%–150%）和对话字体（默认 / 衬线 / 等宽，浏览器支持读取本机字体时还可从本机已安装的字体中选择），只作用于消息与输入框，工具卡片等其余界面保持原样，并带实时预览；主题也可在这里直接选择跟随系统、浅色或深色 ([#75](https://github.com/maotoumao/Cebian/issues/75))
 
 - Added Settings → Chat → Auto-compact long chats: a switch for automatic compaction plus a slider for the trigger threshold (a percentage of the model's context window, 80% by default). The trigger used to be hard-coded at "window − 16384 tokens", which drifts with window size — 87% on a 128k model but 98.4% on a 1M one, so large-window models would blow past the limit before compaction ever ran ([#72](https://github.com/maotoumao/Cebian/issues/72))
 - Added a context-usage ring next to the composer: see at a glance how much of the model's context window the current chat is using, and click it for the exact amount and the threshold at which earlier history is compacted. The ring changes colour as usage approaches that threshold. It reports the same estimate automatic compaction uses, so the number on screen is exactly the one the threshold is compared against
+- Added Settings → Appearance: adjust the chat font size (80%–150%) and chat font (default / serif / monospace, or — where the browser can read installed fonts — any font installed on your device). It applies to messages and the input box only, leaving tool cards and the rest of the interface unchanged, and comes with a live preview. The theme can also be picked here directly: system, light or dark ([#75](https://github.com/maotoumao/Cebian/issues/75))
+
+### 变更 / Changed
+
+- 语音输入需要授权时，重复点击麦克风不再叠开多个授权页或 Chrome 设置页，而是切回已经打开的那个；标签页打不开时会给出提示
+
+- When voice input needs permission, clicking the mic again no longer stacks up duplicate permission or Chrome settings tabs — it switches back to the one already open, and shows a message if the tab can't be opened
 
 ### 修复 / Fixed
 
 - 修复长会话在上下文写满后彻底卡死、已完成的工作全部白费的问题：AI 连续调用工具收集内容时，现在会在轮次中途自动压缩上下文，而不是只在用户发下一条消息前才压；压缩摘要生成失败时也不再原样重发整段超长上下文（那必然再次报错），改为丢弃最早的历史并在对话里标出；确实压不动时 AI 会主动暂停并说明原因，而不是反复报错。另外修正了中文内容的上下文用量估算——此前按英文经验值估算，中文被低估 2.7–4 倍，导致压缩触发过晚 ([#72](https://github.com/maotoumao/Cebian/issues/72))
+- 修复在新设备上用「合并」方式恢复备份时，对话自定义指引、主题、模型、思考档位、自动压缩、页面交互等设置全部没有恢复的问题：合并现在会把本地从未设置过的项从备份补上，本地已经设置过的仍保留本地 ([#76](https://github.com/maotoumao/Cebian/issues/76))
 
 - Fixed long chats wedging permanently once the context filled up, losing all the work already done. While the AI is making back-to-back tool calls, the context is now compacted mid-turn instead of only before the user's next message; when summarization fails, the over-long context is no longer resent verbatim (which could only fail again) — the earliest history is dropped and marked in the transcript instead; and when nothing can be compacted any further the AI pauses itself and explains why instead of failing over and over. Context-usage estimates for Chinese text were also corrected — they previously used an English-tuned heuristic that underestimated Chinese by 2.7–4×, so compaction triggered far too late ([#72](https://github.com/maotoumao/Cebian/issues/72))
+- Fixed restoring a backup with "Merge" on a new device leaving custom chat instructions, theme, model, thinking level, auto-compaction, page-interaction and similar settings unrestored. Merge now fills in any setting that was never set locally from the backup, while settings you have already changed locally still keep their local value ([#76](https://github.com/maotoumao/Cebian/issues/76))
 
 ## 1.7.1 - 2026-09-15
 

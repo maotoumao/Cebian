@@ -68,7 +68,7 @@ function CodeBlock({ node, children }: { node?: HastElement; children?: ReactNod
         <span className="font-mono">{lang || t('common.code')}</span>
         <CopyButton text={text} />
       </div>
-      <pre className="overflow-x-auto px-3 pb-3 text-[0.8rem]">
+      <pre className="overflow-x-auto px-3 pb-3 chat-text-code">
         {children}
       </pre>
     </div>
@@ -613,7 +613,7 @@ const components: Components = {
       );
     }
     return (
-      <code className="rounded bg-accent/50 px-1.5 py-0.5 text-[0.8rem] font-mono" {...props}>
+      <code className="rounded bg-accent/50 px-1.5 py-0.5 chat-text-code font-mono" {...props}>
         {children}
       </code>
     );
@@ -622,7 +622,7 @@ const components: Components = {
   // Table — horizontal-scroll wrapper with subtle container border
   table: ({ children, ...props }) => (
     <div className="overflow-x-auto border border-border/50 rounded-md my-3">
-      <table className="w-full text-xs border-collapse" {...props}>
+      <table className="w-full chat-text-small leading-[calc(1/0.75)] border-collapse" {...props}>
         {children}
       </table>
     </div>

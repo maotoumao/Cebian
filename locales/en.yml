@@ -142,6 +142,7 @@ settings:
     providers: "AI providers"
     mcp: "MCP Servers"
     chat: "Chat"
+    appearance: "Appearance"
     prompts: "Prompts"
     skills: "Skills"
     memory: "Memory"
@@ -243,6 +244,34 @@ settings:
       label: "Toolbar model"
       hint: "The model used by all toolbar actions. A fast, low-cost model is usually enough. Defaults to the conversation model."
       followMain: "Same as conversation model"
+  appearance:
+    title: "Appearance"
+    theme:
+      label: "Theme"
+      system: "System"
+      light: "Light"
+      dark: "Dark"
+    fontScale:
+      label: "Chat font size"
+      hint: "Scales messages and the input box. Tool cards and the rest of the interface keep their size."
+      # $1 = scale percentage
+      value: "$1%"
+    font:
+      label: "Chat font"
+      default: "Default"
+      serif: "Serif"
+      mono: "Monospace"
+      custom: "Custom"
+      customHint: "Choose from the fonts installed on this device. The first time, Cebian opens a tab to ask for permission to read them."
+      needPermission: "Permission to read installed fonts is needed — grant it in the tab that just opened, then open the font list again."
+      pickerPlaceholder: "Choose a font…"
+      searchPlaceholder: "Search fonts…"
+      loading: "Reading installed fonts…"
+      notFound: "No fonts found"
+    preview:
+      label: "Preview"
+      question: "How can I make chat text easier to read?"
+      answer: "Adjust the font size and font above. Changes apply to all chats right away."
   chat:
     title: "Chat"
     instructions:
@@ -994,6 +1023,16 @@ permission:
     denied: "Microphone access was blocked."
     deniedHint: "To use voice input, allow the microphone for Cebian in Chrome settings — it just opened in a new tab."
     deviceError: "No microphone was found, or it couldn't be accessed. Check your device and try again."
+  localFonts:
+    title: "Request access to installed fonts"
+    description: "Cebian needs to read the fonts installed on this device so you can pick a custom chat font. Click the button below, then choose Allow in the browser prompt."
+    allow: "Allow access to fonts"
+    requesting: "Waiting for your response…"
+    granted: "Access to installed fonts granted. This tab will close automatically."
+    dismissed: "The request was dismissed. You can try again."
+    denied: "Access to installed fonts was blocked."
+    deniedHint: "To pick a custom chat font, allow installed fonts for Cebian in Chrome settings — it just opened in a new tab."
+    failed: "Couldn't read installed fonts. Try again."
 
 # ─── Errors (toasts, thrown messages) ───
 errors:
@@ -1006,6 +1045,10 @@ errors:
   pageActionGone: "This action no longer exists."
   pageActionSaveFailed: "Could not save the action."
   compactionSettingsSaveFailed: "Could not save the compaction settings. Try again."
+  appearanceSaveFailed: "Could not save the appearance settings. Try again."
+  localFontsPermissionDenied: "Access to installed fonts is blocked. Allow it for Cebian in Chrome settings, then try again."
+  localFontsLoadFailed: "Couldn't read installed fonts. Try again."
+  openTabFailed: "Couldn't open the tab. Try again."
   searchEngineGone: "This search engine no longer exists."
   searchEngineSaveFailed: "Could not save the search engine settings. Try again."
   # $1 = the literal query placeholder ("{query}")

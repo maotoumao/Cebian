@@ -14,6 +14,7 @@ import {
   compactionModel,
   compactionSettings,
   autoTitleSettings,
+  chatAppearance,
   customProviders,
   userInstructions,
   themePreference,
@@ -52,7 +53,7 @@ export type StorageClass = 'settings' | 'credentials' | 'exclude';
  * `restoreSecret` 在恢复 credentials 分类时，把备份 secret 按策略写进本地完整值。
  * `fillMissing` 是合并模式的「补缺」钩子，与 storageClass 解耦：credentials 类 item 必
  * 须声明；settings 类的列表项（customProviders / mcpServers）可选声明以获得「按 id
- * 补缺」；未声明的标量 settings 项在 merge 下保留本地。
+ * 补缺」；未声明的标量 settings 项在 merge 下仅在本地从未写过时从备份补入，否则保留本地。
  */
 export interface BackupEntry<T> {
   item: WxtStorageItem<T, any>;
@@ -281,6 +282,8 @@ export const BACKUP_REGISTRY: BackupEntry<any>[] = [
   entry({ item: compactionModel, storageClass: 'settings' }),
   entry({ item: compactionSettings, storageClass: 'settings' }),
   entry({ item: autoTitleSettings, storageClass: 'settings' }),
+  // 对话区外观（字号 / 字体，无密钥）。无 fillMissing：merge 下本地没存过才从备份补入整个对象。
+  entry({ item: chatAppearance, storageClass: 'settings' }),
   entry({
     item: customProviders,
     storageClass: 'settings',
@@ -325,7 +328,7 @@ export const BACKUP_REGISTRY: BackupEntry<any>[] = [
     fillMissing: (local: WebDavConfig | null, backup: WebDavConfig | null) =>
       local ?? backup,
   }),
-  // 记忆系统设置（仅开关，无密钥）。merge 恢复时保留本地开关状态（无 fillMissing）。
+  // 记忆系统设置（仅开关，无密钥）。无 fillMissing：merge 恢复时本地设置过则保留本地开关状态。
   entry({ item: memorySettings, storageClass: 'settings' }),
   entry({ item: memoryOrganizeState, storageClass: 'exclude' }),
   // 页面交互设置（悬浮球 / 划词工具条开关 + 工具条模型 + 翻译目标 + 页面生效范围；无密钥）。

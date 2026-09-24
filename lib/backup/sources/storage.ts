@@ -9,6 +9,7 @@
 // 分两步：先按 storageClass 写 safe（settings），再把 secret 写回（credentials），
 // 二者解耦，故 credentials-only 恢复也能补回密钥。
 
+import { storage } from '#imports';
 import { BACKUP_REGISTRY } from '../registry';
 import type { RestoreStrategy } from '../types';
 
@@ -87,8 +88,9 @@ export async function collectStorage(opts: {
  * 1. 普通设置（settings-class，含混合 item 的 safe 配置）：
  *    - `replace`：用备份 safe 覆盖（config 视为不可信输入，混合 item 先重新剥一次，
  *      丢弃任何残留密钥，只写 safe，token 留空）。
- *    - `merge`：仅对声明了 `fillMissing` 的 item（列表型，如 customProviders /
- *      mcpServers）按 id 补缺；未声明的标量项保留本地、不写。
+ *    - `merge`：声明了 `fillMissing` 的 item（列表型，如 customProviders /
+ *      mcpServers）按 id 补缺；未声明的标量项仅在本地从未写过时从备份补入，
+ *      本地已有值则保留本地。
  * 2. 密钥（随 credentials 分类，独立于 settings）：
  *    - credentials-class item：`replace` 覆盖；`merge` 调 `fillMissing` 补缺。
  *    - 混合 item（settings-class 但 secret 在 credentials.json）：调 `restoreSecret`
@@ -106,8 +108,9 @@ export async function restoreStorage(
 
   // ── 步骤 1：写 settings 的 safe 配置 ──
   // replace：用备份 safe 覆盖。
-  // merge：仅对声明了 `fillMissing` 的 item 做「按 id 补缺」（如 customProviders /
-  //        mcpServers 列表）；未声明的标量（theme / thinkingLevel 等）保留本地、不写。
+  // merge：声明了 `fillMissing` 的 item 做「按 id 补缺」（如 customProviders /
+  //        mcpServers 列表）；未声明的标量（theme / userInstructions 等）按「本地缺才补」：
+  //        本地从未写过该 key（全新安装）则写入备份值，本地已有值则保留本地。
   if (plan.settings) {
     for (const entry of BACKUP_REGISTRY) {
       if (entry.storageClass !== 'settings') continue;
@@ -124,6 +127,13 @@ export async function restoreStorage(
         // 合并：本地优先、按 id 补缺备份里多出来的。
         const local = await entry.item.getValue();
         await entry.item.setValue(entry.fillMissing(local, backupSafe));
+        settingsWritten++;
+      } else if (backupSafe != null && (await storage.getItem(key)) === null) {
+        // 标量补缺：不带 fallback 读原始值，null 即本地没有存值（从未写过，或本地被设为
+        // null——WXT 写 null 等于删 key）。不能用 item.getValue() 判断——它会返回
+        // fallback，分不清「没设置过」与「主动选了默认值」。备份值为 null 时写入等于删
+        // key，是空操作，直接跳过。
+        await entry.item.setValue(backupSafe);
         settingsWritten++;
       }
     }

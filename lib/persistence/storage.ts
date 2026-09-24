@@ -217,6 +217,71 @@ export const autoTitleSettings = storage.defineItem<AutoTitleSettings>(
   { fallback: { ...DEFAULT_AUTO_TITLE } },
 );
 
+/** 对话区字体预设；`custom` 表示使用用户选择的本机字体。 */
+export type ChatFontPreset = 'default' | 'serif' | 'mono' | 'custom';
+
+/**
+ * 对话区外观：只作用于对话阅读区（用户消息、AI 回复、思考过程、输入框），不缩放工具卡片、
+ * 顶栏等界面框架。
+ * - `fontScalePercent`：相对各处原始字号的百分比。100 = 各处保持原始字号；每处文字按
+ *   自己的基准同比缩放，而不是统一成一个字号。
+ * - `fontPreset`：字体预设；`custom` 时使用 `customFontName`（本机已安装字体名，找不到时浏览器
+ *   自动回退系统字体）。切回预设时保留 `customFontName`，再切回 custom 不用重选。
+ */
+export interface ChatAppearance {
+  /** 80–150 且为 5 的倍数，由 {@link resolveChatAppearance} 保证。 */
+  fontScalePercent: number;
+  fontPreset: ChatFontPreset;
+  /** 已去首尾空白、截断到 {@link MAX_CUSTOM_FONT_NAME_LENGTH}（截断后再去尾部空白）。CSS 转义在渲染边界做。 */
+  customFontName: string;
+}
+
+const DEFAULT_CHAT_APPEARANCE: ChatAppearance = {
+  fontScalePercent: 100,
+  fontPreset: 'default',
+  customFontName: '',
+};
+export const MIN_CHAT_FONT_SCALE_PERCENT = 80;
+export const MAX_CHAT_FONT_SCALE_PERCENT = 150;
+export const CHAT_FONT_SCALE_STEP = 5;
+export const MAX_CUSTOM_FONT_NAME_LENGTH = 64;
+const CHAT_FONT_PRESETS: readonly ChatFontPreset[] = ['default', 'serif', 'mono', 'custom'];
+
+/**
+ * 取规范的对话区外观：缺字段补默认（WXT fallback 只在 key 整体缺失时生效），并校验值域。
+ * 该项参与备份恢复，恢复会把备份 JSON 原样写回，所以这里是防线，滑杆范围不是。
+ * 所有读取对话区外观的地方都走这里。
+ */
+export function resolveChatAppearance(
+  s: Partial<ChatAppearance> | null | undefined,
+): ChatAppearance {
+  // 只认有限数字：null / '' / 数组经 Number() 会变 0，被夹成最小值而不是退回默认
+  const rawScale = s?.fontScalePercent;
+  const fontScalePercent =
+    typeof rawScale === 'number' && Number.isFinite(rawScale)
+      ? Math.min(
+          MAX_CHAT_FONT_SCALE_PERCENT,
+          Math.max(
+            MIN_CHAT_FONT_SCALE_PERCENT,
+            Math.round(rawScale / CHAT_FONT_SCALE_STEP) * CHAT_FONT_SCALE_STEP,
+          ),
+        )
+      : DEFAULT_CHAT_APPEARANCE.fontScalePercent;
+  const fontPreset = CHAT_FONT_PRESETS.includes(s?.fontPreset as ChatFontPreset)
+    ? (s!.fontPreset as ChatFontPreset)
+    : DEFAULT_CHAT_APPEARANCE.fontPreset;
+  const customFontName =
+    typeof s?.customFontName === 'string'
+      ? s.customFontName.trim().slice(0, MAX_CUSTOM_FONT_NAME_LENGTH).trimEnd()
+      : DEFAULT_CHAT_APPEARANCE.customFontName;
+  return { fontScalePercent, fontPreset, customFontName };
+}
+
+export const chatAppearance = storage.defineItem<ChatAppearance>(
+  'local:chatAppearance',
+  { fallback: { ...DEFAULT_CHAT_APPEARANCE } },
+);
+
 export const customProviders = storage.defineItem<CustomProviderConfig[]>(
   'local:customProviders',
   { fallback: [] },
@@ -227,7 +292,9 @@ export const lastSelectedThinkingLevel = storage.defineItem<ThinkingLevel>(
   { fallback: 'medium' },
 );
 
-export const themePreference = storage.defineItem<'dark' | 'light' | 'system'>(
+export type ThemePreference = 'dark' | 'light' | 'system';
+
+export const themePreference = storage.defineItem<ThemePreference>(
   'local:theme',
   { fallback: 'system' },
 );

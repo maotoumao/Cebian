@@ -4,6 +4,7 @@ import { SettingsLayout } from '@/components/settings/SettingsLayout';
 import { SETTINGS_SECTIONS } from '@/components/settings/SectionNav';
 import { ProvidersSection } from '@/components/settings/sections/ProvidersSection';
 import { ChatSection } from '@/components/settings/sections/ChatSection';
+import { AppearanceSection } from '@/components/settings/sections/AppearanceSection';
 import { PromptsSection } from '@/components/settings/sections/PromptsSection';
 import { SkillsSection } from '@/components/settings/sections/SkillsSection';
 import { MemorySection } from '@/components/settings/sections/MemorySection';
@@ -54,6 +55,7 @@ export function SettingsRoutes({ basePath, showBackButton = false, showOpenInTab
         <Route path="providers" element={<ProvidersSection />} />
         <Route path="mcp" element={<MCPSection />} />
         <Route path="chat/*" element={<ChatSection />} />
+        <Route path="appearance" element={<AppearanceSection />} />
         <Route path="prompts/*" element={<PromptsSection />} />
         <Route path="skills/*" element={<SkillsSection />} />
         <Route path="memory/*" element={<MemorySection />} />

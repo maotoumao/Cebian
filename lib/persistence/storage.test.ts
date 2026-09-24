@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import {
   autoTitleSettings,
+  chatAppearance,
+  resolveChatAppearance,
   memorySettings,
   memoryOrganizeState,
   resolveAutoTitleSettings,
@@ -131,5 +133,53 @@ describe('resolvePageInteractionSettings — 页面生效范围', () => {
     const s = resolvePageInteractionSettings(stored);
     s.toolbarPages.include.push('https://b.com/*');
     expect(stored.toolbarPages.include).toEqual(['https://a.com/*']);
+  });
+});
+
+describe('resolveChatAppearance', () => {
+  const DEFAULT = { fontScalePercent: 100, fontPreset: 'default', customFontName: '' };
+
+  it('缺失 / 空对象 → 默认值（100%、默认字体）', () => {
+    expect(resolveChatAppearance(undefined)).toEqual(DEFAULT);
+    expect(resolveChatAppearance(null)).toEqual(DEFAULT);
+    expect(resolveChatAppearance({})).toEqual(DEFAULT);
+  });
+
+  it('合法值原样保留', () => {
+    const v = { fontScalePercent: 120, fontPreset: 'custom' as const, customFontName: 'LXGW WenKai' };
+    expect(resolveChatAppearance(v)).toEqual(v);
+  });
+
+  it('字号夹到 80–150 并吸附到 5 的倍数', () => {
+    expect(resolveChatAppearance({ fontScalePercent: 10 }).fontScalePercent).toBe(80);
+    expect(resolveChatAppearance({ fontScalePercent: 999 }).fontScalePercent).toBe(150);
+    expect(resolveChatAppearance({ fontScalePercent: 112 }).fontScalePercent).toBe(110);
+    expect(resolveChatAppearance({ fontScalePercent: 113 }).fontScalePercent).toBe(115);
+  });
+
+  it('非有限数字的字号退回默认，而不是被夹成最小值', () => {
+    for (const bad of [null, '', '120', Number.NaN, Number.POSITIVE_INFINITY, [], {}]) {
+      expect(resolveChatAppearance({ fontScalePercent: bad as never }).fontScalePercent).toBe(100);
+    }
+  });
+
+  it('未知字体预设退回默认', () => {
+    expect(resolveChatAppearance({ fontPreset: 'comic' as never }).fontPreset).toBe('default');
+    expect(resolveChatAppearance({ fontPreset: 42 as never }).fontPreset).toBe('default');
+  });
+
+  it('自定义字体名去首尾空白、截断到 64 字符，非字符串退回空串', () => {
+    expect(resolveChatAppearance({ customFontName: '  Inter  ' }).customFontName).toBe('Inter');
+    expect(resolveChatAppearance({ customFontName: 'x'.repeat(100) }).customFontName).toHaveLength(64);
+    expect(resolveChatAppearance({ customFontName: 7 as never }).customFontName).toBe('');
+    // 截断点落在空格上时不留尾部空白（否则加引号后匹配不到字体）
+    expect(resolveChatAppearance({ customFontName: 'a'.repeat(63) + ' b' }).customFontName).toBe('a'.repeat(63));
+  });
+
+  it('storage fallback 与默认值一致', async () => {
+    fakeBrowser.reset();
+    expect(await chatAppearance.getValue()).toEqual(DEFAULT);
+    // 读 fallback 不落盘：原始 key 仍缺失，备份 merge 才能把整个对象补进来
+    expect(await fakeBrowser.storage.local.get('chatAppearance')).toEqual({});
   });
 });

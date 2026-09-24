@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { Toaster } from '@/components/ui/sonner';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { themePreference } from '@/lib/persistence/storage';
 import { t } from '@/lib/i18n';
-import { getRequester } from './requesters';
-import { Panel } from './panels/Panel';
-import { MicrophonePanel, type PanelState } from './panels/MicrophonePanel';
+import { openPermissionSettings } from '@/lib/ui/user-permission';
+import { REQUESTERS, parsePermissionType } from './requesters';
+import { Panel, type PanelState } from './panels/Panel';
+import { PermissionPanel } from './panels/PermissionPanel';
+import { PANEL_CONFIGS } from './panels/configs';
 
 // 通用「用户权限」页（独立标签页）。
 //
@@ -21,17 +24,13 @@ import { MicrophonePanel, type PanelState } from './panels/MicrophonePanel';
 /** 页面整体状态：unknownType=未知权限类型终态；其余复用面板可见状态。 */
 type PageState = 'unknownType' | PanelState;
 
-/** Chrome 麦克风内容设置页，denied 后引导用户手动放开。 */
-const MIC_SETTINGS_URL = 'chrome://settings/content/microphone';
+function resolveTheme(pref: 'dark' | 'light' | 'system'): 'dark' | 'light' {
+  if (pref !== 'system') return pref;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
 
 function applyTheme(pref: 'dark' | 'light' | 'system'): void {
-  const resolved =
-    pref === 'system'
-      ? window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light'
-      : pref;
-  document.documentElement.setAttribute('data-theme', resolved);
+  document.documentElement.setAttribute('data-theme', resolveTheme(pref));
 }
 
 /** 关闭当前标签页。优先用 tabs API（本页由 chrome.tabs.create 打开，
@@ -63,37 +62,42 @@ export default function App() {
   }, [theme]);
 
   // 解析 ?type=；未知类型走 unknownType 终态。
-  const type = new URLSearchParams(window.location.search).get('type') ?? '';
-  const requester = getRequester(type);
-  const [state, setState] = useState<PageState>(requester ? 'idle' : 'unknownType');
+  const type = parsePermissionType(new URLSearchParams(window.location.search).get('type') ?? '');
+  const [state, setState] = useState<PageState>(type ? 'idle' : 'unknownType');
 
+  // denied 时 openPermissionSettings 打不开设置页的失败提示走 sonner，页面底部挂了 Toaster
   const request = useCallback(async () => {
-    if (!requester) return;
+    if (!type) return;
     setState('requesting');
-    const outcome = await requester();
+    const outcome = await REQUESTERS[type]();
     setState(outcome);
     if (outcome === 'granted') {
       // 略作停留让用户看到成功提示，再自动关闭标签页。
       setTimeout(() => void closeSelfTab(), 1200);
     } else if (outcome === 'denied') {
-      // 被阻止后已无法再弹框，直接打开 Chrome 设置引导手动放开。
-      void chrome.tabs.create({ url: MIC_SETTINGS_URL });
+      // 被阻止后已无法再弹框，直接打开（或切到）Chrome 设置引导手动放开。
+      void openPermissionSettings(type);
     }
-  }, [requester]);
+  }, [type]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
       <div className="w-full max-w-sm text-center">
-        {state === 'unknownType' ? (
+        {state === 'unknownType' || !type ? (
           <Panel
             icon={<AlertTriangle className="size-6 text-amber-500" />}
             title={t('permission.unknownType')}
           />
         ) : (
-          // 目前仅麦克风一种类型；未来按 `type` 分发到对应面板。
-          <MicrophonePanel state={state} onRequest={request} />
+          <PermissionPanel
+            state={state}
+            onRequest={request}
+            icon={PANEL_CONFIGS[type].icon}
+            messages={PANEL_CONFIGS[type].messages()}
+          />
         )}
       </div>
+      <Toaster theme={resolveTheme(theme)} />
     </div>
   );
 }

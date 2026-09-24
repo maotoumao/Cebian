@@ -1,6 +1,6 @@
 import { Fragment } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Key, MessageSquare, FileText, Blocks, Brain, Plug, Info, Database, MousePointerClick } from 'lucide-react';
+import { Key, MessageSquare, Palette, FileText, Blocks, Brain, Plug, Info, Database, MousePointerClick } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 
@@ -25,7 +25,7 @@ interface SectionNavGroup {
 /**
  * 设置页导航按用户意图分三组：
  * - 连接：把模型和外部工具接进来（AI 提供商、MCP）
- * - 定制：助手怎么想、怎么做（对话、提示词、技能、记忆、页面交互）
+ * - 定制：助手怎么想、怎么做、长什么样（对话、外观、提示词、技能、记忆、页面交互）
  * - 系统：我的数据在哪、这是什么版本（数据、关于）
  */
 const SETTINGS_SECTION_GROUPS: SectionNavGroup[] = [
@@ -40,6 +40,7 @@ const SETTINGS_SECTION_GROUPS: SectionNavGroup[] = [
     getLabel: () => t('settings.nav.group.customize'),
     items: [
       { path: 'chat', getLabel: () => t('settings.nav.chat'), icon: MessageSquare },
+      { path: 'appearance', getLabel: () => t('settings.nav.appearance'), icon: Palette },
       { path: 'prompts', getLabel: () => t('settings.nav.prompts'), icon: FileText },
       { path: 'skills', getLabel: () => t('settings.nav.skills'), icon: Blocks },
       { path: 'memory', getLabel: () => t('settings.nav.memory'), icon: Brain },

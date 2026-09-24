@@ -138,6 +138,7 @@ settings:
     providers: "AI 供應商"
     mcp: "MCP 伺服器"
     chat: "對話"
+    appearance: "外觀"
     prompts: "提示詞"
     skills: "技能"
     memory: "記憶"
@@ -239,6 +240,34 @@ settings:
       label: "工具列模型"
       hint: "劃詞工具列使用的模型。通常選擇速度快、成本低的模型即可，預設與對話模型相同。"
       followMain: "與對話模型相同"
+  appearance:
+    title: "外觀"
+    theme:
+      label: "主題"
+      system: "跟隨系統"
+      light: "淺色"
+      dark: "深色"
+    fontScale:
+      label: "對話字型大小"
+      hint: "縮放對話中的訊息與輸入框，工具卡片等其他介面維持原樣。"
+      # $1 = 縮放百分比
+      value: "$1%"
+    font:
+      label: "對話字型"
+      default: "預設"
+      serif: "襯線"
+      mono: "等寬"
+      custom: "自訂"
+      customHint: "從這台裝置已安裝的字型中選擇。第一次使用時會開啟一個分頁，要求讀取本機字型的權限。"
+      needPermission: "需要讀取本機字型的權限——請在剛開啟的分頁裡授權，然後再點開字型清單。"
+      pickerPlaceholder: "選擇字型…"
+      searchPlaceholder: "搜尋字型…"
+      loading: "正在讀取本機字型…"
+      notFound: "找不到字型"
+    preview:
+      label: "預覽"
+      question: "怎麼讓對話文字更容易閱讀？"
+      answer: "調整上方的字型大小與字型，變更會立即套用到所有對話。"
   chat:
     title: "對話"
     instructions:
@@ -980,6 +1009,16 @@ permission:
     denied: "麥克風權限被拒絕了。"
     deniedHint: "要使用語音輸入，請在剛開啟的 Chrome 設定頁裡允許 Cebian 使用麥克風。"
     deviceError: "找不到麥克風，或無法存取。請檢查裝置後重試。"
+  localFonts:
+    title: "請求讀取本機字型"
+    description: "自訂對話字型需要讀取這台裝置已安裝的字型。點擊下面的按鈕，然後在瀏覽器彈窗中選擇「允許」。"
+    allow: "允許讀取字型"
+    requesting: "等待你的選擇…"
+    granted: "已取得本機字型權限，此分頁將自動關閉。"
+    dismissed: "請求被關閉了，可以重新嘗試。"
+    denied: "讀取本機字型的權限被拒絕了。"
+    deniedHint: "要自訂對話字型，請在剛開啟的 Chrome 設定頁裡允許 Cebian 使用本機字型。"
+    failed: "無法讀取本機字型，請重試。"
 
 # ─── 錯誤（toast、抛出的錯誤訊息）───
 errors:
@@ -992,6 +1031,10 @@ errors:
   pageActionGone: "找不到該操作。"
   pageActionSaveFailed: "儲存失敗，請重試。"
   compactionSettingsSaveFailed: "儲存上下文壓縮設定失敗，請重試。"
+  appearanceSaveFailed: "儲存外觀設定失敗，請重試。"
+  localFontsPermissionDenied: "讀取本機字型的權限被拒絕。請在 Chrome 設定裡允許 Cebian 使用本機字型，然後重試。"
+  localFontsLoadFailed: "無法讀取本機字型，請重試。"
+  openTabFailed: "無法開啟分頁，請重試。"
   searchEngineGone: "找不到該搜尋引擎。"
   searchEngineSaveFailed: "儲存搜尋引擎設定失敗，請重試。"
   # $1 = 搜尋詞佔位符字面值（「{query}」）

@@ -127,7 +127,7 @@ export function UserMessageBubble({
             }}
             aria-label={t('common.edit')}
             rows={Math.min(8, Math.max(2, draft.split('\n').length))}
-            className="w-full resize-y bg-transparent text-[0.9rem] leading-relaxed outline-none px-2 py-1"
+            className="w-full resize-y bg-transparent chat-text-body chat-font leading-relaxed outline-none px-2 py-1"
           />
           <div className="flex items-center justify-end gap-2 px-1">
             <span className="text-[0.7rem] text-muted-foreground mr-auto">
@@ -157,7 +157,7 @@ export function UserMessageBubble({
   return (
     <div className="self-end max-w-[95%] group/user">
       {hasBubble && (
-        <div className="bg-card border border-border px-4 py-3 rounded-2xl text-[0.9rem] leading-relaxed w-fit ml-auto whitespace-pre-wrap break-all">
+        <div className="bg-card border border-border px-4 py-3 rounded-2xl chat-text-body chat-font leading-relaxed w-fit ml-auto whitespace-pre-wrap break-all">
           {bubble}
         </div>
       )}
@@ -402,7 +402,7 @@ export function AgentTextBlock({ content, streaming }: { content: string; stream
   // data-speech-content：标记「可朗读的回复正文」，供 extractSpeakText 只读此子树，
   // 从而跳过 thinking / 工具卡片 / 错误提示等同处一个容器下的其它块。
   return (
-    <div data-speech-content>
+    <div data-speech-content className="chat-text-body chat-font">
       <MarkdownRenderer content={content} normalizeMath streaming={streaming} />
     </div>
   );
@@ -441,7 +441,7 @@ export function ThinkingBlock({ content, isLive }: { content: string; isLive?: b
         }`}
       >
         <div className="overflow-hidden">
-          <div className="px-3 py-3 border-t border-dashed border-border text-muted-foreground font-mono text-[0.75rem] leading-relaxed bg-card/50">
+          <div className="px-3 py-3 border-t border-dashed border-border text-muted-foreground font-mono chat-text-small leading-relaxed bg-card/50">
             <MarkdownRenderer content={content} normalizeMath streaming={isLive} />
           </div>
         </div>
