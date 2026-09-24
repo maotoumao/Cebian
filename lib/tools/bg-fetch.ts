@@ -73,6 +73,13 @@ function normalizeInit(init: unknown): RequestInit {
   return out;
 }
 
+/** 只有裸 `bgFetch`（解析为任意 HTTP(S) URL）允许浏览器自动跟随重定向。
+ *  Fetch API 的 `manual` 模式只暴露 opaqueredirect，脚本拿不到 Location，无法逐跳
+ *  重新做 pattern 校验；受限权限因此必须在发请求前用 `error` 禁止重定向。 */
+function allowsAllHttpUrls(patterns: readonly MatchPattern[]): boolean {
+  return patterns.some(p => p.scheme === '*' && p.host === '*' && p.pathGlob === '/*');
+}
+
 /**
  * 执行一次 skill 发起的 bgFetch 请求。
  *
@@ -118,6 +125,9 @@ export async function handleBgFetch(
     let resp: Response;
     try {
       const init = normalizeInit(rawInit);
+      if (!allowsAllHttpUrls(patterns) && init.redirect !== 'manual') {
+        init.redirect = 'error';
+      }
       init.signal = controller.signal;
       resp = await fetch(parsed.href, init);
     } catch (err) {
