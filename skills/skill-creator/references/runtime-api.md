@@ -172,7 +172,7 @@ A common but wrong instinct is "the user is on the API's web app, so I'll call t
 | `method` | `string` | Defaults to `'GET'`. |
 | `headers` | `Record<string, string>` or `Headers` | Sandbox-side `Headers` instances are flattened before being sent. |
 | `body` | `string`, `Uint8Array`, `ArrayBuffer`, `ArrayBufferView` | `Blob` / `File` is **not** supported (the RPC boundary is JSON-only) — convert via `new Uint8Array(await blob.arrayBuffer())` first. |
-| `redirect` | `'follow' \| 'error' \| 'manual'` | Mirrors native fetch. |
+| `redirect` | `'follow' \| 'error' \| 'manual'` | Mirrors native fetch for unrestricted `bgFetch`. For `bgFetch:<match-pattern>`, `follow` (including the default) is forced to `error` so a redirect cannot escape the declared URL scope; `manual` remains available but returns the browser's opaque redirect response. |
 | `referrer`, `referrerPolicy`, `cache` | Standard | Pass through to the SW fetch. |
 
 Not supported: `mode`, `credentials` (SW context has no site cookies anyway), `signal` (cancellation is automatic when the `run_skill` timeout fires or the sandbox is torn down), `integrity`, `keepalive`, `priority`. There is no manual cancellation surface for the skill author in v1.
