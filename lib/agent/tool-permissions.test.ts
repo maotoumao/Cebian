@@ -36,8 +36,9 @@ function fakeGate(
   toolName: string,
   check: ToolGate['check'],
   persistGrant: ToolGate['persistGrant'] = vi.fn(async () => {}),
+  discard: ToolGate['discard'] = vi.fn(),
 ): ToolGate {
-  return { toolName, check, persistGrant };
+  return { toolName, check, persistGrant, discard };
 }
 
 const REQUEST: PermissionRequestDetails = {
@@ -91,8 +92,8 @@ describe('createPermissionGate — 放行 / 阻断分流', () => {
     const result = await gate(ctx('run_skill', 'c1', { skill: 's' }));
     expect(result).toBeUndefined();
     expect(persistGrant).toHaveBeenCalledTimes(1);
-    // persistGrant 拿到的是原始 args，不是 request。
-    expect(persistGrant).toHaveBeenCalledWith({ skill: 's' });
+    // persistGrant 拿到原始 args 与受信 toolCallId，不依赖展示 request 反推身份。
+    expect(persistGrant).toHaveBeenCalledWith({ skill: 's' }, 'c1');
   });
 
   it('需授权 + 用户 denied → 阻断（block + 拒绝 reason），不持久化', async () => {
@@ -174,6 +175,53 @@ describe('createPermissionGate — 安全不变式', () => {
       requestDecision,
     );
     await expect(gate(ctx('run_skill', 'c1', {}))).rejects.toThrow(/storage write failed/);
+  });
+
+  it('把 toolCallId 传给 check 与 persistGrant，使授权绑定到单次调用', async () => {
+    const check = vi.fn(async () => ({ needsGrant: true, request: REQUEST }));
+    const persistGrant = vi.fn(async () => {});
+    const gate = createPermissionGate(
+      [fakeGate('run_skill', check, persistGrant)],
+      vi.fn(async () => 'always' as PermissionDecision),
+    );
+
+    await gate(ctx('run_skill', 'call-bound', { skill: 's' }));
+
+    expect(check).toHaveBeenCalledWith({ skill: 's' }, 'call-bound');
+    expect(persistGrant).toHaveBeenCalledWith({ skill: 's' }, 'call-bound');
+  });
+
+  it.each(['denied', 'dismissed'] as const)('%s 时丢弃该调用的授权快照', async (decision) => {
+    const discard = vi.fn();
+    const gate = createPermissionGate(
+      [fakeGate(
+        'run_skill',
+        async () => ({ needsGrant: true, request: REQUEST }),
+        vi.fn(async () => {}),
+        discard,
+      )],
+      vi.fn(async () => decision),
+    );
+
+    await gate(ctx('run_skill', 'call-denied', {}));
+
+    expect(discard).toHaveBeenCalledWith('call-denied');
+  });
+
+  it('等待授权抛错时丢弃该调用的授权快照', async () => {
+    const discard = vi.fn();
+    const gate = createPermissionGate(
+      [fakeGate(
+        'run_skill',
+        async () => ({ needsGrant: true, request: REQUEST }),
+        vi.fn(async () => {}),
+        discard,
+      )],
+      vi.fn(async () => { throw new Error('aborted'); }),
+    );
+
+    await expect(gate(ctx('run_skill', 'call-aborted', {}))).rejects.toThrow('aborted');
+    expect(discard).toHaveBeenCalledWith('call-aborted');
   });
 });
 

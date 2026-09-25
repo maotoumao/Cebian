@@ -215,9 +215,14 @@ interface ToolGate {
    * permissions 这类展示字段；调用身份由通用门禁从 context 补全）。
    * check 自己负责读取已有授权（grant）并判定是否仍然有效。
    */
-  check(args: unknown): Promise<{ needsGrant: boolean; request?: PermissionRequestDetails }>;
+  check(
+    args: unknown,
+    toolCallId: string,
+  ): Promise<{ needsGrant: boolean; request?: PermissionRequestDetails }>;
   /** 用户选「始终允许」时持久化授权。`once` / `denied` / `dismissed` 不调用。 */
-  persistGrant(args: unknown): Promise<void>;
+  persistGrant(args: unknown, toolCallId: string): Promise<void>;
+  /** 授权未放行时清理由 check 为该次调用保留的临时状态。 */
+  discard?(toolCallId: string): void;
 }
 
 /**
@@ -260,13 +265,15 @@ function createPermissionGate(
     // 无 gate → 放行
     if (!gate) return undefined;
 
-    const { needsGrant, request: details } = await gate.check(context.args);
+    const toolCallId = context.toolCall.id;
+    const { needsGrant, request: details } = await gate.check(context.args, toolCallId);
     // 无需授权 / 已授权 → 放行
     if (!needsGrant) return undefined;
 
     // 安全边界：声称需要授权却没给展示信息，是 gate 实现的 bug。
     // 绝不 fail open——抛错让框架转成 error tool result，工具不执行。
     if (!details) {
+      gate.discard?.(toolCallId);
       throw new Error(
         `Permission gate for "${context.toolCall.name}" reported needsGrant but returned no request.`,
       );
@@ -280,16 +287,29 @@ function createPermissionGate(
       permissions: details.permissions,
     };
 
-    const decision = await requestDecision(request, signal);
+    let decision: PermissionDecision;
+    try {
+      decision = await requestDecision(request, signal);
+    } catch (err) {
+      gate.discard?.(toolCallId);
+      throw err;
+    }
 
     if (decision === 'denied') {
+      gate.discard?.(toolCallId);
       return { block: true, reason: PERMISSION_DENIED_REASON };
     }
     if (decision === 'dismissed') {
+      gate.discard?.(toolCallId);
       return { block: true, reason: PERMISSION_DISMISSED_REASON };
     }
     if (decision === 'always') {
-      await gate.persistGrant(context.args);
+      try {
+        await gate.persistGrant(context.args, toolCallId);
+      } catch (err) {
+        gate.discard?.(toolCallId);
+        throw err;
+      }
     }
     // once / always → 放行
     return undefined;
