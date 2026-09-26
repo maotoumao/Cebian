@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## 1.8.0 - 2026-09-26
+
 ### 新增 / Added
 
 - 新增「设置 → 对话 → 自动压缩超长对话」：可开关自动压缩，并用滑杆调整触发阈值（占模型上下文窗口的百分比，默认 80%）。此前触发点写死为「窗口 − 16384 token」，换算成百分比会随窗口漂移——128k 模型 87%、1M 模型要到 98.4% 才压，基本等于压不到就已经撑爆 ([#72](https://github.com/maotoumao/Cebian/issues/72))
