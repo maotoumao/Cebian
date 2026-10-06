@@ -1,6 +1,7 @@
 import type { ImageContent } from '@earendil-works/pi-ai';
 import { escapeXml } from '@/lib/utils';
 import { RECORDING_SCHEMA_COMMENT } from '@/lib/recorder/schema-doc';
+import type { NetworkCaptureState } from '@/lib/recorder/network-types';
 
 // ─── Attachment types ───
 
@@ -53,6 +54,21 @@ export interface RecordingAttachment {
   json: string;
   /** True when events were dropped from the end to fit the size limit. */
   truncatedAttachment?: boolean;
+  /** 时间线里带上的网络请求条数；没开网络录制时省略。`eventCount` 不含它们。 */
+  networkCount?: number;
+  /** 被过滤掉的埋点 / 监控请求数。 */
+  filteredCount?: number;
+  /** 网络录制的整体状态。 */
+  networkState?: NetworkCaptureState;
+  /**
+   * 完整网络记录（HAR）。只在侧边栏 → 后台之间携带：发送时后台把它写进会话工作目录，
+   * 换成 `harPath`，不进发给模型的内容。
+   */
+  har?: { name: string; json: string };
+  /** HAR 在会话工作目录下的相对路径（如 `recordings/recording-….har`），后台写入后设置。 */
+  harPath?: string;
+  /** HAR 写入失败（录到了网络数据，但模型拿不到完整记录）。 */
+  harFailed?: boolean;
 }
 
 export type Attachment = ImageAttachment | TextFileAttachment | ElementAttachment | RecordingAttachment;
@@ -185,14 +201,24 @@ export function buildTextPrefix(attachments: Attachment[]): string {
     }
 
     if (a.type === 'recording') {
-      const truncAttr = a.truncatedAttachment ? ' truncated="true"' : '';
+      const attrs: Array<[string, string]> = [
+        ['name', a.name],
+        ['mime', RECORDING_MIME],
+        ['event-count', String(a.eventCount)],
+        ['duration-ms', String(a.durationMs)],
+      ];
+      if (a.truncatedAttachment) attrs.push(['truncated', 'true']);
+      if (a.networkCount != null) attrs.push(['network-count', String(a.networkCount)]);
+      if (a.filteredCount) attrs.push(['filtered-count', String(a.filteredCount)]);
+      if (a.networkState && a.networkState !== 'active') attrs.push(['network-state', a.networkState]);
+      if (a.harPath) attrs.push(['har', a.harPath]);
+      if (a.harFailed) attrs.push(['har-failed', 'true']);
+      const attrText = attrs.map(([k, v]) => `${k}="${escapeXml(v, { forAttribute: true })}"`).join(' ');
       // Element-text-escape the JSON body so arbitrary recorded text
       // (containing `<`, `>`, or `&`) can't break the surrounding XML or
       // the non-greedy <attachments>...</attachments> regex used for
       // parsing. Body is plain readable JSON for the agent (no base64).
-      blocks.push(
-        `<recording name="${escapeXml(a.name, { forAttribute: true })}" mime="${RECORDING_MIME}" event-count="${a.eventCount}" duration-ms="${a.durationMs}"${truncAttr}>\n${escapeXml(a.json)}\n</recording>`,
-      );
+      blocks.push(`<recording ${attrText}>\n${escapeXml(a.json)}\n</recording>`);
     }
   }
 

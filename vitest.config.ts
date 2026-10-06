@@ -8,10 +8,7 @@ import { WxtVitest } from 'wxt/testing/vitest-plugin';
 // 单元测试就近协置：放在被测文件同目录下的同名 `*.test.ts`，只覆盖高风险逻辑，
 // 不强求每个文件都有。顶层 test/ 目录留给将来真正串联多文件的 E2E/集成测试。
 export default defineConfig({
-  // WxtVitest 的返回类型按 wxt 自带的 vite 版本声明，与 vitest 拉入的 vite
-  // 版本存在纯类型层面的 skew（运行无影响），用 any 收敛。
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  plugins: [WxtVitest() as any],
+  plugins: [WxtVitest()],
   test: {
     include: ['**/*.test.ts'],
     exclude: ['**/node_modules/**', '.wxt/**', '.output/**', 'dist/**', 'site/**'],

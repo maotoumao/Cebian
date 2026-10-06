@@ -2,7 +2,8 @@
 // db.ts 的 cebian 库；vitest 每个测试文件独立 worker，全局互不串扰）
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { AgentMessage, Entry } from '@earendil-works/pi-agent-core';
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
+import type { Entry } from '@/lib/shims/pi-harness/session/types';
 import {
   applySessionsTransactional,
   getSessionMutations,
@@ -22,7 +23,7 @@ import {
   validateMutationLog,
 } from '@/lib/persistence/migrate-messages';
 import { sessionTreeDb } from '@/lib/persistence/db';
-import type { SessionMutation } from '@/lib/shims/pi-session-state';
+import type { SessionMutation } from '@/lib/shims/pi-harness/session/state';
 
 const base: SessionRecordLike = {
   id: '6f9619ff-8b86-d011-b42d-00cf4fc964ff',

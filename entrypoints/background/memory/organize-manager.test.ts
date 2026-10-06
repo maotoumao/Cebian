@@ -89,6 +89,31 @@ describe('resolveOrganizeModel', () => {
     expect(await resolveOrganizeModel()).toBeNull();
   });
 
+  // 整理靠工具读写记忆文件：关掉「工具调用」的模型跑不了（#83）
+  it('整理专用模型关掉了工具调用 → warn 后回退全局模型', async () => {
+    await customProviders.setValue(
+      PROVIDERS.map((p) =>
+        p.id === 'organize-provider' ? { ...p, models: p.models.map((m) => ({ ...m, toolCalling: false })) } : p,
+      ),
+    );
+    await setOrganizeModel({ provider: ORGANIZE_PROVIDER, modelId: 'organize-model' });
+    await lastSelectedModel.setValue({ provider: GLOBAL_PROVIDER, modelId: 'global-model' });
+
+    const model = await resolveOrganizeModel();
+    expect(model?.id).toBe('global-model');
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('全局模型也关掉了工具调用 → null', async () => {
+    await customProviders.setValue(
+      PROVIDERS.map((p) => ({ ...p, models: p.models.map((m) => ({ ...m, toolCalling: false })) })),
+    );
+    await setOrganizeModel(undefined);
+    await lastSelectedModel.setValue({ provider: GLOBAL_PROVIDER, modelId: 'global-model' });
+
+    expect(await resolveOrganizeModel()).toBeNull();
+  });
+
   it('两者都没配 → null', async () => {
     await setOrganizeModel(undefined);
     await lastSelectedModel.setValue(null);

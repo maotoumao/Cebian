@@ -120,3 +120,8 @@ export function isTextualMime(mime: string): boolean {
   if (m.endsWith('+json') || m.endsWith('+xml') || m.endsWith('+yaml')) return true;
   return false;
 }
+
+/** MIME 字符串里的媒体类型（去掉 `;` 之后的参数、首尾空白，转小写）；缺省时返回空串。 */
+export function mediaType(mimeType: string | undefined): string {
+  return (mimeType ?? '').split(';')[0].trim().toLowerCase();
+}

@@ -142,13 +142,20 @@ message-helpers / tool-permissions —— 四个都确有 UI + background 双边
 
 ## 🔵 未来方向：迁移到 pi 的 `AgentHarness`
 
+> **现状（2026-10）**：pi 1.0.0 删除了整个实验性 harness（含 `AgentHarness` 与 Session 层），
+> 本节「迁移到 AgentHarness」的方向已不成立。Cebian 已升到 pi 1.0 的稳定 Agent 核心，
+> 会话树 / 压缩依赖的 harness 代码冻结 vendor 于 `lib/shims/pi-harness/`。上游的接替者是
+> `@earendil-works/pi-durable`（仍标 Experimental，API 全新，且无浏览器存储后端），等它
+> 稳定后再评估是否迁移。下文保留为历史记录。
+>
 > **进展（2026-08）**：树化迁移已完成——存储层换成会话树（`DexieSessionStorage`
-> implements pi `SessionStorage` + `lib/shims/pi-session-state.ts` 移植 reducer +
+> implements pi `SessionStorage` + `lib/shims/pi-harness/session/state.ts` 移植 reducer +
 > Dexie v1→v2 无损迁移 + 备份随包分支），运行时经 `TreeBinding`（syncTail 水位线 /
 > moveLane 回卷）接线，消息编辑（#44）/ 任意轮重试 / 分支切换 UI 已上。原「阶段 1」
 > 目标全部落地。**注意**：0.84.x 的 `AgentHarness` 类是空壳（全部方法
 > `HarnessNotImplemented`，能跑的编排在未安装的 `pi-coding-agent` 里），阶段 3 的
-> 运行时替换须等上游填实现；`SessionState` 未公开导出，上游导出后删除本地移植副本。
+> 运行时替换须等上游填实现；`SessionState` 未公开导出，连同 session 层一起 vendor 于
+> `lib/shims/pi-harness/`（维护约定见该目录 README）。
 >
 > 树化后的剩余后续项：
 > - IPC 增量广播（2026-08-22 部分完成：流式帧已增量化为 `stream_ops` + 80ms 合帧，

@@ -130,6 +130,10 @@ function estimateMessageTokens(message: AgentMessage): number {
     case 'branchSummary':
     case 'compactionSummary':
       return estimateTextTokens(message.summary);
+    case 'system':
+      // 会话 transcript 里本不该有 system 消息（system 头只在请求时现装，见
+      // agent/factory.ts）；提示词与工具已由 estimatePrefixTokens 单独计入，不重复算。
+      return 0;
     default:
       // Cebian 自己注入 union 的 permissionRequest 落这里。它被 factory 的 convertToLlm
       // 白名单滤掉、根本不进 LLM 视图，估 0 是对的。
@@ -158,7 +162,7 @@ export interface ContextSnapshot {
   /** LLM 视图形态的消息序列（摘要折叠后的那一份，不是 state 全量）。 */
   messages: AgentMessage[];
   systemPrompt?: string;
-  /** `agent.state.tools`。序列化后按文本估，见 `estimatePrefixTokens`。 */
+  /** 声明给模型的工具集（会话的 `preamble.tools`）。序列化后按文本估，见 `estimatePrefixTokens`。 */
   tools?: unknown[];
 }
 
@@ -187,9 +191,6 @@ export interface ContextTokenEstimate {
  * 3. **它的时间戳不早于在它之前出现过的任何一条消息**。压缩摘要是尾部追加的（时间戳最新），
  *    而它前面挂着的 `retainedTail` 是压缩时的旧消息——若不看时间戳，刚压完的那一轮会
  *    读到 retainedTail 里那条「压缩前的巨大 usage」，误判成仍然超阈值而立刻再压一次。
- *
- * 有意省略 pi-ai 的一处逻辑：它在有锚点时会补算 `addedToolNames` 引入的新工具 schema。
- * Cebian 不用延迟工具加载（全仓无 `addedToolNames` 生产者），省略等价。
  */
 function estimateContextTokens(context: ContextSnapshot): ContextTokenEstimate {
   const { messages } = context;

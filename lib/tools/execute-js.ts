@@ -1,7 +1,7 @@
 import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { TOOL_EXECUTE_JS } from '@/lib/tools/names';
-import { executeViaDebugger } from '@/lib/browser/tab-actions';
+import { executeViaDebugger, isDebuggerAvailable } from '@/lib/browser/debugger-session';
 import { vfs } from '@/lib/persistence/vfs';
 
 /** Sentinel value returned by the injected func when CSP blocks new Function(). */
@@ -97,6 +97,9 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
     let text: string;
     let canWrite: boolean;
     if (result?.result === CSP_BLOCKED) {
+      if (!isDebuggerAvailable()) {
+        throw new Error('The page\'s Content Security Policy blocks in-page script execution, and this browser has no debugger fallback.');
+      }
       text = await executeViaDebugger(tabId, params.code);
       // CDP 走的 fallback 返回的是字符串（包含 sentinel）：
       //   "(no return value)" → 没有返回值

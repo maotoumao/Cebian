@@ -7,7 +7,7 @@ import { registerClientHandlers, type ClientHandlerMap } from '../ipc/client-rou
 import { getPortState, post } from '../ipc/port-registry';
 
 const recorderClientHandlers: ClientHandlerMap = {
-  async recorder_start(port) {
+  async recorder_start(port, msg) {
     const instanceId = getPortState(port)?.instanceId;
     if (instanceId == null) {
       // Sidepanel never sent its instanceId — reject so we never start
@@ -60,7 +60,7 @@ const recorderClientHandlers: ClientHandlerMap = {
       });
       return;
     }
-    await recorder.start({ port, instanceId, initialWindowId });
+    await recorder.start({ port, instanceId, initialWindowId, options: msg.options });
   },
 
   async recorder_stop(port) {

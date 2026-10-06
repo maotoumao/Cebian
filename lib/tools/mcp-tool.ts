@@ -40,7 +40,7 @@ export interface MCPAppDetails {
  * rows survive code refactors and third-party servers ship arbitrary
  * `_meta`, so a truthy check on `details.mcpApp` is not enough.
  *
- * Sidepanel `details` is typed `any` (per `ToolResultMessage<TDetails = any>`),
+ * Sidepanel `details` is only typed `JsonValue` (per `ToolResultMessage`),
  * so this is the boundary where the contract is enforced. Co-located with
  * the producer (`createMCPAgentTool`) so the guard stays in sync if the
  * persisted shape evolves.

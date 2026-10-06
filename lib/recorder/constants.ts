@@ -2,6 +2,8 @@
 // safe for typical pages and for the heavy-SPA case (Notion / 飞书 / GitHub);
 // see docs/plans/2026-04-22-recording-button.md for rationale.
 
+import type { RecorderOptions } from './types';
+
 /** Hard cap on the total number of events in one recording session. */
 export const RECORDER_MAX_EVENTS = 1000;
 
@@ -58,3 +60,35 @@ export const RESTRICTED_URL_PREFIXES: readonly string[] = [
   'https://chrome.google.com/webstore',
   'https://chromewebstore.google.com',
 ];
+
+/** 录制选项的默认值：只录操作。 */
+export const DEFAULT_RECORDER_OPTIONS: RecorderOptions = { interactions: true, network: false };
+
+// ─── 网络录制 ───
+
+/** 单个请求体 / 响应体最多记录的字节数；超过的在读取之前就跳过（记为 too_large）。 */
+export const NETWORK_BODY_MAX = 64 * 1024;
+
+/** 一次录制里网络数据（请求体 + 响应体 + 消息预览）的总量上限，到达后停止录制网络。 */
+export const NETWORK_TOTAL_MAX = 5 * 1024 * 1024;
+
+/** 一次录制最多记录的网络请求数，到达后停止录制网络（不影响操作录制）。 */
+export const NETWORK_MAX_ENTRIES = 500;
+
+/** 每个 WebSocket / EventSource 连接最多记录的消息条数。 */
+export const NETWORK_STREAM_MESSAGES_MAX = 20;
+
+/** 每条 WebSocket / EventSource 消息最多记录的字符数。 */
+export const NETWORK_STREAM_MESSAGE_CHARS = 500;
+
+/** 内联时间线里请求体预览的字符数。 */
+export const NETWORK_REQUEST_PREVIEW_MAX = 200;
+
+/** 内联时间线里响应体预览的字符数。 */
+export const NETWORK_RESPONSE_PREVIEW_MAX = 300;
+
+/** 内联时间线里 JSON 响应结构概要的字符数。 */
+export const NETWORK_SHAPE_MAX = 300;
+
+/** 录制的 HAR 存放在会话工作目录下的这个子目录（信封里的 har 属性以它开头）。 */
+export const RECORDING_HAR_DIR = 'recordings';

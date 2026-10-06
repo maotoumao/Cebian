@@ -10,14 +10,13 @@ import {
   InMemoryCredentialStore,
 } from '@earendil-works/pi-ai';
 import { getApiProvider } from '@earendil-works/pi-ai/compat';
+import type { AgentMessage, ThinkingLevel } from '@earendil-works/pi-agent-core';
 import {
-  type AgentMessage,
-  type ThinkingLevel,
-  convertToLlm,
-  generateSummary,
-  serializeConversation,
   DEFAULT_COMPACTION_SETTINGS,
-} from '@earendil-works/pi-agent-core';
+  generateSummary,
+} from '@/lib/shims/pi-harness/compaction/compaction';
+import { serializeConversation } from '@/lib/shims/pi-harness/compaction/utils';
+import { convertToLlm } from '@/lib/shims/pi-harness/messages';
 import {
   estimateContextTokens,
   estimateMessageTokens,
@@ -521,7 +520,7 @@ function splitForSummary(
 // ─── 摘要生成 ───
 
 /**
- * 生成一段压缩摘要：底层复用 pi 的 `generateSummary`（内部处理摘要提示词与
+ * 生成一段压缩摘要：底层复用 pi 的 `generateSummary`（vendor 于 lib/shims/pi-harness；内部处理摘要提示词与
  * previousSummary 滚动合并），在其上叠加「按摘要模型窗口分块」与「每块失败重试一次」。
  *
  * 返回摘要文本；任一块两次尝试都失败返回 null。调用方（session-manager）据此插入一条

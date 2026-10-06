@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback, useImperativeHandle, forwardRef, type KeyboardEvent } from 'react';
-import { Send, Square, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X, FileType, Film } from 'lucide-react';
+import { Send, Square, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X, FileType, Film, Network } from 'lucide-react';
 import { showDialog } from '@/lib/ui/dialog';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -33,7 +33,8 @@ import { appendTranscript, cleanTranscript } from '@/lib/speech/transcript';
 import { openPermissionPage, openPermissionSettings, queryPermission } from '@/lib/ui/user-permission';
 import { useMobileEmulation } from '@/hooks/useMobileEmulation';
 import { useChatAppearance } from '@/hooks/useChatAppearance';
-import { downloadFile, formatDuration, formatCompactCount } from '@/lib/utils';
+import { downloadFile, formatCompactCount } from '@/lib/utils';
+import { recordingMetaText, recordingTitle } from '@/components/chat/recording-meta';
 import { t } from '@/lib/i18n';
 import type { PromptDispatchResult } from '@/hooks/useBackgroundAgent';
 
@@ -100,7 +101,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   // entering history mode so we can restore it on ↓-past-end.
   const [historyIndex, setHistoryIndex] = useState<number | null>(null);
   const [draft, setDraft] = useState('');
-  const { isActiveTabMobile, toggle: toggleMobile } = useMobileEmulation();
+  const { supported: mobileSupported, isActiveTabMobile, toggle: toggleMobile } = useMobileEmulation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const slashMenuRef = useRef<HTMLDivElement>(null);
@@ -887,16 +888,18 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             disabled={isDispatching}
             onChange={handleFileUpload}
           />
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            title={t('chat.composer.mobileMode')}
-            className={`size-7 ${isActiveTabMobile ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}`}
-            onClick={toggleMobile}
-            disabled={isDispatching}
-          >
-            <Smartphone className="size-3.5" />
-          </Button>
+          {mobileSupported && (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              title={t('chat.composer.mobileMode')}
+              className={`size-7 ${isActiveTabMobile ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}`}
+              onClick={toggleMobile}
+              disabled={isDispatching}
+            >
+              <Smartphone className="size-3.5" />
+            </Button>
+          )}
 
           {attachments.length > 0 && (
             <>
@@ -935,21 +938,31 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                   ) : att.type === 'recording' ? (
                     // Recording attachment: amber chip mirroring Message.tsx;
                     // chip body downloads the JSON, X removes from the list.
+                    // 录了网络时多一个按钮下载 HAR（完整网络记录）。
                     <Badge
                       key={i}
                       variant="outline"
                       className="shrink-0 text-[0.65rem] font-mono gap-1 h-5 rounded pl-1 pr-0.5 text-amber-400 border-amber-400/20 bg-amber-400/5 hover:bg-amber-400/10"
-                      title={`${t('chat.attachments.recordingDownload')}\n${t('chat.attachments.recordingHover', [String(att.eventCount), formatCompactCount(att.json.length)])}`}
+                      title={recordingTitle(att)}
                     >
                       <button
                         className="flex items-center gap-1 cursor-pointer"
                         onClick={() => downloadFile(att.name, att.json, RECORDING_MIME)}
                       >
                         <Film className="size-2.5 shrink-0" />
-                        <span className="truncate max-w-40">
-                          {att.name} · {t('chat.attachments.recordingMeta', [String(att.eventCount), formatDuration(att.durationMs)])}
-                        </span>
+                        <span className="truncate max-w-24">{att.name}</span>
+                        <span className="shrink-0">· {recordingMetaText(att)}</span>
                       </button>
+                      {att.har && (
+                        <button
+                          className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
+                          title={t('chat.attachments.recordingHarDownload')}
+                          aria-label={t('chat.attachments.recordingHarDownload')}
+                          onClick={() => downloadFile(att.har!.name, att.har!.json, 'application/json')}
+                        >
+                          <Network className="size-2.5" />
+                        </button>
+                      )}
                       <button
                         className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
                         disabled={isDispatching}

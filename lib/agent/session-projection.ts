@@ -25,7 +25,8 @@
  * - `model_change` / `thinking_level_change` / `active_tools_change` /
  *   `branch_summary` → 不进消息流（分支摘要的呈现由分支导航子任务另行处理）。
  */
-import type { AgentMessage, Entry } from '@earendil-works/pi-agent-core';
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
+import type { Entry } from '@/lib/shims/pi-harness/session/types';
 import { getRetainedTail, isCompactionSummary, type CompactionSummaryMessage } from './compaction-summary';
 import {
   isPermissionRequest,

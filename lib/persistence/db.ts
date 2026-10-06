@@ -6,7 +6,7 @@ import {
   sanitizeMutationLog,
   validateMutationLog,
 } from '@/lib/persistence/migrate-messages';
-import type { SessionMutation } from '@/lib/shims/pi-session-state';
+import type { SessionMutation } from '@/lib/shims/pi-harness/session/state';
 import {
   countMessageEntries,
   mutationSeq,

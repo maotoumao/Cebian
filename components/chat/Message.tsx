@@ -1,4 +1,4 @@
-import { Bot, ChevronLeft, ChevronRight, Lightbulb, CheckCircle, Crosshair, FileText, Film, FoldVertical, Pencil, Scissors, ShieldAlert } from 'lucide-react';
+import { Bot, ChevronLeft, ChevronRight, Lightbulb, CheckCircle, Crosshair, FileText, Film, FoldVertical, Network, Pencil, Scissors, ShieldAlert } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +11,10 @@ import { showDialog } from '@/lib/ui/dialog';
 import { RECORDING_MIME } from '@/lib/agent/attachments';
 import { t } from '@/lib/i18n';
 import { describePermission } from '@/lib/agent/tool-permissions';
-import { downloadFile, formatDuration, formatCompactCount } from '@/lib/utils';
+import { downloadFile } from '@/lib/utils';
+import { recordingMetaText, recordingTitle } from '@/components/chat/recording-meta';
+import { RECORDING_HAR_DIR } from '@/lib/recorder/constants';
+import { browser } from 'wxt/browser';
 import type { Message } from '@earendil-works/pi-ai';
 
 /* ─── Branch switcher ─── */
@@ -65,15 +68,30 @@ export function BranchSwitcher({
   );
 }
 
+/** 录制 HAR 的相对路径（信封里的 har 属性）只接受 `recordings/<文件名>`。 */
+const HAR_PATH_RE = new RegExp(`^${RECORDING_HAR_DIR}/[\\w-][\\w.-]*$`);
+
+/**
+ * 已发送录制的 HAR 在文件浏览器里的地址。按**当前会话**拼路径：分叉会复制整个工作目录，
+ * 消息里只存相对路径，所以分叉后的会话里点开的是它自己那份。
+ */
+function harFileUrl(sessionId: string, harPath: string): string | null {
+  if (!HAR_PATH_RE.test(harPath)) return null;
+  return `${browser.runtime.getURL('/vfs.html' as never)}#/workspaces/${encodeURIComponent(sessionId)}/${harPath}`;
+}
+
 /* ─── User Message ─── */
 export function UserMessageBubble({
   msg,
   children,
   onEdit,
   branch,
+  sessionId,
 }: {
   msg?: Message;
   children?: ReactNode;
+  /** 当前会话 id，用来拼录制 HAR 的打开地址；缺省时不显示 HAR 入口。 */
+  sessionId?: string | null;
   /** 编辑已发送消息（issue #44）：以新文案从此消息重新生成。仅当消息已落树
    *  （广播带 entryId）且 agent 空闲时由上层传入；缺省不显示编辑入口。 */
   onEdit?: (text: string) => void;
@@ -201,21 +219,41 @@ export function UserMessageBubble({
               <span className="truncate max-w-24">{f.name}</span>
             </Badge>
           ))}
-          {attachments.recordings.map((r, i) => (
-            <Badge
-              key={`rec-${i}`}
-              variant="outline"
-              className="shrink-0 text-[0.65rem] font-mono gap-1 h-5 rounded pl-1 pr-1 text-amber-400 border-amber-400/20 bg-amber-400/5 cursor-pointer hover:bg-amber-400/10"
-              title={`${t('chat.attachments.recordingDownload')}\n${t('chat.attachments.recordingHover', [String(r.eventCount), formatCompactCount(r.json.length)])}`}
-              onClick={() => downloadFile(r.name, r.json, RECORDING_MIME)}
-            >
-              <Film className="size-2.5 shrink-0" />
-              <span className="truncate max-w-40">
-                {r.name} · {t('chat.attachments.recordingMeta', [String(r.eventCount), formatDuration(r.durationMs)])}
-                {r.truncated ? ` · ${t('chat.attachments.recordingTruncated')}` : ''}
-              </span>
-            </Badge>
-          ))}
+          {attachments.recordings.map((r, i) => {
+            const harUrl = sessionId && r.harPath ? harFileUrl(sessionId, r.harPath) : null;
+            return (
+              <Badge
+                key={`rec-${i}`}
+                variant="outline"
+                className="shrink-0 text-[0.65rem] font-mono gap-1 h-5 rounded pl-1 pr-1 text-amber-400 border-amber-400/20 bg-amber-400/5 hover:bg-amber-400/10"
+                title={recordingTitle(r)}
+              >
+                <button
+                  className="flex items-center gap-1 cursor-pointer"
+                  onClick={() => downloadFile(r.name, r.json, RECORDING_MIME)}
+                >
+                  <Film className="size-2.5 shrink-0" />
+                  <span className="truncate max-w-24">{r.name}</span>
+                  <span className="shrink-0">
+                    · {recordingMetaText(r)}
+                    {r.truncated ? ` · ${t('chat.attachments.recordingTruncated')}` : ''}
+                  </span>
+                </button>
+                {harUrl && (
+                  <a
+                    href={harUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10"
+                    title={t('chat.attachments.recordingHarOpen')}
+                    aria-label={t('chat.attachments.recordingHarOpen')}
+                  >
+                    <Network className="size-2.5" />
+                  </a>
+                )}
+              </Badge>
+            );
+          })}
         </div>
       )}
 

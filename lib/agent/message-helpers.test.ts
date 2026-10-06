@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { assertJsonSerializable, type AgentMessage } from '@earendil-works/pi-agent-core';
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
+import { assertJsonSerializable } from '@/lib/shims/pi-harness/session/session';
+import type { Message } from '@earendil-works/pi-ai';
+import { buildTextPrefix, type RecordingAttachment } from './attachments';
+import { wrapUserRequest } from './prompt-envelope';
 import {
   extractSlashPrompt,
+  extractUserAttachments,
   extractUserText,
   replaceUserText,
   sanitizeAgentMessages,
@@ -386,5 +391,71 @@ describe('truncateForRetry', () => {
     const truncated = truncateForRetry(messages);
     expect(truncated).toEqual([user('a')]);
     expect(truncated).toEqual(messages.slice(0, truncated!.length));
+  });
+});
+
+describe('extractUserAttachments · <recording> 信封', () => {
+  const userMessage = (text: string): Message => ({ role: 'user', content: [{ type: 'text', text }], timestamp: 1 });
+  const recording = (overrides: Partial<RecordingAttachment> = {}): RecordingAttachment => ({
+    type: 'recording',
+    name: 'recording-20260101-120000-abcd.json',
+    sizeBytes: 20,
+    eventCount: 3,
+    durationMs: 4200,
+    json: '{"events":[{"label":"a < b & \\"c\\""}]}',
+    ...overrides,
+  });
+
+  it('buildTextPrefix 与解析往返：网络属性逐个还原，HAR 内容不进信封', () => {
+    const att = recording({
+      truncatedAttachment: true,
+      networkCount: 12,
+      filteredCount: 4,
+      networkState: 'aborted',
+      harPath: 'recordings/recording-20260101-120000-abcd.har',
+      har: { name: 'x.har', json: '{"log":{}}' },
+    });
+    const text = buildTextPrefix([att]);
+    expect(text).not.toContain('"log"');
+    const [parsed] = extractUserAttachments(userMessage(`${text}\n${wrapUserRequest('看看')}`)).recordings;
+    expect(parsed).toEqual({
+      name: att.name,
+      eventCount: 3,
+      durationMs: 4200,
+      truncated: true,
+      json: att.json,
+      networkCount: 12,
+      filteredCount: 4,
+      networkState: 'aborted',
+      harPath: 'recordings/recording-20260101-120000-abcd.har',
+    });
+  });
+
+  it('HAR 写入失败的标记往返；正常状态不写 network-state', () => {
+    const text = buildTextPrefix([recording({ networkCount: 0, networkState: 'active', harFailed: true })]);
+    expect(text.match(/<recording [^\n]*>/)![0]).not.toContain('network-state');
+    const [parsed] = extractUserAttachments(userMessage(text)).recordings;
+    expect(parsed).toMatchObject({ networkCount: 0, harFailed: true });
+    expect(parsed.networkState).toBeUndefined();
+    expect(parsed.harPath).toBeUndefined();
+  });
+
+  it('兼容旧消息：固定顺序、没有网络属性的信封照常解析', () => {
+    const old = '<attachments>\n<recording name="old.json" mime="application/x-cebian-recording+json" event-count="5" duration-ms="900" truncated="true">\n{"a":1}\n</recording>\n</attachments>';
+    expect(extractUserAttachments(userMessage(old)).recordings).toEqual([
+      { name: 'old.json', eventCount: 5, durationMs: 900, truncated: true, json: '{"a":1}' },
+    ]);
+  });
+
+  it('属性顺序无关；未知属性与未知网络状态被忽略', () => {
+    const text = '<attachments>\n<recording har="recordings/a.har" future="1" network-state="weird" duration-ms="10" event-count="2" name="a.json" network-count="1">\n{}\n</recording>\n</attachments>';
+    const [parsed] = extractUserAttachments(userMessage(text)).recordings;
+    expect(parsed).toEqual({ name: 'a.json', eventCount: 2, durationMs: 10, truncated: false, json: '{}', networkCount: 1, harPath: 'recordings/a.har' });
+  });
+
+  it('一条消息里多个录制各自解析', () => {
+    const text = buildTextPrefix([recording({ name: 'one.json' }), recording({ name: 'two.json', networkCount: 3 })]);
+    const recordings = extractUserAttachments(userMessage(text)).recordings;
+    expect(recordings.map((r) => [r.name, r.networkCount])).toEqual([['one.json', undefined], ['two.json', 3]]);
   });
 });

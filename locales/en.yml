@@ -458,6 +458,8 @@ settings:
       disconnected: "Disconnected"
       probing: "Reconnecting"
       circuitOpen: "Unavailable"
+      # $1 = error message returned by the server or the connection
+      lastError: "Last error: $1"
     form:
       name: "Name"
       namePlaceholder: "e.g. weather, github, my-tools"
@@ -651,14 +653,31 @@ chat:
     recordingMeta: "$1 events · $2"
     recordingTruncated: "truncated"
     recordingDownload: "Download recording JSON"
-    # $1 = event count, $2 = compact char count (e.g. 1.2K, 3M)
-    recordingHover: "$1 events · ~$2 chars"
+    # $1 = compact char count (e.g. 1.2K, 3M)
+    recordingChars: "~$1 chars"
+    # $1 = non network events, $2 = network requests
+    recordingMetaNetwork: "$1 events · $2 requests"
+    # $1 = analytics / monitoring requests skipped
+    recordingFiltered: "$1 filtered"
+    recordingNetworkAborted: "network recording stopped"
+    recordingNetworkUnavailable: "network not recorded"
+    recordingHarFailed: "HAR not saved"
+    recordingHarDownload: "Download HAR (full network log)"
+    recordingHarOpen: "Open HAR (full network log)"
   recorder:
-    start: "Start recording user actions"
+    start: "Start recording"
     stop: "Stop recording (will attach to next message)"
     startRejectedBusy: "Another sidepanel is already recording. Stop it first to start a new recording."
     autoStoppedEvents: "Recording auto-stopped: event limit reached"
     autoStoppedTime: "Recording auto-stopped: time limit reached"
+    options: "Recording options"
+    interactions: "Page actions"
+    network: "Network requests"
+    noneSelected: "Select at least one option in Recording options first"
+    networkHint: "While recording, Chrome shows a debugging bar at the top of the browser window. It goes away when you stop, unless Mobile mode is still on. Clicking Cancel on the bar stops network recording and also turns off Mobile mode."
+    networkHintFirefox: "In Firefox, request details are recorded but response contents are not."
+    networkAborted: "Network recording stopped because the debugging bar was cancelled."
+    networkAbortedFirefox: "Network recording stopped because the permission to observe requests was removed."
   askUser:
     placeholder: "Type a reply…"
     # Multi-question form (paged): navigation + per-question affordances
@@ -851,6 +870,9 @@ provider:
     maxTokens: "Max output"
     maxTokensPlaceholder: "0 (unlimited)"
     tokensHint: "Blank uses defaults · context window sets when history is compacted, not a hard limit"
+    toolCalling: "Tool calling"
+    toolCallingHint: "Turn off for chat-only models without function calling support: requests then carry no tools and the model can only chat"
+    noTools: "No tools"
     manualModelPlaceholder: "Manual Model ID"
     addManual: "Add model manually"
     advanced: "Advanced"
@@ -1080,6 +1102,12 @@ errors:
     requestFailed: "Request failed: $1"
   mobile:
     toggleFailed: "Failed to toggle mobile mode"
+  recorder:
+    networkPermissionDenied: "Network requests won't be recorded: permission to observe requests wasn't granted."
+    networkPermissionDeniedNotStarted: "Recording didn't start: permission to observe requests wasn't granted, and page actions are turned off."
+    optionsChanged: "Recording didn't start: the recording options weren't saved or were just changed. Check them and start again."
+    networkUnavailable: "Network requests can't be recorded on this page. Another debugger may be attached to it."
+    networkUnavailableFirefox: "Network requests can't be recorded in this browser right now."
   skillPackage:
     invalid: "Invalid skill package."
     tooLarge: "Skill package is too large."

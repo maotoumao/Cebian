@@ -19,12 +19,13 @@ RecordedSession {
                    them by tIdx (an index into this array, not the tabId)
   events: RecordedEvent[]   ordered by t ascending
   truncated?: 'event_limit' | 'time_limit'   set if auto stopped
+  network?: NetworkSummary   present only if network recording was on
 }
 
 RecordedEvent base: { id, t, tIdx, kind }
   t: ms since startedAt (>= 0, non decreasing)
   tIdx: index into the tabs[] array above; tabs[tIdx] is the Chrome tabId
-  kind: 'interaction' | 'tab' | 'mutation'
+  kind: 'interaction' | 'tab' | 'mutation' | 'network'
 
 interaction (a user action):
   action:   'click' | 'input' | 'change' | 'submit' | 'keypress' | 'scroll'
@@ -50,6 +51,36 @@ mutation (batched DOM changes since previous mutation event):
               textPreview?, size?: {w,h}, childCount? }]
   note?:   'too_many_changes' (raw buffer overflowed; changes empty)
 
+network (one HTTP request, WebSocket or EventSource, in the same
+timeline so it follows the click that caused it):
+  id:       matches "_cebianId" in the HAR file (see har attr below)
+  type:     'document' | 'fetch' | 'xhr' | 'eventsource' | 'websocket'
+  method, url   url is the request URL (not the page URL)
+  status?, ms?, error?, redirects?: number of redirects followed
+  req?:     request body preview; reqOmitted?: why it was not recorded
+  res?:     response body preview; resOmitted?: why it was not recorded
+            ('binary' | 'too_large' | 'evicted' | 'unavailable' |
+             'unsupported' = format that cannot be reliably redacted)
+  shape?:   field names and types of a JSON response
+  messages?: number of WebSocket / EventSource messages recorded
+
+NetworkSummary {
+  state: 'active' | 'aborted' (user stopped network recording at
+         abortedAt ms; later requests are missing) | 'unavailable'
+         (could not record, see unavailableReason)
+  unavailableTabs?: number of tabs whose requests could not be recorded
+                    (e.g. another debugger was attached); requests on
+                    those tabs are missing
+  requests: total recorded; included?: how many are in this timeline
+            when fewer (size limit)
+  filtered: analytics / monitoring requests skipped
+  truncated?: 'entry_limit' | 'size_limit'   network recording stopped
+  previews?: 'no_shape' | 'no_previews'   previews dropped for size;
+             the HAR file still has the full bodies
+}
+Secrets (tokens, passwords, keys, auth headers, cookies) are replaced
+with [redacted] or not recorded at all. Cookies are never recorded.
+
 Notes:
   - Empty optional fields ('', undefined, null) are dropped from the JSON
     rather than emitted; their absence is not meaningful.
@@ -59,7 +90,16 @@ Notes:
 
 <recording> envelope attrs:
   name, mime
-  event-count: events.length in this body
+  event-count: non network events in this body
+  network-count: network events in this body (network recording only)
+  filtered-count: analytics / monitoring requests skipped
+  network-state: 'aborted' | 'unavailable' when network recording did
+                 not run normally
+  har: path of the full network log (HAR 1.2, with headers and bodies),
+       relative to /workspaces/{SESSION_ID}/. Each entry carries
+       "_cebianId" equal to a network event id: search for it with
+       fs_search, then read the nearby lines with fs_read_file.
+  har-failed="true": the HAR could not be saved; only this body exists
   duration-ms: original session duration (covers trimmed events too)
   truncated="true": events were trimmed for size; original had more
 
@@ -69,6 +109,10 @@ Usage:
     interaction events into the corresponding interact tool calls in
     timestamp order, using each event's target.selector. Insert a
     wait_navigation call wherever the timeline shows a tab navigation.
+  - When the user wants to automate a site or extract its data, prefer
+    calling the recorded API requests directly (method, url, request
+    body shape from the HAR) over replaying clicks. Redacted values must
+    come from the user or the live page, never be guessed.
   - When the user only asks about the recording (summarize, explain,
     inspect), describe it without executing.
   - Do not ask the user to confirm steps that are already in the

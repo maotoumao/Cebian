@@ -116,7 +116,7 @@ export default defineContentScript({
 
     // ─── Outbound messaging ─────────────────────────────────────────────
 
-    function send(event: RecordedEventWithoutBase): void {
+    function send(event: RecordedEventWithoutBase, at: number): void {
       if (!initState) return;
       // Allow drain-time emissions through even after `stopped` flips, so
       // the stop() drain can land last input/scroll values.
@@ -126,6 +126,7 @@ export default defineContentScript({
           kind: RECORDER_MSG_KIND,
           type: 'event',
           event,
+          at,
         });
       } catch (err) {
         // Extension context invalidated, background not ready, or the
@@ -148,13 +149,14 @@ export default defineContentScript({
     type EmitArg = RecordedEventWithoutBase extends infer T
       ? T extends RecordedEventWithoutBase ? Omit<T, 'tabId' | 'url'> : never
       : never;
-    function emit(partial: EmitArg): void {
+    /** `at`：事件在页面里发生的时刻，缺省为此刻。防抖 / 攒批的事件传入真正发生的时刻。 */
+    function emit(partial: EmitArg, at: number = Date.now()): void {
       if (!initState) return;
       send({
         ...partial,
         tabId: initState.tabId,
         url: location.href,
-      } as RecordedEventWithoutBase);
+      } as RecordedEventWithoutBase, at);
     }
 
     // ─── Inbound control messages ───────────────────────────────────────
@@ -228,6 +230,8 @@ export default defineContentScript({
     let lastScrollX = window.scrollX;
     let lastScrollY = window.scrollY;
     let scrollFlushTimer: ReturnType<typeof setTimeout> | null = null;
+    /** 本轮聚合窗口里第一次滚动的时刻。 */
+    let scrollStartedAt = 0;
 
     function installInteractionListeners(): void {
       // All listeners are window-level capture-phase so we see events the
@@ -319,6 +323,8 @@ export default defineContentScript({
       key?: string;
       modifiers?: Array<'ctrl' | 'shift' | 'alt' | 'meta'>;
       scroll?: { deltaY: number; deltaX: number };
+      /** 事件发生时刻，缺省为此刻（见 emit）。 */
+      at?: number;
     }): void {
       // Crucial: flush any pending DOM mutations BEFORE the interaction
       // emits, so the timeline shows the previous interaction's reactions
@@ -333,7 +339,7 @@ export default defineContentScript({
         key: args.key,
         modifiers: args.modifiers,
         scroll: args.scroll,
-      });
+      }, args.at);
     }
 
     /** Truncate a string to `max` chars, appending an ellipsis if cut. */
@@ -389,6 +395,8 @@ export default defineContentScript({
       // runs ONE flush per field, not one per keystroke.
       const prev = inputDebounceTimers.get(raw);
       if (prev) clearTimeout(prev);
+      // 记最后一次键入的时刻：防抖后才发送，但事件属于用户停手的那一刻
+      const typedAt = Date.now();
 
       const flush = () => {
         inputDebounceTimers.delete(raw);
@@ -421,6 +429,7 @@ export default defineContentScript({
           action: 'input',
           target: describeTarget(raw),
           value,
+          at: typedAt,
         });
       };
       pendingInputFlushes.set(raw, flush);
@@ -515,6 +524,7 @@ export default defineContentScript({
       scrollAccumDy += dy;
 
       if (scrollFlushTimer) return;
+      scrollStartedAt = Date.now();
       scrollFlushTimer = setTimeout(() => {
         scrollFlushTimer = null;
         flushScroll();
@@ -533,6 +543,7 @@ export default defineContentScript({
         action: 'scroll',
         target: describeTarget(document.body),
         scroll: { deltaX: dx, deltaY: dy },
+        at: scrollStartedAt,
       });
     }
 
@@ -585,8 +596,10 @@ export default defineContentScript({
       const observer = new MutationObserver((records) => {
         if (stopped) return;
         if (mutationTooMany) return;
+        const observedAt = Date.now();
         for (const r of records) {
           mutationBuffer.push(r);
+          mutationTimes.push(observedAt);
           if (mutationBuffer.length > MUTATION_RAW_BUFFER_MAX) {
             mutationTooMany = true;
             break;
@@ -628,6 +641,8 @@ export default defineContentScript({
      *  expensive to record. */
     const mutationBuffer: MutationRecord[] = [];
     let mutationTooMany = false;
+    /** 与 mutationBuffer 一一对应的观察时刻：攒批后才发送，事件时刻取真正被记录的那条变动。 */
+    const mutationTimes: number[] = [];
     let mutationIdleTimer: ReturnType<typeof setTimeout> | null = null;
     let mutationForceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -667,14 +682,16 @@ export default defineContentScript({
       // tooMany handling: emit a single sentinel event so the agent knows
       // a window of mutation activity was dropped, then reset and bail.
       if (mutationTooMany) {
+        const firstAt = mutationTimes[0] ?? Date.now();
         mutationBuffer.length = 0;
+        mutationTimes.length = 0;
         mutationTooMany = false;
         clearMutationTimers();
         emit({
           kind: 'mutation',
           changes: [],
           note: 'too_many_changes',
-        });
+        }, firstAt);
         return;
       }
       if (mutationBuffer.length === 0) {
@@ -685,8 +702,16 @@ export default defineContentScript({
       // Drain the buffer first so re-entry (e.g. an emit triggers another
       // observer callback inside the same microtask) starts fresh.
       const records = mutationBuffer.slice();
+      const recordTimes = mutationTimes.slice();
       mutationBuffer.length = 0;
+      mutationTimes.length = 0;
       clearMutationTimers();
+      // 每个候选节点最早出现在哪条变动里：事件时刻取真正被记录的变动，而不是本批里第一条
+      // （可能是被过滤掉的小改动），否则「结果出现」会排到引起它的网络响应之前
+      const seenAt = new Map<Element, number>();
+      const markSeen = (el: Element, at: number) => {
+        if (!seenAt.has(el)) seenAt.set(el, at);
+      };
 
       // ── 1. Collect candidates ────────────────────────────────────────
       const viewportArea = getViewportArea();
@@ -696,7 +721,8 @@ export default defineContentScript({
       // re-read getBoundingClientRect for the same element later.
       const addedRects = new Map<Element, DOMRect>();
 
-      for (const r of records) {
+      for (const [i, r] of records.entries()) {
+        const recordAt = recordTimes[i] ?? Date.now();
         // We observe { childList: true, subtree: true } only, so the
         // node lists are the only fields we need from each record.
         for (const n of r.addedNodes) {
@@ -710,12 +736,14 @@ export default defineContentScript({
           if (!n.isConnected) continue;
           if (isSemanticContainer(n)) {
             addedSet.add(n);
+            markSeen(n, recordAt);
             continue;
           }
           const rect = n.getBoundingClientRect();
           if (rectMeetsAreaThreshold(rect, viewportArea, MUTATION_AREA_RATIO)) {
             addedSet.add(n);
             addedRects.set(n, rect);
+            markSeen(n, recordAt);
           }
         }
         for (const n of r.removedNodes) {
@@ -725,6 +753,7 @@ export default defineContentScript({
           // even if its current rect is 0×0 (it's detached now). The
           // self-check below handles the unindexed case.
           removedSet.add(n);
+          markSeen(n, recordAt);
         }
       }
 
@@ -758,6 +787,7 @@ export default defineContentScript({
 
       // ── 4. Build changes ────────────────────────────────────────────
       const changes: MutationChange[] = [];
+      const changeTimes: number[] = [];
 
       for (const el of addedKept) {
         const meta = describeNode(el, addedRects.get(el));
@@ -765,12 +795,14 @@ export default defineContentScript({
         // even if the node is detached by then.
         indexedNodes.set(el, meta);
         changes.push({ op: 'appeared', ...meta });
+        changeTimes.push(seenAt.get(el) ?? Date.now());
       }
 
       for (const el of removedSet) {
         const stored = indexedNodes.get(el);
         if (stored) {
           changes.push({ op: 'disappeared', ...stored });
+          changeTimes.push(seenAt.get(el) ?? Date.now());
           continue;
         }
         // P2 fallback: node wasn't pre-indexed. Self-check whether it's
@@ -783,6 +815,7 @@ export default defineContentScript({
             role: getRole(el),
             label: getLabel(el),
           });
+          changeTimes.push(seenAt.get(el) ?? Date.now());
         }
         // Else: drop. Was probably noise (e.g. an inline span removed
         // by a re-render).
@@ -793,7 +826,7 @@ export default defineContentScript({
       emit({
         kind: 'mutation',
         changes,
-      });
+      }, Math.min(...changeTimes));
     }
   },
 });

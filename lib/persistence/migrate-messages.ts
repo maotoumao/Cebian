@@ -20,11 +20,12 @@
  * 必须是**纯同步**函数：Dexie 的 versionchange upgrade 事务里 await 非 IDB 的
  * Promise 会导致 PrematureCommit。
  */
-import { uuidv7 } from '@earendil-works/pi-agent-core';
-import type { AgentMessage, Entry } from '@earendil-works/pi-agent-core';
+import { uuidv7 } from '@earendil-works/pi-ai';
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
+import type { Entry } from '@/lib/shims/pi-harness/session/types';
 import { sanitizeAgentMessages } from '@/lib/agent/message-helpers';
 import { entriesToMessages, messageToEntryBody } from '@/lib/agent/session-projection';
-import { SessionState, type SessionMutation } from '@/lib/shims/pi-session-state';
+import { SessionState, type SessionMutation } from '@/lib/shims/pi-harness/session/state';
 
 /** 消息可能来自脏历史，timestamp 缺失 / 非法时退回给定的兜底值（通常取行的 updatedAt）。 */
 function entryTimestamp(msg: AgentMessage, fallback: number): number {

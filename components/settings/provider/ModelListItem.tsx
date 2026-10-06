@@ -24,18 +24,22 @@ interface ModelListItemProps {
   onToggleReasoning: (modelId: string) => void;
   onToggleImage: (modelId: string) => void;
   onRemove: (modelId: string) => void;
-  onFieldChange: (modelId: string, patch: Partial<Pick<CustomModelDef, 'contextWindow' | 'maxTokens'>>) => void;
+  onFieldChange: (
+    modelId: string,
+    patch: Partial<Pick<CustomModelDef, 'contextWindow' | 'maxTokens' | 'toolCalling'>>,
+  ) => void;
 }
 
 /**
  * 自定义 provider 里的单个模型行：摘要行（modelId + 非默认 chip + 推理/多模态开关 +
- * 删除 + 展开箭头）+ 展开后的 context/maxTokens 配置。父级用 <Accordion> 包裹一组
+ * 删除 + 展开箭头）+ 展开后的 context/maxTokens 与工具调用配置。父级用 <Accordion> 包裹一组
  */
 export function ModelListItem({ model, onToggleReasoning, onToggleImage, onRemove, onFieldChange }: ModelListItemProps) {
   const reasoningId = useId();
   const imageId = useId();
   const ctxId = useId();
   const maxId = useId();
+  const toolsId = useId();
 
   const ctxChip = model.contextWindow != null && model.contextWindow !== DEFAULT_CONTEXT_WINDOW
     ? formatCompactCount(model.contextWindow)
@@ -43,14 +47,15 @@ export function ModelListItem({ model, onToggleReasoning, onToggleImage, onRemov
   const maxChip = model.maxTokens != null && model.maxTokens !== DEFAULT_MAX_TOKENS
     ? `≤${formatCompactCount(model.maxTokens)}`
     : null;
+  const toolsChip = model.toolCalling === false ? t('provider.form.noTools') : null;
 
   return (
     <AccordionItem value={model.modelId} className="border-0">
       <div className="flex items-center gap-2 text-xs py-1.5">
         <span className="flex-1 min-w-0 font-mono truncate">{model.modelId}</span>
-        {(ctxChip || maxChip) && (
+        {(ctxChip || maxChip || toolsChip) && (
           <span className="shrink-0 text-[0.6rem] text-muted-foreground tabular-nums whitespace-nowrap">
-            {[ctxChip, maxChip].filter(Boolean).join(' · ')}
+            {[ctxChip, maxChip, toolsChip].filter(Boolean).join(' · ')}
           </span>
         )}
         <div className="flex items-center gap-1 shrink-0">
@@ -112,6 +117,17 @@ export function ModelListItem({ model, onToggleReasoning, onToggleImage, onRemov
             </div>
           </div>
           <p className="text-[0.6rem] text-muted-foreground">{t('provider.form.tokensHint')}</p>
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <Label htmlFor={toolsId} className="text-[0.65rem] text-muted-foreground">{t('provider.form.toolCalling')}</Label>
+            <Switch
+              id={toolsId}
+              checked={model.toolCalling ?? true}
+              // 打开时删掉字段（undefined），保持「缺省即支持」
+              onCheckedChange={checked => onFieldChange(model.modelId, { toolCalling: checked ? undefined : false })}
+              className="scale-75"
+            />
+          </div>
+          <p className="text-[0.6rem] text-muted-foreground">{t('provider.form.toolCallingHint')}</p>
         </div>
       </AccordionContent>
     </AccordionItem>

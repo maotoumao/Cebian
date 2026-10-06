@@ -38,7 +38,7 @@
  * 的混淆代码判定。
  */
 import type { OAuthAuth, OAuthCredential } from '@earendil-works/pi-ai';
-import { getBuiltinModels } from '@/lib/providers/builtin-models';
+import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all';
 import { t } from '@/lib/i18n';
 
 const CLIENT_ID = 'Iv1.b507a08c87ecfe98';
@@ -259,7 +259,7 @@ async function refreshCopilotToken(
 
 /**
  * 登录成功后逐个把内置 Copilot 模型 POST 到 `/policy` 开启（Claude / Grok 等需要显式
- * 开启才能用）。模型 id 列表取自内置 Copilot 目录（pi 目录 + 本地补丁，见 builtin-models.ts）。
+ * 开启才能用）。模型 id 列表取自 pi 内置 Copilot 目录（`providers/all`）。
  * best-effort：任一模型开启失败都不阻断登录。
  */
 async function enableAllCopilotModels(

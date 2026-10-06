@@ -454,6 +454,8 @@ settings:
       disconnected: "未连接"
       probing: "重连中"
       circuitOpen: "暂时不可用"
+      # $1 = 服务器或连接返回的错误信息
+      lastError: "最近一次错误：$1"
     form:
       name: "名称"
       namePlaceholder: "例如：weather、github、my-tools"
@@ -647,14 +649,31 @@ chat:
     recordingMeta: "$1 个事件 · $2"
     recordingTruncated: "已截断"
     recordingDownload: "下载录制 JSON"
-    # $1 = 事件数量, $2 = 简短字符数（如 1.2K、3M）
-    recordingHover: "$1 个事件 · 约 $2 字符"
+    # $1 = 简短字符数（如 1.2K、3M）
+    recordingChars: "约 $1 字符"
+    # $1 = 事件数量, $2 = 网络请求数量
+    recordingMetaNetwork: "$1 个事件 · $2 个请求"
+    # $1 = 被过滤的埋点 / 监控请求数量
+    recordingFiltered: "已过滤 $1 个"
+    recordingNetworkAborted: "网络录制已中止"
+    recordingNetworkUnavailable: "未能录制网络"
+    recordingHarFailed: "HAR 保存失败"
+    recordingHarDownload: "下载 HAR（完整网络记录）"
+    recordingHarOpen: "打开 HAR（完整网络记录）"
   recorder:
-    start: "开始录制用户操作"
+    start: "开始录制"
     stop: "停止录制（会随下一条消息发送）"
     startRejectedBusy: "另一个侧边栏正在录制，请先停止后再开始新的录制。"
     autoStoppedEvents: "录制已自动停止：达到事件上限"
     autoStoppedTime: "录制已自动停止：达到时长上限"
+    options: "录制选项"
+    interactions: "页面操作"
+    network: "网络请求"
+    noneSelected: "请先在录制选项里至少勾选一项"
+    networkHint: "录制期间浏览器窗口顶部会显示调试提示条，停止录制后消失（移动端模式仍开着时会保留）。点提示条上的「取消」会停止网络录制，移动端模式也会一起关闭。"
+    networkHintFirefox: "Firefox 下只记录请求信息，不记录响应内容。"
+    networkAborted: "调试提示条被取消，网络录制已停止。"
+    networkAbortedFirefox: "查看网络请求的权限已被移除，网络录制已停止。"
   askUser:
     placeholder: "输入回复…"
     # 多问题表单（翻页）：导航 + 每题交互
@@ -837,6 +856,9 @@ provider:
     maxTokens: "最大输出"
     maxTokensPlaceholder: "0（不限）"
     tokensHint: "留空即用默认 · 上下文窗口决定何时压缩历史，并非硬上限"
+    toolCalling: "工具调用"
+    toolCallingHint: "模型不支持 function calling 时关闭：请求不再携带工具，模型只能对话"
+    noTools: "无工具"
     manualModelPlaceholder: "手动输入 Model ID"
     addManual: "手动添加模型"
     advanced: "高级设置"
@@ -1067,6 +1089,12 @@ errors:
     requestFailed: "请求失败：$1"
   mobile:
     toggleFailed: "移动端模式切换失败"
+  recorder:
+    networkPermissionDenied: "未授予查看网络请求的权限，不会录制网络请求。"
+    networkPermissionDeniedNotStarted: "未开始录制：未授予查看网络请求的权限，且未勾选页面操作。"
+    optionsChanged: "未开始录制：录制选项没有保存成功或刚被修改，请确认后重新开始。"
+    networkUnavailable: "无法录制此页面的网络请求，可能已有其他调试器连接到该页面。"
+    networkUnavailableFirefox: "当前无法在此浏览器中录制网络请求。"
   skillPackage:
     invalid: "无效的技能包。"
     tooLarge: "技能包过大。"

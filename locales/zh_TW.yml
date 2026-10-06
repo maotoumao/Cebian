@@ -454,6 +454,8 @@ settings:
       disconnected: "未連線"
       probing: "重新連線中"
       circuitOpen: "暫時無法使用"
+      # $1 = 伺服器或連線回傳的錯誤訊息
+      lastError: "最近一次錯誤：$1"
     form:
       name: "名稱"
       namePlaceholder: "例如：weather、github、my-tools"
@@ -647,14 +649,31 @@ chat:
     recordingMeta: "$1 個事件 · $2"
     recordingTruncated: "已截斷"
     recordingDownload: "下載錄製 JSON"
-    # $1 = 事件數量, $2 = 簡短字元數（如 1.2K、3M）
-    recordingHover: "$1 個事件 · 約 $2 字元"
+    # $1 = 簡短字元數（如 1.2K、3M）
+    recordingChars: "約 $1 字元"
+    # $1 = 事件數量, $2 = 網路請求數量
+    recordingMetaNetwork: "$1 個事件 · $2 個請求"
+    # $1 = 被過濾的埋點 / 監控請求數量
+    recordingFiltered: "已過濾 $1 個"
+    recordingNetworkAborted: "網路錄製已中止"
+    recordingNetworkUnavailable: "未能錄製網路"
+    recordingHarFailed: "HAR 儲存失敗"
+    recordingHarDownload: "下載 HAR（完整網路記錄）"
+    recordingHarOpen: "開啟 HAR（完整網路記錄）"
   recorder:
-    start: "開始錄製使用者操作"
+    start: "開始錄製"
     stop: "停止錄製（會隨下一條訊息發送）"
     startRejectedBusy: "另一個側邊欄正在錄製，請先停止後再開始新的錄製。"
     autoStoppedEvents: "錄製已自動停止：達到事件上限"
     autoStoppedTime: "錄製已自動停止：達到時長上限"
+    options: "錄製選項"
+    interactions: "頁面操作"
+    network: "網路請求"
+    noneSelected: "請先在錄製選項裡至少勾選一項"
+    networkHint: "錄製期間瀏覽器視窗頂端會顯示偵錯提示列，停止錄製後消失（行動裝置模式仍開啟時會保留）。點提示列上的「取消」會停止網路錄製，行動裝置模式也會一併關閉。"
+    networkHintFirefox: "Firefox 下只記錄請求資訊，不記錄回應內容。"
+    networkAborted: "偵錯提示列已取消，網路錄製已停止。"
+    networkAbortedFirefox: "檢視網路請求的權限已被移除，網路錄製已停止。"
   askUser:
     placeholder: "輸入回覆…"
     # 多問題表單（翻頁）：導覽 + 每題互動
@@ -837,6 +856,9 @@ provider:
     maxTokens: "最大輸出"
     maxTokensPlaceholder: "0（不限）"
     tokensHint: "留空即用預設 · 上下文視窗決定何時壓縮歷史，並非硬上限"
+    toolCalling: "工具呼叫"
+    toolCallingHint: "模型不支援 function calling 時關閉：請求不再附帶工具，模型只能對話"
+    noTools: "無工具"
     manualModelPlaceholder: "手動輸入 Model ID"
     addManual: "手動新增模型"
     advanced: "進階設定"
@@ -1066,6 +1088,12 @@ errors:
     requestFailed: "請求失敗：$1"
   mobile:
     toggleFailed: "行動裝置模式切換失敗"
+  recorder:
+    networkPermissionDenied: "未授予檢視網路請求的權限，不會錄製網路請求。"
+    networkPermissionDeniedNotStarted: "未開始錄製：未授予檢視網路請求的權限，且未勾選頁面操作。"
+    optionsChanged: "未開始錄製：錄製選項沒有儲存成功或剛被修改，請確認後重新開始。"
+    networkUnavailable: "無法錄製此頁面的網路請求，可能已有其他偵錯工具連線到此頁面。"
+    networkUnavailableFirefox: "目前無法在此瀏覽器中錄製網路請求。"
   skillPackage:
     invalid: "無效的技能包。"
     tooLarge: "技能包過大。"

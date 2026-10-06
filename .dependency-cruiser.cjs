@@ -53,6 +53,13 @@ module.exports = {
       to: { path: '^lib/ui/' },
     },
     {
+      name: 'debugger-session-background-only',
+      severity: 'error',
+      comment: '调试连接只能由后台持有（按扩展计的单一连接），界面侧不得直接租用',
+      from: { path: '^(hooks|components)/|^entrypoints/(?!background/)' },
+      to: { path: '^lib/browser/debugger-session\\.ts$' },
+    },
+    {
       name: 'content-no-lib-browser',
       severity: 'error',
       comment: 'content script 不得依赖 lib/browser（Chrome / CDP）',

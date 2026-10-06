@@ -11,7 +11,8 @@
 import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { TOOL_WEB_SEARCH } from '@/lib/tools/names';
-import { executeViaDebugger, isInjectablePage, navigateAndWait, waitForNavigation } from '@/lib/browser/tab-actions';
+import { executeViaDebugger, isDebuggerAvailable } from '@/lib/browser/debugger-session';
+import { isInjectablePage, navigateAndWait, waitForNavigation } from '@/lib/browser/tab-actions';
 import {
   buildSearchUrl,
   isSearchEngineHost,
@@ -262,7 +263,7 @@ async function runExtract(tabId: number, engine: ResolvedSearchEngine, query: st
     return { ok: false, reason: `script injection failed: ${(e as Error).message}` };
   }
   if (raw === EXTRACT_CSP_BLOCKED) {
-    if (typeof chrome.debugger?.attach !== 'function') {
+    if (!isDebuggerAvailable()) {
       return { ok: false, reason: 'page CSP blocks in-page scripts and this browser has no debugger fallback' };
     }
     try {

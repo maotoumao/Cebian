@@ -2,7 +2,7 @@
 
 English | **[简体中文](PRIVACY.zh-CN.md)**
 
-**Last updated:** 2026-05-14
+**Last updated:** 2026-10-06
 
 ## TL;DR
 
@@ -54,6 +54,7 @@ the relevant feature**. Nothing is collected in the background.
 | **Recently closed tabs / sessions** | Read via `chrome.sessions` | Only when you explicitly ask the AI for them | Your local browser → the AI provider you chose |
 | **Downloads** | Read via `chrome.downloads` | Only when you explicitly ask the AI to query downloads | Your local browser → the AI provider you chose |
 | **Recorded interaction sessions** | Clicks, keypresses (including special keys like Enter/Backspace), typed text, scrolls, page navigations, and DOM-element selectors on the tabs you are recording | Only while you have explicitly started a recording from the Cebian UI | Held in memory during recording; when you stop, attached to a chat message and persisted with that session in IndexedDB |
+| **Recorded network requests** | For each request the recorded tabs make (page loads, fetch / XHR, EventSource, WebSocket): method, URL, status, timing, request and response headers, request and response bodies up to 64 KB each, and the first few WebSocket / EventSource messages (in Firefox: no response bodies and no messages). Recognizable secrets such as tokens, passwords, API keys and auth headers are replaced with `[redacted]`, and formats that cannot be reliably redacted are left out; a secret with no recognizable name (for example a bare token inside a URL path) may remain, so review the recording before sending or sharing it. Recording stops capturing network data after 500 requests or 5 MB of recorded request bodies, response bodies and message previews combined. **Cookies are never captured**, static assets (images, scripts, styles, fonts) are not recorded, and recognized requests to common analytics / monitoring services are skipped | Only while a recording you started has "Network requests" turned on (off by default) | Held in memory during recording; when you stop, a summary is attached to the chat message, goes to your AI provider with it, and is stored with that chat in IndexedDB. The full log is saved as a HAR file in that chat's workspace in Cebian's virtual filesystem (`cebian-vfs`) when you send the message |
 | **Microphone audio (voice input)** | Live microphone audio, used only to transcribe speech into the chat input | Only while you have explicitly started voice input from the composer's mic button | The **audio** is processed entirely **on-device** by the browser's built-in speech engine and **never leaves your device** — it is not sent to any server, including AI providers. The resulting **text** appears in the input for you to review; by default it is **not sent anywhere**. If you enable AI correction (an optional feature), that transcribed text is sent to your configured AI provider for cleanup, just like a normal message — the audio itself still never leaves your device |
 | **API keys & OAuth tokens** | Credentials you enter for AI providers | When you enter or update them in Settings | Stored locally in `chrome.storage.local`; sent only as the `Authorization` header to the matching provider's API |
 | **MCP server configurations** | URLs, custom headers, and bearer tokens for any Model Context Protocol server you add | When you add or edit one in Settings | Stored locally in `chrome.storage.local`; sent only to the MCP server you configured |
@@ -166,7 +167,7 @@ the purpose stated below.
 | `storage` | Persist your settings, prompt templates, Skills, and API keys in `chrome.storage.local`. |
 | `alarms` | Run the periodic OAuth-token refresh check (every 30 min) so logged-in providers like GitHub Copilot stay valid. |
 | `offscreen` | Host an offscreen document for tasks that require a DOM/audio context the service worker can't provide (e.g. clipboard, audio). |
-| `debugger` | Power advanced page interactions via the Chrome DevTools Protocol (e.g. mobile-device emulation, screenshots, network capture) — only on tabs you actively work with. |
+| `debugger` | Power advanced page interactions via the Chrome DevTools Protocol (e.g. mobile-device emulation, screenshots, and recording network requests when you turn that on for a recording) — only on tabs you actively work with. Chrome shows a notice bar while it is in use. |
 | `webNavigation` | Detect navigation events on the active tab so context (URL, title) stays in sync with what you're looking at. |
 | `bookmarks` | Read and write your bookmarks **only** when you explicitly ask the AI to manage them. |
 | `history` | Query your browsing history **only** when you explicitly ask the AI to look something up in it. |
@@ -176,6 +177,7 @@ the purpose stated below.
 | `downloads` | Query and manage downloads **only** when you explicitly ask the AI to. |
 | `notifications` | Show desktop notifications for long-running tasks you've asked the AI to perform. |
 | `clipboardRead` | Read the system clipboard **only** when you submit a prompt template that includes the `{{clipboard}}` variable. |
+| `webRequest` (Firefox only, optional) | Requested the first time you turn on "Network requests" for a recording in Firefox, and used only to record request and response headers, status, timing and request bodies (no response bodies) while such a recording runs. You can decline it or revoke it at any time. |
 | `host_permissions: <all_urls>` | The AI can be asked about **any** website you visit; without all-URL host access, Cebian could not read or assist on arbitrary sites. Host access is used solely to read/interact with the tab you're working on, never to scan sites in the background. |
 
 ---
@@ -189,7 +191,10 @@ All data Cebian creates is stored locally in your browser, specifically:
 - **IndexedDB — `cebian` database** — chat sessions and message history
   (including any recorded interaction sessions you've attached to a chat).
 - **IndexedDB — `cebian-vfs` database** — prompt templates, Skill packages, and
-  any files you create or import into Cebian's virtual filesystem.
+  any files you create or import into Cebian's virtual filesystem, including the
+  HAR files of recorded network requests (in each chat's `recordings/` folder).
+  When you export a backup that includes a chat's workspace, its HAR files are
+  included too.
 
 You can delete this data at any time:
 

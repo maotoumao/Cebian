@@ -3,7 +3,7 @@
 // 侧的 `mcp_status`（设置页一次性状态查询）。文件名取 bridge 而非 client-handlers，
 // 因为它不只处理端口消息。
 
-import { getMCPManager } from '@/lib/mcp/manager';
+import { getMCPManager, type ServerStatus } from '@/lib/mcp/manager';
 import { registerClientHandlers, type ClientHandlerMap } from '../ipc/client-router';
 import { post } from '../ipc/port-registry';
 
@@ -68,14 +68,17 @@ function setupMcpBridge(): void {
     // One-shot status query for the Settings UI. Returns a map keyed by
     // server id, only for currently-enabled servers (disabled ones never
     // connect, so the UI handles them via `!server.enabled` first).
+    // 副作用：对空闲的服务器调用 `connectIfIdle` 在后台试连，下一次轮询即可显示结果。
     void (async () => {
       try {
         const mgr = getMCPManager();
         const servers = await mgr.getEnabledServers();
-        const out: Record<string, { connected: boolean; breaker: string }> = {};
+        const out: Record<string, ServerStatus> = {};
         for (const s of servers) {
           const st = await mgr.getStatus(s.id);
-          if (st) out[s.id] = { connected: st.connected, breaker: st.breaker };
+          if (!st) continue;
+          out[s.id] = st;
+          void mgr.connectIfIdle(s.id);
         }
         sendResponse(out);
       } catch (err) {

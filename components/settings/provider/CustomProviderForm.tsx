@@ -116,7 +116,7 @@ function ProviderFormBody({
   onRemoveModel: (modelId: string) => void;
   onToggleReasoning: (modelId: string) => void;
   onToggleImage: (modelId: string) => void;
-  onModelFieldChange: (modelId: string, patch: Partial<Pick<CustomModelDef, 'contextWindow' | 'maxTokens'>>) => void;
+  onModelFieldChange: (modelId: string, patch: Partial<Pick<CustomModelDef, 'contextWindow' | 'maxTokens' | 'toolCalling'>>) => void;
   onSubmit: () => void;
   onCancel: () => void;
   submitLabel: string;
@@ -300,7 +300,7 @@ function useProviderForm(initial?: { name: string; baseUrl: string; apiKey: stri
 
   const handleModelFieldChange = (
     modelId: string,
-    patch: Partial<Pick<CustomModelDef, 'contextWindow' | 'maxTokens'>>,
+    patch: Partial<Pick<CustomModelDef, 'contextWindow' | 'maxTokens' | 'toolCalling'>>,
   ) => setModels(models.map(m => (m.modelId === modelId ? { ...m, ...patch } : m)));
 
   const reset = () => {

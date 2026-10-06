@@ -1,18 +1,10 @@
 /**
- * pi 会话树的内存态 reducer，移植自 @earendil-works/pi-agent-core@0.84.1
- * `dist/harness/session/state.js`（MIT，https://github.com/earendil-works/pi）。
- *
- * 为什么要移植：pi 只导出了 `SessionStorage` 接口和 InMemory/Jsonl 两个后端，
- * `SessionState`（所有后端共享的校验 + 索引 + 统计逻辑）没有进公开 API，包的
- * exports 映射也封死了深层导入。自研 Dexie 后端需要这份逻辑，且必须和 pi 的
- * conformance 测试套件（`@earendil-works/pi-agent-core/session/testing`）逐字节
- * 一致，故按原实现忠实移植，仅补 TypeScript 类型（类型全部来自 pi 的公开导出）。
- *
- * 维护约定：不要在这里加 Cebian 业务逻辑；升级 pi 时 diff 上游 state.js 同步改动，
- * conformance 套件（lib/persistence/session-tree.test.ts）会兜住行为漂移。上游若
- * 公开导出 SessionState，删除本文件改用官方版。
+ * 移植自 @earendil-works/pi-agent-core@0.84.1 `dist/harness/session/state.js`（MIT，许可证见同目录 LICENSE），
+ * 类型为手补，与 0.84.4 源码逻辑一致、仅类型标注有差异。上游从未公开导出 `SessionState`（所有后端共享的
+ * 校验 + 索引 + 统计逻辑），自研 Dexie 后端需要它。
+ * vendor 原因、维护约定与偏离记录见 lib/shims/pi-harness/README.md。
  */
-import { SessionError } from '@earendil-works/pi-agent-core';
+import { SessionError } from '@/lib/shims/pi-harness/session/types';
 import type {
   BranchBounds,
   Entry,
@@ -26,7 +18,7 @@ import type {
   OperationStartedRecord,
   RecordQuery,
   SessionStats,
-} from '@earendil-works/pi-agent-core';
+} from '@/lib/shims/pi-harness/session/types';
 
 /** 持久化单位。与上游 state.d.ts 的 SessionMutation 同形（上游未导出，故在此声明）。 */
 export type SessionMutation =

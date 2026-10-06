@@ -53,6 +53,23 @@ For example:
 
 > What's recorded is the sequence of actions, not a video. It records events such as clicks, input, and page navigation, so the model can understand what you just did.
 
+### Recording network requests too
+
+The small arrow next to the record button opens "Recording options", where you can check "Page actions" and "Network requests" (your choice is remembered, network requests are off by default, and recording can't start with both unchecked). With network requests on, the API calls, page loads and WebSocket / EventSource connections the page makes while you work are recorded as well, on the same timeline as your actions, so the model can see which request a click triggered and what came back.
+
+This helps when you want to:
+
+- Teach the model how a website works, turn it into a Skill, or call its API directly to fetch data
+- Hand the model a bug together with the failing request and response
+- Find out which request a piece of data on the page comes from
+
+A few notes:
+
+- While recording, Chrome shows a debugging bar at the top of the window; it goes away when you stop (unless Mobile mode is still on). Clicking Cancel on the bar stops network recording (page actions keep recording) and also turns off Mobile mode if it's on.
+- Recognizable secrets such as tokens, passwords, API keys and auth headers are replaced with `[redacted]`, and cookies are never recorded. A secret with no recognizable name (such as a bare token inside a URL path) may remain, so check before sending or sharing. Static assets such as images and scripts aren't recorded, and recognized requests to common analytics and monitoring services are filtered out; the attachment shows how many were filtered.
+- The model receives a summary of each request. The full log (headers, request bodies, response contents) is saved as a HAR file in this chat's workspace under `recordings/` when you send the message, and the model reads it when it needs details. Request or response bodies over 64 KB aren't recorded, and one recording keeps at most 500 requests. The network icon on a sent message opens the file; on an attachment in the input box it downloads it.
+- In Firefox, turning on network requests asks for a permission the first time, and only request details (including request bodies) are recorded, not response contents.
+
 ## <LucideIcon name="camera" />Screenshot
 
 If the state of the page matters, click "Screenshot" to send the visible area of the current tab along with your message.
@@ -124,4 +141,6 @@ Voice input is handy for quickly jotting down a longer thought, such as:
 <QAItem q="What if a file won't upload?">Currently images and common text files are supported, with up to 10 attachments per message.</QAItem>
 <QAItem q="What if I can't select an element on a special page?">For security reasons, the browser doesn't allow extensions to read these pages. Try a regular web page instead.</QAItem>
 <QAItem q="What if clicking the record button does nothing?">Another sidebar may be recording; stop the recording over there first and try again.</QAItem>
+<QAItem q="What does “network recording stopped” on the attachment mean?">Cancel was clicked on the browser's debugging bar during the recording (in Firefox: the permission was removed). Requests after that weren't recorded; the ones recorded before are still sent to the model.</QAItem>
+<QAItem q="What if the attachment says “network not recorded”?">Usually another extension or debugging tool was already debugging the tab, or the permission wasn't granted in Firefox. Close that tool (or grant the permission) and record again.</QAItem>
 </QA>

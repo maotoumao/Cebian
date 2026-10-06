@@ -13,10 +13,13 @@
  * per-session 串行队列执行（IndexedDB 写是异步的，pi conformance 要求并发写的
  * 完成顺序与 seq 顺序一致）。
  *
- * 行为合规由 pi 官方 conformance 套件钉死（见 session-tree.test.ts）。
+ * 行为合规由 pi 上游的 conformance 套件钉死（随 session 层 vendor 于 lib/shims/pi-harness，
+ * 见 session-tree.test.ts）。
  */
 import Dexie, { type EntityTable, type Table } from 'dexie';
-import { Session, SessionError, uuidv7 } from '@earendil-works/pi-agent-core';
+import { uuidv7 } from '@earendil-works/pi-ai';
+import { Session } from '@/lib/shims/pi-harness/session/session';
+import { SessionError } from '@/lib/shims/pi-harness/session/types';
 import type {
   BranchBounds,
   Entry,
@@ -35,8 +38,8 @@ import type {
   SessionRepo,
   SessionStats,
   SessionStorage,
-} from '@earendil-works/pi-agent-core';
-import { SessionState, type SessionMutation } from '@/lib/shims/pi-session-state';
+} from '@/lib/shims/pi-harness/session/types';
+import { SessionState, type SessionMutation } from '@/lib/shims/pi-harness/session/state';
 
 // ─── 类型 ───
 

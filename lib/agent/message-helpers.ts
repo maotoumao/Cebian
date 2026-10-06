@@ -11,6 +11,7 @@ import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import { unescapeXml } from '@/lib/utils';
 import { SLASH_PROMPT_ONLY_REQUEST } from '@/lib/ai-config/slash-prompt';
 import { USER_REQUEST_CLOSE, USER_REQUEST_OPEN, wrapUserRequest } from '@/lib/agent/prompt-envelope';
+import type { NetworkCaptureState } from '@/lib/recorder/network-types';
 
 // ─── Parsed attachment metadata for UI display ───
 
@@ -18,7 +19,24 @@ export interface ParsedUserAttachments {
   images: { data: string; mimeType: string }[];
   elements: { selector: string }[];
   files: { name: string; type: string }[];
-  recordings: { name: string; eventCount: number; durationMs: number; truncated: boolean; json: string }[];
+  recordings: ParsedRecording[];
+}
+
+/** 用户消息里一个 `<recording>` 的元数据（从信封属性解析）。 */
+export interface ParsedRecording {
+  name: string;
+  eventCount: number;
+  durationMs: number;
+  truncated: boolean;
+  json: string;
+  /** 带上的网络请求条数；没开网络录制的录制（含旧消息）没有。 */
+  networkCount?: number;
+  filteredCount?: number;
+  /** 网络录制没有正常进行时的状态（`aborted` / `unavailable`）。 */
+  networkState?: NetworkCaptureState;
+  /** HAR 在会话工作目录下的相对路径。 */
+  harPath?: string;
+  harFailed?: boolean;
 }
 
 /** Extract plain text from an AssistantMessage's content blocks */
@@ -132,8 +150,19 @@ const FILE_RE = /<attached-file\s+name="([^"]*)"\s+type="([^"]*)">/g;
 // Body is XML-escaped JSON. Recorded `<`/`>`/`&` chars are encoded as
 // entities so they can't fake a `</recording>` or `</attachments>` close
 // tag, keeping the non-greedy boundary unambiguous.
-const RECORDING_RE = /<recording\s+name="([^"]*)"\s+mime="[^"]*"\s+event-count="(\d+)"\s+duration-ms="(\d+)"(\s+truncated="true")?>\n([\s\S]*?)\n<\/recording>/g;
+// 属性按名字解析（顺序无关，新旧信封都认）：旧消息只有 name / mime / event-count /
+// duration-ms / truncated，开了网络录制的还有 network-count / har 等。
+// 属性值里的 `"` 已转义、`>` 没有转义，所以按「名="值"」逐个匹配，而不是找第一个 `>`。
+const RECORDING_RE = /<recording((?:\s+[\w-]+="[^"]*")+)\s*>\n([\s\S]*?)\n<\/recording>/g;
+const ATTRIBUTE_RE = /([\w-]+)="([^"]*)"/g;
 const ATTACHMENTS_BLOCK_RE = /<attachments>([\s\S]*?)<\/attachments>/;
+
+// 网络录制状态的全集：用 Record 列出，新增状态时这里不补就编译不过
+const NETWORK_STATES: Record<NetworkCaptureState, true> = { active: true, aborted: true, unavailable: true };
+
+function isNetworkState(value: string | undefined): value is NetworkCaptureState {
+  return value !== undefined && Object.hasOwn(NETWORK_STATES, value);
+}
 
 /** Extract attachment metadata from a user message for display in the chat bubble. */
 export function extractUserAttachments(msg: Message): ParsedUserAttachments {
@@ -164,12 +193,20 @@ export function extractUserAttachments(msg: Message): ParsedUserAttachments {
     });
   }
   for (const m of attachBlock.matchAll(RECORDING_RE)) {
+    const attrs = new Map([...m[1].matchAll(ATTRIBUTE_RE)].map(([, key, value]) => [key, unescapeXml(value)]));
+    const count = (key: string) => (attrs.has(key) ? Number(attrs.get(key)) : undefined);
+    const networkState = attrs.get('network-state');
     result.recordings.push({
-      name: unescapeXml(m[1]),
-      eventCount: Number(m[2]),
-      durationMs: Number(m[3]),
-      truncated: !!m[4],
-      json: unescapeXml(m[5]),
+      name: attrs.get('name') ?? '',
+      eventCount: count('event-count') ?? 0,
+      durationMs: count('duration-ms') ?? 0,
+      truncated: attrs.get('truncated') === 'true',
+      json: unescapeXml(m[2]),
+      ...(attrs.has('network-count') ? { networkCount: count('network-count') } : {}),
+      ...(attrs.has('filtered-count') ? { filteredCount: count('filtered-count') } : {}),
+      ...(isNetworkState(networkState) ? { networkState } : {}),
+      ...(attrs.has('har') ? { harPath: attrs.get('har') } : {}),
+      ...(attrs.get('har-failed') === 'true' ? { harFailed: true } : {}),
     });
   }
 

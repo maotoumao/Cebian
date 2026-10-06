@@ -16,6 +16,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { recorderChannel, type RecorderStatus } from '@/lib/recorder/sidepanel-channel';
+import type { RecorderOptions } from '@/lib/recorder/types';
+import type { NetworkCaptureState } from '@/lib/recorder/network-types';
 import { myInstanceId } from '@/lib/ipc/instance-id';
 import { t } from '@/lib/i18n';
 
@@ -33,10 +35,14 @@ export interface UseRecorderResult {
   /** Absolute timestamp the current/last recording started. Used for latching
    *  one-shot effects to a specific recording. */
   startedAt: number | null;
+  /** 是否有录制在进行（不论哪个实例发起的）。 */
+  isRecording: boolean;
+  /** 本轮网络录制的状态；没开网络录制或空闲时为 undefined。 */
+  networkState: NetworkCaptureState | undefined;
   /** Start a new recording on the focused window. No-op if another
    *  instance already owns the recording — the BG rejects and a toast
-   *  surfaces the reason. */
-  start: () => void;
+   *  surfaces the reason. `options` 缺省时只录操作。 */
+  start: (options?: RecorderOptions) => void;
   /** Stop the active recording. Resolves once the background has finalized.
    *  The captured session is delivered via `recorderChannel.subscribeSession`
    *  (consumed by useComposerAttachments, which appends it as a `RecordingAttachment`),
@@ -88,8 +94,8 @@ export function useRecorder(): UseRecorderResult {
     installRejectionToastsOnce();
   }, []);
 
-  const start = useCallback(() => {
-    recorderChannel.start();
+  const start = useCallback((options?: RecorderOptions) => {
+    recorderChannel.start(options);
   }, []);
 
   // Track an in-flight stop so concurrent clicks share the same promise.
@@ -147,8 +153,10 @@ export function useRecorder(): UseRecorderResult {
   return {
     isOwner,
     isOwnerNow,
+    isRecording: status.isRecording,
     truncated: status.truncated,
     startedAt: status.startedAt,
+    networkState: status.networkState,
     start,
     stop,
   };

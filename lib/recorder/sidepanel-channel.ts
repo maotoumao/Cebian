@@ -10,7 +10,8 @@
 // to the recorder. Import `myInstanceId` from there if you need it.
 
 import type { ClientMessage } from '@/lib/ipc/protocol';
-import type { RecordedSession } from './types';
+import type { NetworkCaptureState } from './network-types';
+import type { RecordedSession, RecorderOptions } from './types';
 
 export interface RecorderStatus {
   isRecording: boolean;
@@ -19,6 +20,9 @@ export interface RecorderStatus {
   truncated?: 'event_limit' | 'time_limit';
   initiatorInstanceId: string | null;
   activeWindowId: number | null;
+  /** 网络录制的状态与已录请求数；本轮没开网络录制时不出现。 */
+  networkState?: NetworkCaptureState;
+  networkCount?: number;
 }
 
 export type RecorderRejectionReason = 'busy' | 'before_hello';
@@ -122,9 +126,9 @@ export const recorderChannel = {
   },
 
   /** Returns true if the message was posted; false if no port is connected. */
-  start(): boolean {
+  start(options?: RecorderOptions): boolean {
     if (!portRef) return false;
-    portRef.postMessage({ type: 'recorder_start' } satisfies ClientMessage);
+    portRef.postMessage({ type: 'recorder_start', options } satisfies ClientMessage);
     return true;
   },
 

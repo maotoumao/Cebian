@@ -352,6 +352,8 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
             truncated: msg.truncated,
             initiatorInstanceId: msg.initiatorInstanceId,
             activeWindowId: msg.activeWindowId,
+            networkState: msg.networkState,
+            networkCount: msg.networkCount,
           });
           break;
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { mergeFetchedModels, toModel } from '@/lib/providers/custom-models';
+import { mergeFetchedModels, supportsToolCalling, toModel } from '@/lib/providers/custom-models';
+import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all';
 import type { CustomModelDef, CustomProviderConfig } from '@/lib/persistence/storage';
 
 const configured: CustomModelDef = {
@@ -30,6 +31,11 @@ describe('mergeFetchedModels', () => {
     ]);
   });
 
+  it('重新拉取保留「不支持工具调用」的设置', () => {
+    const chatOnly: CustomModelDef = { ...configured, toolCalling: false };
+    expect(mergeFetchedModels([chatOnly], ['gpt-x'])).toEqual([chatOnly]);
+  });
+
   it('远端重复 id 只取首个', () => {
     expect(mergeFetchedModels([configured], ['gpt-x', 'gpt-x'])).toEqual([configured]);
   });
@@ -56,5 +62,27 @@ describe('toModel', () => {
   it('无 headers / 空 headers → model 不带 headers', () => {
     expect(toModel(cfg, m).headers).toBeUndefined();
     expect(toModel({ ...cfg, headers: {} }, m).headers).toBeUndefined();
+  });
+});
+
+describe('supportsToolCalling', () => {
+  const cfg: CustomProviderConfig = { id: 'p', name: 'P', baseUrl: 'https://x/v1', models: [] };
+  const m: CustomModelDef = { modelId: 'm', name: 'm', reasoning: false };
+
+  it('自定义模型缺省 / 显式开启都支持工具调用', () => {
+    expect(supportsToolCalling(toModel(cfg, m))).toBe(true);
+    expect(supportsToolCalling(toModel(cfg, { ...m, toolCalling: true }))).toBe(true);
+  });
+
+  it('关闭后不支持，且标记在展开复制后仍保留', () => {
+    const model = toModel(cfg, { ...m, toolCalling: false });
+    expect(supportsToolCalling(model)).toBe(false);
+    expect(supportsToolCalling({ ...model })).toBe(false);
+  });
+
+  it('内置模型一律支持', () => {
+    const builtin = getBuiltinModels('anthropic');
+    expect(builtin.length).toBeGreaterThan(0);
+    expect(builtin.every(supportsToolCalling)).toBe(true);
   });
 });

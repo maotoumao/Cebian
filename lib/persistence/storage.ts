@@ -6,6 +6,8 @@ import type { ThinkingLevel } from '@earendil-works/pi-agent-core';
 import type { PageActionsConfig } from '@/lib/page-actions/types';
 import { resolvePageScope, type PageScope } from '@/lib/page-actions/match';
 import type { SearchEnginesConfig } from '@/lib/search/types';
+import { DEFAULT_RECORDER_OPTIONS } from '@/lib/recorder/constants';
+import type { RecorderOptions } from '@/lib/recorder/types';
 
 // ─── Provider credential types ───
 
@@ -46,6 +48,11 @@ export interface CustomModelDef {
   reasoning: boolean;
   /** 模型是否支持图片输入（多模态/VLM）。缺省视为 false（纯文本）。 */
   image?: boolean;
+  /**
+   * 模型是否支持工具调用（function calling）。缺省视为 true；只支持对话的模型设为 false，
+   * 请求便不携带工具（#83）。关闭时才写入这个字段，打开时删掉，老数据与新拉取的模型都按支持处理。
+   */
+  toolCalling?: boolean;
   contextWindow?: number;
   maxTokens?: number;
 }
@@ -290,6 +297,12 @@ export const customProviders = storage.defineItem<CustomProviderConfig[]>(
 export const lastSelectedThinkingLevel = storage.defineItem<ThinkingLevel>(
   'local:thinkingLevel',
   { fallback: 'medium' },
+);
+
+/** 录制选项（录操作 / 网络请求），记住上次的选择。 */
+export const recorderOptions = storage.defineItem<RecorderOptions>(
+  'local:recorderOptions',
+  { fallback: { ...DEFAULT_RECORDER_OPTIONS } },
 );
 
 export type ThemePreference = 'dark' | 'light' | 'system';
@@ -577,6 +590,15 @@ export const DEFAULT_FLOATING_BALL_POSITION: FloatingBallPosition = {
 export const floatingBallPosition = storage.defineItem<FloatingBallPosition>(
   'local:floatingBallPosition',
   { fallback: { ...DEFAULT_FLOATING_BALL_POSITION } },
+);
+
+/**
+ * 开着手机模拟的标签页 id。后台持有调试连接并负责写，侧边栏只读来点亮按钮。
+ * 会话级存储与调试连接同寿命：浏览器重启 / 扩展重载后两者一起清空。
+ */
+export const mobileEmulatedTabs = storage.defineItem<number[]>(
+  'session:mobileEmulatedTabs',
+  { fallback: [] },
 );
 
 /**

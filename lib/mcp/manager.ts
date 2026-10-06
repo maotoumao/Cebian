@@ -5,8 +5,8 @@ import {
   type MCPTool,
   type MCPToolResult,
 } from './client';
-import { ServerThrottle, type ThrottleAcquire } from './throttle';
-import type { BreakerState } from './circuit-breaker';
+import { DEFAULT_THROTTLE, ServerThrottle, type ThrottleAcquire } from './throttle';
+import type { BreakerError, BreakerState } from './circuit-breaker';
 
 /**
  * Process-level singleton that owns one `MCPClient` + `ServerThrottle` per
@@ -17,6 +17,8 @@ import type { BreakerState } from './circuit-breaker';
  */
 
 const TOOL_CACHE_TTL_MS = 10 * 60 * 1000;
+/** 后台试连失败后，至少隔这么久才再试（与熔断冷却期一致）。 */
+const RETRY_AFTER_FAILURE_MS = DEFAULT_THROTTLE.cooldownMs;
 
 interface ServerEntry {
   config: MCPServerConfig;
@@ -37,6 +39,8 @@ export class ThrottleError extends Error {
 export interface ServerStatus {
   connected: boolean;
   breaker: BreakerState;
+  /** 最近一次连接 / 请求失败的原因，比最近一次成功更新；成功后清空。 */
+  lastError?: BreakerError;
 }
 
 export interface ServerToolsResult {
@@ -51,6 +55,8 @@ class MCPManager {
   private initPromise?: Promise<void>;
   /** Fired AFTER reconcile mutates `entries`, so subscribers see fresh state. */
   private listeners = new Set<() => void>();
+  /** 每次连接前要等的外部前置条件，见 `setConnectGate`。 */
+  private connectGate?: () => Promise<void>;
 
   init(): Promise<void> {
     if (!this.initPromise) {
@@ -94,6 +100,15 @@ class MCPManager {
     }
   }
 
+  /**
+   * 设置每次连接前要等待的前置条件（只设一次，后设的覆盖先设的）。后台用它等去掉 Origin 头的
+   * 网络规则按最新配置装好：新增 / 修改服务器时会话会立刻刷新工具并连接，若抢在规则生效前
+   * 发出，校验 Origin 的服务器就会拒绝（#81）。gate 不应 reject，否则连接按失败处理。
+   */
+  setConnectGate(gate: () => Promise<void>): void {
+    this.connectGate = gate;
+  }
+
   async getEnabledServers(): Promise<MCPServerConfig[]> {
     await this.init();
     return Array.from(this.entries.values())
@@ -105,10 +120,31 @@ class MCPManager {
     await this.init();
     const entry = this.entries.get(serverId);
     if (!entry) return undefined;
+    const lastError = entry.throttle.getLastError();
     return {
       connected: entry.client.isConnected(),
       breaker: entry.throttle.getBreakerState(),
+      ...(lastError ? { lastError } : {}),
     };
+  }
+
+  /**
+   * 在后台试连一个启用但未连上的服务器，让设置页不必等用户开会话就能看到连接结果。
+   * 从没失败过（刚添加 / 改过配置 / SW 刚重启）就立即试；失败过则等冷却期过了再试，
+   * 避免设置页每次轮询都去撞一个连不上的服务器。结果记在熔断器上，由 `getStatus` 读出；
+   * 本方法自身不抛错。
+   */
+  async connectIfIdle(serverId: string): Promise<void> {
+    try {
+      await this.init();
+      const entry = this.entries.get(serverId);
+      if (!entry || !entry.config.enabled || entry.client.isConnected()) return;
+      const lastError = entry.throttle.getLastError();
+      if (lastError && Date.now() - lastError.at < RETRY_AFTER_FAILURE_MS) return;
+      await this.getTools(serverId);
+    } catch {
+      // 失败已由熔断器记下（getStatus 会读出），这里不再处理
+    }
   }
 
   async getTools(serverId: string): Promise<MCPTool[]> {
@@ -123,10 +159,12 @@ class MCPManager {
     }
     if (entry.refreshingTools) return entry.refreshingTools;
 
-    entry.refreshingTools = this.refreshTools(entry).finally(() => {
-      entry.refreshingTools = undefined;
+    const refreshing = this.refreshTools(entry).finally(() => {
+      // 期间配置被改过时 upsert 已换掉这个字段，别把新一轮的进行中标记清掉
+      if (entry.refreshingTools === refreshing) entry.refreshingTools = undefined;
     });
-    return entry.refreshingTools;
+    entry.refreshingTools = refreshing;
+    return refreshing;
   }
 
   /** Fetch tools for all enabled servers, isolating per-server errors. */
@@ -153,12 +191,7 @@ class MCPManager {
     if (!entry) throw new Error(`MCP server not registered: ${serverId}`);
     if (!entry.config.enabled) throw new Error(`MCP server disabled: ${entry.config.name}`);
 
-    await this.ensureConnected(entry);
-
-    // Capture refs so a mid-call reconcile that swaps client/throttle
-    // doesn't cross-record on a fresh throttle that never saw acquire.
-    const client = entry.client;
-    const throttle = entry.throttle;
+    const { client, throttle } = await this.connectedRefs(entry);
 
     const acquired = throttle.acquire();
     if (!acquired.ok) throw new ThrottleError(acquired);
@@ -189,10 +222,7 @@ class MCPManager {
     if (!entry) throw new Error(`MCP server not registered: ${serverId}`);
     if (!entry.config.enabled) throw new Error(`MCP server disabled: ${entry.config.name}`);
 
-    await this.ensureConnected(entry);
-
-    const client = entry.client;
-    const throttle = entry.throttle;
+    const { client, throttle } = await this.connectedRefs(entry);
 
     const acquired = throttle.acquire();
     if (!acquired.ok) throw new ThrottleError(acquired);
@@ -274,8 +304,11 @@ class MCPManager {
     const acquired = throttle.acquire();
     if (!acquired.ok) throw new ThrottleError(acquired);
 
-    entry.connecting = (async () => {
+    const connecting = (async () => {
       try {
+        await this.connectGate?.();
+        // 等 gate 期间服务器可能被禁用 / 删除 / 改配置：旧 client 不能再用旧地址和旧凭据发请求
+        if (this.isStale(entry, client)) throw staleEntryError(entry);
         await client.connect();
         throttle.recordSuccess();
       } catch (err) {
@@ -283,16 +316,37 @@ class MCPManager {
         throw err;
       }
     })().finally(() => {
-      entry.connecting = undefined;
+      if (entry.connecting === connecting) entry.connecting = undefined;
     });
-    return entry.connecting;
+    entry.connecting = connecting;
+    return connecting;
+  }
+
+  /**
+   * 连上服务器，返回连接所用的 client / throttle。引用在连接**之前**取：连接期间配置被改，
+   * upsert 会换上新的、尚未连接的 client 和 throttle，这时继续用 `entry.client` 会在新
+   * throttle 上记一条假的「not connected」失败，设置页随之显示错误、推迟重试。
+   *
+   * 连接期间服务器被改配置或删除时，upsert / reconcile 的 close 对还没连上的 client 是空操作，
+   * 这里连上之后要自己关掉它，否则旧连接（含 Streamable HTTP 的长连 SSE 流）会一直挂到 SW 重启。
+   */
+  private async connectedRefs(entry: ServerEntry): Promise<{ client: MCPClient; throttle: ServerThrottle }> {
+    const { client, throttle } = entry;
+    await this.ensureConnected(entry);
+    if (this.isStale(entry, client)) {
+      void client.close().catch(() => {});
+      throw staleEntryError(entry);
+    }
+    return { client, throttle };
+  }
+
+  /** client 已被 upsert 换掉（改配置 / 启停），或整个服务器已从注册表删除。 */
+  private isStale(entry: ServerEntry, client: MCPClient): boolean {
+    return entry.client !== client || this.entries.get(entry.config.id) !== entry;
   }
 
   private async refreshTools(entry: ServerEntry): Promise<MCPTool[]> {
-    await this.ensureConnected(entry);
-
-    const client = entry.client;
-    const throttle = entry.throttle;
+    const { client, throttle } = await this.connectedRefs(entry);
 
     const acquired = throttle.acquire();
     if (!acquired.ok) throw new ThrottleError(acquired);
@@ -300,7 +354,8 @@ class MCPManager {
     try {
       const tools = await client.listTools();
       throttle.recordSuccess();
-      entry.toolCache = { tools, fetchedAt: Date.now() };
+      // 期间配置被改过（upsert 换了 client）时，这份是旧服务器的工具，不能写进新配置的缓存
+      if (entry.client === client) entry.toolCache = { tools, fetchedAt: Date.now() };
       return tools;
     } catch (err) {
       throttle.recordFailure(err);
@@ -315,6 +370,10 @@ class MCPManager {
       // best-effort cleanup; errors during close are non-actionable
     }
   }
+}
+
+function staleEntryError(entry: ServerEntry): Error {
+  return new Error(`MCP server "${entry.config.name}" was reconfigured or removed while connecting`);
 }
 
 function sameStringMap(

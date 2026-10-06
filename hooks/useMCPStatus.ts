@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'react';
+import type { ServerStatus } from '@/lib/mcp/manager';
 
-export interface MCPStatusInfo {
-  connected: boolean;
-  breaker: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
-}
+/** 后台 `mcp_status` 返回的单个服务器状态，与 `MCPManager.getStatus` 同一形状。 */
+export type MCPStatusInfo = ServerStatus;
 
 export type MCPStatusMap = Record<string, MCPStatusInfo>;
 
 const POLL_MS = 5_000;
 
 /**
- * Polls the background SW for live MCP server status (connection + breaker).
+ * 轮询后台 SW 拿各 MCP 服务器的实时状态（连接、熔断器、最近一次错误）。
  *
  * Status is in-memory in the background, so a one-shot `chrome.runtime.sendMessage`
  * round-trip works fine — no port subscription needed. Disabled servers are

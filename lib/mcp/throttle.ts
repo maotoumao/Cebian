@@ -1,5 +1,5 @@
 ﻿import { RateLimiter } from './rate-limiter';
-import { CircuitBreaker, type BreakerState } from './circuit-breaker';
+import { CircuitBreaker, type BreakerError, type BreakerState } from './circuit-breaker';
 
 /**
  * Per-server throttle facade combining rate-limiter + circuit-breaker.
@@ -62,7 +62,8 @@ export class ServerThrottle {
     }
     const acquired = this.limiter.tryAcquire(now);
     if (!acquired) {
-      this.breaker.recordFailure(new Error('limiter race'), now);
+      // 请求没有发出，不该计入失败（也不该覆盖真实的 lastError），只撤回探测占位
+      this.breaker.cancel();
       return { ok: false, reason: 'rate-limited', retryAfterMs: this.limiter.retryAfterMs(now) };
     }
     return { ok: true };
@@ -78,6 +79,10 @@ export class ServerThrottle {
 
   getBreakerState(now?: number): BreakerState {
     return this.breaker.getState(now);
+  }
+
+  getLastError(): BreakerError | undefined {
+    return this.breaker.getLastError();
   }
 
   reset(): void {

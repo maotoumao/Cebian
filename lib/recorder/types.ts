@@ -1,3 +1,5 @@
+import type { NetworkLog } from './network-types';
+
 // User-action recording event schema.
 //
 // All events share a base shape and are discriminated by `kind`. The recording
@@ -100,4 +102,14 @@ export type RecordedSession = {
   events: RecordedEvent[];
   /** Why the recording was auto-stopped, if applicable. */
   truncated?: 'event_limit' | 'time_limit';
+  /** 录到的网络请求（开启了网络录制时才有），已打码。 */
+  network?: NetworkLog;
+};
+
+/** 录制哪些内容。两项都可以关：此时界面上的开始按钮置灰，后台收到这样的开始请求也不开始。 */
+export type RecorderOptions = {
+  /** 页面上的操作（点击、输入、按键、滚动、结构变化）；关掉时不注入内容脚本，标签页事件照记。 */
+  interactions: boolean;
+  /** 网络请求。 */
+  network: boolean;
 };

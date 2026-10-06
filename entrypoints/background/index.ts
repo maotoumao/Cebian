@@ -7,6 +7,8 @@ import { recorder } from './recorder/manager';
 import { setupRecorderClientHandlers } from './recorder/client-handlers';
 import { setupRecorderPortRelay } from './recorder/port-relay';
 import { setupMcpBridge } from './mcp/bridge';
+import { setupMobileEmulation } from './mobile-emulation';
+import { setupMcpOriginRules } from './mcp/origin-rules';
 import { seedDevStorage } from './providers/dev-seed';
 import { registerBackupHandler } from './chat/backup-handler';
 import { setupPageActions } from '@/lib/page-actions/manager';
@@ -49,6 +51,10 @@ export default defineBackground(() => {
   setupOrganizeSchedule();
   // 订阅 MCP 服务端 / 搜索引擎配置变更，把刷新后的工具集推给所有活跃会话。
   sessionManager.watchToolConfig();
+  // 去掉发往 MCP 服务器的请求里浏览器自动附带的 Origin 头（#81），配置变更时重建规则。
+  setupMcpOriginRules();
+  // 手机模拟：调试连接统一由后台持有，侧边栏经一次性消息切换。
+  setupMobileEmulation();
 
   // Dev-only: seed a custom provider from .env.local if configured.
   // No-op in production builds and when WXT_DEV_API_KEY is empty.
@@ -177,9 +183,9 @@ export default defineBackground(() => {
       // content scripts on OTHER tabs could push events into the active
       // recording.
       if (sender.id !== chrome.runtime.id) return false;
-      const expected = recorder.getObservedTabId();
-      if (expected == null || sender.tab?.id !== expected) return false;
-      recorder.pushEvent(msg.event);
+      // 只录网络的一轮不收操作事件（上一轮残留的脚本可能还在发）
+      if (!recorder.acceptsContentEvents(sender.tab?.id)) return false;
+      recorder.pushEvent(msg.event, msg.at);
     }
     return false;
   });

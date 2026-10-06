@@ -47,6 +47,15 @@ import type { SlashPrompt } from '@/lib/ai-config/slash-prompt';
 import type { SessionSnapshot } from '@/lib/ipc/protocol';
 import { t } from '@/lib/i18n';
 
+/**
+ * 交互式工具（如 ask_user）被用户取消时，结果的 `details` 带 `cancelled: true`。
+ * `details` 的类型是 `JsonValue`（pi 1.0 起），读字段前要先收窄成对象。
+ */
+function isCancelledToolResult(tr: ToolResultMessage): boolean {
+  const details = tr.details as { cancelled?: unknown } | null | undefined;
+  return typeof details === 'object' && details !== null && Boolean(details.cancelled);
+}
+
 // ─── ChatPage ───
 
 export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: () => void; onTitleChange?: (title: string) => void }) {
@@ -322,6 +331,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                 <UserMessageBubble
                   key={`user-${entryId ?? idx}`}
                   msg={msg}
+                  sessionId={activeSessionId}
                   onEdit={canEdit && entryId ? (text) => handleEdit(entryId, text) : undefined}
                   branch={branch
                     ? {
@@ -364,7 +374,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                 if (prev.role === 'toolResult') {
                   const tr = prev as ToolResultMessage;
                   const info = uiToolRegistry.get(tr.toolName);
-                  if (info?.renderResultAsUserBubble && !tr.details?.cancelled) break;
+                  if (info?.renderResultAsUserBubble && !isCancelledToolResult(tr)) break;
                   continue;
                 }
                 // 权限卡片是这一轮中间插入的授权环节，对头折叠「透明」：穿透它
@@ -428,7 +438,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                 if (
                   m.role === 'toolResult' &&
                   uiToolRegistry.get((m as ToolResultMessage).toolName)?.renderResultAsUserBubble &&
-                  !(m as ToolResultMessage).details?.cancelled
+                  !isCancelledToolResult(m as ToolResultMessage)
                 ) {
                   // 该轮由交互式工具结果开启，无对应 user 消息（被取消的结果对轮
                   // 边界「透明」，与 showHeader 的扫描口径一致）
@@ -516,8 +526,8 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                     // once we have something to feed the iframe.
                     //
                     // Use a structural guard rather than a cast: `details`
-                    // is `any` (per `ToolResultMessage<TDetails = any>`),
-                    // so a truthy check would let a corrupted IDB row or
+                    // is only `JsonValue` (per `ToolResultMessage`), so a
+                    // truthy check would let a corrupted IDB row or
                     // an off-spec server's bogus payload reach the iframe
                     // and produce a vague fetch failure downstream.
                     if (toolResult?.details && isMcpAppResult(toolResult.details)) {
@@ -591,7 +601,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
             if (msg.role === 'toolResult') {
               const tr = msg as ToolResultMessage;
               const info = uiToolRegistry.get(tr.toolName);
-              if (info?.renderResultAsUserBubble && !tr.details?.cancelled) {
+              if (info?.renderResultAsUserBubble && !isCancelledToolResult(tr)) {
                 const text = tr.content
                   .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
                   .map(b => b.text)

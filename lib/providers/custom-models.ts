@@ -48,7 +48,15 @@ export function toModel(config: CustomProviderConfig, model: CustomModelDef): Mo
   if (config.headers && Object.keys(config.headers).length > 0) {
     base.headers = config.headers;
   }
+  // pi 的 Model 没有「是否支持工具」的字段，这里挂一个 Cebian 自己的标记，由
+  // supportsToolCalling 读取。Model 对象只在内存里按引用传递，不持久化也不广播。
+  if (model.toolCalling === false) Object.assign(base, { toolCalling: false });
   return base;
+}
+
+/** 模型能否调用工具。只有自定义模型可能关掉；内置模型一律支持。 */
+export function supportsToolCalling(model: Model<Api>): boolean {
+  return (model as { toolCalling?: boolean }).toolCalling !== false;
 }
 
 /** Get all Model objects for a custom provider */
@@ -57,7 +65,7 @@ export function getCustomModels(config: CustomProviderConfig): Model<Api>[] {
 }
 
 /**
- * 重新拉取模型列表后按 modelId 合并：仍存在的模型保留既有配置（reasoning/image/
+ * 重新拉取模型列表后按 modelId 合并：仍存在的模型保留既有配置（reasoning/image/toolCalling/
  * contextWindow/maxTokens），新模型以默认值补入，远端已消失的移除；顺序跟随远端、
  * 重复 id 只取首个。避免「自动获取」把用户设过的每模型配置整批冲掉
  */

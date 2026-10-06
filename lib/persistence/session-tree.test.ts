@@ -2,8 +2,9 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import Dexie from 'dexie';
-import type { AgentMessage, SessionRepo } from '@earendil-works/pi-agent-core';
-import { createSessionBackendConformance } from '@earendil-works/pi-agent-core/session/testing';
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
+import { createSessionBackendConformance } from '@/lib/shims/pi-harness/session/testing/conformance';
+import type { SessionRepo } from '@/lib/shims/pi-harness/session/types';
 import {
   DexieSessionRepo,
   SESSION_META_SCHEMA,
@@ -25,7 +26,7 @@ function userMessage(text: string): AgentMessage {
   return { role: 'user', content: [{ type: 'text', text }], timestamp: Date.now() } as AgentMessage;
 }
 
-// ─── pi 官方后端一致性套件 ───
+// ─── pi 上游后端一致性套件（vendor 于 lib/shims/pi-harness） ───
 
 const conformanceCases = createSessionBackendConformance(async () => {
   const db = createDb(`cebian-tree-conformance-${crypto.randomUUID()}`);

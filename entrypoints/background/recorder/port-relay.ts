@@ -19,6 +19,8 @@ function recorderStatusMessage(): ServerMessage {
     truncated: status.truncated,
     initiatorInstanceId: status.initiatorInstanceId,
     activeWindowId: status.activeWindowId,
+    networkState: status.networkState,
+    networkCount: status.networkCount,
   };
 }
 
@@ -34,19 +36,9 @@ function setupRecorderPortRelay(): void {
   // Forward finalized recordings to whichever port owned the recording.
   // Both manual `stop()` and the cap-trigger `autoStop()` fan out through
   // this single hook, so we never need to special-case auto-stop on the
-  // delivery side. We snapshot the initiator port BEFORE recorder.stop()
-  // clears it; by the time this fires, recorder state is already idle, so
-  // we capture the port via a closure on the start path instead.
-  let lastInitiatorPort: chrome.runtime.Port | null = null;
-  recorder.onStatusChange(() => {
-    // Track the current initiator while it exists so the session listener
-    // (which fires AFTER recorder clears it) still knows where to send.
-    const ip = recorder.getInitiatorPort();
-    if (ip) lastInitiatorPort = ip;
-  });
-  recorder.onRecordingFinished(session => {
-    const target = lastInitiatorPort;
-    lastInitiatorPort = null;
+  // delivery side. 发起端口由 recorder 在定稿开始时记下、随成品一起交来：收尾（等内容脚本
+  // 断开、等网络取完正文）期间别的实例可能已开始新一轮，不能按「当前发起方」投递。
+  recorder.onRecordingFinished((session, target) => {
     if (!target) {
       console.warn('[recorder] session finalized but no initiator port to deliver to');
       return;

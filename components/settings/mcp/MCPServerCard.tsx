@@ -47,7 +47,9 @@ function getStatusDot(server: MCPServerConfig, info: MCPStatusInfo | undefined):
 export function MCPServerCard({ server }: MCPServerCardProps) {
   const [editing, setEditing] = useState(false);
   const statusMap = useMCPStatus();
-  const dot = getStatusDot(server, statusMap[server.id]);
+  const status = statusMap[server.id];
+  const dot = getStatusDot(server, status);
+  const lastError = server.enabled ? status?.lastError : undefined;
 
   const handleToggle = async (enabled: boolean) => {
     try {
@@ -128,6 +130,11 @@ export function MCPServerCard({ server }: MCPServerCardProps) {
       <p className="text-xs text-muted-foreground font-mono truncate" title={server.transport.url}>
         {server.transport.url}
       </p>
+      {lastError && (
+        <p className="text-xs text-destructive line-clamp-2 break-all" title={lastError.message}>
+          {t('settings.mcp.status.lastError', [lastError.message])}
+        </p>
+      )}
     </div>
   );
 }

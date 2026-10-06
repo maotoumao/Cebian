@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentMessage, Entry } from '@earendil-works/pi-agent-core';
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
+import type { Entry } from '@/lib/shims/pi-harness/session/types';
 import { buildBranchInfo } from './session-projection';
 
 function msg(text: string): AgentMessage {

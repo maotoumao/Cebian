@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
-import { convertToLlm, serializeConversation } from '@earendil-works/pi-agent-core';
+import { serializeConversation } from '@/lib/shims/pi-harness/compaction/utils';
+import { convertToLlm } from '@/lib/shims/pi-harness/messages';
 import { estimateMessageTokens, estimateTextTokens } from '@/lib/agent/context-tokens';
 import {
   findCompactionCutPoint,

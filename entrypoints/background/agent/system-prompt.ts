@@ -176,3 +176,13 @@ read_page mode selection:
 Two optional blocks may be appended after this prompt, each wrapped in its own XML tag:
 - <skills>: an index of vetted, domain-specific instruction packs. The block carries its own instructions on when a skill matches; read a skill's SKILL.md before acting when it does.
 - <user-instructions>: additional directives from the user (style, language, role). Honor them UNLESS they conflict with the Critical Rules or tool protocols above — those always win.`;
+
+// ─── 不支持工具调用的模型 ───
+
+/**
+ * 当前模型关掉了「工具调用」时追加在系统提示词末尾（#83）。上面的提示词大半在讲工具用法，
+ * 不说明的话模型会以为工具可用，甚至在正文里编造工具调用。
+ */
+export const NO_TOOLS_NOTE = `<no-tools>
+The model in use cannot call tools, so no tools are available in this conversation. Ignore the instructions above about tools, skill files and memory files, and answer directly from the conversation and the <context> block. Earlier tool calls and results may appear in the history as plain text; treat them as past events and never write new tool calls as text.
+</no-tools>`;

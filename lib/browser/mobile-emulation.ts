@@ -1,51 +1,40 @@
-// ─── iPhone 14 Pro device profile ───
+// 手机模拟的消息契约与界面侧入口：调试连接统一由后台持有（见
+// lib/browser/debugger-session.ts），界面（侧边栏 / 以标签页打开的 Cebian）只发切换请求；
+// 哪些标签页开着手机模拟由后台写进 `mobileEmulatedTabs` 存储项。
 
-const DEVICE = {
-  width: 393,
-  height: 852,
-  deviceScaleFactor: 3,
-  mobile: true,
-  screenWidth: 393,
-  screenHeight: 852,
-  userAgent:
-    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) ' +
-    'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+/** 侧边栏 → 后台的一次性切换请求。 */
+const MOBILE_EMULATION_TOGGLE = 'cebian:mobile_emulation_toggle';
+
+interface MobileEmulationToggleRequest {
+  type: typeof MOBILE_EMULATION_TOGGLE;
+  tabId: number;
+}
+
+type MobileEmulationToggleResponse = { ok: true; enabled: boolean } | { ok: false; error: string };
+
+/**
+ * 当前浏览器能否手机模拟（依赖 debugger API，Firefox 没有）。与 debugger-session 的
+ * `isDebuggerAvailable` 判断相同，有意复制一份：界面侧不得引用 debugger-session。
+ */
+function isMobileEmulationSupported(): boolean {
+  return typeof globalThis.chrome?.debugger?.attach === 'function';
+}
+
+/** 切换某个标签页的手机模拟，返回切换后是否开启；失败时抛错。 */
+async function toggleMobileEmulation(tabId: number): Promise<boolean> {
+  const request: MobileEmulationToggleRequest = { type: MOBILE_EMULATION_TOGGLE, tabId };
+  const response = (await chrome.runtime.sendMessage(request)) as MobileEmulationToggleResponse | undefined;
+  if (!response) throw new Error('No response from the background.');
+  if (!response.ok) throw new Error(response.error);
+  return response.enabled;
+}
+
+// ─── 公开 API ───
+
+export {
+  MOBILE_EMULATION_TOGGLE,
+  isMobileEmulationSupported,
+  toggleMobileEmulation,
+  type MobileEmulationToggleRequest,
+  type MobileEmulationToggleResponse,
 };
-
-// ─── CDP helpers ───
-
-export async function attachEmulation(tabId: number): Promise<void> {
-  const target = { tabId };
-  try {
-    await chrome.debugger.attach(target, '1.3');
-  } catch (err: any) {
-    // Already attached — safe to continue
-    if (!String(err?.message).includes('Already attached')) throw err;
-  }
-  await chrome.debugger.sendCommand(target, 'Emulation.setDeviceMetricsOverride', {
-    width: DEVICE.width,
-    height: DEVICE.height,
-    deviceScaleFactor: DEVICE.deviceScaleFactor,
-    mobile: DEVICE.mobile,
-    screenWidth: DEVICE.screenWidth,
-    screenHeight: DEVICE.screenHeight,
-  });
-  await chrome.debugger.sendCommand(target, 'Emulation.setUserAgentOverride', {
-    userAgent: DEVICE.userAgent,
-  });
-}
-
-export async function detachEmulation(tabId: number): Promise<void> {
-  const target = { tabId };
-  try {
-    await chrome.debugger.sendCommand(target, 'Emulation.clearDeviceMetricsOverride');
-    await chrome.debugger.sendCommand(target, 'Emulation.setUserAgentOverride', { userAgent: '' });
-  } catch {
-    // CDP commands may fail if tab is in a restricted state — still detach
-  }
-  try {
-    await chrome.debugger.detach(target);
-  } catch {
-    // Tab may have been closed or debugger already detached
-  }
-}

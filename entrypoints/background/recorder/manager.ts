@@ -26,17 +26,22 @@
 // look like a spurious port disconnect and discard the in-flight session.
 
 import {
+  DEFAULT_RECORDER_OPTIONS,
   RECORDER_MAX_DURATION_MS,
   RECORDER_MAX_EVENTS,
 } from '@/lib/recorder/constants';
+import type { NetworkCaptureState } from '@/lib/recorder/network-types';
 import type {
   RecordedEvent,
   RecordedEventWithoutBase,
   RecordedSession,
+  RecorderOptions,
   TabEvent,
 } from '@/lib/recorder/types';
 import { acquireKeepAlive, releaseKeepAlive } from '../lifecycle/keepalive';
 import { randomId } from '@/lib/utils';
+import { startNetworkCapture, type NetworkCapture } from './network-capture';
+import { eventOffset, sortByTime } from './timeline';
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -53,6 +58,9 @@ export type RecorderStatus = {
   /** The window currently being recorded. Tracks the user's focused window
    *  while recording (recording follows focus). `null` when idle. */
   activeWindowId: number | null;
+  /** 网络录制的状态与已录请求数；本轮没开网络录制时不出现。 */
+  networkState?: NetworkCaptureState;
+  networkCount?: number;
 };
 
 export type RecorderStatusListener = (status: RecorderStatus) => void;
@@ -64,7 +72,11 @@ export type RecorderStatusListener = (status: RecorderStatus) => void;
  *  the session to the initiator port as a `recorder_session` server
  *  message. Recorder doesn't know about ports or the wire protocol —
  *  it just hands off the sealed session. */
-export type RecordingFinishedListener = (session: RecordedSession) => void;
+export type RecordingFinishedListener = (
+  session: RecordedSession,
+  /** 发起这一轮录制的端口（在定稿开始时记下）：收尾期间可能已有新一轮开始，不能按「当前发起方」投递。 */
+  initiatorPort: chrome.runtime.Port | null,
+) => void;
 
 /** Hooks that Task 4 (content-script orchestration) plugs in. Kept as an
  *  injectable interface so this module can be unit-tested in isolation and
@@ -130,6 +142,8 @@ class Recorder {
    *  it discards its result rather than overwriting fresher state (e.g. user
    *  rapidly toggles between window A and B). */
   private switchGeneration = 0;
+  /** 第几轮录制（只增不减）：迟到的异步结果据此判断自己是否还属于当前这一轮。 */
+  private round = 0;
   private events: RecordedEvent[] = [];
   private truncated: 'event_limit' | 'time_limit' | undefined;
   private capTimer: ReturnType<typeof setInterval> | null = null;
@@ -140,6 +154,24 @@ class Recorder {
   private listeners = new Set<RecorderStatusListener>();
   private recordingFinishedListeners = new Set<RecordingFinishedListener>();
   private hooks: RecorderAttachHooks = noopHooks;
+  /** 本轮实际使用的内容脚本钩子：不录操作时是空实现（不注入脚本），标签页事件照记。 */
+  private contentHooks: RecorderAttachHooks = noopHooks;
+  /** 本轮的网络采集；没开网络录制时为 null。 */
+  private network: NetworkCapture | null = null;
+  /**
+   * 上一轮定稿时拆除内容脚本的任务。新一轮注入前先等它结束：拆除会调用页面里脚本的全局停止
+   * 函数，晚于新脚本初始化执行就会把新一轮的脚本关掉。
+   */
+  private contentTeardown: Promise<void> = Promise.resolve();
+  /** 最近一次获得焦点的窗口（不含失焦）。 */
+  private focusedWindowId: number | null = null;
+  /**
+   * 已确定要切过去、但还在拆旧脚本的目标窗口。这期间录制仍算在旧窗口上，旧窗口在后台换了
+   * 标签页（如认证标签页完成后自己关闭）不能取消这次切换。
+   */
+  private pendingWindowTarget: number | null = null;
+  /** 本轮内正在拆除内容脚本的标签页：切回这个标签页时要等拆完再重新注入。 */
+  private detachingTabs = new Map<number, Promise<void>>();
   /** Wrapped chrome.* listeners we attach on start and remove on stop, so
    *  there is no leak between sessions. */
   private chromeListeners: Array<() => void> = [];
@@ -174,6 +206,7 @@ class Recorder {
       truncated: this.truncated,
       initiatorInstanceId: this.initiatorInstanceId,
       activeWindowId: this.activeWindowId,
+      ...(this.network ? { networkState: this.network.state, networkCount: this.network.count } : {}),
     };
   }
 
@@ -189,6 +222,14 @@ class Recorder {
    *  otherwise be able to inject events into the active recording). */
   getObservedTabId(): number | null {
     return this.observedTabId;
+  }
+
+  /** 这个标签页的内容脚本事件是否该收：本轮录操作、且是当前被跟踪的标签页。 */
+  acceptsContentEvents(tabId: number | undefined): boolean {
+    return this.status === 'recording'
+      && this.contentHooks !== noopHooks
+      && tabId != null
+      && tabId === this.observedTabId;
   }
 
   /** Coalesce status broadcasts to ~5/sec so the sidepanel's badge updates
@@ -228,7 +269,15 @@ class Recorder {
     port: chrome.runtime.Port;
     instanceId: string;
     initialWindowId: number;
+    /** 录制哪些内容；缺省只录操作（旧客户端不带）。两项都关时不开始。 */
+    options?: RecorderOptions;
   }): Promise<void> {
+    const requested = initiator.options;
+    // 两项都关：界面上开始按钮已置灰，这里再守一道，不替用户录没选的内容
+    if (requested && !requested.interactions && !requested.network) {
+      console.warn('[recorder] start ignored: no recording option selected');
+      return;
+    }
     // Flip status synchronously BEFORE any await so concurrent recorder_start
     // messages can't both pass the guard and double-install listeners.
     if (this.status === 'recording') {
@@ -242,12 +291,20 @@ class Recorder {
     this.truncated = undefined;
     this.observedTabId = null;
     this.observedAttachFailed = false;
-    this.switchGeneration = 0;
+    // 只增不重置：上一轮还没收尾的切换（等查询、等注入）回来时，据此发现自己已过期
+    this.switchGeneration++;
+    this.round++;
     this.initiatorPort = initiator.port;
     this.initiatorInstanceId = initiator.instanceId;
     // Recording starts focused on the initiator window;
     // handleWindowFocusChanged moves it as the user alt-tabs.
     this.activeWindowId = initiator.initialWindowId;
+    this.focusedWindowId = initiator.initialWindowId;
+    const options = requested ?? DEFAULT_RECORDER_OPTIONS;
+    this.contentHooks = options.interactions ? this.hooks : noopHooks;
+    this.network = options.network
+      ? startNetworkCapture(this.startedAt, () => this.scheduleBroadcast())
+      : null;
 
     this.installChromeListeners();
     this.startCapTimer();
@@ -290,7 +347,7 @@ class Recorder {
     }
 
     if (activeTab?.id != null) {
-      await this.switchObservedTab(activeTab.id);
+      await this.switchObservedTab(activeTab.id, activeTab.url);
     }
 
     this.scheduleBroadcast(true);
@@ -316,9 +373,13 @@ class Recorder {
    *  because Omit on a discriminated union collapses the variants — TS would
    *  refuse the discriminator field (`event` / `kind` / `action`) on object
    *  literals. */
-  pushEvent(event: RecordedEventWithoutBase): void {
+  pushEvent(event: RecordedEventWithoutBase, at?: number): void {
     if (this.status !== 'recording' || this.startedAt == null) return;
     if (this.truncated) return; // already capped, drop further events
+    // 发生在本轮开始之前的事件（上一轮的脚本拆除时排出的残留）不属于这一轮
+    if (at != null && at < this.startedAt) return;
+    // 按页面端记下的发生时刻计算（见 ./timeline.ts）；后台自己产生的标签页事件没有 `at`
+    const t = eventOffset(at, Date.now(), this.startedAt);
 
     // Coalesce repeated Backspace/Delete presses on the same target into a
     // `repeat` count on the previous event. Holding the key is already
@@ -340,7 +401,7 @@ class Recorder {
         && last.key === event.key
         && last.target.selector === event.target.selector
         && sameModifiers(last.modifiers, event.modifiers)
-        && (Date.now() - this.startedAt) - last.t < 1000
+        && Math.abs(t - last.t) < 1000
       ) {
         last.repeat = (last.repeat ?? 1) + 1;
         this.scheduleBroadcast();
@@ -385,7 +446,7 @@ class Recorder {
     const enriched = {
       ...event,
       id: randomId(8),
-      t: Date.now() - this.startedAt,
+      t,
     } as RecordedEvent;
     this.events.push(enriched);
 
@@ -415,13 +476,17 @@ class Recorder {
     if (this.status !== 'recording' || this.startedAt == null) return null;
 
     const startedAt = this.startedAt;
+    const initiatorPort = this.initiatorPort;
     // The session's windowId carries the window the recording was last
     // focused on; the active window may have moved during recording (visible
     // via tab events of kind 'focus_changed' in the event stream).
     const sessionWindowId = this.activeWindowId ?? -1;
     const observed = this.observedTabId;
+    const contentHooks = this.contentHooks;
+    const network = this.network;
     const sealedTruncated = this.truncated;
-    const sealedEvents = this.events;
+    // 事件按到达顺序入列，定稿时恢复成发生顺序
+    const sealedEvents = sortByTime(this.events);
 
     // Synchronous teardown FIRST so subsequent messages see idle state.
     this.status = 'idle';
@@ -434,16 +499,31 @@ class Recorder {
     this.activeWindowId = null;
     this.observedTabId = null;
     this.observedAttachFailed = false;
-    this.switchGeneration = 0;
+    this.switchGeneration++;
     this.events = [];
     this.truncated = undefined;
+    this.contentHooks = noopHooks;
+    this.network = null;
+    // 网络采集立即停止接收新请求（stop 同步进入停止状态），再去等内容脚本拆除；丢弃时同样
+    // 要停：释放调试连接，浏览器顶部的提示条随之消失
+    const networkStopping = network?.stop().catch((err: unknown) => {
+      console.warn('[recorder] network capture stop failed:', err);
+      return undefined;
+    });
 
-    if (observed != null) {
-      try { await this.hooks.detach(observed); }
-      catch (err) { console.warn('[recorder] detach failed:', err); }
-    }
+    const teardown = observed != null
+      ? contentHooks.detach(observed).catch((err) => console.warn('[recorder] detach failed:', err))
+      : Promise.resolve();
+    // 接在尚未结束的拆除后面，不能用一个已完成的任务把它们覆盖掉
+    this.addContentTeardown(teardown);
+    // 本轮切换中还没拆完的也接进去：下一轮可能马上注入到那个标签页
+    for (const pending of this.detachingTabs.values()) this.addContentTeardown(pending);
+    this.detachingTabs.clear();
+    await teardown;
 
+    // 结束时刻不含网络收尾（取完未完成的响应体、释放调试连接）的时间
     const endedAt = Date.now();
+    const networkLog = await networkStopping;
     const session: RecordedSession | null = discard ? null : {
       version: 1,
       startedAt,
@@ -452,6 +532,7 @@ class Recorder {
       windowId: sessionWindowId,
       events: sealedEvents,
       truncated: sealedTruncated,
+      ...(networkLog ? { network: networkLog } : {}),
     };
 
     // Fan the finalized session out to subscribers (the BG entrypoint
@@ -460,7 +541,7 @@ class Recorder {
     // bad subscriber doesn't break others.
     if (session) {
       for (const l of this.recordingFinishedListeners) {
-        try { l(session); } catch (err) { console.warn('[recorder] recordingFinished listener threw:', err); }
+        try { l(session, initiatorPort); } catch (err) { console.warn('[recorder] recordingFinished listener threw:', err); }
       }
     }
 
@@ -515,9 +596,15 @@ class Recorder {
 
   private async handleTabActivated(tabId: number, windowId: number): Promise<void> {
     if (windowId !== this.activeWindowId) return; // only the currently-focused window
+    // 正在切往另一个窗口、且焦点仍在那里：这是旧窗口在后台换标签页，不跟着切
+    if (this.pendingWindowTarget != null && this.focusedWindowId === this.pendingWindowTarget) return;
+    // 每次激活都是一次新的切换意图：连续切换时以最后一次为准，先发出的查询晚回来也作废
+    const gen = ++this.switchGeneration;
     const tab = await safeGetTab(tabId);
+    // 查询期间录制已停止、换了一轮或又切到了别处：结果作废，不能动到新的状态
+    if (gen !== this.switchGeneration || this.status !== 'recording') return;
     this.pushTabEvent('focus_changed', tabId, tab);
-    await this.switchObservedTab(tabId);
+    await this.switchObservedTab(tabId, tab?.url);
   }
 
   private async handleTabUpdated(
@@ -529,13 +616,16 @@ class Recorder {
     if (tabId !== this.observedTabId) return; // only care about the observed tab
     if (change.url || (change.status === 'loading' && tab.url)) {
       this.pushTabEvent('navigated', tabId, tab);
+      // 网络采集在跳转一开始就要连上，才能录到新页面的文档请求（不等 complete）
+      this.network?.tabNavigated(tabId, tab.url);
       // Re-attach: the previous content script was destroyed by navigation.
       // Detach is implicit (script is gone); just attach again once loaded.
       this.observedAttachFailed = true; // force a retry on `complete`
-    } else if (change.status === 'complete' && this.observedAttachFailed) {
+    } else if (change.status === 'complete' && this.observedAttachFailed && !this.detachingTabs.has(tabId)) {
+      // （正在拆除的标签页是用户切走了：切回来时激活路径会重新接上，这里不注入，免得留下没人跟踪的脚本）
       // No new url in this update, but a previous attach failed (or a
       // navigation just completed in a separate update). Try again.
-      await this.switchObservedTab(tabId);
+      await this.switchObservedTab(tabId, tab.url);
     }
   }
 
@@ -543,6 +633,8 @@ class Recorder {
     tabId: number,
     info: { windowId: number; isWindowClosing: boolean },
   ): Promise<void> {
+    // 网络采集对访问过的标签页都持有连接（不限当前窗口），关闭时释放
+    this.network?.tabClosed(tabId);
     if (info.windowId !== this.activeWindowId) return;
     this.pushEvent({
       kind: 'tab',
@@ -572,65 +664,112 @@ class Recorder {
   private async handleWindowFocusChanged(windowId: number): Promise<void> {
     if (this.status !== 'recording') return;
     if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+    // 记下最新的焦点：进行中的跨窗口切换据此发现用户已经切回或又切走了。切回当前窗口本身
+    // 不动 switchGeneration——同一窗口里正在进行的标签页切换（如从别的应用点开链接时先激活
+    // 新标签页、再把窗口提到前台）不能被它作废
+    this.focusedWindowId = windowId;
     if (windowId === this.activeWindowId) return;
-
-    // Bump generation FIRST so any in-flight switchObservedTab from the
-    // previous focus bails out. Capture our own gen so we can detect a
-    // newer focus event clobbering us mid-await. (Review issue #1.)
-    const gen = ++this.switchGeneration;
+    const round = this.round;
 
     let win: chrome.windows.Window;
     try {
-      win = await chrome.windows.get(windowId, { populate: true });
+      win = await chrome.windows.get(windowId);
     } catch {
       return; // window vanished
     }
-    if (gen !== this.switchGeneration) return;
-    if (this.status !== 'recording') return;
+    if (this.focusedWindowId !== windowId || this.status !== 'recording' || round !== this.round) return;
+    // 查询期间另一次切换已经把录制切到了这个窗口
+    if (windowId === this.activeWindowId) return;
     // Ignore devtools / popup / panel windows — recording stays on the last
     // normal window the user was using.
     if (win.type !== 'normal') return;
 
+    // 确定要切过去了才作废进行中的切换（开发者工具、弹窗不打断当前窗口里的切换）
+    const gen = ++this.switchGeneration;
+
     const prev = this.observedTabId;
     if (prev != null) {
-      try { await this.hooks.detach(prev); }
-      catch (err) { console.warn('[recorder] detach failed on focus change:', err); }
-      // Re-check after detach await: another focus event may have moved
-      // us again. Don't mutate state if so.
-      if (gen !== this.switchGeneration) return;
-      if (this.status !== 'recording') return;
+      this.pendingWindowTarget = windowId;
+      try {
+        await this.detachContent(this.contentHooks, prev);
+      } finally {
+        if (this.pendingWindowTarget === windowId) this.pendingWindowTarget = null;
+      }
+      if (gen !== this.switchGeneration || this.status !== 'recording') return;
+      if (this.focusedWindowId !== windowId) {
+        // 拆除期间焦点又移走了（切回原窗口、或弹出了登录弹窗等）：放弃这次切换，按录制所在窗口
+        // 真正激活的标签页重新对准，把刚才拆掉的补回来。焦点若去了另一个普通窗口，那边的处理
+        // 随后会再切过去
+        await this.realignActiveTab(gen);
+        return;
+      }
     }
     this.observedTabId = null;
     this.observedAttachFailed = false;
     this.activeWindowId = windowId;
 
-    const activeTab = win.tabs?.find(t => t.active);
+    // 现在才查这个窗口激活的标签页：拆旧脚本期间用户可能已在新窗口里换了标签页（那次激活
+    // 事件因为 activeWindowId 还没切过来而被忽略了）
+    let activeTab: chrome.tabs.Tab | undefined;
+    try {
+      [activeTab] = await chrome.tabs.query({ active: true, windowId });
+    } catch {
+      activeTab = undefined;
+    }
+    if (gen !== this.switchGeneration || this.status !== 'recording') return;
     if (activeTab?.id != null) {
       this.pushTabEvent('focus_changed', activeTab.id, activeTab);
-      await this.switchObservedTab(activeTab.id);
+      await this.switchObservedTab(activeTab.id, activeTab.url);
     }
+  }
+
+  /** 重新对准当前窗口里真正激活的标签页（跨窗口切换中途被取消、已拆掉的内容脚本要补回来）。 */
+  private async realignActiveTab(gen: number): Promise<void> {
+    if (this.activeWindowId == null) return;
+    let active: chrome.tabs.Tab | undefined;
+    try {
+      [active] = await chrome.tabs.query({ active: true, windowId: this.activeWindowId });
+    } catch {
+      return;
+    }
+    if (gen !== this.switchGeneration || this.status !== 'recording' || active?.id == null) return;
+    if (active.id !== this.observedTabId) this.pushTabEvent('focus_changed', active.id, active);
+    await this.switchObservedTab(active.id, active.url);
   }
 
   /** Detach old observed tab (if any) and attach to the new one. Guarded
    *  by `switchGeneration`: if focus moves to another window mid-attach,
    *  the resolved attach is discarded so we don't overwrite the newer
    *  observed-tab state. */
-  private async switchObservedTab(tabId: number): Promise<void> {
+  private async switchObservedTab(tabId: number, url: string | undefined): Promise<void> {
     const gen = this.switchGeneration;
+    const round = this.round;
     const prev = this.observedTabId;
+    // 记下这一轮的钩子：停止后 contentHooks 会被换成空实现，迟到的清理仍要用注入时的那一套
+    const hooks = this.contentHooks;
+    // 网络采集与内容脚本各管各的：observe 幂等，不受内容脚本注入成败影响
+    this.network?.observe(tabId, url);
     if (prev === tabId && !this.observedAttachFailed) return;
     if (prev != null && prev !== tabId) {
-      try { await this.hooks.detach(prev); }
-      catch (err) { console.warn('[recorder] detach failed:', err); }
+      await this.detachContent(hooks, prev);
       // Generation may have been bumped while detach awaited.
       if (gen !== this.switchGeneration) return;
+    }
+    // 等上一轮拆完内容脚本、以及本轮对这个标签页尚未结束的拆除，再注入；等待期间又追加了
+    // 拆除（迟到注入的清理等）就接着等
+    for (;;) {
+      const teardown = this.contentTeardown;
+      const detaching = this.detachingTabs.get(tabId);
+      await Promise.all([teardown, detaching]);
+      if (gen !== this.switchGeneration) return;
+      if (teardown === this.contentTeardown && detaching === this.detachingTabs.get(tabId)) break;
     }
     this.observedTabId = tabId;
     this.observedAttachFailed = false;
     if (this.startedAt == null) return;
     let attached = false;
     try {
-      await this.hooks.attach(tabId, this.startedAt);
+      await hooks.attach(tabId, this.startedAt);
       attached = true;
     } catch (err) {
       if (gen !== this.switchGeneration) return;
@@ -648,12 +787,51 @@ class Recorder {
     // we'd leave a content script attached that we no longer track.
     // (Review issue #3.)
     if (gen !== this.switchGeneration) {
-      if (this.observedTabId === tabId) this.observedTabId = null;
-      try { await this.hooks.detach(tabId); }
-      catch (err) { console.warn('[recorder] stale-attach detach failed:', err); }
+      // 跟踪的仍是这个标签页、钩子相同、且没有人正在拆它：让 generation 变化的那次切换要么继续
+      // 用这个标签页（会自己注入并初始化），要么会把它当作上一个标签页拆掉——这里都不必插手，
+      // 也不能清它的跟踪状态（拆除按标签页生效，分不清脚本是谁注入的）。正在拆的标签页不算被
+      // 接管：拆除已经执行过的话，这次迟到注入的脚本要再拆一次
+      const takenOver = this.status === 'recording'
+        && this.observedTabId === tabId
+        && this.contentHooks === hooks
+        && !this.detachingTabs.has(tabId);
+      if (takenOver) return;
+      if (round === this.round && this.observedTabId === tabId) this.observedTabId = null;
+      if (round === this.round) {
+        await this.detachContent(hooks, tabId);
+      } else {
+        // 已经换了一轮：这次拆除归入跨轮的拆除链，新一轮注入前会等它
+        const teardown = hooks.detach(tabId).catch((err) => console.warn('[recorder] stale-attach detach failed:', err));
+        this.addContentTeardown(teardown);
+        await teardown;
+      }
       return;
     }
     void attached;
+  }
+
+  /**
+   * 拆除某个标签页的内容脚本（本轮内）。拆除期间把它登记为「正在拆」，并在它仍是被跟踪的
+   * 标签页时标记需要重新注入：用户在拆完之前又切回来，切换会等拆完再重新注入。
+   */
+  private async detachContent(hooks: RecorderAttachHooks, tabId: number): Promise<void> {
+    if (this.observedTabId === tabId) this.observedAttachFailed = true;
+    // 同一标签页已有拆除在进行：与它合并，等待者要等两次都结束
+    const previous = this.detachingTabs.get(tabId);
+    const current = hooks.detach(tabId).catch((err) => console.warn('[recorder] detach failed:', err));
+    const done: Promise<void> = Promise.all([previous, current])
+      .then(() => undefined)
+      .finally(() => {
+        if (this.detachingTabs.get(tabId) === done) this.detachingTabs.delete(tabId);
+      });
+    this.detachingTabs.set(tabId, done);
+    await done;
+  }
+
+  /** 把一次跨轮的拆除接进拆除链。 */
+  private addContentTeardown(teardown: Promise<void>): void {
+    const previous = this.contentTeardown;
+    this.contentTeardown = Promise.all([previous, teardown]).then(() => undefined);
   }
 
   private pushTabEvent(

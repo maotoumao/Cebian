@@ -63,9 +63,8 @@ export function createStagingScopeGate(stagingRoot: string) {
 export function createOrganizeAgent(model: Model<Api>): Agent {
   return createCebianAgent({
     model,
-    systemPrompt: ORGANIZE_INSTRUCTIONS,
+    preamble: { systemPrompt: ORGANIZE_INSTRUCTIONS, tools: ORGANIZE_TOOLS },
     thinkingLevel: 'medium',
-    tools: ORGANIZE_TOOLS,
     beforeToolCall: createStagingScopeGate(CEBIAN_MEMORIES_STAGING_DIR),
   });
 }

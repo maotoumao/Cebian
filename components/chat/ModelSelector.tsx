@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getBuiltinModels, type BuiltinProvider } from '@/lib/providers/builtin-models';
+import { getBuiltinModels, type BuiltinProvider } from '@earendil-works/pi-ai/providers/all';
 import type { Api, Model } from '@earendil-works/pi-ai';
 import { AlertTriangle, Check, ChevronDown, Settings } from 'lucide-react';
 

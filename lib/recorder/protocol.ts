@@ -40,12 +40,14 @@ export type RecorderControlMessage =
 // ─── Content script → Background ───
 
 /** A single event captured in the page. The content script omits `id` and
- *  `t` — the background assigns both on receipt so timestamps reflect a
- *  single monotonic clock and ids are guaranteed unique within the session. */
+ *  `t`; the background assigns `id` and derives `t` from `at`. */
 export type RecorderEventMessage = {
   kind: typeof RECORDER_MSG_KIND;
   type: 'event';
   event: RecordedEventWithoutBase;
+  /** 事件在页面里发生的时刻（`Date.now()`）。输入防抖、结构变化攒批、滚动聚合都会让
+   *  消息晚于事件本身到达，后台据此而不是收到时刻计算 `t`。 */
+  at?: number;
 };
 
 export type RecorderRuntimeMessage =

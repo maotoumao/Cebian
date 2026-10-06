@@ -41,6 +41,7 @@ import {
   customProviders,
 } from '@/lib/persistence/storage';
 import { resolveModel } from '@/lib/providers/resolve-model';
+import { supportsToolCalling } from '@/lib/providers/custom-models';
 import { acquireKeepAlive, releaseKeepAlive } from '../lifecycle/keepalive';
 import { createOrganizeAgent } from './organize-agent';
 import { sessionManager } from '../chat/session-manager';
@@ -103,6 +104,8 @@ async function doRecover(): Promise<void> {
  * 整理是 alarm 静默任务，在这里返回 null 意味着整理永久停摆而用户收不到任何提示。与压缩
  * （`resolveCompactionModel`）保持同一语义：warn 后降级，绝不因配错而彻底不干活。
  *
+ * 整理要靠工具读写记忆文件，关掉了「工具调用」的模型同样视为不可用（#83）。
+ *
  * 两条都不可用才返回 null，由调用方报 `no-model`。
  *
  * 仅为同目录单测导出（静默降级路径出错时用户无感知，值得回归守卫），生产侧只有本文件调用
@@ -118,13 +121,16 @@ export async function resolveOrganizeModel(): Promise<Model<Api> | null> {
   const configured = resolveOrganizeSettings(settings).model;
   if (configured) {
     const model = resolveModel(configured, creds, providers);
-    if (model) return model;
+    if (model && supportsToolCalling(model)) return model;
     console.warn(
-      '[organize] configured model cannot be resolved (possibly deleted), trying the global model instead',
+      model
+        ? '[organize] configured model has tool calling turned off, trying the global model instead'
+        : '[organize] configured model cannot be resolved (possibly deleted), trying the global model instead',
       configured,
     );
   }
-  return globalModel ? resolveModel(globalModel, creds, providers) : null;
+  const fallback = globalModel ? resolveModel(globalModel, creds, providers) : null;
+  return fallback && supportsToolCalling(fallback) ? fallback : null;
 }
 
 // ─── 跑整理 agent 到结束，判断是否成功 ───

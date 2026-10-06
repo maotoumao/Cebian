@@ -3,7 +3,7 @@ import 'fake-indexeddb/auto';
 import { describe, expect, it, vi } from 'vitest';
 import Dexie from 'dexie';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
-import { SessionState, type SessionMutation } from '@/lib/shims/pi-session-state';
+import { SessionState, type SessionMutation } from '@/lib/shims/pi-harness/session/state';
 import { entriesToMessages } from '@/lib/agent/session-projection';
 import { sanitizeAgentMessages } from '@/lib/agent/message-helpers';
 import { messagesToMutations } from '@/lib/persistence/migrate-messages';

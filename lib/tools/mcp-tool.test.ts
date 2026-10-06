@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { assertJsonSerializable } from '@earendil-works/pi-agent-core';
+import { assertJsonSerializable } from '@/lib/shims/pi-harness/session/session';
 import type { MCPServerConfig } from '@/lib/persistence/storage';
 import { createMCPAgentTool } from '@/lib/tools/mcp-tool';
 

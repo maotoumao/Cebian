@@ -3,7 +3,10 @@
 // transcript 的真相在 mutation 日志（会话树）里；`sessions` 行只承载列表元数据
 // （v1 遗留的 `messages` 影子字段仅作迁移保险，不再更新）。
 
-import { SessionError, uuidv7, type AgentMessage, type Session } from '@earendil-works/pi-agent-core';
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
+import { uuidv7 } from '@earendil-works/pi-ai';
+import type { Session } from '@/lib/shims/pi-harness/session/session';
+import { SessionError } from '@/lib/shims/pi-harness/session/types';
 import {
   applySessionsTransactional,
   getSession,

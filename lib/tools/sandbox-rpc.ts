@@ -5,7 +5,7 @@
  */
 
 import { ensureOffscreen } from './offscreen';
-import { executeViaDebugger } from '@/lib/browser/tab-actions';
+import { executeViaDebugger, isDebuggerAvailable } from '@/lib/browser/debugger-session';
 import { isChromeCallAllowed } from './chrome-api-whitelist';
 import { vfs } from '@/lib/persistence/vfs';
 import { isVfsCallAllowed, resolveScopedPath, sessionSkillRoot } from './vfs-whitelist';
@@ -148,6 +148,9 @@ async function handlePageExec(msg: {
     // 只用后台记录的权威 tabId；sandbox 消息自带的 msg.tabId 可伪造，忽略
     if (pending.tabId == null) {
       throw new Error('executeInPage requires a tabId. Re-invoke run_skill with an explicit tabId parameter (read it from the [Active Tab] block in the context).');
+    }
+    if (!isDebuggerAvailable()) {
+      throw new Error('executeInPage needs the debugger API, which this browser does not provide.');
     }
     resultText = await executeViaDebugger(pending.tabId, msg.code);
   } catch (err) {

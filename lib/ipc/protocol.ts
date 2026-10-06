@@ -21,7 +21,8 @@ import type { SessionPlacement, SessionRecord } from '@/lib/persistence/db';
 import type { ModelIdentity, ThinkingLevel } from '@/lib/persistence/storage';
 import type { Attachment } from '@/lib/agent/attachments';
 import type { SlashPrompt } from '@/lib/ai-config/slash-prompt';
-import type { RecordedSession } from '@/lib/recorder/types';
+import type { RecordedSession, RecorderOptions } from '@/lib/recorder/types';
+import type { NetworkCaptureState } from '@/lib/recorder/network-types';
 import type { MCPResourceContents } from '@/lib/mcp/client';
 import type { PermissionRequest } from '@/lib/agent/tool-permissions';
 import type { ContextUsage } from '@/lib/agent/compaction';
@@ -116,7 +117,8 @@ export type ClientMessage =
   /** 改会话标题（页头 / 历史面板共用）。后台归一化（压一行、上限 100）后落库；成功广播
    *  `session_renamed` 给所有端口，失败回发起端口 `session_write_failed { op:'rename' }`。 */
   | { type: 'session_rename'; sessionId: string; title: string }
-  | { type: 'recorder_start' }
+  /** `options` 缺省按只录操作处理（兼容旧客户端）。 */
+  | { type: 'recorder_start'; options?: RecorderOptions }
   | { type: 'recorder_stop' }
   /** Sent by a sidepanel right after it opens a port, declaring a unique
    *  per-instance id (generated client-side at module load via
@@ -302,7 +304,8 @@ export type ServerMessage =
    *  里「新会话」的含义混淆。刻意不复用通用 `error`（会被聊天视图当成本轮对话出错），也不
    *  复用 `session_write_failed`（那条的语义是「撤销乐观更新并重拉列表」，分叉没有乐观更新）。 */
   | { type: 'session_fork_failed'; sourceSessionId: string; error: string }
-  | { type: 'recorder_status'; isRecording: boolean; startedAt: number | null; eventCount: number; truncated?: 'event_limit' | 'time_limit'; initiatorInstanceId: string | null; activeWindowId: number | null }
+  /** `networkState` / `networkCount` 只在本轮开启了网络录制时出现。 */
+  | { type: 'recorder_status'; isRecording: boolean; startedAt: number | null; eventCount: number; truncated?: 'event_limit' | 'time_limit'; initiatorInstanceId: string | null; activeWindowId: number | null; networkState?: NetworkCaptureState; networkCount?: number }
   | { type: 'recorder_session'; session: RecordedSession }
   /** Sent in reply to `recorder_start` when the BG refuses to start a
    *  recording. `busy` = another sidepanel instance currently owns the
