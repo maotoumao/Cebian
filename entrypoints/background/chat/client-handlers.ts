@@ -213,6 +213,18 @@ const chatClientHandlers: ClientHandlerMap = {
     });
   },
 
+  compact(port, msg) {
+    // 手动压缩（issue #85）。错误经 `error` ServerMessage 冒泡，与 retry / switch_branch 一致。
+    setViewing(port, msg.sessionId);
+    sessionManager.compact(msg.sessionId).catch((err) => {
+      post(port, {
+        type: 'error',
+        sessionId: msg.sessionId,
+        error: err.message ?? String(err),
+      });
+    });
+  },
+
   resolve_tool(_port, msg) {
     sessionManager.resolveTool(msg.sessionId, msg.toolName, msg.response);
   },

@@ -1054,6 +1054,9 @@ errors:
     invalid: "頁面比對規則格式錯誤。"
     duplicate: "該規則已存在。"
   modelUnavailable: "所選模型已無法使用，請重新選擇。"
+  # 手動壓縮上下文失敗（issue #85）
+  compactionUnavailable: "無法壓縮上下文：所用模型沒有可用的憑證，請檢查供應商設定。"
+  compactionFailed: "上下文壓縮失敗，對話維持不變，請稍後再試。"
   pageActionGone: "找不到該操作。"
   pageActionSaveFailed: "儲存失敗，請重試。"
   compactionSettingsSaveFailed: "儲存上下文壓縮設定失敗，請重試。"

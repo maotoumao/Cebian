@@ -25,6 +25,7 @@ import type { SessionRecord } from '@/lib/persistence/db';
 import {
   measureContextUsage,
   planCompaction,
+  planManualCompaction,
   runCompaction,
   type CompactionDecision,
   type CompactionPlan,
@@ -151,6 +152,11 @@ interface AgentSession {
    * to abandon the turn. Cleared back to `undefined` when compaction ends.
    */
   compactionController?: AbortController;
+  /**
+   * 在途的手动压缩（`compact()`）所持有的 controller；它掌管会话时与 `compactionController`
+   * 是同一个对象。`agent_start` 据此只中止手动压缩、不误伤轮首自动压缩。
+   */
+  manualCompaction?: AbortController;
   /**
    * 首轮结束后的自动标题生成在途时持有。`destroySession` 中 abort，让删掉的会话不会
    * 被迟到的生成结果「复活」一条标题写入（rename 对不存在的行返回 false，双保险）。
@@ -897,7 +903,19 @@ class SessionManager {
         // 状态机硬约束：进入 running 的唯一入口就是本事件，且只能从
         // preparing / idle 前进（preparing → running 单向不可逆）。其他
         // 任何地方不准手动置 running；这里断言锁死方向。
-        if (agentSession.phase !== 'preparing' && agentSession.phase !== 'idle') {
+        //
+        // 例外：手动压缩（`compact()`）占着 compacting 时，是准备阶段已越过 idle 门的 prompt
+        // 在压缩期间开跑。让用户消息优先：中止在途摘要，compact() 随后静默放弃。只认手动
+        // 压缩——轮首自动压缩被抢跑属于既有的并发 prompt 竞态，其取消收尾会提交待投递消息并
+        // 广播停止，不能在这里触发。
+        if (
+          agentSession.phase === 'compacting' &&
+          agentSession.manualCompaction &&
+          agentSession.compactionController === agentSession.manualCompaction
+        ) {
+          agentSession.manualCompaction.abort();
+          agentSession.manualCompaction = undefined;
+        } else if (agentSession.phase !== 'preparing' && agentSession.phase !== 'idle') {
           console.warn(
             `[session-manager] agent_start from unexpected phase '${agentSession.phase}' for ${sessionId}`,
           );
@@ -1312,6 +1330,116 @@ class SessionManager {
         agentSession.phase = 'idle';
         this.updateKeepAlive();
       }
+    }
+  }
+
+  /**
+   * 手动压缩（issue #85）：用户在占用小窗里点「立即压缩」。
+   *
+   * 与轮首 `maybeCompact` 共用摘要生成与落库（`summarizeForPlan` / `applyCompaction`），差别：
+   * - 判定走 `planManualCompaction`：不看自动压缩开关与阈值。不值得压时只补发一帧占用纠正
+   *   界面——按钮本不该出现，多半是过期的点击，不报错；
+   * - 没有待投递的用户消息：被取消就什么都不改，直接复位；
+   * - 摘要失败不落 `dropped` 标记。自动那条路丢历史是因为已经超窗、不丢就卡死；手动是
+   *   可选操作，失败应原样保留并报错。
+   *
+   * 并发：
+   * - 压缩设置与在途树操作在 idle 判定之前等完，从判定到同步占住 `phase = 'compacting'`
+   *   之间没有 await（同 `maybeCompact`）；
+   * - 会中止本次压缩的有：`cancel()`（含空闲收尾）、`destroySession()`、被 prompt 抢先时的
+   *   `agent_start`。它们只 abort，复位与广播由本方法收尾；
+   * - 收尾只在本次压缩仍持有 `compactionController` 时进行：迟到的旧压缩（卡在不认 abort 的
+   *   凭证解析上）不能清掉后来者的 controller、把它的 compacting 复位成 idle；
+   * - 失去会话（被中止 / 抢先 / 出表 / 消息被改）时一律静默退出，连摘要请求抛错也不上报——
+   *   此时报错会把正在运行的另一轮在界面上误标成已停止。
+   */
+  async compact(sessionId: string): Promise<void> {
+    // 会话行不存在（另一窗口已删除，这是过期的点击）：别为它建一个占位 agent——之后同 id 的
+    // prompt 会复用它而跳过建行。判据同 prompt()。
+    if (!this.sessions.has(sessionId) && !(await sessionStore.load(sessionId))) return;
+    const agentSession = await this.getOrCreateAgent(sessionId);
+    if (!agentSession.sessionCreated) return;
+    // 会话挂着顶上来的兜底模型时，摘要会悄悄用另一个模型发出——与 prompt 一样拒绝（issue #62）。
+    if (agentSession.modelFallback) throw new Error(t('errors.modelUnavailable'));
+    const settings = resolveCompactionSettings(await compactionSettings.getValue());
+    // 等已受理的树操作落定（如 switchBranch 不占 phase，判完 idle 后在链上重投影）：否则它会在
+    // 压缩之后整体替换消息，把刚落的摘要冲掉。之后才入链的切分支会在链内复检 phase 而放弃。
+    await this.flushTree(agentSession);
+    // 等待期间会话可能已被销毁 / 同 id 重建
+    if (this.sessions.get(sessionId) !== agentSession) return;
+    if (agentSession.phase !== 'idle') {
+      console.debug('[session-manager] compact: phase not idle, ignored', sessionId, agentSession.phase);
+      return;
+    }
+    const state = agentSession.agent.state;
+    const decision = planManualCompaction({
+      messages: state.messages,
+      settings,
+      contextWindow: state.model.contextWindow,
+      ...requestPreamble(agentSession.preamble, state.model),
+    });
+    if (decision.kind !== 'compact') {
+      this.pushContextUsage(sessionId);
+      return;
+    }
+    const { plan } = decision;
+    // 计划所依据的消息序列。state.messages 的 setter 会换成新数组、message_end 原地 push，
+    // 所以「同一引用 + 同一长度」就说明摘要期间没人动过它。
+    const source = state.messages;
+    const sourceLength = source.length;
+
+    // 占住可取消的忙碌态（自动保活 + 挡住新的 prompt / 重试 / 切分支），界面据 isCompacting
+    // 显示压缩中。判定到这里之间没有 await。
+    agentSession.phase = 'compacting';
+    const controller = new AbortController();
+    agentSession.compactionController = controller;
+    agentSession.manualCompaction = controller;
+    const { signal } = controller;
+    this.updateKeepAlive();
+    this.broadcastSessionSnapshot(agentSession);
+
+    // 本次压缩是否仍掌管会话。不掌管的情形（都静默放弃、什么都不改）：
+    // - 取消 / 会话被销毁 / 被 prompt 抢先（signal 被 abort；抢先时 phase 已推进到 running）；
+    // - 会话已出表（取消的空闲收尾判过 idle 后摘除了会话）；
+    // - 消息序列被别的路径改过：拿旧序列覆盖会吞掉新消息并让水位线与状态错位。
+    const ownsSession = () =>
+      !signal.aborted &&
+      agentSession.compactionController === controller &&
+      agentSession.phase === 'compacting' &&
+      this.sessions.get(sessionId) === agentSession &&
+      agentSession.agent.state.messages === source &&
+      source.length === sourceLength;
+
+    try {
+      let marker: CompactionSummaryMessage | null;
+      try {
+        marker = await this.summarizeForPlan(agentSession, plan, signal);
+      } catch (err) {
+        if (!ownsSession()) return;
+        throw err;
+      }
+      // 必须先于「摘要失败」的判断：失去会话时报错会误标正在运行的另一轮
+      if (!ownsSession()) return;
+      // 无凭证：摘要请求发不出去
+      if (!marker) throw new Error(t('errors.compactionUnavailable'));
+      if (marker.dropped) throw new Error(t('errors.compactionFailed'));
+      await this.applyCompaction(agentSession, plan, marker);
+    } finally {
+      // 只在仍持有 controller 时收尾：迟到的旧压缩不能动后来者的 controller 与 phase
+      if (agentSession.compactionController === controller) {
+        agentSession.compactionController = undefined;
+        // 被 prompt 抢先时 phase 已是 running，那一轮自己的广播才是权威，这里不复位也不广播
+        if (agentSession.phase === 'compacting') {
+          agentSession.phase = 'idle';
+          this.updateKeepAlive();
+          // 被 destroySession / 取消清理移出表时不再广播，免得给新会话的观众发旧数据
+          if (this.sessions.get(sessionId) === agentSession) {
+            this.broadcastSessionSnapshot(agentSession);
+            this.pushContextUsage(sessionId);
+          }
+        }
+      }
+      if (agentSession.manualCompaction === controller) agentSession.manualCompaction = undefined;
     }
   }
 
@@ -2123,6 +2251,8 @@ class SessionManager {
     }
 
     if (agentSession.phase === 'compacting') {
+      // 手动压缩（`compact()`）同样走这里：只 abort，复位与广播由它自己的 finally 负责。
+      //
       // A pre-turn compaction is running. Abort the in-flight
       // `generateSummary`; `maybeCompact()` detects the abort and routes to
       // `commitCompactionCancel()`, which commits the pending user message +
@@ -2183,8 +2313,10 @@ class SessionManager {
     // 分支信息须在会话出表前算（getBranchInfo 按 sessionId 查活会话）——中断的
     // retry / 编辑可能刚在树上造出新分支，撤下的 agent_end 帧要携带它
     const branchInfo = await this.getBranchInfo(sessionId).catch(() => undefined);
-    // 在途的自动标题一并取消：会话出表后 destroySession 就找不到它了。
+    // 在途的自动标题一并取消：会话出表后 destroySession 就找不到它了。清理期间（上面的
+    // await）可能有手动压缩判过 idle 后开始，同样中止。
     agentSession.titleController?.abort();
+    agentSession.compactionController?.abort();
     this.sessions.delete(sessionId);
     this.updateKeepAlive();
     // Ensure client knows the agent stopped (abort may not fire agent_end)

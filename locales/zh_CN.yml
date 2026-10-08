@@ -1055,6 +1055,9 @@ errors:
     invalid: "页面匹配规则格式错误。"
     duplicate: "该规则已存在。"
   modelUnavailable: "所选模型已不可用，请重新选择。"
+  # 手动压缩上下文失败（issue #85）
+  compactionUnavailable: "无法压缩上下文：所用模型没有可用的凭证，请检查提供商设置。"
+  compactionFailed: "上下文压缩失败，对话保持不变，请稍后重试。"
   pageActionGone: "找不到该操作。"
   pageActionSaveFailed: "保存失败，请重试。"
   compactionSettingsSaveFailed: "保存上下文压缩设置失败，请重试。"

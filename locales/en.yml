@@ -1068,6 +1068,9 @@ errors:
     invalid: "Not a valid match pattern."
     duplicate: "This pattern is already in the list."
   modelUnavailable: "The selected model is no longer available. Pick another one."
+  # Manual context compaction failed (issue #85)
+  compactionUnavailable: "Could not compact the context: the model has no usable credentials. Check your provider settings."
+  compactionFailed: "Could not compact the context. The conversation is unchanged. Try again later."
   pageActionGone: "This action no longer exists."
   pageActionSaveFailed: "Could not save the action."
   compactionSettingsSaveFailed: "Could not save the compaction settings. Try again."

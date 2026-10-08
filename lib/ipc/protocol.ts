@@ -94,6 +94,10 @@ export type ClientMessage =
    *  `branchInfo[...].siblings`）。后台把 main lane 移到该兄弟子树的最深叶并
    *  重投影广播。仅 agent 空闲时受理。 */
   | { type: 'switch_branch'; sessionId: string; targetEntryId: string }
+  /** 手动压缩上下文（issue #85）：用户点「立即压缩」。仅 agent 空闲且后台判定值得压缩时
+   *  受理（见 `planManualCompaction`），否则只补发一帧 `context_usage` 纠正界面。进度与结果
+   *  经 `session_state`（isCompacting）广播，失败经 `error` 回发起端口。 */
+  | { type: 'compact'; sessionId: string }
   | { type: 'resolve_tool'; sessionId: string; toolName: string; response: any }
   | { type: 'cancel_tool'; sessionId: string; toolName: string }
   /** User's decision on a tool's pre-execution permission prompt, keyed by
@@ -158,6 +162,7 @@ export const CLIENT_MESSAGE_TYPES = [
   'cancel_tool',
   'resolve_permission',
   'switch_branch',
+  'compact',
   'session_list',
   'session_delete',
   'session_set_placement',
