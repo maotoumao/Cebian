@@ -775,6 +775,8 @@ chat:
     threshold: "Earlier history is compacted automatically at $1%."
     compactionOff: "Automatic compaction is turned off."
     estimateNote: "Estimated — the exact count depends on the provider's tokenizer."
+    # Button that compacts earlier history right away (issue #85)
+    compactNow: "Compact now"
   compaction:
     # Label on the divider marking where earlier context was folded into a summary.
     divider: "Earlier context compacted"

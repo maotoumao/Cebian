@@ -632,6 +632,20 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     postMessage({ type: 'switch_branch', sessionId, targetEntryId });
   }, [postMessage]);
 
+  /** 手动压缩当前会话的上下文（issue #85）。无乐观状态：后台占住压缩后以 session_state
+   *  （isCompacting）广播回来；不值得压时只补一帧 context_usage，按钮随之消失。 */
+  const compact = useCallback(() => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId) return;
+    if (!portRef.current) {
+      setState(prev => ({ ...prev, lastError: t('chat.session.notConnected') }));
+      return;
+    }
+    // 清掉上一次的错误条，免得它和这次压缩的结果混在一起
+    setState(prev => (prev.lastError === null ? prev : { ...prev, lastError: null }));
+    postMessage({ type: 'compact', sessionId });
+  }, [postMessage]);
+
   /** 从当前会话的某条 assistant 消息处分叉出新会话（issue #60）。无乐观状态：新会话
    *  在后台建好后以 `session_forked` 回来，由 onSessionForked 跳转。同一时刻只允许一个
    *  分叉在途（见 forkPendingRef）。 */
@@ -795,6 +809,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     retry,
     editMessage,
     switchBranch,
+    compact,
     forkSession,
     subscribe,
     unsubscribe,

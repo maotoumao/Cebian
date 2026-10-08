@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -37,22 +37,21 @@ const RING_CLASS: Record<Tone, string> = {
   over: 'text-destructive',
 };
 
-/**
- * 输入框右下角的上下文占用环：点开是一个小窗，报当前会话占了模型窗口的多少。
- *
- * 数字一律来自后台（`context_usage` 帧），不在前端重算——前端拿不到模型的
- * `contextWindow`，而且两处各算一套必然漂移，会出现「显示 75% 却已经开始压缩」。
- *
- * 窄侧栏里只画环、不显示百分比，数字留给小窗；环本身足够表达「快满了」。
- *
- * 已知局限：在输入框里改了模型但还没发送时，环的分母仍是会话**当前实际在用**的模型
- * 窗口——模型选择在发送前只是前端草稿，后台并不知情。下一轮发出去之后即自动纠正。
- */
-export function ContextUsageIndicator({ usage }: { usage: ContextUsage | null }) {
+interface ContextUsageIndicatorProps {
+  usage: ContextUsage | null;
+  onCompact?: () => void;
+  /** 会话正在回复 / 压缩，此时「立即压缩」置灰。 */
+  busy?: boolean;
+}
+
+/** {@link ContextUsageIndicator} 的小窗本体，只在有可画的占用时挂载。 */
+function UsagePopover({
+  usage,
+  onCompact,
+  busy = false,
+}: Omit<ContextUsageIndicatorProps, 'usage'> & { usage: ContextUsage }) {
   const titleId = useId();
-  // 没收到过快照、或模型没声明窗口（画不出比例）时整个不渲染，不占位、不显示假数据。
-  // 显式挡掉 NaN：`NaN <= 0` 是 false，漏过去会渲染出 "NaN%" 和非法的 strokeDashoffset。
-  if (!usage || !Number.isFinite(usage.contextWindow) || usage.contextWindow <= 0) return null;
+  const [open, setOpen] = useState(false);
 
   // 文字用真实百分比，只有环的填充夹到 [0,1]：超窗时（120K/100K）夹了文字就会显示
   // "100%"，把「超出多少」这个最要紧的信息藏起来。
@@ -62,7 +61,7 @@ export function ContextUsageIndicator({ usage }: { usage: ContextUsage | null })
   const label = t('chat.contextUsage.label', [String(percent)]);
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <Tooltip>
         <TooltipTrigger asChild>
           <PopoverTrigger asChild>
@@ -112,7 +111,44 @@ export function ContextUsageIndicator({ usage }: { usage: ContextUsage | null })
         <PopoverDescription className="text-[0.7rem] text-muted-foreground/70">
           {t('chat.contextUsage.estimateNote')}
         </PopoverDescription>
+        {usage.compactable && onCompact && (
+          <Button
+            variant="outline"
+            size="xs"
+            className="w-full"
+            disabled={busy}
+            onClick={() => {
+              setOpen(false);
+              onCompact();
+            }}
+          >
+            {t('chat.contextUsage.compactNow')}
+          </Button>
+        )}
       </PopoverContent>
     </Popover>
   );
+}
+
+/**
+ * 输入框右下角的上下文占用环：点开是一个小窗，报当前会话占了模型窗口的多少。
+ *
+ * 数字一律来自后台（`context_usage` 帧），不在前端重算——前端拿不到模型的
+ * `contextWindow`，而且两处各算一套必然漂移，会出现「显示 75% 却已经开始压缩」。
+ *
+ * 窄侧栏里只画环、不显示百分比，数字留给小窗；环本身足够表达「快满了」。
+ *
+ * 「立即压缩」（issue #85）只在后台判定值得压时出现（`usage.compactable`，判据见
+ * `planManualCompaction`）；会话忙时置灰。点了就关掉小窗，让对话里的「压缩中」占位接手。
+ *
+ * 已知局限：在输入框里改了模型但还没发送时，环的分母仍是会话**当前实际在用**的模型
+ * 窗口——模型选择在发送前只是前端草稿，后台并不知情。下一轮发出去之后即自动纠正。
+ */
+export function ContextUsageIndicator({ usage, ...rest }: ContextUsageIndicatorProps) {
+  // 没收到过快照、或模型没声明窗口（画不出比例）时整个不渲染，不占位、不显示假数据。
+  // 显式挡掉 NaN：`NaN <= 0` 是 false，漏过去会渲染出 "NaN%" 和非法的 strokeDashoffset。
+  if (!usage || !Number.isFinite(usage.contextWindow) || usage.contextWindow <= 0) return null;
+  // 小窗的开合状态放在内层：占用清空（切会话 / 会话被删）时随之卸载复位，新会话的
+  // 占用帧到来时不会把上一个会话开着的小窗自己弹出来。
+  return <UsagePopover usage={usage} {...rest} />;
 }

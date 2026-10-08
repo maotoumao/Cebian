@@ -767,6 +767,8 @@ chat:
     threshold: "达到 $1% 时自动压缩较早的历史。"
     compactionOff: "未开启自动压缩。"
     estimateNote: "为估算值，实际计数取决于模型自己的分词器。"
+    # 立即压缩较早历史的按钮（issue #85）
+    compactNow: "立即压缩"
   compaction:
     # 历史压缩分割条上的标签
     divider: "此前上下文已压缩"

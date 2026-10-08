@@ -60,6 +60,11 @@ interface ChatInputProps {
   onThinkingChange: (level: ThinkingLevel) => void;
   /** 当前上下文占用；`null`（还没收到后台快照）时不渲染占用环。 */
   contextUsage: ContextUsage | null;
+  /** 后台会话是否非空闲（回复 / 压缩中，含等待工具或授权裁决——`isAgentRunning` 在那时
+   *  为 false，但后台仍不受理压缩）。用于置灰「立即压缩」。 */
+  agentBusy?: boolean;
+  /** 手动压缩上下文（issue #85）。 */
+  onCompact?: () => void;
   /** 发送进行中（上锁到派发完成）的起止通知。聊天页据此决定拖放区此刻能不能接收文件。 */
   onDispatchingChange?: (dispatching: boolean) => void;
 }
@@ -73,7 +78,7 @@ export interface ChatInputHandle {
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
-  { onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId, model: currentModel, thinkingLevel: currentThinkingLevel, onModelChange, onThinkingChange, contextUsage, onDispatchingChange },
+  { onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId, model: currentModel, thinkingLevel: currentThinkingLevel, onModelChange, onThinkingChange, contextUsage, agentBusy, onCompact, onDispatchingChange },
   ref,
 ) {
   const [value, setValue] = useState('');
@@ -1056,7 +1061,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           </div>
 
           <div className="flex items-center gap-1">
-            <ContextUsageIndicator usage={contextUsage} />
+            <ContextUsageIndicator usage={contextUsage} onCompact={onCompact} busy={agentBusy || isDispatching} />
             {speech.supported && (
               <MicButton
                 state={speech.state}

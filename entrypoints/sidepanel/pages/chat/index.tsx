@@ -131,6 +131,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     retry,
     editMessage,
     switchBranch,
+    compact,
     forkSession,
     subscribe: portSubscribe,
     unsubscribe: portUnsubscribe,
@@ -676,6 +677,8 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
         onModelChange={handleModelChange}
         onThinkingChange={handleThinkingChange}
         contextUsage={contextUsage}
+        agentBusy={isAgentRunning}
+        onCompact={compact}
         onDispatchingChange={setComposerDispatching}
       />
 
