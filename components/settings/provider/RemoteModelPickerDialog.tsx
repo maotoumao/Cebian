@@ -90,7 +90,7 @@ function RemoteModelPickerDialog({ remoteIds, existingIds, returnFocusRef, onCon
             <div className="flex items-center justify-between gap-2 text-xs">
               <label className="flex items-center gap-2">
                 <Checkbox checked={allState} onCheckedChange={toggleAll} disabled={visible.length === 0} />
-                <span>{t('provider.form.pickModels.selectAll')}</span>
+                <span>{t('common.selectAll')}</span>
               </label>
               <span className="tabular-nums text-muted-foreground">
                 {t('provider.form.pickModels.count', [String(selected.size), String(remoteIds.length)])}

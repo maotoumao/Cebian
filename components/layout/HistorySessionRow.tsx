@@ -235,7 +235,7 @@ export function HistorySessionRow({
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => onEnterSelection(session.id)}>
                 <CheckSquare />
-                <span className="min-w-0 break-words">{t('common.session.select')}</span>
+                <span className="min-w-0 break-words">{t('common.select')}</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" onSelect={() => onDelete(session.id)}>

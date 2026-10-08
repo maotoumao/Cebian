@@ -209,7 +209,7 @@ export function HistoryPanel({ open, onClose, onSelectSession, onDeleteSession }
               <X className="size-5" />
             </Button>
             <span className="font-semibold text-sm truncate min-w-0">
-              {t('common.session.selectedCount', selectedSessions.length)}
+              {t('common.selectedCount', selectedSessions.length)}
             </span>
             <div className="flex items-center gap-0.5 ml-auto shrink-0">
               <Button

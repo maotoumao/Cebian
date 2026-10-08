@@ -32,6 +32,13 @@ common:
   rename: "重命名"
   edit: "编辑"
   add: "添加"
+  # 通用多选文案（历史列表、模型列表等）
+  select: "选择"
+  selectAll: "全选"
+  # $1 = 已选中的条目数
+  selectedCount:
+    1: "已选 1 项"
+    n: "已选 $1 项"
   headers:
     keyPlaceholder: "Header 名"
     valuePlaceholder: "Header 值"
@@ -77,11 +84,6 @@ common:
     unpin: "取消置顶"
     archive: "归档"
     unarchive: "取消归档"
-    select: "选择"
-    # $1 = 已选中的会话数
-    selectedCount:
-      1: "已选 1 项"
-      n: "已选 $1 项"
     # $1 = 待删除的会话数
     deleteManyConfirmTitle:
       1: "删除该会话？"
@@ -873,7 +875,6 @@ provider:
       title: "选择要添加的模型"
       description: "勾选的模型会加入列表，已在列表里但未勾选的会被移除；不在此次获取结果里的模型不受影响。"
       search: "搜索模型"
-      selectAll: "全选"
       # $1 = 已选数量，$2 = 提供商返回的模型总数
       count: "已选 $1 / $2"
       empty: "提供商没有返回任何模型，可以手动添加。"

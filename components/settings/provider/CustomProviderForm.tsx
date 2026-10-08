@@ -1,87 +1,18 @@
 import { useState, useRef } from 'react';
-import { Plus, Trash2, RefreshCw, Pencil, X } from 'lucide-react';
+import { Plus, Trash2, Pencil } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Spinner } from '@/components/ui/spinner';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionItem, AccordionContent, AccordionTrigger } from '@/components/ui/accordion';
 import type { CustomProviderConfig, CustomModelDef } from '@/lib/persistence/storage';
 import { applyFetchedSelection, fetchRemoteModels } from '@/lib/providers/custom-models';
-import { ModelListItem } from '@/components/settings/provider/ModelListItem';
-import { RemoteModelPickerDialog } from '@/components/settings/provider/RemoteModelPickerDialog';
+import { ModelList } from '@/components/settings/provider/ModelList';
+import type { ModelFieldPatch } from '@/components/settings/provider/ModelListItem';
 import { HeadersEditor, headerRowsToRecord, recordToHeaderRows, type HeaderRow } from '@/components/settings/HeadersEditor';
 import { t } from '@/lib/i18n';
-
-// ─── Manual "add model by id" control ───
-
-/**
- * 手动添加模型的入口。静息态是一个整行按钮，点开才露出输入框——避免裸输入框和上方
- * 展开的模型配置混在一起（动线不清），也让「输入后要按回车/点添加」这个动作显式化
- */
-function ManualAddModel({
-  value,
-  onChange,
-  onAdd,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onAdd: () => void;
-}) {
-  const [adding, setAdding] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const open = () => {
-    setAdding(true);
-    requestAnimationFrame(() => inputRef.current?.focus());
-  };
-
-  const cancel = () => {
-    setAdding(false);
-    onChange('');
-  };
-
-  const submit = () => {
-    if (!value.trim()) return;
-    onAdd();
-    // 保持展开并重新聚焦，便于连续添加
-    requestAnimationFrame(() => inputRef.current?.focus());
-  };
-
-  if (!adding) {
-    return (
-      <Button variant="outline" size="sm" className="w-full" onClick={open}>
-        <Plus className="size-3.5" />
-        {t('provider.form.addManual')}
-      </Button>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      <Input
-        ref={inputRef}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter') { e.preventDefault(); submit(); }
-          else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
-        }}
-        onBlur={() => { if (!value.trim()) setAdding(false); }}
-        placeholder={t('provider.form.manualModelPlaceholder')}
-        className="h-7 text-xs flex-1"
-      />
-      <Button size="sm" onClick={submit} disabled={!value.trim()}>
-        {t('common.add')}
-      </Button>
-      <Button variant="ghost" size="icon-xs" onClick={cancel} aria-label={t('common.cancel')}>
-        <X className="size-3.5" />
-      </Button>
-    </div>
-  );
-}
 
 // ─── Shared form body (used by both create and edit) ───
 
@@ -105,7 +36,7 @@ function ProviderFormBody({
   onConfirmPicked,
   onCancelPick,
   onAddManualModel,
-  onRemoveModel,
+  onRemoveModels,
   onToggleReasoning,
   onToggleImage,
   onModelFieldChange,
@@ -120,17 +51,15 @@ function ProviderFormBody({
   onConfirmPicked: (selected: ReadonlySet<string>) => void;
   onCancelPick: () => void;
   onAddManualModel: () => void;
-  onRemoveModel: (modelId: string) => void;
+  onRemoveModels: (modelIds: string[]) => void;
   onToggleReasoning: (modelId: string) => void;
   onToggleImage: (modelId: string) => void;
-  onModelFieldChange: (modelId: string, patch: Partial<Pick<CustomModelDef, 'contextWindow' | 'maxTokens' | 'toolCalling'>>) => void;
+  onModelFieldChange: (modelId: string, patch: ModelFieldPatch) => void;
   onSubmit: () => void;
   onCancel: () => void;
   submitLabel: string;
   submitDisabled: boolean;
 }) {
-  // 勾选弹窗关闭后把焦点还给「自动获取」——弹窗不是由 DialogTrigger 打开的，Radix 自己找不到触发元素
-  const fetchButtonRef = useRef<HTMLButtonElement>(null);
   // 同时填了 API Key 与鉴权类 header（authorization / cf-aig-authorization）时提示：
   // pi-ai 会优先用 API Key（getClientApiKey），此时 header 不生效
   const authConflict = fields.apiKey.trim() !== '' &&
@@ -172,59 +101,23 @@ function ProviderFormBody({
 
       <Separator />
 
-      {/* Fetch models */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs">{t('provider.form.models')}</Label>
-          <Button
-            ref={fetchButtonRef}
-            variant="ghost"
-            size="xs"
-            onClick={onFetchModels}
-            disabled={fields.fetching || !fields.baseUrl.trim()}
-          >
-            {fields.fetching ? <Spinner className="size-3" /> : <RefreshCw className="size-3" />}
-            {t('provider.form.autoFetch')}
-          </Button>
-        </div>
-
-        {fields.fetchError && (
-          <p className="text-xs text-destructive">{fields.fetchError}</p>
-        )}
-
-        {fields.pickerRemoteIds && (
-          <RemoteModelPickerDialog
-            remoteIds={fields.pickerRemoteIds}
-            existingIds={new Set(fields.models.map(m => m.modelId))}
-            returnFocusRef={fetchButtonRef}
-            onConfirm={onConfirmPicked}
-            onCancel={onCancelPick}
-          />
-        )}
-
-        {/* Model list */}
-        {fields.models.length > 0 && (
-          <Accordion type="multiple" className="divide-y divide-border/50">
-            {fields.models.map(m => (
-              <ModelListItem
-                key={m.modelId}
-                model={m}
-                onToggleReasoning={onToggleReasoning}
-                onToggleImage={onToggleImage}
-                onRemove={onRemoveModel}
-                onFieldChange={onModelFieldChange}
-              />
-            ))}
-          </Accordion>
-        )}
-
-        {/* Manual add */}
-        <ManualAddModel
-          value={fields.manualModelId}
-          onChange={v => onFieldChange({ manualModelId: v })}
-          onAdd={onAddManualModel}
-        />
-      </div>
+      <ModelList
+        models={fields.models}
+        canFetch={fields.baseUrl.trim() !== ''}
+        fetching={fields.fetching}
+        fetchError={fields.fetchError}
+        pickerRemoteIds={fields.pickerRemoteIds}
+        manualModelId={fields.manualModelId}
+        onManualModelIdChange={v => onFieldChange({ manualModelId: v })}
+        onFetchModels={onFetchModels}
+        onConfirmPicked={onConfirmPicked}
+        onCancelPick={onCancelPick}
+        onAddManualModel={onAddManualModel}
+        onRemoveModels={onRemoveModels}
+        onToggleReasoning={onToggleReasoning}
+        onToggleImage={onToggleImage}
+        onModelFieldChange={onModelFieldChange}
+      />
 
       <Separator />
 
@@ -333,7 +226,10 @@ function useProviderForm(initial?: { name: string; baseUrl: string; apiKey: stri
     setManualModelId('');
   };
 
-  const handleRemoveModel = (modelId: string) => setModels(models.filter(m => m.modelId !== modelId));
+  const handleRemoveModels = (modelIds: string[]) => {
+    const removed = new Set(modelIds);
+    setModels(prev => prev.filter(m => !removed.has(m.modelId)));
+  };
 
   const handleToggleReasoning = (modelId: string) =>
     setModels(models.map(m => m.modelId === modelId ? { ...m, reasoning: !m.reasoning } : m));
@@ -343,7 +239,7 @@ function useProviderForm(initial?: { name: string; baseUrl: string; apiKey: stri
 
   const handleModelFieldChange = (
     modelId: string,
-    patch: Partial<Pick<CustomModelDef, 'contextWindow' | 'maxTokens' | 'toolCalling'>>,
+    patch: ModelFieldPatch,
   ) => setModels(models.map(m => (m.modelId === modelId ? { ...m, ...patch } : m)));
 
   const reset = () => {
@@ -358,7 +254,7 @@ function useProviderForm(initial?: { name: string; baseUrl: string; apiKey: stri
     invalidateFetch();
   };
 
-  return { fields, onFieldChange, handleFetchModels, handleConfirmPicked, handleCancelPick, handleAddManualModel, handleRemoveModel, handleToggleReasoning, handleToggleImage, handleModelFieldChange, reset };
+  return { fields, onFieldChange, handleFetchModels, handleConfirmPicked, handleCancelPick, handleAddManualModel, handleRemoveModels, handleToggleReasoning, handleToggleImage, handleModelFieldChange, reset };
 }
 
 // ─── Create form ───
@@ -419,7 +315,7 @@ export function CustomProviderForm({ onAdd }: CustomProviderFormProps) {
       onConfirmPicked={form.handleConfirmPicked}
       onCancelPick={form.handleCancelPick}
       onAddManualModel={form.handleAddManualModel}
-      onRemoveModel={form.handleRemoveModel}
+      onRemoveModels={form.handleRemoveModels}
       onToggleReasoning={form.handleToggleReasoning}
       onToggleImage={form.handleToggleImage}
       onModelFieldChange={form.handleModelFieldChange}
@@ -494,7 +390,7 @@ export function CustomProviderCard({ config, apiKey, onUpdate, onRemove }: Custo
         onConfirmPicked={form.handleConfirmPicked}
         onCancelPick={form.handleCancelPick}
         onAddManualModel={form.handleAddManualModel}
-        onRemoveModel={form.handleRemoveModel}
+        onRemoveModels={form.handleRemoveModels}
         onToggleReasoning={form.handleToggleReasoning}
         onToggleImage={form.handleToggleImage}
         onModelFieldChange={form.handleModelFieldChange}

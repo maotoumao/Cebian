@@ -19,6 +19,9 @@ function parseTokenInput(raw: string): number | undefined {
   return Math.min(n, Number.MAX_SAFE_INTEGER);
 }
 
+/** 单个模型可在展开区调整的配置项补丁。 */
+type ModelFieldPatch = Partial<Pick<CustomModelDef, 'contextWindow' | 'maxTokens' | 'toolCalling'>>;
+
 interface ModelListItemProps {
   model: CustomModelDef;
   onToggleReasoning: (modelId: string) => void;
@@ -26,7 +29,7 @@ interface ModelListItemProps {
   onRemove: (modelId: string) => void;
   onFieldChange: (
     modelId: string,
-    patch: Partial<Pick<CustomModelDef, 'contextWindow' | 'maxTokens' | 'toolCalling'>>,
+    patch: ModelFieldPatch,
   ) => void;
 }
 
@@ -133,3 +136,5 @@ export function ModelListItem({ model, onToggleReasoning, onToggleImage, onRemov
     </AccordionItem>
   );
 }
+
+export type { ModelFieldPatch };
