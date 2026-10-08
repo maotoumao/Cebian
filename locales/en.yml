@@ -882,6 +882,16 @@ provider:
     authOverrideHint: "You set both an API Key and an Authorization header; the API Key wins. To authenticate via the header, clear the API Key above."
     addCustom: "Add custom provider"
     fetchFailed: "Failed to fetch models, please add manually"
+    # Dialog shown after "Fetch models" to pick which of the provider's models to add (issue #86)
+    pickModels:
+      title: "Choose models to add"
+      description: "Checked models are added to the list, and unchecked ones already in it are removed. Models not in this result are kept."
+      search: "Search models"
+      selectAll: "Select all"
+      # $1 = number selected, $2 = total models returned by the provider
+      count: "$1 of $2 selected"
+      empty: "The provider returned no models. You can add them manually."
+      noMatch: "No matching models"
 
 # ─── Tool runtime labels (shown in ToolCard) ───
 tools:

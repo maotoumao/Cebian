@@ -868,6 +868,16 @@ provider:
     authOverrideHint: "同時填了 API Key 與 Authorization 標頭，會優先使用 API Key。若要用該標頭驗證，請清空上面的 API Key。"
     addCustom: "新增自訂供應商"
     fetchFailed: "無法擷取模型清單，請手動新增"
+    # 「自動擷取」後勾選要新增哪些模型的對話框（issue #86）
+    pickModels:
+      title: "選擇要新增的模型"
+      description: "勾選的模型會加入清單，已在清單中但未勾選的會被移除；不在此次擷取結果中的模型不受影響。"
+      search: "搜尋模型"
+      selectAll: "全選"
+      # $1 = 已選數量，$2 = 供應商回傳的模型總數
+      count: "已選 $1 / $2"
+      empty: "供應商沒有回傳任何模型，可以手動新增。"
+      noMatch: "沒有符合的模型"
 
 # ─── 工具執行時標籤（在 ToolCard 中顯示）───
 tools:

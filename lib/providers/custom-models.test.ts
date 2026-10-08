@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mergeFetchedModels, supportsToolCalling, toModel } from '@/lib/providers/custom-models';
+import { applyFetchedSelection, supportsToolCalling, toModel } from '@/lib/providers/custom-models';
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all';
 import type { CustomModelDef, CustomProviderConfig } from '@/lib/persistence/storage';
 
@@ -12,36 +12,43 @@ const configured: CustomModelDef = {
   maxTokens: 4096,
 };
 
-describe('mergeFetchedModels', () => {
-  it('仍存在的模型保留既有配置', () => {
-    expect(mergeFetchedModels([configured], ['gpt-x'])).toEqual([configured]);
+describe('applyFetchedSelection', () => {
+  const fresh = (modelId: string): CustomModelDef => ({ modelId, name: modelId, reasoning: false, image: false });
+  const manual: CustomModelDef = { modelId: 'manual-only', name: 'manual-only', reasoning: true, image: false };
+
+  it('首次获取（列表为空）：只加入勾选的，以默认值补入，顺序跟随远端', () => {
+    expect(applyFetchedSelection([], ['a', 'b', 'c'], new Set(['c', 'a']))).toEqual([fresh('a'), fresh('c')]);
   });
 
-  it('新模型以默认值补入', () => {
-    expect(mergeFetchedModels([], ['new'])).toEqual([
-      { modelId: 'new', name: 'new', reasoning: false, image: false },
-    ]);
+  it('首次获取一个都没勾 → 仍为空', () => {
+    expect(applyFetchedSelection([], ['a', 'b'], new Set())).toEqual([]);
   });
 
-  it('混合：保留旧的、补入新的、丢弃远端已消失的，顺序跟随远端', () => {
-    const other: CustomModelDef = { modelId: 'keep', name: 'keep', reasoning: false, image: false };
-    expect(mergeFetchedModels([configured, other], ['new', 'gpt-x'])).toEqual([
-      { modelId: 'new', name: 'new', reasoning: false, image: false },
-      configured,
-    ]);
-  });
-
-  it('重新拉取保留「不支持工具调用」的设置', () => {
+  it('勾选的既有模型保留原配置（含「不支持工具调用」）', () => {
     const chatOnly: CustomModelDef = { ...configured, toolCalling: false };
-    expect(mergeFetchedModels([chatOnly], ['gpt-x'])).toEqual([chatOnly]);
+    expect(applyFetchedSelection([chatOnly], ['gpt-x'], new Set(['gpt-x']))).toEqual([chatOnly]);
   });
 
-  it('远端重复 id 只取首个', () => {
-    expect(mergeFetchedModels([configured], ['gpt-x', 'gpt-x'])).toEqual([configured]);
+  it('远端有但没勾的既有模型被移除', () => {
+    expect(applyFetchedSelection([configured, fresh('b')], ['gpt-x', 'b'], new Set(['b']))).toEqual([fresh('b')]);
   });
 
-  it('空远端 → 清空', () => {
-    expect(mergeFetchedModels([configured], [])).toEqual([]);
+  it('不在远端列表里的手动模型原样保留，哪怕什么都没勾', () => {
+    expect(applyFetchedSelection([manual, configured], ['gpt-x'], new Set())).toEqual([manual]);
+  });
+
+  it('既有模型保持原顺序，新模型按远端顺序追加在后', () => {
+    expect(
+      applyFetchedSelection([fresh('z'), manual, configured], ['new2', 'gpt-x', 'z', 'new1'], new Set(['gpt-x', 'z', 'new1', 'new2'])),
+    ).toEqual([fresh('z'), manual, configured, fresh('new2'), fresh('new1')]);
+  });
+
+  it('远端重复 id 只补入一次', () => {
+    expect(applyFetchedSelection([], ['a', 'a'], new Set(['a']))).toEqual([fresh('a')]);
+  });
+
+  it('勾选集里不在远端列表的 id 被忽略', () => {
+    expect(applyFetchedSelection([], ['a'], new Set(['a', 'ghost']))).toEqual([fresh('a')]);
   });
 });
 

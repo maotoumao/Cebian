@@ -65,23 +65,29 @@ export function getCustomModels(config: CustomProviderConfig): Model<Api>[] {
 }
 
 /**
- * 重新拉取模型列表后按 modelId 合并：仍存在的模型保留既有配置（reasoning/image/toolCalling/
- * contextWindow/maxTokens），新模型以默认值补入，远端已消失的移除；顺序跟随远端、
- * 重复 id 只取首个。避免「自动获取」把用户设过的每模型配置整批冲掉
+ * 「自动获取」后按用户在弹窗里的勾选更新模型列表：
+ * - 远端列表里的模型以勾选为准——勾上的保留既有配置（reasoning/image/toolCalling/
+ *   contextWindow/maxTokens），没有的以默认值补入；没勾的移除；
+ * - 不在远端列表里的既有模型（手动添加的，很多服务商的 `/models` 列不全）原样保留；
+ * - 既有模型保持原顺序，新补入的按远端顺序追加；远端重复 id 只取首个。
+ *
+ * `selectedIds` 里不在远端列表中的 id 会被忽略：只能从远端列表里勾选。
  */
-export function mergeFetchedModels(
+export function applyFetchedSelection(
   existing: CustomModelDef[],
-  fetchedIds: string[],
+  remoteIds: string[],
+  selectedIds: ReadonlySet<string>,
 ): CustomModelDef[] {
-  const byId = new Map(existing.map(m => [m.modelId, m]));
-  const seen = new Set<string>();
-  const out: CustomModelDef[] = [];
-  for (const id of fetchedIds) {
-    if (seen.has(id)) continue;
-    seen.add(id);
-    out.push(byId.get(id) ?? { modelId: id, name: id, reasoning: false, image: false });
+  const remote = new Set(remoteIds);
+  const kept = existing.filter(m => !remote.has(m.modelId) || selectedIds.has(m.modelId));
+  const present = new Set(kept.map(m => m.modelId));
+  const added: CustomModelDef[] = [];
+  for (const id of remote) {
+    if (!selectedIds.has(id) || present.has(id)) continue;
+    present.add(id);
+    added.push({ modelId: id, name: id, reasoning: false, image: false });
   }
-  return out;
+  return [...kept, ...added];
 }
 
 /** Find a custom provider config by provider key (e.g. "custom:deepseek") */

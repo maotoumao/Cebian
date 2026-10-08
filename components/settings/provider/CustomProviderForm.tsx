@@ -9,8 +9,9 @@ import { Spinner } from '@/components/ui/spinner';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionItem, AccordionContent, AccordionTrigger } from '@/components/ui/accordion';
 import type { CustomProviderConfig, CustomModelDef } from '@/lib/persistence/storage';
-import { fetchRemoteModels, mergeFetchedModels } from '@/lib/providers/custom-models';
+import { applyFetchedSelection, fetchRemoteModels } from '@/lib/providers/custom-models';
 import { ModelListItem } from '@/components/settings/provider/ModelListItem';
+import { RemoteModelPickerDialog } from '@/components/settings/provider/RemoteModelPickerDialog';
 import { HeadersEditor, headerRowsToRecord, recordToHeaderRows, type HeaderRow } from '@/components/settings/HeadersEditor';
 import { t } from '@/lib/i18n';
 
@@ -93,12 +94,16 @@ interface ProviderFormFields {
   manualModelId: string;
   fetching: boolean;
   fetchError: string;
+  /** 「自动获取」拿到的远端模型 id，等用户在弹窗里勾选；`null` = 弹窗未打开。 */
+  pickerRemoteIds: string[] | null;
 }
 
 function ProviderFormBody({
   fields,
   onFieldChange,
   onFetchModels,
+  onConfirmPicked,
+  onCancelPick,
   onAddManualModel,
   onRemoveModel,
   onToggleReasoning,
@@ -112,6 +117,8 @@ function ProviderFormBody({
   fields: ProviderFormFields;
   onFieldChange: (patch: Partial<ProviderFormFields>) => void;
   onFetchModels: () => void;
+  onConfirmPicked: (selected: ReadonlySet<string>) => void;
+  onCancelPick: () => void;
   onAddManualModel: () => void;
   onRemoveModel: (modelId: string) => void;
   onToggleReasoning: (modelId: string) => void;
@@ -122,6 +129,8 @@ function ProviderFormBody({
   submitLabel: string;
   submitDisabled: boolean;
 }) {
+  // 勾选弹窗关闭后把焦点还给「自动获取」——弹窗不是由 DialogTrigger 打开的，Radix 自己找不到触发元素
+  const fetchButtonRef = useRef<HTMLButtonElement>(null);
   // 同时填了 API Key 与鉴权类 header（authorization / cf-aig-authorization）时提示：
   // pi-ai 会优先用 API Key（getClientApiKey），此时 header 不生效
   const authConflict = fields.apiKey.trim() !== '' &&
@@ -168,6 +177,7 @@ function ProviderFormBody({
         <div className="flex items-center justify-between">
           <Label className="text-xs">{t('provider.form.models')}</Label>
           <Button
+            ref={fetchButtonRef}
             variant="ghost"
             size="xs"
             onClick={onFetchModels}
@@ -180,6 +190,16 @@ function ProviderFormBody({
 
         {fields.fetchError && (
           <p className="text-xs text-destructive">{fields.fetchError}</p>
+        )}
+
+        {fields.pickerRemoteIds && (
+          <RemoteModelPickerDialog
+            remoteIds={fields.pickerRemoteIds}
+            existingIds={new Set(fields.models.map(m => m.modelId))}
+            returnFocusRef={fetchButtonRef}
+            onConfirm={onConfirmPicked}
+            onCancel={onCancelPick}
+          />
         )}
 
         {/* Model list */}
@@ -255,33 +275,56 @@ function useProviderForm(initial?: { name: string; baseUrl: string; apiKey: stri
   const [manualModelId, setManualModelId] = useState('');
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState('');
+  const [pickerRemoteIds, setPickerRemoteIds] = useState<string[] | null>(null);
+  // 拉取代次：表单被重置 / 重新打开编辑、或端点参数变了，在途的拉取就作废——否则迟到的结果
+  // 会在之后的表单里弹出上一个端点的模型勾选框（最长等 10 秒超时）。
+  const fetchGenerationRef = useRef(0);
+  const invalidateFetch = () => {
+    fetchGenerationRef.current += 1;
+    setFetching(false);
+  };
 
-  const fields: ProviderFormFields = { name, baseUrl, apiKey, models, headers, manualModelId, fetching, fetchError };
+  const fields: ProviderFormFields = { name, baseUrl, apiKey, models, headers, manualModelId, fetching, fetchError, pickerRemoteIds };
 
   const onFieldChange = (patch: Partial<ProviderFormFields>) => {
+    if (patch.baseUrl !== undefined || patch.apiKey !== undefined || patch.headers !== undefined) invalidateFetch();
     if (patch.name !== undefined) setName(patch.name);
     if (patch.baseUrl !== undefined) setBaseUrl(patch.baseUrl);
     if (patch.apiKey !== undefined) setApiKey(patch.apiKey);
     if (patch.models !== undefined) setModels(patch.models);
     if (patch.headers !== undefined) setHeaders(patch.headers);
     if (patch.manualModelId !== undefined) setManualModelId(patch.manualModelId);
+    if (patch.pickerRemoteIds !== undefined) setPickerRemoteIds(patch.pickerRemoteIds);
   };
 
   const handleFetchModels = async () => {
     if (!baseUrl.trim()) return;
+    const generation = ++fetchGenerationRef.current;
     setFetching(true);
     setFetchError('');
     try {
       const remote = await fetchRemoteModels(baseUrl, apiKey, headerRowsToRecord(headers));
-      // 按 modelId 合并，保留用户已设过的每模型配置，不因重新获取而清空
-      setModels(prev => mergeFetchedModels(prev, remote.map(r => r.id)));
+      if (generation !== fetchGenerationRef.current) return;
+      // 不直接改列表：先让用户在弹窗里勾选（issue #86），确定时再按勾选合并
+      setPickerRemoteIds([...new Set(remote.map(r => r.id))]);
       setFetchError('');
     } catch {
+      if (generation !== fetchGenerationRef.current) return;
       setFetchError(t('provider.form.fetchFailed'));
     } finally {
-      setFetching(false);
+      if (generation === fetchGenerationRef.current) setFetching(false);
     }
   };
+
+  const handleConfirmPicked = (selected: ReadonlySet<string>) => {
+    const remoteIds = pickerRemoteIds;
+    setPickerRemoteIds(null);
+    if (!remoteIds) return;
+    // 按 modelId 合并：勾上的保留既有配置，不在这次获取结果里的（如手动添加的）不受影响
+    setModels(prev => applyFetchedSelection(prev, remoteIds, selected));
+  };
+
+  const handleCancelPick = () => setPickerRemoteIds(null);
 
   const handleAddManualModel = () => {
     const id = manualModelId.trim();
@@ -311,9 +354,11 @@ function useProviderForm(initial?: { name: string; baseUrl: string; apiKey: stri
     setHeaders([]);
     setManualModelId('');
     setFetchError('');
+    setPickerRemoteIds(null);
+    invalidateFetch();
   };
 
-  return { fields, onFieldChange, handleFetchModels, handleAddManualModel, handleRemoveModel, handleToggleReasoning, handleToggleImage, handleModelFieldChange, reset };
+  return { fields, onFieldChange, handleFetchModels, handleConfirmPicked, handleCancelPick, handleAddManualModel, handleRemoveModel, handleToggleReasoning, handleToggleImage, handleModelFieldChange, reset };
 }
 
 // ─── Create form ───
@@ -371,6 +416,8 @@ export function CustomProviderForm({ onAdd }: CustomProviderFormProps) {
       fields={form.fields}
       onFieldChange={form.onFieldChange}
       onFetchModels={form.handleFetchModels}
+      onConfirmPicked={form.handleConfirmPicked}
+      onCancelPick={form.handleCancelPick}
       onAddManualModel={form.handleAddManualModel}
       onRemoveModel={form.handleRemoveModel}
       onToggleReasoning={form.handleToggleReasoning}
@@ -412,6 +459,7 @@ export function CustomProviderCard({ config, apiKey, onUpdate, onRemove }: Custo
       models: config.models,
       headers: recordToHeaderRows(config.headers),
       manualModelId: '',
+      pickerRemoteIds: null,
     });
     setEditing(true);
   };
@@ -443,6 +491,8 @@ export function CustomProviderCard({ config, apiKey, onUpdate, onRemove }: Custo
         fields={form.fields}
         onFieldChange={form.onFieldChange}
         onFetchModels={form.handleFetchModels}
+        onConfirmPicked={form.handleConfirmPicked}
+        onCancelPick={form.handleCancelPick}
         onAddManualModel={form.handleAddManualModel}
         onRemoveModel={form.handleRemoveModel}
         onToggleReasoning={form.handleToggleReasoning}
