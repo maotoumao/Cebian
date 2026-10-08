@@ -55,12 +55,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 修复打开开发者工具后手机模式按钮被误显示为已开启的问题
 - Firefox 下不再显示无法使用的手机模式按钮
 - 录制里输入、滚动和页面变化的时间改为按实际发生的时刻记录，不再滞后最多一两秒，事件顺序更准确
+- 修复在新标签页中打开设置时，创建或恢复备份失败并提示「backup messages are not allowed from tab contexts」的问题 ([#87](https://github.com/maotoumao/Cebian/issues/87))
 
 - Fixed connecting to remote MCP servers that validate the request Origin, such as Cloudflare's ([#81](https://github.com/maotoumao/Cebian/issues/81))
 - Fixed running scripts on a tab in mobile mode when the page's security policy forces the debugger fallback; both now work together
 - Fixed the mobile mode button showing as on after opening DevTools
 - The mobile mode button, which cannot work there, is no longer shown in Firefox
 - Typing, scrolling and page changes in a recording are now timed by when they actually happened rather than up to a couple of seconds later, so events appear in the right order
+- Fixed creating or restoring a backup failing with "backup messages are not allowed from tab contexts" when Settings is opened in a browser tab ([#87](https://github.com/maotoumao/Cebian/issues/87))
 
 ## 1.8.0 - 2026-09-29
 

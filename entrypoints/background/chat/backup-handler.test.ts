@@ -42,9 +42,12 @@ const SESSION = {
 
 let listener: MessageListener;
 
-function send<T>(message: object): Promise<BackupResponse<T>> {
+function send<T>(
+  message: object,
+  sender: chrome.runtime.MessageSender = { id: chrome.runtime.id, url: chrome.runtime.getURL('/sidepanel.html') },
+): Promise<BackupResponse<T>> {
   return new Promise((resolve) => {
-    listener(message, { id: chrome.runtime.id }, (response) => {
+    listener(message, sender, (response) => {
       resolve(response as BackupResponse<T>);
     });
   });
@@ -60,6 +63,28 @@ describe('registerBackupHandler keepalive', () => {
       listener = registered as MessageListener;
     });
     registerBackupHandler();
+  });
+
+  it('接受以标签页打开的扩展页面（#87）', async () => {
+    const tab = { id: 7 } as chrome.tabs.Tab;
+    const response = await send(
+      { type: BACKUP_APPLY_ABORT, nonce: 'from-tab' },
+      { id: chrome.runtime.id, url: chrome.runtime.getURL('/settings.html'), tab },
+    );
+
+    expect(response).toEqual({ ok: true, value: undefined });
+  });
+
+  it('拒绝内容脚本发来的 backup 消息', async () => {
+    const tab = { id: 7 } as chrome.tabs.Tab;
+    const response = await send(
+      { type: BACKUP_APPLY_CHUNK, nonce: 'from-content', records: [SESSION] },
+      { id: chrome.runtime.id, url: 'https://example.com/', tab },
+    );
+
+    expect(response.ok).toBe(false);
+    // 被拒的来源不能建立缓冲
+    expect(mocks.acquireKeepAlive).not.toHaveBeenCalled();
   });
 
   it('空恢复的 commit 独立保活，并在事务完成后释放', async () => {

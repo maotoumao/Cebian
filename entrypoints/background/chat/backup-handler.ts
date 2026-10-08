@@ -30,6 +30,7 @@ import {
   type SessionBackupRecord,
   type SessionRecordLike,
 } from '@/lib/persistence/db';
+import { isExtensionPageSender } from '@/lib/ipc/sender';
 import { acquireKeepAlive, releaseKeepAlive } from '../lifecycle/keepalive';
 
 /** 统一把异步结果包成响应信封发回，错误转成可读字符串（页面侧据此重新抛出）。 */
@@ -116,10 +117,10 @@ export function registerBackupHandler(): void {
     // 非 backup 消息，交给其它监听器
     if (!isBackup) return false;
 
-    // 破坏性 backup 操作只允许扩展自身页面 / SW 发起。content script 注入在标签页
-    // 里时 sender.tab 非空——拒绝，避免页面脚本触发刷写 / 累积 / 写回会话。
-    if (sender.tab != null) {
-      sendResponse({ ok: false, error: 'backup messages are not allowed from tab contexts' });
+    // 破坏性 backup 操作只允许扩展自身页面发起（侧边栏或以标签页打开的设置页），
+    // 拒绝内容脚本，避免页面脚本触发刷写 / 累积 / 写回会话。
+    if (!isExtensionPageSender(sender)) {
+      sendResponse({ ok: false, error: 'backup messages are only accepted from extension pages' });
       return true;
     }
 

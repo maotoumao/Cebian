@@ -10,6 +10,7 @@ import {
   type MobileEmulationToggleRequest,
   type MobileEmulationToggleResponse,
 } from '@/lib/browser/mobile-emulation';
+import { isExtensionPageSender } from '@/lib/ipc/sender';
 import { mobileEmulatedTabs } from '@/lib/persistence/storage';
 
 // iPhone 14 Pro
@@ -119,10 +120,8 @@ function setupMobileEmulation(): void {
     if (msg?.type !== MOBILE_EMULATION_TOGGLE) return false;
     const respond = (response: MobileEmulationToggleResponse) => sendResponse(response);
     const { tabId } = msg as MobileEmulationToggleRequest;
-    // 只接受扩展自身页面（侧边栏、以标签页打开的 Cebian）的请求：内容脚本的 sender.url
-    // 是所在网页的地址，不能替用户开关模拟
-    const fromExtensionPage = sender.id === chrome.runtime.id && !!sender.url?.startsWith(chrome.runtime.getURL(''));
-    if (!fromExtensionPage || typeof tabId !== 'number') {
+    // 只接受扩展自身页面（侧边栏、以标签页打开的 Cebian）的请求：内容脚本不能替用户开关模拟
+    if (!isExtensionPageSender(sender) || typeof tabId !== 'number') {
       respond({ ok: false, error: 'Invalid mobile emulation request.' });
       return true;
     }
