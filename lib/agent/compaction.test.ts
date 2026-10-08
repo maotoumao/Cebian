@@ -7,6 +7,7 @@ import {
   findCompactionCutPoint,
   measureContextUsage,
   planCompaction,
+  planManualCompaction,
   resolveCompactionBudget,
   splitForSummary,
   summaryChunkBudget,
@@ -483,6 +484,130 @@ describe('planCompaction', () => {
       ...retained,
       ...after,
     ]);
+  });
+});
+
+// ─── 手动压缩 ───
+
+describe('planManualCompaction', () => {
+  // 100k 窗口、80% 阈值：触发点 80k，保留区预算 20k。
+  const settings = { enabled: true, thresholdPercent: 80 };
+  const WINDOW = 100_000;
+  const manual = (messages: AgentMessage[], s: CompactionSettings = settings, contextWindow = WINDOW) =>
+    planManualCompaction({ messages, settings: s, contextWindow });
+
+  it('没到自动阈值、但能摘掉一半以上 → compact，正是「提前手动压缩」的区间', () => {
+    const messages = conversation(16, '中'.repeat(2_000));
+    expect(planCompaction({ messages, settings, contextWindow: WINDOW }).kind).toBe('skip');
+    const decision = manual(messages);
+    if (decision.kind !== 'compact') throw new Error(`expected compact, got ${decision.kind}`);
+    expect([...decision.plan.messagesToSummarize, ...decision.plan.retainedTail]).toEqual(messages);
+  });
+
+  it('占用没明显超过保留区 → skip，压一次省不了多少', () => {
+    expect(manual(conversation(6, '中'.repeat(2_000))).kind).toBe('skip');
+  });
+
+  it('短对话整段落在保留区里 → skip', () => {
+    expect(manual(conversation(2, '中'.repeat(100))).kind).toBe('skip');
+  });
+
+  it('关掉自动压缩照样可以手动压缩', () => {
+    const messages = conversation(16, '中'.repeat(2_000));
+    expect(manual(messages, { enabled: false, thresholdPercent: 80 }).kind).toBe('compact');
+  });
+
+  it('小窗口模型关掉自动压缩后，保留区预算与开着时一致，不会膨胀成整个窗口', () => {
+    const messages = conversation(8, '中'.repeat(1_000));
+    const enabled = manual(messages, settings, 16_000);
+    const disabled = manual(messages, { enabled: false, thresholdPercent: 80 }, 16_000);
+    if (enabled.kind !== 'compact') throw new Error(`expected compact, got ${enabled.kind}`);
+    if (disabled.kind !== 'compact') throw new Error(`expected compact, got ${disabled.kind}`);
+    expect(disabled.plan.retainedTail).toEqual(enabled.plan.retainedTail);
+  });
+
+  it('收益门槛只量消息：systemPrompt / 工具表再大也不影响结论', () => {
+    const messages = conversation(16, '中'.repeat(2_000));
+    const decision = planManualCompaction({
+      messages,
+      settings,
+      contextWindow: WINDOW,
+      systemPrompt: '很长的系统提示词'.repeat(2_000),
+      tools: [{ name: 'read', description: 'x'.repeat(60_000) }],
+    });
+    expect(decision.kind).toBe('compact');
+  });
+
+  it('模型没声明窗口 → skip', () => {
+    expect(manual(conversation(16, '中'.repeat(2_000)), settings, 0).kind).toBe('skip');
+  });
+
+  it('尾部一组拆不开的超大工具结果撑满保留区 → skip，不会产生 stuck', () => {
+    // 前面的历史足够长，单看收益门槛是该压的——skip 只能来自「保留区塞不进窗口」。
+    const messages = [
+      ...conversation(30, '中'.repeat(2_000)),
+      user('抓一下这个页面'),
+      caller('big'),
+      toolResult('big', '中'.repeat(90_000)),
+    ];
+    expect(manual(messages).kind).toBe('skip');
+  });
+
+  it('保留区被大工具结果撑大、可摘要部分不到一半 → skip', () => {
+    const messages = [
+      ...conversation(6, '中'.repeat(2_000)),
+      user('抓一下这个页面'),
+      caller('big'),
+      toolResult('big', '中'.repeat(40_000)),
+    ];
+    expect(manual(messages).kind).toBe('skip');
+  });
+
+  it('刚压完、上次保留区以 assistant 开头时，用户新发一句短消息不会让按钮冒出来', () => {
+    // 工具密集的一轮压完后，保留区常是「caller + 大 toolResult」。切点会落在新的 user 上，
+    // 实际保留区只剩一句话——门槛必须按保留区预算算，否则占用一成就显示「立即压缩」。
+    const summaryMsg = {
+      role: 'compactionSummary',
+      summary: '上一段摘要',
+      tokensBefore: 1,
+      timestamp: 1,
+      retainedTail: [caller('t'), toolResult('t', '中'.repeat(10_000))],
+    } as unknown as AgentMessage;
+    expect(manual([user('很早以前的问题'), summaryMsg, user('hi')]).kind).toBe('skip');
+  });
+
+  it('已有摘要时按「自上次摘要以来」计算，旧摘要交出去做滚动合并', () => {
+    const retained = [user('保留区里的问题'), assistant('回答')];
+    const summaryMsg = {
+      role: 'compactionSummary',
+      summary: '上一段摘要',
+      tokensBefore: 1,
+      timestamp: 1,
+      retainedTail: retained,
+    } as unknown as AgentMessage;
+    const after = conversation(16, '中'.repeat(2_000));
+    const decision = manual([user('很早以前的问题'), summaryMsg, ...after]);
+    if (decision.kind !== 'compact') throw new Error(`expected compact, got ${decision.kind}`);
+    expect(decision.plan.lastSummary?.summary).toBe('上一段摘要');
+    expect([...decision.plan.messagesToSummarize, ...decision.plan.retainedTail]).toEqual([
+      ...retained,
+      ...after,
+    ]);
+  });
+
+  it('占用快照的 compactable 与 planManualCompaction 结论一致', () => {
+    const cases: [AgentMessage[], CompactionSettings, number][] = [
+      [conversation(16, '中'.repeat(2_000)), settings, WINDOW],
+      [conversation(6, '中'.repeat(2_000)), settings, WINDOW],
+      [conversation(16, '中'.repeat(2_000)), { enabled: false, thresholdPercent: 80 }, WINDOW],
+      [conversation(16, '中'.repeat(2_000)), settings, 0],
+    ];
+    for (const [messages, s, contextWindow] of cases) {
+      const usage = measureContextUsage({ messages, settings: s, contextWindow });
+      expect(usage.compactable).toBe(manual(messages, s, contextWindow).kind === 'compact');
+    }
+    // 至少覆盖到真、假两种结论，免得这条断言恒等于比较两个 false。
+    expect(cases.map(([m, s, w]) => manual(m, s, w).kind)).toEqual(['compact', 'skip', 'compact', 'skip']);
   });
 });
 

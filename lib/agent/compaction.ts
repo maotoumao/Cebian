@@ -202,6 +202,8 @@ export interface ContextUsage {
   contextWindow: number;
   /** 触发压缩的 token 数；`null` = 不压缩（用户关掉了自动压缩，或窗口未知）。 */
   triggerTokens: number | null;
+  /** 现在手动压缩是否值得做（判据见 {@link planManualCompaction}），界面据此显示「立即压缩」。 */
+  compactable: boolean;
 }
 
 /**
@@ -250,21 +252,31 @@ type CompactionDecision =
   | { kind: 'stuck' };
 
 /**
- * 判断当前上下文该不该压缩、压哪一段。纯函数、无副作用，摘要调用与状态回写都在
- * 编排层（session-manager）。
+ * 手动压缩的收益门槛：「被摘要部分 ÷ 保留区」（估算 token，保留区取实际大小与预算中的较大者）
+ * 至少为此值，「立即压缩」才值得出现。取 1 即被摘要的部分至少要有保留区这么大。
+ *
+ * 压缩后剩下的是「摘要 + 保留区」，保留区预算本就占窗口不小的一块（见 KEEP_RECENT_PERCENT）。
+ * 消息还没明显超过保留区时压一次省不了多少，却要多付一次摘要请求——按钮不如不出现。
+ * 两边都只量消息（`estimateMessageTokens`），不含 systemPrompt / 工具 schema：那部分压缩
+ * 动不了，算进去会让工具多的会话迟迟等不到按钮。门槛相当于「消息 ≥ 2 × 保留区」：常见窗口
+ * 落在 40% 左右，1M 窗口在 12.8% 左右。
  */
+const MANUAL_COMPACTION_MIN_GAIN_RATIO = 1;
+
 /**
  * 量一次当前上下文占用。
  *
  * 与 {@link planCompaction} 共用同一段折叠与估算——指示器显示的必须就是压缩判据用的
- * 那个数，否则会出现「界面显示 75%、却已经开始压缩」这种对不上的情况。
+ * 那个数，否则会出现「界面显示 75%、却已经开始压缩」这种对不上的情况。`compactable`
+ * 同样基于这一次折叠算出，与 {@link planManualCompaction} 的结论一致。
  */
 function measureContextUsage(params: ContextInput): ContextUsage {
-  const { budget, tokens } = readContext(params);
+  const context = readContext(params);
   return {
-    tokens,
+    tokens: context.tokens,
     contextWindow: Math.max(0, params.contextWindow),
-    triggerTokens: Number.isFinite(budget.triggerTokens) ? budget.triggerTokens : null,
+    triggerTokens: Number.isFinite(context.budget.triggerTokens) ? context.budget.triggerTokens : null,
+    compactable: decideManualCompaction(context, params).kind === 'compact',
   };
 }
 
@@ -306,38 +318,40 @@ function readContext(
   return { budget, messages, lastSummary, sinceLast, tokens };
 }
 
-function planCompaction(params: ContextInput): CompactionDecision {
-  // 预算不可达（总开关关闭 / 窗口未知）→ 本会话不压缩。「压不压」的判据只在
-  // resolveCompactionBudget 里编码一次，这里不复述开关，免得新增调用点漏判。
-  // 先判再读：关掉压缩时就不必走 readContext 那三趟线性扫描了（占用指示那边没有这个
-  // 短路——它关掉压缩也要照常显示占用）。算好的 budget 直接传下去，不重复算。
-  const budget = resolveCompactionBudget(params.settings, params.contextWindow);
-  if (!Number.isFinite(budget.triggerTokens)) return { kind: 'skip' };
-  const { messages, lastSummary, sinceLast, tokens } = readContext(params, budget);
-  if (tokens <= budget.triggerTokens) return { kind: 'skip' };
+/** {@link readContext} 折叠出的上下文。 */
+type FoldedContext = ReturnType<typeof readContext>;
 
-  const cut = findCompactionCutPoint(sinceLast, budget.keepRecentTokens);
-  // cut <= 0：无候选 / 从头保留即 no-op（其前没有可摘要的历史）。已经超阈值却切不动，
-  // 再跑下去只会一路涨到 400。
-  if (cut <= 0) return { kind: 'stuck' };
+/**
+ * 切点 → 可行性判定 → 组出计划：自动与手动压缩共用的后半段。返回 `null` = 压不动
+ * （没有可切的切点，或切完保留区自己仍塞不进窗口）。`retainedTokens` 是保留区的估算
+ * token，手动压缩据此判断值不值得。
+ */
+function planCut(
+  context: FoldedContext,
+  keepRecentTokens: number,
+  contextWindow: number,
+): { plan: CompactionPlan; retainedTokens: number } | null {
+  const { messages, lastSummary, sinceLast, tokens } = context;
+  const cut = findCompactionCutPoint(sinceLast, keepRecentTokens);
+  // cut <= 0：无候选 / 从头保留即 no-op（其前没有可摘要的历史）。
+  if (cut <= 0) return null;
 
   // 切得动，但保留区自己就已经塞不进窗口——压了也白压，这一次请求照样会 400。典型形状是
   // 一次工具调用返回的正文极大，切点的第三档回退把它连同它的 assistant 整组留在保留区，
-  // 谁也拆不开。同样按 stuck 处理。
+  // 谁也拆不开。
   //
   // 判据必须用**窗口**而不是 `triggerTokens`：「压完还装不装得下」是模型窗口的事，跟用户
   // 设的触发百分比无关。拿阈值比会让「把阈值调低」——本意是更早压缩——反而更容易误判成
   // 压不动而停轮，把设置的含义整个拧反。
   //
   // 两边的尺子不完全同口径：这里是 `estimateMessageTokens` 的裸和，不含 systemPrompt /
-  // 工具 schema，也不含压完之后要带上的那段摘要；而上面的 `tokens` 可能来自真实 usage
+  // 工具 schema，也不含压完之后要带上的那段摘要；而 `tokens` 可能来自真实 usage
   // 锚点（本就含前缀）。偏差方向是低估保留区，也就是偏向「继续压」，这是安全的一侧。
   const retainedTail = sinceLast.slice(cut);
-  const retainedTokens = retainedTail.reduce((sum, m) => sum + estimateMessageTokens(m), 0);
-  if (retainedTokens >= hopelessRetainedTokens(params.contextWindow)) return { kind: 'stuck' };
+  const retainedTokens = sumMessageTokens(retainedTail);
+  if (retainedTokens >= hopelessRetainedTokens(contextWindow)) return null;
 
   return {
-    kind: 'compact',
     plan: {
       messages,
       lastSummary,
@@ -345,7 +359,83 @@ function planCompaction(params: ContextInput): CompactionDecision {
       retainedTail,
       tokensBefore: tokens,
     },
+    retainedTokens,
   };
+}
+
+function sumMessageTokens(messages: AgentMessage[]): number {
+  return messages.reduce((sum, m) => sum + estimateMessageTokens(m), 0);
+}
+
+/**
+ * 这些消息的估算 token 是否达到 `target`。达到即停：占用快照每条 message_end 都会算一次，
+ * 不能每次都把切点之前的整段历史逐字估一遍。
+ */
+function reachesTokens(messages: AgentMessage[], target: number): boolean {
+  let sum = 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    sum += estimateMessageTokens(messages[i]);
+    if (sum >= target) return true;
+  }
+  return sum >= target;
+}
+
+/**
+ * 判断当前上下文该不该自动压缩、压哪一段。纯函数、无副作用，摘要调用与状态回写都在
+ * 编排层（session-manager）。
+ */
+function planCompaction(params: ContextInput): CompactionDecision {
+  // 预算不可达（总开关关闭 / 窗口未知）→ 本会话不压缩。「压不压」的判据只在
+  // resolveCompactionBudget 里编码一次，这里不复述开关，免得新增调用点漏判。
+  // 先判再读：关掉压缩时就不必走 readContext 那三趟线性扫描了（占用指示那边没有这个
+  // 短路——它关掉压缩也要照常显示占用）。算好的 budget 直接传下去，不重复算。
+  const budget = resolveCompactionBudget(params.settings, params.contextWindow);
+  if (!Number.isFinite(budget.triggerTokens)) return { kind: 'skip' };
+  const context = readContext(params, budget);
+  if (context.tokens <= budget.triggerTokens) return { kind: 'skip' };
+
+  // 已经超阈值却压不动，再跑下去只会一路涨到 400——按 stuck 交给调用方停轮。
+  const cut = planCut(context, budget.keepRecentTokens, params.contextWindow);
+  return cut ? { kind: 'compact', plan: cut.plan } : { kind: 'stuck' };
+}
+
+/** {@link planManualCompaction} 的本体，接收已折叠好的上下文，供占用快照复用同一次扫描。 */
+function decideManualCompaction(
+  context: FoldedContext,
+  params: ContextInput,
+): CompactionDecision {
+  // 窗口未知时宁可不压，理由同 resolveCompactionBudget。
+  if (params.contextWindow <= 0) return { kind: 'skip' };
+  // 保留区预算按「自动压缩开着」来算：关掉时 resolveCompactionBudget 不再按触发点钳位，
+  // 小窗口模型的保留区会膨胀到几乎整个窗口，手动压缩就永远切不动了。
+  const { keepRecentTokens } = resolveCompactionBudget(
+    { ...params.settings, enabled: true },
+    params.contextWindow,
+  );
+  const cut = planCut(context, keepRecentTokens, params.contextWindow);
+  // 手动是可选操作：压不动就是「现在不值得」，不产生 stuck、不停轮。
+  if (!cut) return { kind: 'skip' };
+  const { plan, retainedTokens } = cut;
+  // 用「实际保留区」与「保留区预算」中较大者作基准：刚压完一次时，上次保留区若以 assistant
+  // 开头，切点会落在用户新发的一句短消息上，实际保留区小得可怜——拿它比，占用才一成按钮就会冒出来。
+  const baseline = Math.max(retainedTokens, keepRecentTokens);
+  if (!reachesTokens(plan.messagesToSummarize, baseline * MANUAL_COMPACTION_MIN_GAIN_RATIO)) {
+    return { kind: 'skip' };
+  }
+  return { kind: 'compact', plan };
+}
+
+/**
+ * 判断现在手动压缩是否值得做、压哪一段（用户点「立即压缩」）。
+ *
+ * 与 {@link planCompaction} 共用切点与可行性判定，区别在于：
+ * - 不看自动压缩的总开关与触发阈值——关掉自动压缩的用户正需要自己掌握时机；
+ * - 保留区预算不随自动压缩开关变化；
+ * - 只在被摘要的部分足够大（{@link MANUAL_COMPACTION_MIN_GAIN_RATIO}）时才给出 compact；
+ * - 压不动时返回 skip 而不是 stuck。
+ */
+function planManualCompaction(params: ContextInput): CompactionDecision {
+  return decideManualCompaction(readContext(params), params);
 }
 
 // 压缩用哪个模型 + 凭证的判定（ModelTarget / usableModelTarget）在 lib/providers/model-target.ts，
@@ -630,6 +720,7 @@ export {
   findCompactionCutPoint,
   measureContextUsage,
   planCompaction,
+  planManualCompaction,
   resolveCompactionBudget,
   runCompaction,
   splitForSummary,
