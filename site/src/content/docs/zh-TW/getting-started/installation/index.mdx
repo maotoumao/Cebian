@@ -1,13 +1,29 @@
 ---
 title: 安裝指南
-description: 通過外掛市場或 Github Release 在瀏覽器裡裝上 Cebian。
+description: 通過外掛市場或 GitHub Release 在瀏覽器裡裝上 Cebian。
 group: getting-started
 order: 1
 ---
 
 {/* AUTO-GENERATED from docs/zh by scripts/gen-zhtw.mjs — do not edit; edit zh then run `pnpm gen:zhtw`. */}
 
-你可以選擇下面任意一種方式安裝 Cebian。普通使用的話，建議優先從外掛市場安裝；如果想第一時間用上最新版本，可以從 Github Release 下載。
+你可以選擇下面任意一種方式安裝 Cebian。普通使用的話，建議優先從外掛市場安裝；如果想第一時間用上最新版本，可以從 GitHub Release 下載。
+
+## 瀏覽器要求
+
+- 使用近期版本的桌面 Chrome、Edge 或支援側邊欄擴充套件的 Chromium 瀏覽器。
+- Firefox 最低要求 **140.0**。
+
+不同瀏覽器的能力並不完全相同：
+
+| 功能 | Chrome / Edge 等 Chromium 瀏覽器 | Firefox |
+| --- | --- | --- |
+| 移動端模式 | 有偵錯程式介面時可用 | 不提供 |
+| 網路錄製 | 可記錄請求、響應及有限的流訊息內容 | 需授予 `webRequest` 許可權；有請求詳情和響應後設資料，沒有響應體或流訊息內容 |
+| VFS HTML 預覽 | 隔離沙箱內可執行指令碼 | 靜態預覽，不執行指令碼 |
+| 語音輸入 | 取決於瀏覽器語音 API、語言包及網路 | 未提供語音識別 API 時隱藏按鈕 |
+
+Firefox 沒有偵錯程式兜底：嚴格網頁安全策略可能阻止部分頁面指令碼；Skill 的 `executeInPage` 也不可用。普通聊天與不依賴這些介面的功能不受此差異影響。詳情見[輸入工具](/zh-TW/docs/guides/input-tools/)和 [VFS 檔案系統](/zh-TW/docs/guides/vfs/)。
 
 ## 通過外掛市場安裝
 
@@ -19,13 +35,15 @@ Firefox、Chrome、Edge 以及大多數 Chromium 系瀏覽器都可以從外掛�
 
 開啟對應頁面後，點選安裝按鈕即可。安裝完成後，瀏覽器工具欄會出現 Cebian 圖示，點選它就可以開啟側邊欄。
 
-> 商店版本需要等稽核，所以可能會比 Github Release 晚一點更新。
+> 商店版本需要等稽核，所以可能會比 GitHub Release 晚一點更新。
 
-## 通過 Github Release 安裝
+## 通過 GitHub Release 安裝
 
-更新時也會在 Github 同步釋出，你可以去 Releases 中下載最新版本：
+更新時也會在 GitHub 同步釋出，你可以去 Releases 中下載最新版本：
 
-[Cebian Github Releases](https://github.com/maotoumao/Cebian/releases)
+[Cebian GitHub Releases](https://github.com/maotoumao/Cebian/releases)
+
+### Chrome / Edge / Chromium
 
 安裝步驟如下：
 
@@ -36,7 +54,15 @@ Firefox、Chrome、Edge 以及大多數 Chromium 系瀏覽器都可以從外掛�
 5. 點選「載入已解壓的擴充套件程式」
 6. 選擇剛才解壓出來的目錄
 
-> Release 裡也會有 Firefox 包。如果需要手動安裝，可以下載對應的 `firefox.zip`；日常使用建議優先選擇 Firefox 附加元件。
+### Firefox
+
+Release 中的 `cebian-{version}-firefox.zip` 可用於臨時測試，不應按 Chrome 的「載入已解壓的擴充套件程式」步驟安裝：
+
+1. 下載 Firefox zip 包
+2. 開啟 `about:debugging`，選擇「此 Firefox」
+3. 點選「臨時載入附加元件」，選擇該 zip，或解壓後的 `manifest.json`
+
+臨時安裝會在 Firefox 重啟後失效。日常使用請從 Firefox 附加元件安裝已簽名版本；參見 [Mozilla 的臨時安裝說明](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/)。
 
 ## 安裝方式選擇
 
@@ -45,7 +71,7 @@ Firefox、Chrome、Edge 以及大多數 Chromium 系瀏覽器都可以從外掛�
     - Chrome / Chromium 使用者：優先用 Chrome 外掛市場
     - Firefox 使用者：優先用 Firefox 附加元件
 
-- 想用最新版：Github Release 通常最快
+- 想用最新版：GitHub Release 通常最快
 
 ## 安裝後
 

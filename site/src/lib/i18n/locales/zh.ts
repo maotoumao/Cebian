@@ -5,7 +5,7 @@ export const zh: Dict = {
     name: 'Cebian',
     tagline: '运行在浏览器侧边栏的 AI Agent',
     description:
-      'Cebian 是一个常驻浏览器侧边栏的 AI Agent：它可以读取页面信息、和浏览器进行交互，也支持通过 MCP 和 Skill 扩展 Agent 能力。所有数据只保存在浏览器本地，无需账号，直接连接你自己的模型 API。',
+      'Cebian 是一个常驻浏览器侧边栏的 AI Agent：它可以读取页面信息、和浏览器进行交互，也支持通过 MCP 和 Skill 扩展 Agent 能力。会话与设置保存在浏览器本地，无需 Cebian 账号，直接连接你配置的模型和外部服务。',
   },
   nav: {
     home: '首页',
@@ -87,7 +87,7 @@ export const zh: Dict = {
       mcpTitle: 'MCP 工具',
       mcpBody: '内置 MCP 客户端，通过 HTTP 接入外部工具，即插即用；并支持带交互界面的 MCP App。',
       privacyTitle: '本地优先，可验证',
-      privacyBody: '对话、Prompt、Skill、附件都存在浏览器里。除了发给大模型厂商的必要请求，不向任何服务器上传数据。',
+      privacyBody: '对话、Prompt、Skill 和附件保存在浏览器里。使用模型、MCP、云端语音或 WebDAV 备份时，相关数据会发送到对应服务。',
       privacyNote: '所有代码开源可审计',
     },
     install: {
@@ -171,7 +171,7 @@ export const zh: Dict = {
     title: '关于 Cebian',
     lead: 'Cebian 是一个运行在浏览器侧边栏里的开源 AI Agent，由 maotoumao 维护。',
     whatTitle: 'Cebian 是什么',
-    whatBody: 'Cebian 运行在浏览器侧边栏，能读取你正在看的页面、调用工具、使用 MCP 和 Skill，可以按你的要求完成任务。它运行在本地，不会将你的信息上传到除大模型提供商外的第三方。',
+    whatBody: 'Cebian 运行在浏览器侧边栏，能读取你正在看的页面、调用工具、使用 MCP 和 Skill，可以按你的要求完成任务。会话与设置保存在本地，使用模型或其他联网功能时，相关数据会发送到对应服务。',
     authorTitle: '作者',
     authorBody: 'Cebian 由 maotoumao 开发与维护。',
     licenseTitle: '许可证',

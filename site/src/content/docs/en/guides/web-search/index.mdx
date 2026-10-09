@@ -11,7 +11,7 @@ import QAItem from '@/components/docs/QAItem.astro';
 
 When a question needs information beyond the current page, Cebian calls the `web_search` tool: it opens a search engine in a background tab, reads the results, and hands the model a list of titles, links and snippets.
 
-Which engines to use, which one to try first, and where to fall back when one is blocked is all up to you.
+Which engines to use, which one to try first, and where to fall back when one is blocked is all up to you. Search requires a model with tool calling enabled.
 
 ## How it works
 
@@ -45,11 +45,13 @@ When a search engine redesigns its results page and the script stops working, yo
 Click **Add engine** and fill in:
 
 - **Name**: shown in the list, e.g. `Kagi`.
-- **Search URL**: use `{query}` where the search terms go, e.g. `https://kagi.com/search?q={query}`. Cebian URL-encodes the terms before inserting them.
+- **Search URL**: a full http or https URL containing `{query}`, e.g. `https://kagi.com/search?q={query}`. Cebian URL-encodes the terms before inserting them.
 - **Extraction script**: JavaScript that runs inside the results page, see below.
 - **Best for** (optional): one line about when the model should prefer this engine. It becomes part of the tool description.
 
 You do not need to write the script from scratch. Enter the results container's CSS selector (for example `#results`) in the field above the script editor and click **Generate template**. This replaces the script currently in the editor; adjust the selectors for result items, titles and snippets to match the page. You can also ask Cebian in a chat to inspect the engine's results page and help write the script, then paste it into the editor.
+
+Click **Save** to apply a new or edited engine. On/off switches and ordering changes in the list are saved immediately.
 
 ## The extraction script
 

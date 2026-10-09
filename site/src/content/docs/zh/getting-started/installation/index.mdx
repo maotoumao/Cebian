@@ -1,11 +1,27 @@
 ---
 title: 安装指南
-description: 通过插件市场或 Github Release 在浏览器里装上 Cebian。
+description: 通过插件市场或 GitHub Release 在浏览器里装上 Cebian。
 group: getting-started
 order: 1
 ---
 
-你可以选择下面任意一种方式安装 Cebian。普通使用的话，建议优先从插件市场安装；如果想第一时间用上最新版本，可以从 Github Release 下载。
+你可以选择下面任意一种方式安装 Cebian。普通使用的话，建议优先从插件市场安装；如果想第一时间用上最新版本，可以从 GitHub Release 下载。
+
+## 浏览器要求
+
+- 使用近期版本的桌面 Chrome、Edge 或支持侧边栏扩展的 Chromium 浏览器。
+- Firefox 最低要求 **140.0**。
+
+不同浏览器的能力并不完全相同：
+
+| 功能 | Chrome / Edge 等 Chromium 浏览器 | Firefox |
+| --- | --- | --- |
+| 移动端模式 | 有调试器接口时可用 | 不提供 |
+| 网络录制 | 可记录请求、响应及有限的流消息内容 | 需授予 `webRequest` 权限；有请求详情和响应元数据，没有响应体或流消息内容 |
+| VFS HTML 预览 | 隔离沙箱内可运行脚本 | 静态预览，不运行脚本 |
+| 语音输入 | 取决于浏览器语音 API、语言包及网络 | 未提供语音识别 API 时隐藏按钮 |
+
+Firefox 没有调试器兜底：严格网页安全策略可能阻止部分页面脚本；Skill 的 `executeInPage` 也不可用。普通聊天与不依赖这些接口的功能不受此差异影响。详情见[输入工具](/zh/docs/guides/input-tools/)和 [VFS 文件系统](/zh/docs/guides/vfs/)。
 
 ## 通过插件市场安装
 
@@ -17,13 +33,15 @@ Firefox、Chrome、Edge 以及大多数 Chromium 系浏览器都可以从插件�
 
 打开对应页面后，点击安装按钮即可。安装完成后，浏览器工具栏会出现 Cebian 图标，点击它就可以打开侧边栏。
 
-> 商店版本需要等审核，所以可能会比 Github Release 晚一点更新。
+> 商店版本需要等审核，所以可能会比 GitHub Release 晚一点更新。
 
-## 通过 Github Release 安装
+## 通过 GitHub Release 安装
 
-更新时也会在 Github 同步发布，你可以去 Releases 中下载最新版本：
+更新时也会在 GitHub 同步发布，你可以去 Releases 中下载最新版本：
 
-[Cebian Github Releases](https://github.com/maotoumao/Cebian/releases)
+[Cebian GitHub Releases](https://github.com/maotoumao/Cebian/releases)
+
+### Chrome / Edge / Chromium
 
 安装步骤如下：
 
@@ -34,7 +52,15 @@ Firefox、Chrome、Edge 以及大多数 Chromium 系浏览器都可以从插件�
 5. 点击「加载已解压的扩展程序」
 6. 选择刚才解压出来的目录
 
-> Release 里也会有 Firefox 包。如果需要手动安装，可以下载对应的 `firefox.zip`；日常使用建议优先选择 Firefox 附加组件。
+### Firefox
+
+Release 中的 `cebian-{version}-firefox.zip` 可用于临时测试，不应按 Chrome 的「加载已解压的扩展程序」步骤安装：
+
+1. 下载 Firefox zip 包
+2. 打开 `about:debugging`，选择「此 Firefox」
+3. 点击「临时载入附加组件」，选择该 zip，或解压后的 `manifest.json`
+
+临时安装会在 Firefox 重启后失效。日常使用请从 Firefox 附加组件安装已签名版本；参见 [Mozilla 的临时安装说明](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/)。
 
 ## 安装方式选择
 
@@ -43,7 +69,7 @@ Firefox、Chrome、Edge 以及大多数 Chromium 系浏览器都可以从插件�
     - Chrome / Chromium 用户：优先用 Chrome 插件市场
     - Firefox 用户：优先用 Firefox 附加组件
 
-- 想用最新版：Github Release 通常最快
+- 想用最新版：GitHub Release 通常最快
 
 ## 安装后
 

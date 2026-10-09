@@ -53,7 +53,7 @@ After importing, you can ask Cebian in a conversation to help you create or modi
 
 The entry point is under "Settings → Skills".
 
-After clicking "Create skill", Cebian automatically generates a `new-skill` folder containing:
+After clicking "Create skill", Cebian automatically generates a `new-skill` folder (adding a number if that name exists) containing:
 
 - `SKILL.md`: the skill entry file, where you write the description and trigger conditions
 - `scripts/`: optional, for scripts
@@ -72,13 +72,17 @@ description: Compare prices across multiple product pages and organize them into
 When the user asks to compare prices, first read the current page, then organize the product name, price, link, and notes.
 ```
 
+Edits are saved automatically; Ctrl/Cmd+S saves immediately. Give the folder and `name` a meaningful name using 1–64 lowercase letters, digits or hyphens, without leading, trailing or consecutive hyphens. Imports cannot use the reserved `builtin-` prefix.
+
 The `description` is important. The Agent first looks at the skill index to decide whether the current request is suitable for reading this Skill.
 
 ## Trigger mechanism
 
 You don't need to manually click a Skill in a conversation.
 
-When the user's request matches a Skill's name or description, the Agent first reads its `SKILL.md`, then continues working according to the instructions inside.
+The Agent judges relevance from the name and description; its instructions require reading `SKILL.md` first when a Skill matches. This is not a fixed keyword trigger. You can also name the Skill directly in your request.
+
+`metadata.matched-url` tells the Agent to use a Skill only on matching pages; it is neither an automatic trigger nor a permission restriction. Setting `metadata.disabled: true` hides the Skill from the index without deleting its files.
 
 If the Skill mentions that it also needs to read `references/` or run `scripts/`, the Agent will use those files on demand as well.
 
@@ -92,17 +96,19 @@ The skills page supports importing and exporting.
 
 If a Skill with the same name already exists during import, you can choose to overwrite it or keep both copies.
 
-> When overwriting an existing Skill, any "always allow" permission previously granted is cleared. If new scripts need to run, they require re-confirmation.
+> Overwriting a Skill clears its previous "always allow" grant. Running a script that declares extra permissions then requires confirmation again.
 
 ## Permissions and scripts
 
-A Skill can include scripts and can declare the permissions it needs.
+Skill scripts are JavaScript run in a sandbox through `run_skill`, not local Shell or Python scripts. They read parameters through `args` and return results through `module.exports`; extra capabilities are declared in `SKILL.md` under `metadata.permissions`.
 
-When a script tries to perform a sensitive operation, Cebian shows an authorization card in the conversation. You can choose:
+Reading Skill files and running scripts require a model with tool calling enabled. Before running a script with declared permissions that have not been granted, Cebian shows an authorization card in the conversation. You can choose:
 
 - Deny
 - Allow once
 - Always allow this skill
+
+Scripts with no declared extra permissions do not show this authorization card, but can still use basic JavaScript APIs such as `fetch`. Declaring new permissions requires authorization again.
 
 A regular Skill can contain only instructions and reference materials, without any scripts. When starting out, it's recommended to begin with instruction-only Skills.
 

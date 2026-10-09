@@ -7,7 +7,6 @@ order: 5
 
 {/* AUTO-GENERATED from docs/zh by scripts/gen-zhtw.mjs — do not edit; edit zh then run `pnpm gen:zhtw`. */}
 
-import Placeholder from '@/components/Placeholder.astro';
 import QA from '@/components/docs/QA.astro';
 import QAItem from '@/components/docs/QAItem.astro';
 import StatusLegend from '@/components/docs/StatusLegend.astro';
@@ -30,7 +29,7 @@ MCP 用來把外部工具接進 Cebian。配置好 MCP 伺服器後，伺服器�
 - 認證方式：無，或者 Bearer Token
 - 自定義 Headers：需要額外請求頭時再填
 
-儲存後，Cebian 會在後臺連線伺服器並讀取它提供的工具。
+儲存並啟用後，設定頁會查詢狀態，並在後臺嘗試連線尚未連上的伺服器、讀取工具列表，不必先發起對話。狀態約每 5 秒重新整理；儲存成功只表示配置已儲存，不表示連線成功。
 
 ## 傳輸協議選擇
 
@@ -56,14 +55,16 @@ MCP 用來把外部工具接進 Cebian。配置好 MCP 伺服器後，伺服器�
 
 <StatusLegend
 	items={[
-		{ color: 'blue', label: '等待首次呼叫', text: '已經儲存，但還沒真正用過' },
-		{ color: 'green', label: '已連線', text: '當前連線正常' },
-		{ color: 'sky', label: '未連線', text: '下一次呼叫時會重新連線' },
-		{ color: 'yellow', label: '重連中', text: '正在嘗試恢復連線' },
+		{ color: 'blue', label: '等待首次呼叫', text: '尚未收到後臺狀態；不代表必須先在對話中呼叫' },
+		{ color: 'green', label: '已連線', text: '後臺記錄為已連線，不代表每個工具都能成功執行' },
+		{ color: 'sky', label: '未連線', text: '等待後臺試連，或在下一次工具請求時連線' },
+		{ color: 'yellow', label: '重連中', text: '失敗冷卻結束，允許探測恢復；不一定已有請求在途' },
 		{ color: 'red', label: '暫時不可用', text: '連續失敗後會短暫熔斷，稍後再試' },
 		{ color: 'gray', label: '已停用', text: '這個 server 不會出現在 Agent 的工具列表裡' },
 	]}
 />
+
+伺服器卡片會顯示最近一次連線或請求失敗的原因，成功後清除。後臺試連失敗後至少等待 30 秒再試，不會每次狀態重新整理都重連；連續失敗還會觸發短暫熔斷。修改 URL、協議、認證或 Headers，或者停用後重新啟用，會重置連線和工具快取。
 
 如果某個服務暫時用不上，可以先把它停用，不需要刪除配置。
 
@@ -73,6 +74,14 @@ MCP 用來把外部工具接進 Cebian。配置好 MCP 伺服器後，伺服器�
 
 如果伺服器需要其它請求頭，可以在「自定義 Headers」裡新增。注意：使用 Bearer Token 時，不要再手動新增 `Authorization` header，Cebian 會自動處理。
 
+## 連線與工具呼叫排錯
+
+- **先看卡片錯誤**：核對完整 MCP 端點路徑、協議、網路、token 與 Headers；普通網頁地址不一定是 MCP 端點。服務需要許可權或額外認證時，也要檢查伺服器日誌。
+- **一直未連線或暫時不可用**：修正配置後儲存，等待下一次狀態重新整理；暫時性故障可等冷卻結束後再試，避免連續重試。
+- **已連線但沒有呼叫**：確認伺服器已啟用、確實提供工具，並且當前模型支援工具呼叫。自定義模型關閉「工具呼叫」後，MCP 同樣不能使用。Agent 是否呼叫也取決於任務需要。
+- **工具呼叫報錯**：檢視對話中的失敗詳情，區分引數或業務錯誤與連線失敗。伺服器返回的工具錯誤會作為失敗交給模型；限流或熔斷會提示重試等待時間。綠點不代表業務操作成功。
+- **MCP App 沒顯示**：不是每個工具都有介面。工具執行失敗不會生成 App 檢視；成功後仍載入失敗時，再檢查伺服器是否啟用以及 UI 資源能否讀取。
+
 ## Q&A
 
 <QA>
@@ -80,5 +89,5 @@ MCP 用來把外部工具接進 Cebian。配置好 MCP 伺服器後，伺服器�
 	<QAItem q="狀態一直不可用怎麼辦？">檢查 URL、網路、token 和 server 日誌。</QAItem>
 	<QAItem q="新增時報 URL 無效怎麼辦？">URL 必須以 <code>http://</code> 或 <code>https://</code> 開頭。</QAItem>
 	<QAItem q="不確定協議選哪個？">優先試 <code>streamable-http</code>。</QAItem>
-	<QAItem q="擔心配置丟失怎麼辦？">備份時選擇「普通設定」和「金鑰資訊」，MCP 配置和 token 會一起備份。</QAItem>
+	<QAItem q="擔心配置丟失怎麼辦？">備份時選擇「普通設定」和「金鑰資訊」，MCP 配置、token 和自定義 Headers 會一起備份。</QAItem>
 </QA>

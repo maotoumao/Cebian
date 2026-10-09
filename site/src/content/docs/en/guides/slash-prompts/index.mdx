@@ -21,7 +21,7 @@ The entry point is under "Settings → Prompts".
 
 ![Screenshot](./snapshot.png)
 
-Click "New file" on the left to create a Markdown file. A Prompt file looks roughly like this:
+Click "New file" on the left and create a Markdown file ending in `.md`. Edits are saved automatically; Ctrl/Cmd+S saves immediately. A Prompt file looks roughly like this:
 
 ```md
 ---
@@ -40,13 +40,13 @@ Where:
 
 For everyday use, a few short templates are enough to start. Once you get comfortable, gradually organize them into your own prompt library.
 
-> Note: the file name has no special meaning; the name shown in the slash menu is the `name` field in the frontmatter. You can change `name` at any time to adjust how it appears in the menu, without renaming the file.
+> The slash menu uses the frontmatter `name` when present; otherwise it uses the file name without `.md`. Only `.md` files directly inside `~/.cebian/prompts/` are scanned, not files in subfolders.
 
 ## Use it in a chat
 
-Back in the chat input box, type `/` to open the Prompt list.
+Back in the chat input box, type `/` at the start of the text to open the Prompt list.
 
-You can keep typing keywords to filter, then press Enter on a selection, or just click an item.
+Keep typing to filter by name or description, use the up/down arrow keys and Enter to select, or click an item. Esc closes the list. With no matching item, Enter sends the literal `/keyword` text instead of attaching a template.
 
 Rather than pasting the body in, Cebian attaches a tinted `/name` marker at the start of the first line, so a long template doesn't bury the message you're actually writing. Type your own request to the right of it and send — or send with just the marker, and the Prompt itself becomes the request.
 
@@ -56,7 +56,7 @@ In the conversation, the sent message simply starts with `/name` followed by wha
 
 ## Template variables
 
-You can write certain variables in a Prompt, and when triggered Cebian replaces them with the real content from the current environment.
+You can write variables in a Prompt. Cebian resolves them **when you select the template**, not when you send it. Select the template again after switching pages, changing the selection, or updating the clipboard.
 
 | Variable | Meaning |
 | --- | --- |
@@ -64,7 +64,10 @@ You can write certain variables in a Prompt, and when triggered Cebian replaces 
 | `{{page_url}}` | The current page URL |
 | `{{page_title}}` | The current page title |
 | `{{date}}` | The current date |
+| `{{ui_language}}` | The browser UI language, expressed as an English name |
 | `{{clipboard}}` | Clipboard content |
+
+Selecting a template attempts to read the clipboard to prepare variables, even if the template does not reference it. Only a template using `{{clipboard}}` inserts that value into the content to be sent.
 
 For example:
 

@@ -5,7 +5,6 @@ group: guides
 order: 5
 ---
 
-import Placeholder from '@/components/Placeholder.astro';
 import QA from '@/components/docs/QA.astro';
 import QAItem from '@/components/docs/QAItem.astro';
 import StatusLegend from '@/components/docs/StatusLegend.astro';
@@ -28,7 +27,7 @@ After clicking "Add MCP server", you need to fill in:
 - Authentication: none, or Bearer Token
 - Custom headers: fill in when you need extra request headers
 
-After saving, Cebian connects to the server in the background and reads the tools it provides.
+After saving and enabling a server, the settings page queries its status and starts a background connection / tool-discovery attempt if needed, without requiring a conversation. Status refreshes about every 5 seconds. Saving the configuration does not mean the connection succeeded.
 
 ## Choosing a transport
 
@@ -54,14 +53,16 @@ Each MCP server has a small dot on its left, using different colors to indicate 
 
 <StatusLegend
 items={[
-{ color: 'blue', label: 'Waiting for first call', text: 'Saved, but not actually used yet' },
-{ color: 'green', label: 'Connected', text: 'The connection is currently working' },
-{ color: 'sky', label: 'Not connected', text: 'It will reconnect on the next call' },
-{ color: 'yellow', label: 'Reconnecting', text: 'Trying to restore the connection' },
+{ color: 'blue', label: 'Awaiting first call', text: 'No background status received yet; a chat tool call is not required' },
+{ color: 'green', label: 'Connected', text: 'The background reports a connection, not a guarantee that every tool call will succeed' },
+{ color: 'sky', label: 'Disconnected', text: 'Waiting for a background attempt or the next tool request to connect' },
+{ color: 'yellow', label: 'Reconnecting', text: 'Cooldown has ended and a recovery probe is allowed; a request may not yet be in flight' },
 { color: 'red', label: 'Temporarily unavailable', text: 'After repeated failures it briefly circuit-breaks; try again later' },
 { color: 'gray', label: 'Disabled', text: "This server won't appear in the Agent's tool list" },
 ]}
 />
+
+The server card shows the most recent connection or request failure; a successful request clears it. Failed background attempts wait at least 30 seconds before retrying, rather than reconnecting at every status refresh. Repeated failures also trigger a short circuit-breaker cooldown. Changing the URL, transport, authentication, or headers, or disabling and re-enabling a server, resets its connection and tool cache.
 
 If a service isn't needed for now, you can disable it instead of deleting the configuration.
 
@@ -71,6 +72,14 @@ If the server requires a Bearer Token, select Bearer Token under "Authentication
 
 If the server requires other request headers, add them under "Custom headers". Note: when using a Bearer Token, don't manually add an `Authorization` header again; Cebian handles it automatically.
 
+## Troubleshooting connections and tool calls
+
+- **Start with the card's error**: check the full MCP endpoint path, transport, network, token, and headers. A regular website URL is not necessarily an MCP endpoint. Check server logs for permission or authentication requirements.
+- **Disconnected or temporarily unavailable**: save corrected settings and wait for the next status refresh. For transient failures, let the cooldown finish instead of retrying repeatedly.
+- **Connected but no tool call**: confirm the server is enabled, actually exposes tools, and the selected model supports tool calling. Turning off "Tool calling" for a custom model also disables MCP use. The Agent still decides whether the task needs a tool.
+- **Tool call fails**: inspect the failure details in the conversation. Argument or business errors differ from connection failures. Server-reported tool errors reach the model as failures; throttling or circuit-breaking reports a retry wait. A green dot does not mean the business operation succeeded.
+- **No MCP App view**: not every tool has a UI. Failed tool calls do not create an App view. If a successful call's view fails to load, check whether the server is enabled and its UI resource can be read.
+
 ## Q&A
 
 <QA>
@@ -78,5 +87,5 @@ If the server requires other request headers, add them under "Custom headers". N
 <QAItem q="The status stays unavailable. What now?">Check the URL, network, token, and server logs.</QAItem>
 <QAItem q="It reports an invalid URL when adding. What now?">The URL must start with <code>http://</code> or <code>https://</code>.</QAItem>
 <QAItem q="Not sure which transport to choose?">Try <code>streamable-http</code> first.</QAItem>
-<QAItem q="Worried about losing the configuration. What now?">When backing up, choose "General settings" and "Secrets", and the MCP configuration and tokens will be backed up too.</QAItem>
+<QAItem q="Worried about losing the configuration. What now?">When backing up, choose "General settings" and "Secrets", and the MCP configuration, tokens, and custom headers will be backed up too.</QAItem>
 </QA>

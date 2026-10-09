@@ -5,7 +5,6 @@ group: guides
 order: 5
 ---
 
-import Placeholder from '@/components/Placeholder.astro';
 import QA from '@/components/docs/QA.astro';
 import QAItem from '@/components/docs/QAItem.astro';
 import StatusLegend from '@/components/docs/StatusLegend.astro';
@@ -28,7 +27,7 @@ MCP 用来把外部工具接进 Cebian。配置好 MCP 服务器后，服务器�
 - 认证方式：无，或者 Bearer Token
 - 自定义 Headers：需要额外请求头时再填
 
-保存后，Cebian 会在后台连接服务器并读取它提供的工具。
+保存并启用后，设置页会查询状态，并在后台尝试连接尚未连上的服务器、读取工具列表，不必先发起对话。状态约每 5 秒刷新；保存成功只表示配置已保存，不表示连接成功。
 
 ## 传输协议选择
 
@@ -54,14 +53,16 @@ MCP 用来把外部工具接进 Cebian。配置好 MCP 服务器后，服务器�
 
 <StatusLegend
 	items={[
-		{ color: 'blue', label: '等待首次调用', text: '已经保存，但还没真正用过' },
-		{ color: 'green', label: '已连接', text: '当前连接正常' },
-		{ color: 'sky', label: '未连接', text: '下一次调用时会重新连接' },
-		{ color: 'yellow', label: '重连中', text: '正在尝试恢复连接' },
+		{ color: 'blue', label: '等待首次调用', text: '尚未收到后台状态；不代表必须先在对话中调用' },
+		{ color: 'green', label: '已连接', text: '后台记录为已连接，不代表每个工具都能成功执行' },
+		{ color: 'sky', label: '未连接', text: '等待后台试连，或在下一次工具请求时连接' },
+		{ color: 'yellow', label: '重连中', text: '失败冷却结束，允许探测恢复；不一定已有请求在途' },
 		{ color: 'red', label: '暂时不可用', text: '连续失败后会短暂熔断，稍后再试' },
 		{ color: 'gray', label: '已禁用', text: '这个 server 不会出现在 Agent 的工具列表里' },
 	]}
 />
+
+服务器卡片会显示最近一次连接或请求失败的原因，成功后清除。后台试连失败后至少等待 30 秒再试，不会每次状态刷新都重连；连续失败还会触发短暂熔断。修改 URL、协议、认证或 Headers，或者禁用后重新启用，会重置连接和工具缓存。
 
 如果某个服务暂时用不上，可以先把它禁用，不需要删除配置。
 
@@ -71,6 +72,14 @@ MCP 用来把外部工具接进 Cebian。配置好 MCP 服务器后，服务器�
 
 如果服务器需要其它请求头，可以在「自定义 Headers」里添加。注意：使用 Bearer Token 时，不要再手动添加 `Authorization` header，Cebian 会自动处理。
 
+## 连接与工具调用排错
+
+- **先看卡片错误**：核对完整 MCP 端点路径、协议、网络、token 与 Headers；普通网页地址不一定是 MCP 端点。服务需要权限或额外认证时，也要检查服务器日志。
+- **一直未连接或暂时不可用**：修正配置后保存，等待下一次状态刷新；暂时性故障可等冷却结束后再试，避免连续重试。
+- **已连接但没有调用**：确认服务器已启用、确实提供工具，并且当前模型支持工具调用。自定义模型关闭「工具调用」后，MCP 同样不能使用。Agent 是否调用也取决于任务需要。
+- **工具调用报错**：查看对话中的失败详情，区分参数或业务错误与连接失败。服务器返回的工具错误会作为失败交给模型；限流或熔断会提示重试等待时间。绿点不代表业务操作成功。
+- **MCP App 没显示**：不是每个工具都有界面。工具执行失败不会生成 App 视图；成功后仍加载失败时，再检查服务器是否启用以及 UI 资源能否读取。
+
 ## Q&A
 
 <QA>
@@ -78,5 +87,5 @@ MCP 用来把外部工具接进 Cebian。配置好 MCP 服务器后，服务器�
 	<QAItem q="状态一直不可用怎么办？">检查 URL、网络、token 和 server 日志。</QAItem>
 	<QAItem q="添加时报 URL 无效怎么办？">URL 必须以 <code>http://</code> 或 <code>https://</code> 开头。</QAItem>
 	<QAItem q="不确定协议选哪个？">优先试 <code>streamable-http</code>。</QAItem>
-	<QAItem q="担心配置丢失怎么办？">备份时选择「普通设置」和「密钥信息」，MCP 配置和 token 会一起备份。</QAItem>
+	<QAItem q="担心配置丢失怎么办？">备份时选择「普通设置」和「密钥信息」，MCP 配置、token 和自定义 Headers 会一起备份。</QAItem>
 </QA>

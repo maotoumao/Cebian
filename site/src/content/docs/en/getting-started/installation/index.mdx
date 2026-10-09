@@ -7,6 +7,22 @@ order: 1
 
 You can install Cebian in any of the ways below. For everyday use, installing from an extension store is recommended; if you want the latest version right away, you can download it from GitHub Release.
 
+## Browser requirements
+
+- Use a recent desktop Chrome, Edge, or Chromium browser that supports sidebar extensions.
+- Firefox requires **140.0 or later**.
+
+Browser capabilities differ:
+
+| Feature | Chrome / Edge and other Chromium browsers | Firefox |
+| --- | --- | --- |
+| Mobile mode | Available with the debugger API | Not available |
+| Network recording | Requests, responses, and limited stream-message contents | Requires `webRequest` permission; request details and response metadata, but no response bodies or stream-message contents |
+| VFS HTML preview | Scripts can run inside an isolated sandbox | Static preview without scripts |
+| Voice input | Depends on the speech API, language packs, and network | Hidden when no speech-recognition API is available |
+
+Firefox has no debugger fallback: strict page security policies may block some in-page scripts, and Skills cannot use `executeInPage`. Ordinary chat and features that do not depend on these APIs are unaffected by these differences. See [Input tools](/en/docs/guides/input-tools/) and [VFS file system](/en/docs/guides/vfs/) for details.
+
 ## Install from an extension store
 
 Firefox, Chrome, Edge, and most Chromium-based browsers can install from their extension stores:
@@ -25,6 +41,8 @@ Updates are also published to GitHub at the same time. You can download the late
 
 [Cebian GitHub Releases](https://github.com/maotoumao/Cebian/releases)
 
+### Chrome / Edge / Chromium
+
 The installation steps are:
 
 1. Download `cebian-{version}-chrome.zip`
@@ -34,7 +52,15 @@ The installation steps are:
 5. Click "Load unpacked"
 6. Select the directory you just unzipped
 
-> The Release also includes a Firefox package. For manual installation, download the corresponding `firefox.zip`; for everyday use, Firefox Add-ons is recommended.
+### Firefox
+
+The Release package `cebian-{version}-firefox.zip` is suitable for temporary testing, not Chrome's "Load unpacked" procedure:
+
+1. Download the Firefox zip
+2. Open `about:debugging` and select "This Firefox"
+3. Click "Load Temporary Add-on" and select the zip, or `manifest.json` from its extracted directory
+
+The temporary installation ends when Firefox restarts. For everyday use, install the signed version from Firefox Add-ons. See [Mozilla's temporary installation guide](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/).
 
 ## Choosing an installation method
 

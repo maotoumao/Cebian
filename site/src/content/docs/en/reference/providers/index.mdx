@@ -61,7 +61,25 @@ Common scenarios include:
 - Your own deployment of vLLM, LiteLLM, or a gateway service
 - An OpenAI-compatible interface inside your company
 
-When adding one, enter the name, Base URL, and API Key (if required), then add or automatically fetch the model list.
+Add a custom Provider under "Settings → AI providers", enter its name, Base URL, and API Key if required, and include at least one model. Custom Providers use the OpenAI Chat Completions-compatible protocol.
+
+### Choosing the Base URL
+
+Use the API base address, not a website homepage or the full `/chat/completions` endpoint. Model fetching appends `/models`; Cebian does not add `/v1` for you.
+
+| Example service | Example Base URL |
+| --- | --- |
+| Local Ollama | `http://localhost:11434/v1` |
+| Local LM Studio | `http://localhost:1234/v1` |
+| OpenAI-compatible gateway | `https://api.example.com/v1` |
+
+Use the port and path configured by your service. `localhost` refers to the device running the browser. Leave the API Key empty if the service needs no authentication. Saving a custom Provider does not run a connectivity test; "Configured" does not guarantee requests will succeed.
+
+### Custom headers
+
+Under "Advanced", add any required headers, such as a gateway's `api-key`. Headers are used for both model fetching and conversation requests. To authenticate through a custom `Authorization` header, clear the API Key field; if both are supplied, the API Key takes precedence and the form shows a warning.
+
+In backups, models and endpoints belong to "General settings", while API Keys and all custom headers belong to "Secrets". Include both categories when migrating the full configuration.
 
 ## Custom model controls
 
@@ -73,7 +91,14 @@ For a model without tool support, turn off "Tool calling" to use it for ordinary
 
 ### Fetching and selecting models
 
-Click "Auto-fetch", then search for and check the models to add before confirming.
+Click "Auto-fetch", search and check models in the picker, then confirm:
+
+- Models in this fetched list follow your selection; unchecking an existing model removes it from the draft.
+- Existing models that remain selected retain their reasoning, multimodal, tool-calling, context-window, and maximum-output settings.
+- Existing models absent from the fetched list, including unlisted manual entries, stay unchanged. A manual entry that also appears in the fetched list follows the selection like any other model.
+- Canceling the picker leaves the list unchanged. Confirming only edits the draft; click "Add" or "Save" to apply it.
+
+If fetching fails or the list is incomplete, manually add the exact model ID supplied by the service. Check the Base URL, authentication, and network first. Fetching successfully only confirms access to the model directory, not permission to use every model or support for tools.
 
 <Image src={ModelPickerShot} alt="Searchable remote-model picker using demo model entries" loading="lazy" />
 

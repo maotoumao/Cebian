@@ -18,11 +18,21 @@ You don't need to set up MCP and Skills the first time you use it. Start by tryi
 
 ## Core features
 
-- **Local-first**: Conversations, Prompts, Skills, and attachments are all stored locally in your browser. Apart from the requests necessary to reach the model provider, no data is uploaded to any server.
-- **Connect directly to your own models**: Just enter an API Key from any provider. No account, no credits, and no login required.
-- **Extensible**: You can connect MCP tools*, and package common operations into Skills.
+- **Local-first**: Conversation history, Prompts, Skills, memories, and workspace files are stored in the browser extension's data area. Local storage does not mean all processing happens locally.
+- **Connect your own model service**: Configure a supported provider or a compatible API endpoint; some providers also support sign-in authorization. Cebian itself does not require an account. Model-service accounts, quotas, and charges depend on the provider.
+- **Extensible**: Connect MCP tools or package common operations into Skills. MCP supports Streamable HTTP and SSE over HTTP(S), not directly launching local stdio servers. See the [MCP section](/en/docs/guides/mcp/).
 
-> Note: MCP only supports the HTTP protocol. See the [MCP section](/en/docs/guides/mcp/) for details.
+## Where data goes
+
+| Feature | Data flow |
+| --- | --- |
+| Chat and model-assisted features | Relevant context is sent to the model service in use, including messages, attachments, and any webpage, file, or tool results added to that context |
+| Web search, page actions, MCP, and Skills | Depending on configuration and actual calls, these access search engines, websites, MCP servers, or external services used by scripts; relevant results may then be sent to the model |
+| Voice input | Recognition prefers on-device processing; when that is unavailable, it falls back to the browser's speech service and audio may leave the device |
+| WebDAV backup | When you create a remote backup, the selected data is uploaded to your configured WebDAV server |
+| HTML preview | The Chromium sandbox can run scripts and access permitted external resources; static preview is not guaranteed to be offline either |
+
+Local-first does not mean offline or that data never leaves your device. Check sensitive content before sending, and connect only to model and tool services you trust. Browser profiles have separate local data; uninstalling the extension or clearing its data may remove your records. [Back up](/en/docs/guides/backup/) important content first.
 
 ## Capability examples
 

@@ -16,15 +16,15 @@ This feature is off by default; you turn it on yourself in settings.
 
 ## Enabling memory
 
-The entry point is "Settings → Memory". Only after you turn on the "Enable memory" switch at the top will the AI read and write memories; while it's off, it writes nothing and brings no existing memory into conversations.
+Open "Settings → Memory" and turn on "Enable memory" to include memory instructions, your core profile, and the index in conversations. Turning it off stops automatic injection and automatic organizing; it does not delete files or block file-tool access. You can still manage existing memories in settings.
 
 ## How memory is stored
 
 Each memory is a Markdown file under `~/.cebian/memories/` (in the VFS, not a real folder on your computer). The AI uses the ordinary file tools to write them, which is why you can see its "Remembering…" actions during a chat.
 
-When a new conversation starts, Cebian puts a compact memory index into the context — just the title, type, description, and last-updated time of each entry — and the AI reads the matching file when it needs details. That way it knows what memories you have without stuffing every full body into the context each time.
+With memory enabled, every turn includes a compact index: titles, types, descriptions, time since modification, and file paths. The AI reads individual files when it needs details. The index has a size limit and may be truncated; it does not include every full body.
 
-One file is special: `user_profile.md` holds your core profile (name, role, language, accessibility needs, etc.). It is injected in full every turn, so these most basic facts are always present.
+One file is special: `user_profile.md` holds your core profile (name, role, language, accessibility needs, etc.). Its body is included in full each turn when within the size limit; an oversized profile uses its description and a read-file hint instead, so keep it short.
 
 ## What gets saved, what doesn't
 
@@ -34,7 +34,7 @@ What it saves is "cross-conversation, useful later" information, such as:
 - Long-term preferences (e.g. "lead with the conclusion", "no redundant comments in code")
 - Where your things live (e.g. your tasks all sit in a certain Notion)
 
-What it won't save (and is explicitly told not to):
+The prompt tells the AI not to save the following (this is not an automatic sensitive-data filter):
 
 - Sensitive content like passwords, tokens, cookies, payment and form data
 - One-off task state and the temporary context of the current conversation
@@ -53,18 +53,18 @@ Each memory has a type to keep things organized:
 
 ## Viewing and managing
 
-"Settings → Memory" shows all memory files, and you can view, edit, and delete them directly — this is also the safety net for sensitive information: anything written down is something you can see and remove. Once deleted, new conversations no longer include it.
+View, edit, or delete memory files under "Settings → Memory". Deleted files stop appearing in subsequent automatic injection; deletion does not retract content already included in past messages, sent to a model service, or saved in backups.
 
 ## Organizing memory
 
 As memories pile up they get duplicated, stale, and scattered. Organizing has a temporary background AI read through them all and merge duplicates, drop stale notes, and tidy the bodies.
 
 - Manual: click "Organize" on the memory page to run it right away.
-- Automatic: with "Auto organize" on, Cebian organizes periodically in the background — only when it's been long enough since the last run (14 days by default), enough memories have been added or changed (30 by default), and no conversation is currently active.
+- Automatic: with "Auto organize" on, background checks run periodically. Organizing starts only when enough time has passed since the last successful run (14 days by default), enough memories have been added or changed (30 by default), and no conversation is running. Failed or conflicting attempts also delay automatic retries.
 
-The model used for organizing can be set separately; it defaults to the model your current conversation uses.
+You can select a separate organizing model; otherwise Cebian uses the last-selected conversation model. It also tries that fallback if the dedicated model is unavailable or has tool calling turned off. Organizing requires file-tool support and uses model credits. You can adjust the interval and changed-file threshold; the first run has no previous success time, so it need not wait 14 days.
 
-Organizing happens in a copy. It replaces your memories only after confirming they weren't touched in the meantime; if something goes wrong midway, or you happen to be writing a memory, this run is discarded and your existing memories are unaffected.
+The organizing AI can only work in a temporary copy. Before committing, Cebian checks file format and whether the original memories changed; failed checks or detected conflicts discard the result. This cannot guarantee the AI preserves every fact, and the final file replacement is not atomic. Avoid editing memories during organizing and back up important content first.
 
 ## Backup
 
@@ -72,17 +72,17 @@ Memory can be included in a backup on its own. When creating a backup under "Set
 
 ## Privacy
 
-- Off by default: with it off, there's no memory reading or writing at all.
-- Fully visible and deletable: every memory is viewable, editable, and deletable in settings.
-- No sensitive info: the prompt explicitly tells the AI not to write things like passwords or tokens into memory.
-- Injection-resistant: memory only holds "facts the AI summarized about you", never instructions from web pages; it's also injected below the core safety rules, which always take precedence over memory.
+- Local storage does not mean local-only processing: the core profile and index are sent with conversations to the selected model; file bodies read on demand also enter its context. The organizing model reads memory contents too. Using a remote model involves transmission to that service.
+- WebDAV backups that include memory also upload the files to your configured server.
+- Inspect, edit, and delete memories in settings. Do not save passwords, tokens, or other secrets as memories.
+- Prompts instruct the AI to exclude sensitive information and web-page instructions and treat memory as lower-priority context. These are behavioral constraints, not absolute guarantees against disclosure or prompt injection.
 
 ## Q&A
 
 <QA>
 	<QAItem q="Will the AI remember everything right after I enable it?">No. It only saves a piece of information when it judges it "cross-conversation, useful later", and stays conservative.</QAItem>
-	<QAItem q="Where is memory stored? Is it uploaded?">In the browser's local VFS (`~/.cebian/memories/`). It isn't uploaded unless you back it up yourself.</QAItem>
+	<QAItem q="Where is memory stored? Is it uploaded?">Files are stored in the browser's local VFS. Content used in conversations or organizing is sent to the selected model; WebDAV backups that include memory upload it too.</QAItem>
 	<QAItem q="How do I delete a memory?">Find the file under "Settings → Memory" and delete it; new conversations won't include it anymore.</QAItem>
-	<QAItem q="Will auto-organize wrongly delete my memories?">Organizing happens in a copy and replaces the originals only after confirming they weren't changed; on any conflict the run is discarded. If you're worried, you can stick to manual organizing.</QAItem>
+	<QAItem q="Will auto-organize wrongly delete my memories?">Copies, format checks, and conflict detection reduce risk, but cannot verify that every fact was correctly preserved. Back up important memories and review the result.</QAItem>
 	<QAItem q="How do I keep memories when switching devices?">Tick "Memory" in the backup, and choose to restore memory on the new device.</QAItem>
 </QA>

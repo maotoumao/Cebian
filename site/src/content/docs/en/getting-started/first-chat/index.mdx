@@ -18,7 +18,7 @@ You need to connect an AI provider to Cebian, then select a model, and you can s
 
 ## Configure an AI provider
 
-Cebian itself doesn't provide model credits, and you don't need to register a Cebian account. You can use your own existing API Key or subscription.
+Open "Settings → AI providers". Cebian itself doesn't provide model credits, and you don't need to register a Cebian account. You can use your own existing API Key or subscription.
 
 There are currently a few main approaches:
 
@@ -55,15 +55,29 @@ When you click an example card, it fills the corresponding content into the inpu
 
 ## Context usage and compaction
 
-Click the usage ring at the lower-right of the input to see used / total context and the automatic compaction threshold. Under "Settings → Chat", configure automatic compaction, its trigger percentage, and the compaction model.
+Click the usage ring at the lower-right of the input to see used / total context and the automatic compaction threshold. Usage is an estimate; the ring is hidden if the model does not declare its context window size.
+
+Compaction summarizes earlier history so later requests use the summary plus recent messages, reducing repeated context. The original chat history remains available to browse. Summaries can omit details, so save important content to a file.
+
+### Automatic compaction
+
+Under "Settings → Chat", configure automatic compaction, its trigger percentage, and the compaction model. Automatic compaction is enabled by default at 80%, adjustable from 50% to 95%. Cebian checks usage before sending a new message and between successive tool-calling turns, and attempts compaction above the threshold. The compaction model follows the chat model by default, or you can select a separate one.
 
 <Image src={ChatSettingsShot} alt="Chat settings showing automatic compaction, its threshold, and the compaction model" loading="lazy" />
 
 ### Compact now
 
-Once compacting earlier history would noticeably reduce context usage, the usage popover shows "Compact now". Click it to compact before reaching the automatic threshold. New chats usually do not show this button.
+Once compacting earlier history would noticeably reduce context usage, the usage popover shows "Compact now". Click it to compact before reaching the automatic threshold, even with automatic compaction turned off. New chats usually do not show this button, and it is disabled while replying or compacting.
 
 <Image src={ManualCompactionShot} alt="Demonstration conversation at 78% context usage with the Compact now button" loading="lazy" />
+
+### Cancellation and failures
+
+- While "Compacting context…" is shown, click the stop button beside the input to cancel. Cancellation does not apply the new summary; cancelling automatic compaction also stops the current turn.
+- **Manual compaction fails**: an error is shown and the existing history and context remain unchanged. Retry later or check the compaction model's provider configuration.
+- **Automatic summarization fails**: if it still fails after retrying, Cebian marks earlier context as dropped and excludes the portion it could not summarize from later model requests, retaining recent messages and any previous summary. The original chat history remains available to browse. If the remaining content cannot be compacted further, Cebian pauses and suggests starting a new chat, forking from an earlier reply, or choosing a model with a larger context window.
+
+Compaction only manages context within the current conversation; it does not save the summary as cross-conversation memory. Use [Memory](/en/docs/guides/memory/) to retain preferences or background across chats.
 
 ## Adjust chat appearance
 
@@ -75,4 +89,5 @@ Under "Settings → Appearance", adjust the chat font and size with a live previ
 
 - Prompt "Please select an AI model first": go back to the lower-left corner of the input box and select a model
 - Provider shows "Unverified": the API Key is saved, but the connectivity test didn't pass; try sending a message and see what happens
+- The model cannot read pages, search, or use Skills: these actions require a model with tool calling enabled; check its model settings under the provider
 - The current page can't be read: the Chrome Web Store, browser settings pages, and some special pages simply don't allow extensions to read their content; try a regular web page instead

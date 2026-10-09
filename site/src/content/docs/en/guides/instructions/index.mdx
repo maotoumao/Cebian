@@ -1,6 +1,6 @@
 ---
 title: Custom instructions
-description: Override the default System Prompt to set the model's tone and role.
+description: Append instructions to the default rules to adjust the model's tone and role.
 group: guides
 order: 3
 ---
@@ -19,7 +19,7 @@ They're best suited for long-term preferences, such as reply language, tone, cod
 
 The entry point is under "Settings → Chat".
 
-Just write your preferences in "Custom instructions"; the content is saved automatically. The next time you send a message, Cebian appends these instructions after the default rules.
+Write your preferences in "Custom instructions" (up to 2,000 characters); the content is saved automatically. Cebian appends them after the default rules on the next message, including in existing conversations. Clear the field to stop applying them; this does not replace or remove the default rules.
 
 For example, you might write:
 
@@ -49,8 +49,8 @@ For example:
 
 - They can't make the model bypass tool permissions
 - They can't make the model read pages the browser doesn't allow reading
-- They can't make the model access the real file system on your computer
-- They can't make the model ignore the risk of malicious instructions in web page content
+- They can't give the built-in VFS tools access to your computer's real file system
+- They should not ask the model to obey malicious instructions in web pages; the default rules require treating page content as untrusted data
 
 In short, they're for adjusting "how to answer", not for changing Cebian's safety boundaries.
 

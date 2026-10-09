@@ -1,6 +1,6 @@
 ---
 title: Input tools
-description: The quick-access shortcuts above the chat input box
+description: Page context, file attachments, action recording, and voice input
 group: guides
 order: 1
 ---
@@ -16,7 +16,7 @@ import QAItem from '@/components/docs/QAItem.astro';
 import selectTool from '@/assets/demo/select-tool.mp4';
 import recordReplay from '@/assets/demo/record-replay.mp4';
 
-There's a row of small buttons above the chat input box, used to hand the current page, files, screenshots, or a sequence of actions over to Cebian.
+There's a row of small buttons above the chat input box, used to hand the current page, files, screenshots, or a sequence of actions over to Cebian. The voice-input microphone is below the input, next to Send.
 
 You don't necessarily need them for ordinary chatting. Only when you want the model to see something more specific do you click the corresponding tool.
 
@@ -55,7 +55,7 @@ For example:
 <video controls preload="metadata" src={recordReplay} aria-label="Record actions and replay them"></video>
 
 
-> What's recorded is the sequence of actions, not a video. It records events such as clicks, input, and page navigation, so the model can understand what you just did.
+> What's recorded is the sequence of actions, not a video. It records clicks, input, and page navigation. A recording stops at 10 minutes or 1,000 action events. If the attachment exceeds 256 KiB, network summaries are reduced and, if necessary, events are removed from the end.
 
 ### Recording network requests too
 
@@ -72,9 +72,10 @@ This helps when you want to:
 A few notes:
 
 - While recording, Chrome shows a debugging bar at the top of the window; it goes away when you stop (unless Mobile mode is still on). Clicking Cancel on the bar stops network recording (page actions keep recording) and also turns off Mobile mode if it's on.
-- Recognizable secrets such as tokens, passwords, API keys and auth headers are replaced with `[redacted]`, and cookies are never recorded. A secret with no recognizable name (such as a bare token inside a URL path) may remain, so check before sending or sharing. Static assets such as images and scripts aren't recorded, and recognized requests to common analytics and monitoring services are filtered out; the attachment shows how many were filtered.
-- The model receives a summary of each request. The full log (headers, request bodies, response contents) is saved as a HAR file in this chat's workspace under `recordings/` when you send the message, and the model reads it when it needs details. Request or response bodies over 64 KB aren't recorded, and one recording keeps at most 500 requests. The network icon on a sent message opens the file; on an attachment in the input box it downloads it.
-- In Firefox, turning on network requests asks for a permission the first time, and only request details (including request bodies) are recorded, not response contents.
+- Recognizable secrets such as tokens, passwords, API keys and auth headers are replaced with `[redacted]`, and Cookie / Set-Cookie header values are redacted too. A secret with no recognizable name (such as a bare token inside a URL path) may remain, so check before sending or sharing. Static assets such as images and scripts aren't recorded, and recognized requests to common analytics and monitoring services are filtered out; the attachment shows how many were filtered.
+- The model receives a summary of each request. The full log (headers, request bodies, response contents) is saved as a HAR file in this chat's workspace under `recordings/` when you send the message, and the model can read it for details. The network icon on a sent message opens the file; on an attachment in the input box it downloads it.
+- Only body formats that can be redacted by the rules, such as JSON and forms, are retained; HTML, XML, and unstructured plain-text bodies are omitted. Request or response bodies over 64 KiB aren't recorded. Each network recording is limited to 500 requests and 5 MiB of bodies and message previews combined.
+- In Firefox, network recording requires the `webRequest` permission. It captures request details (including available request bodies), response status, and response headers, but not response bodies or WebSocket / EventSource message contents. If permission is denied, only already-selected page actions are recorded; if network requests were the only selection, recording does not start.
 
 ## <LucideIcon name="camera" />Screenshot
 
@@ -94,20 +95,26 @@ The screenshot appears as an image attachment above the input box. You can keep 
 
 If your question involves a local file, click "Upload file".
 
-It's currently best suited for two kinds of files:
+Two kinds of files are supported:
 
-- Images: screenshots, design mockups, error screenshots, etc.
-- Text files: Markdown, JSON, CSV, code files, log files, etc.
+| Type | Supported formats | Per-file limit |
+| --- | --- | --- |
+| Images | PNG, JPEG, GIF, WebP, SVG | 5 MiB |
+| Text | Common documents, data, code, and configuration files | 100 KiB |
+
+Text files are recognized by extension, including TXT, Markdown, CSV, JSON, and common code or configuration files such as JavaScript, Python, HTML, CSS, and YAML.
+
+PDF, Word, Excel, and archive files cannot be attached here. To read a PDF, open it in a browser tab and ask Cebian to use its PDF tool. Local `file://` PDFs may also require enabling the extension's file-URL access permission.
 
 After uploading, the file is attached to your next message. Plain text files are handed directly to the model to read; images likewise require the current model to support multimodal input.
 
-> A single message can carry up to 10 attachments. For very large files, it's best to extract the relevant portion before uploading.
+> A message can carry up to 10 attachments in total, shared by files, screenshots, selected elements, and action recordings. Oversized files are rejected; crop images or extract the relevant text first.
 
 After upload, the file appears as an attachment you can check before sending.
 
 <Image src={FileAttachmentShot} alt="Demonstration file attached above the chat input" loading="lazy" />
 
-You can also drag files into the chat message area or input, then release when the drop hint appears. Folders are not supported.
+You can also drag files into the chat message area or input, then release when the drop hint appears. Folders are not supported. With an image-capable model, you can also paste images into the input. Uploads, drops, and pasted images share the type and size limits above.
 
 <Image src={FileDropzoneShot} alt="File drag-and-drop highlight and release-to-attach hint" loading="lazy" />
 
@@ -123,13 +130,15 @@ Once enabled, the current tab is temporarily emulated as a phone screen. You can
 
 Click the button again to exit mobile mode.
 
-> This mode only affects the current tab and is meant for quickly checking the mobile state; if the page itself isn't responsive, it won't automatically make the page better.
+> Mobile mode requires Chromium's debugger API, so Firefox hides this button. It changes the current tab's viewport and User-Agent, not the underlying browser into a real phone or Safari. It does not make a non-responsive layout responsive.
 
 ## <LucideIcon name="mic" />Voice input
 
 If you don't want to type, click the microphone button to dictate your words into the input box.
 
-The first time you use it, the browser may ask for microphone permission. Once granted, Cebian appends the recognized text directly into the input box, where you can keep editing it before sending manually.
+On first use, Cebian may open a separate microphone permission page. Allow access there, return to the sidebar, and click the microphone again to start. If you previously denied access, follow the prompt to allow it in your browser's microphone settings.
+
+Recognized text appears in the editable input as you speak. Click the microphone again to stop, check the text, and send it manually.
 
 Voice input is handy for quickly jotting down a longer thought, such as:
 
@@ -137,7 +146,13 @@ Voice input is handy for quickly jotting down a longer thought, such as:
 - Quickly describing a page issue
 - Saying what you want the model to do while looking at the page
 
-> Speech recognition is done locally. Availability may differ across browsers and system environments; if the button doesn't appear, just use the keyboard.
+### Recognition mode and language
+
+- **Local-first, with cloud fallback**: recognition runs on-device when the local engine and language are available. If local recognition is unsupported, the language is unavailable, or the language-pack download fails, Cebian automatically uses the browser's cloud recognition. That path may send audio to the browser's speech service and requires a network connection; it is separate from your configured chat model.
+- **Language packs**: when a local pack can be downloaded but is not ready, the button shows a preparing indicator and is temporarily disabled. Dictation starts automatically after the download completes.
+- **Language selection**: follows the browser's interface language. Simplified Chinese uses a Simplified Mandarin pack; Taiwan, Hong Kong, or Traditional Chinese uses a Traditional Mandarin pack. Other interface languages use US English. There is no separate speech-language selector.
+
+> The microphone appears only when the browser provides a speech-recognition API. It is hidden in environments such as Firefox without that API. The interface currently has no local-only switch; use keyboard input if you do not accept cloud fallback.
 
 ## Choosing a tool
 
@@ -152,7 +167,7 @@ Voice input is handy for quickly jotting down a longer thought, such as:
 
 <QA>
 <QAItem q="What if the screenshot or image button is unavailable?">The current model doesn't support multimodal input; switch to a model that supports images.</QAItem>
-<QAItem q="What if a file won't upload?">Currently images and common text files are supported, with up to 10 attachments per message.</QAItem>
+<QAItem q="What if a file won't upload?">Check the type and size: images must not exceed 5 MiB, supported text files must not exceed 100 KiB, and all attachments share a limit of 10 per message. Images also need an image-capable model.</QAItem>
 <QAItem q="What if I can't select an element on a special page?">For security reasons, the browser doesn't allow extensions to read these pages. Try a regular web page instead.</QAItem>
 <QAItem q="What if clicking the record button does nothing?">Another sidebar may be recording; stop the recording over there first and try again.</QAItem>
 <QAItem q="What does “network recording stopped” on the attachment mean?">Cancel was clicked on the browser's debugging bar during the recording (in Firefox: the permission was removed). Requests after that weren't recorded; the ones recorded before are still sent to the model.</QAItem>
