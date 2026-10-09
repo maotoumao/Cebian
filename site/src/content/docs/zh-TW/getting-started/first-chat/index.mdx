@@ -7,6 +7,11 @@ order: 2
 
 {/* AUTO-GENERATED from docs/zh by scripts/gen-zhtw.mjs — do not edit; edit zh then run `pnpm gen:zhtw`. */}
 
+import { Image } from 'astro:assets';
+import ChatSettingsShot from '@/assets/docs/chat-settings.png';
+import ManualCompactionShot from '@/assets/docs/manual-compaction.png';
+import AppearanceShot from '@/assets/docs/appearance.png';
+
 import providerConfig from '@/assets/demo/provider-config.mp4';
 
 安裝完成後，點選瀏覽器工具欄裡的 Cebian 圖示開啟側邊欄。第一次使用時，如果還沒配置模型，會看到「請先選擇一個 AI 模型」。
@@ -49,6 +54,24 @@ Cebian 會帶上當前標籤頁的標題、URL、選中文本和標籤頁列表�
 配置好模型後，新對話頁會出現幾個示例卡片，比如「總結當前頁面」「翻譯當前頁面」「提取頁面要點」。
 
 點選示例卡片後，它會把對應的內容填到輸入框裡，你可以直接傳送，也可以先改成自己的說法再發送。
+
+## 上下文用量與壓縮
+
+點選輸入框右下角的用量環，可以檢視上下文已用 / 總量及自動壓縮閾值。在「設定 → 對話」裡，可以調整自動壓縮開關、觸發比例和壓縮模型。
+
+<Image src={ChatSettingsShot} alt="對話設定中的自動壓縮開關、觸發閾值與壓縮模型" loading="lazy" />
+
+### 立即壓縮
+
+當壓縮較早歷史能明顯降低上下文佔用時，用量小窗會顯示「立即壓縮」。點選即可提前壓縮，不必等到自動壓縮閾值；新對話通常不會顯示這個按鈕。
+
+<Image src={ManualCompactionShot} alt="上下文用量 78% 的演示會話及立即壓縮按鈕" loading="lazy" />
+
+## 調整對話外觀
+
+在「設定 → 外觀」中調整對話字型和字號，並檢視即時預覽。
+
+<Image src={AppearanceShot} alt="外觀設定中的對話字號、字型與即時預覽" loading="lazy" />
 
 ## 如果發不出去
 

@@ -41,12 +41,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 修改 MCP 服务器或搜索引擎设置后，正在进行中的任务从下一次模型请求起就使用新的工具集，不必等到下一轮对话
 - 修改自定义提供商的模型设置（上下文窗口、最大输出、推理、多模态、工具调用）后，已打开的对话从下一条消息（含重试、编辑重发）起就按新设置请求，不必新开对话
 - 自定义提供商的「自动获取」改为先在弹窗中勾选要添加的模型（可搜索、可全选），不再把提供商返回的全部模型一次性加入列表；已在列表里的模型默认勾选，删掉的模型不会因再次获取而回来 ([#86](https://github.com/maotoumao/Cebian/issues/86))
+- 文档补充真实扩展配图，覆盖上下文压缩、模型管理、备份、VFS 和输入工具，同步简体中文、繁体中文与英文说明。
 
 - Under OpenAI Codex, GPT-6 Sol and Luna now offer the "off" thinking level
 - Some models' thinking levels follow upstream changes: for example, Claude Opus 5 on Anthropic no longer offers "off", the Kimi Coding Plan now offers low / high / max, and Gemini 3.1 Pro Preview on Google gains "medium". A previously selected level that is no longer available is adjusted to the closest level the model supports
 - After you change MCP servers or search-engine settings, a task already in progress picks up the new tool set from its next model request instead of waiting for the next turn
 - After you change a custom provider model's settings (context window, max output, reasoning, multimodal, tool calling), chats that are already open use them from the next message (including retries and edits) instead of requiring a new chat
 - "Auto-fetch" for a custom provider now opens a dialog to pick which models to add, with search and select all, instead of adding every model the provider returns. Models already in the list start checked, so models you removed no longer come back on the next fetch ([#86](https://github.com/maotoumao/Cebian/issues/86))
+- Documentation gains real extension screenshots for context compaction, model management, backups, VFS, and input tools, with captions in Simplified Chinese, Traditional Chinese, and English.
 
 ### 移除 / Removed
 

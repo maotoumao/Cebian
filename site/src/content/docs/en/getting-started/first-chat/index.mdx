@@ -5,6 +5,11 @@ group: getting-started
 order: 2
 ---
 
+import { Image } from 'astro:assets';
+import ChatSettingsShot from '@/assets/docs/chat-settings.png';
+import ManualCompactionShot from '@/assets/docs/manual-compaction.png';
+import AppearanceShot from '@/assets/docs/appearance.png';
+
 import providerConfig from '@/assets/demo/provider-config.mp4';
 
 Once installed, click the Cebian icon in your browser toolbar to open the sidebar. The first time you use it, if you haven't configured a model yet, you'll see "Please select an AI model first".
@@ -47,6 +52,24 @@ Cebian will include context such as the current tab's title, URL, selected text,
 After configuring a model, the new conversation page will show a few example cards, such as "Summarize the current page", "Translate the current page", and "Extract page highlights".
 
 When you click an example card, it fills the corresponding content into the input box. You can send it directly, or edit it into your own wording first and then send.
+
+## Context usage and compaction
+
+Click the usage ring at the lower-right of the input to see used / total context and the automatic compaction threshold. Under "Settings → Chat", configure automatic compaction, its trigger percentage, and the compaction model.
+
+<Image src={ChatSettingsShot} alt="Chat settings showing automatic compaction, its threshold, and the compaction model" loading="lazy" />
+
+### Compact now
+
+Once compacting earlier history would noticeably reduce context usage, the usage popover shows "Compact now". Click it to compact before reaching the automatic threshold. New chats usually do not show this button.
+
+<Image src={ManualCompactionShot} alt="Demonstration conversation at 78% context usage with the Compact now button" loading="lazy" />
+
+## Adjust chat appearance
+
+Under "Settings → Appearance", adjust the chat font and size with a live preview.
+
+<Image src={AppearanceShot} alt="Appearance settings showing chat size, font, and live preview" loading="lazy" />
 
 ## If you can't send
 

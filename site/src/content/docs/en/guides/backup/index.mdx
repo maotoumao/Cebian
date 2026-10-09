@@ -5,7 +5,10 @@ group: guides
 order: 8
 ---
 
-import Placeholder from '@/components/Placeholder.astro';
+import { Image } from 'astro:assets';
+import BackupDialogShot from '@/assets/docs/backup-dialog.png';
+import BackupCategoriesShot from '@/assets/docs/backup-categories.png';
+
 import QA from '@/components/docs/QA.astro';
 import QAItem from '@/components/docs/QAItem.astro';
 
@@ -27,6 +30,8 @@ The steps are:
 4. After confirming, the browser downloads a `.zip` file
 
 If you just want a temporary insurance copy, just create a full backup.
+
+<Image src={BackupDialogShot} alt="Full backup dialog and encryption option" loading="lazy" />
 
 ## WebDAV backup
 
@@ -56,9 +61,12 @@ In a partial backup, you can select:
 - Include workspace files
 - General settings
 - Skills & Prompts
+- Memory
 - Secrets
 
 For everyday use, a full backup is recommended; if you only want to migrate Prompts or Skills, use a partial backup.
+
+<Image src={BackupCategoriesShot} alt="Partial backup categories, including Memory" loading="lazy" />
 
 ## Encrypted backup
 
@@ -93,6 +101,7 @@ The content of each category is roughly as follows:
 | Workspace files | Files generated in conversations or saved to `/workspaces/` |
 | General settings | Theme, default model, custom instructions, non-secret MCP configuration, etc. |
 | Skills & Prompts | Files in `~/.cebian/skills/` and `~/.cebian/prompts/` |
+| Memory | Long-term memory content |
 | Secrets | Provider API Keys, OAuth tokens, MCP tokens, WebDAV credentials, etc. |
 
 The backup does not include browser cookies or website login states. So after restoring to a new device, some model subscriptions or website logins may still need to be re-authorized.

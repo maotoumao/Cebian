@@ -5,6 +5,11 @@ group: reference
 order: 1
 ---
 
+import { Image } from 'astro:assets';
+import ModelCapabilitiesShot from '@/assets/docs/model-capabilities.png';
+import ModelPickerShot from '@/assets/docs/model-picker.png';
+import ModelSelectionShot from '@/assets/docs/model-selection.png';
+
 Cebian 本身不提供模型额度。你需要在「设置 → AI 提供商」里接入自己已有的订阅或 API Key，然后在对话输入框里选择模型。
 
 下面只是当前内置 Provider 的列表。实际可用模型会随各家服务变化，以设置页里能选到的模型为准。
@@ -57,3 +62,21 @@ Cebian 本身不提供模型额度。你需要在「设置 → AI 提供商」�
 - 公司内部的 OpenAI 兼容接口
 
 添加时填入名称、Base URL、API Key（如需要），再添加或自动获取模型列表即可。
+
+## 自定义模型界面
+
+在自定义提供商的编辑表单中，点模型旁的设置按钮，可以填写上下文窗口、最大输出，并设置思考和多模态能力。能力参数应按实际服务填写，开启开关不会让服务获得它原本不支持的能力。
+
+不支持工具调用的模型，关闭「工具调用」即可用于普通对话；关闭后不能调用浏览器、文件或 MCP 工具。
+
+<Image src={ModelCapabilitiesShot} alt="自定义模型的上下文窗口、最大输出与能力开关" loading="lazy" />
+
+### 获取与批量选择模型
+
+点击「自动获取」后，在弹窗中搜索、勾选要加入的模型，再确认。
+
+<Image src={ModelPickerShot} alt="远端模型列表的搜索与勾选弹窗，使用 demo 演示模型" loading="lazy" />
+
+点击模型列表旁的「选择」，可以勾选多个模型或全选，再批量删除。删除只修改当前表单草稿，点击「保存」才生效；「取消」会放弃这次编辑。
+
+<Image src={ModelSelectionShot} alt="模型多选模式：已选两项、部分选中状态和删除入口" loading="lazy" />

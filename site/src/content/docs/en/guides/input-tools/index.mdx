@@ -5,7 +5,11 @@ group: guides
 order: 1
 ---
 
-import Placeholder from '@/components/Placeholder.astro';
+import { Image } from 'astro:assets';
+import RecordingOptionsShot from '@/assets/docs/recording-options.png';
+import FileAttachmentShot from '@/assets/docs/file-attachment.png';
+import FileDropzoneShot from '@/assets/docs/file-dropzone.png';
+
 import LucideIcon from '@/components/docs/LucideIcon.astro';
 import QA from '@/components/docs/QA.astro';
 import QAItem from '@/components/docs/QAItem.astro';
@@ -55,6 +59,8 @@ For example:
 
 ### Recording network requests too
 
+<Image src={RecordingOptionsShot} alt="Recording options for page actions and network requests" loading="lazy" />
+
 The small arrow next to the record button opens "Recording options", where you can check "Page actions" and "Network requests" (your choice is remembered, network requests are off by default, and recording can't start with both unchecked). With network requests on, the API calls, page loads and WebSocket / EventSource connections the page makes while you work are recorded as well, on the same timeline as your actions, so the model can see which request a click triggered and what came back.
 
 This helps when you want to:
@@ -96,6 +102,14 @@ It's currently best suited for two kinds of files:
 After uploading, the file is attached to your next message. Plain text files are handed directly to the model to read; images likewise require the current model to support multimodal input.
 
 > A single message can carry up to 10 attachments. For very large files, it's best to extract the relevant portion before uploading.
+
+After upload, the file appears as an attachment you can check before sending.
+
+<Image src={FileAttachmentShot} alt="Demonstration file attached above the chat input" loading="lazy" />
+
+You can also drag files into the chat message area or input, then release when the drop hint appears. Folders are not supported.
+
+<Image src={FileDropzoneShot} alt="File drag-and-drop highlight and release-to-attach hint" loading="lazy" />
 
 ## <LucideIcon name="smartphone" />Mobile mode
 

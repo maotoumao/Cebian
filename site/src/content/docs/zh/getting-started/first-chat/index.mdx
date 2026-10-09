@@ -5,6 +5,11 @@ group: getting-started
 order: 2
 ---
 
+import { Image } from 'astro:assets';
+import ChatSettingsShot from '@/assets/docs/chat-settings.png';
+import ManualCompactionShot from '@/assets/docs/manual-compaction.png';
+import AppearanceShot from '@/assets/docs/appearance.png';
+
 import providerConfig from '@/assets/demo/provider-config.mp4';
 
 安装完成后，点击浏览器工具栏里的 Cebian 图标打开侧边栏。第一次使用时，如果还没配置模型，会看到「请先选择一个 AI 模型」。
@@ -47,6 +52,24 @@ Cebian 会带上当前标签页的标题、URL、选中文本和标签页列表�
 配置好模型后，新对话页会出现几个示例卡片，比如「总结当前页面」「翻译当前页面」「提取页面要点」。
 
 点击示例卡片后，它会把对应的内容填到输入框里，你可以直接发送，也可以先改成自己的说法再发送。
+
+## 上下文用量与压缩
+
+点击输入框右下角的用量环，可以查看上下文已用 / 总量及自动压缩阈值。在「设置 → 对话」里，可以调整自动压缩开关、触发比例和压缩模型。
+
+<Image src={ChatSettingsShot} alt="对话设置中的自动压缩开关、触发阈值与压缩模型" loading="lazy" />
+
+### 立即压缩
+
+当压缩较早历史能明显降低上下文占用时，用量小窗会显示「立即压缩」。点击即可提前压缩，不必等到自动压缩阈值；新对话通常不会显示这个按钮。
+
+<Image src={ManualCompactionShot} alt="上下文用量 78% 的演示会话及立即压缩按钮" loading="lazy" />
+
+## 调整对话外观
+
+在「设置 → 外观」中调整对话字体和字号，并查看实时预览。
+
+<Image src={AppearanceShot} alt="外观设置中的对话字号、字体与实时预览" loading="lazy" />
 
 ## 如果发不出去
 

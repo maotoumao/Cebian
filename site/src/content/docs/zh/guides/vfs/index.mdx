@@ -5,7 +5,11 @@ group: guides
 order: 6
 ---
 
-import Placeholder from '@/components/Placeholder.astro';
+import { Image } from 'astro:assets';
+import VfsFilesShot from '@/assets/docs/vfs-files.png';
+import VfsPreviewShot from '@/assets/docs/vfs-preview.png';
+import VfsSourceShot from '@/assets/docs/vfs-source.png';
+
 import QA from '@/components/docs/QA.astro';
 import QAItem from '@/components/docs/QAItem.astro';
 
@@ -13,11 +17,7 @@ VFS 是 Cebian 放在浏览器里的虚拟文件系统。它不是你电脑上�
 
 你可以把它理解成 Cebian 自己的一块本地文件区：模型生成的文件、Prompt、Skill、会话工作区里的资料，都会放在这里。
 
-<Placeholder
-	dim="1200 × 760"
-	ratio="16 / 10"
-	label="VFS 浏览器界面"
-/>
+<Image src={VfsFilesShot} alt="VFS 文件浏览器中的演示工作区" loading="lazy" />
 
 ## 存储内容
 
@@ -54,6 +54,14 @@ Cebian 的文件工具读写的就是这套 VFS。比如模型帮你生成一个
 - 下载整个目录的 zip
 
 如果你只是管理 Prompt 或 Skill，优先使用设置里的对应页面；VFS 浏览器更适合查看文件结果和工作区内容。
+
+## HTML 预览与源码
+
+打开 HTML 文件后，点击右上角的「预览 / 源码」，可以切换渲染结果和源文件。
+
+<Image src={VfsPreviewShot} alt="VFS 沙箱中的演示 HTML 阅读清单预览" loading="lazy" />
+
+<Image src={VfsSourceShot} alt="同一演示 HTML 文件的源码与语法高亮" loading="lazy" />
 
 ## Q&A
 

@@ -7,7 +7,10 @@ order: 8
 
 {/* AUTO-GENERATED from docs/zh by scripts/gen-zhtw.mjs — do not edit; edit zh then run `pnpm gen:zhtw`. */}
 
-import Placeholder from '@/components/Placeholder.astro';
+import { Image } from 'astro:assets';
+import BackupDialogShot from '@/assets/docs/backup-dialog.png';
+import BackupCategoriesShot from '@/assets/docs/backup-categories.png';
+
 import QA from '@/components/docs/QA.astro';
 import QAItem from '@/components/docs/QAItem.astro';
 
@@ -29,6 +32,8 @@ Cebian 的資料主要存在瀏覽器本地。換裝置、重灌瀏覽器，或�
 4. 確認後，瀏覽器會下載一個 `.zip` 檔案
 
 如果只是臨時留一份保險，直接建立完整備份就行。
+
+<Image src={BackupDialogShot} alt="建立完整備份與加密選項" loading="lazy" />
 
 ## WebDAV 備份
 
@@ -58,9 +63,12 @@ WebDAV 頁面會列出伺服器上已有的快照。每份快照都可以恢復�
 - 一併備份工作區檔案
 - 普通設定
 - 技能與提示詞
+- 記憶
 - 金鑰資訊
 
 普通使用的話，建議直接用完整備份；如果只是想遷移 Prompt 或 Skill，再用部分備份。
+
+<Image src={BackupCategoriesShot} alt="部分備份分類，包括記憶" loading="lazy" />
 
 ## 加密備份
 
@@ -95,6 +103,7 @@ WebDAV 頁面會列出伺服器上已有的快照。每份快照都可以恢復�
 | 工作區檔案 | 對話中生成或儲存到 `/workspaces/` 的檔案 |
 | 普通設定 | 主題、預設模型、自定義指引、MCP 的非金鑰配置等 |
 | 技能與提示詞 | `~/.cebian/skills/` 和 `~/.cebian/prompts/` 裡的檔案 |
+| 記憶 | 長期記憶內容 |
 | 金鑰資訊 | Provider API Key、OAuth token、MCP token、WebDAV 憑據等 |
 
 備份不會包含瀏覽器 Cookie 和網站登入態。所以恢復到新裝置後，有些模型訂閱或網站登入可能還需要重新授權。

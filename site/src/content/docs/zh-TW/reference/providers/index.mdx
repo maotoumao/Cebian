@@ -7,6 +7,11 @@ order: 1
 
 {/* AUTO-GENERATED from docs/zh by scripts/gen-zhtw.mjs — do not edit; edit zh then run `pnpm gen:zhtw`. */}
 
+import { Image } from 'astro:assets';
+import ModelCapabilitiesShot from '@/assets/docs/model-capabilities.png';
+import ModelPickerShot from '@/assets/docs/model-picker.png';
+import ModelSelectionShot from '@/assets/docs/model-selection.png';
+
 Cebian 本身不提供模型額度。你需要在「設定 → AI 提供商」裡接入自己已有的訂閱或 API Key，然後在對話輸入框裡選擇模型。
 
 下面只是當前內建 Provider 的列表。實際可用模型會隨各家服務變化，以設定頁裡能選到的模型為準。
@@ -59,3 +64,21 @@ Cebian 本身不提供模型額度。你需要在「設定 → AI 提供商」�
 - 公司內部的 OpenAI 相容介面
 
 新增時填入名稱、Base URL、API Key（如需要），再新增或自動獲取模型列表即可。
+
+## 自定義模型介面
+
+在自定義提供商的編輯表單中，點模型旁的設定按鈕，可以填寫上下文視窗、最大輸出，並設定思考和多模態能力。能力引數應按實際服務填寫，開啟開關不會讓服務獲得它原本不支援的能力。
+
+不支援工具呼叫的模型，關閉「工具呼叫」即可用於普通對話；關閉後不能呼叫瀏覽器、檔案或 MCP 工具。
+
+<Image src={ModelCapabilitiesShot} alt="自定義模型的上下文視窗、最大輸出與能力開關" loading="lazy" />
+
+### 獲取與批次選擇模型
+
+點選「自動獲取」後，在彈窗中搜索、勾選要加入的模型，再確認。
+
+<Image src={ModelPickerShot} alt="遠端模型列表的搜尋與勾選彈窗，使用 demo 演示模型" loading="lazy" />
+
+點選模型列表旁的「選擇」，可以勾選多個模型或全選，再批次刪除。刪除只修改當前表單草稿，點選「儲存」才生效；「取消」會放棄這次編輯。
+
+<Image src={ModelSelectionShot} alt="模型多選模式：已選兩項、部分選中狀態和刪除入口" loading="lazy" />

@@ -7,7 +7,11 @@ order: 1
 
 {/* AUTO-GENERATED from docs/zh by scripts/gen-zhtw.mjs — do not edit; edit zh then run `pnpm gen:zhtw`. */}
 
-import Placeholder from '@/components/Placeholder.astro';
+import { Image } from 'astro:assets';
+import RecordingOptionsShot from '@/assets/docs/recording-options.png';
+import FileAttachmentShot from '@/assets/docs/file-attachment.png';
+import FileDropzoneShot from '@/assets/docs/file-dropzone.png';
+
 import LucideIcon from '@/components/docs/LucideIcon.astro';
 import QA from '@/components/docs/QA.astro';
 import QAItem from '@/components/docs/QAItem.astro';
@@ -57,6 +61,8 @@ import recordReplay from '@/assets/demo/record-replay.mp4';
 
 ### 同時錄製網路請求
 
+<Image src={RecordingOptionsShot} alt="錄製選項：頁面操作和網路請求" loading="lazy" />
+
 錄製按鈕旁的小箭頭開啟「錄製選項」，可以勾選「頁面操作」和「網路請求」（選擇會被記住，網路請求預設關閉；兩項都不勾時無法開始錄製）。開啟網路請求後，頁面在你操作時發出的介面呼叫、頁面載入以及 WebSocket / EventSource 連線也會被記下來，和操作按時間排在同一條時間線上，模型能看出「點了這個按鈕之後調了哪個介面、返回了什麼」。
 
 適合這些場景：
@@ -98,6 +104,14 @@ import recordReplay from '@/assets/demo/record-replay.mp4';
 上傳後，檔案會作為附件跟隨下一條訊息傳送。普通文本檔案會直接交給模型閱讀；圖片同樣需要當前模型支援多模態輸入。
 
 > 單條訊息最多可以帶 10 個附件。很大的檔案建議先擷取相關片段再上傳。
+
+上傳後，檔案會顯示為附件標籤，傳送前可以檢查。
+
+<Image src={FileAttachmentShot} alt="輸入框上方的演示檔案附件" loading="lazy" />
+
+也可以把檔案拖到聊天訊息區或輸入框，看到「鬆開以新增附件」後鬆開；不支援拖入資料夾。
+
+<Image src={FileDropzoneShot} alt="拖入檔案時的聊天區域高亮與鬆開以新增附件提示" loading="lazy" />
 
 ## <LucideIcon name="smartphone" />移動端模式
 

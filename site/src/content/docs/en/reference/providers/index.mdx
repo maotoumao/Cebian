@@ -5,6 +5,11 @@ group: reference
 order: 1
 ---
 
+import { Image } from 'astro:assets';
+import ModelCapabilitiesShot from '@/assets/docs/model-capabilities.png';
+import ModelPickerShot from '@/assets/docs/model-picker.png';
+import ModelSelectionShot from '@/assets/docs/model-selection.png';
+
 Cebian itself doesn't provide model credits. You need to connect your own existing subscription or API Key under "Settings → AI providers", then select a model in the chat input box.
 
 The following is just the list of currently built-in Providers. The actually available models will change with each service; the models selectable in the settings page are authoritative.
@@ -57,3 +62,21 @@ Common scenarios include:
 - An OpenAI-compatible interface inside your company
 
 When adding one, enter the name, Base URL, and API Key (if required), then add or automatically fetch the model list.
+
+## Custom model controls
+
+In the custom provider editor, open the settings beside a model to set its context window, maximum output, reasoning, and multimodal capabilities. Use values supported by the actual service; a switch cannot add a capability the service does not have.
+
+For a model without tool support, turn off "Tool calling" to use it for ordinary chat. It will not be able to call browser, file, or MCP tools.
+
+<Image src={ModelCapabilitiesShot} alt="Custom model settings for context window, maximum output, and capability switches" loading="lazy" />
+
+### Fetching and selecting models
+
+Click "Auto-fetch", then search for and check the models to add before confirming.
+
+<Image src={ModelPickerShot} alt="Searchable remote-model picker using demo model entries" loading="lazy" />
+
+Click "Select" beside the model list to check several models or select all, then delete them together. Deletion only changes the form draft until you click "Save"; "Cancel" discards the edit.
+
+<Image src={ModelSelectionShot} alt="Model multi-select with two entries selected, a partial-selection state, and a delete action" loading="lazy" />

@@ -5,7 +5,11 @@ group: guides
 order: 6
 ---
 
-import Placeholder from '@/components/Placeholder.astro';
+import { Image } from 'astro:assets';
+import VfsFilesShot from '@/assets/docs/vfs-files.png';
+import VfsPreviewShot from '@/assets/docs/vfs-preview.png';
+import VfsSourceShot from '@/assets/docs/vfs-source.png';
+
 import QA from '@/components/docs/QA.astro';
 import QAItem from '@/components/docs/QAItem.astro';
 
@@ -13,11 +17,7 @@ The VFS is Cebian's virtual file system inside the browser. It's not a real dire
 
 Think of it as Cebian's own local file area: model-generated files, Prompts, Skills, and materials in session workspaces are all stored here.
 
-<Placeholder
-dim="1200 × 760"
-ratio="16 / 10"
-label="VFS browser interface"
-/>
+<Image src={VfsFilesShot} alt="Demonstration workspace in the VFS file browser" loading="lazy" />
 
 ## What's stored
 
@@ -54,6 +54,14 @@ In the VFS browser, you can:
 - Download an entire directory as a zip
 
 If you're just managing Prompts or Skills, prefer the corresponding pages in Settings; the VFS browser is better suited for viewing file results and workspace content.
+
+## HTML preview and source
+
+Open an HTML file and use "Preview / Source" at the top-right to switch between the rendered result and its source.
+
+<Image src={VfsPreviewShot} alt="Demonstration HTML reading list rendered in the VFS sandbox" loading="lazy" />
+
+<Image src={VfsSourceShot} alt="Source and syntax highlighting for the same demonstration HTML file" loading="lazy" />
 
 ## Q&A
 

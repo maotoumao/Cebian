@@ -5,7 +5,10 @@ group: guides
 order: 8
 ---
 
-import Placeholder from '@/components/Placeholder.astro';
+import { Image } from 'astro:assets';
+import BackupDialogShot from '@/assets/docs/backup-dialog.png';
+import BackupCategoriesShot from '@/assets/docs/backup-categories.png';
+
 import QA from '@/components/docs/QA.astro';
 import QAItem from '@/components/docs/QAItem.astro';
 
@@ -27,6 +30,8 @@ Cebian 的数据主要存在浏览器本地。换设备、重装浏览器，或�
 4. 确认后，浏览器会下载一个 `.zip` 文件
 
 如果只是临时留一份保险，直接创建完整备份就行。
+
+<Image src={BackupDialogShot} alt="创建完整备份与加密选项" loading="lazy" />
 
 ## WebDAV 备份
 
@@ -56,9 +61,12 @@ WebDAV 页面会列出服务器上已有的快照。每份快照都可以恢复�
 - 一并备份工作区文件
 - 普通设置
 - 技能与提示词
+- 记忆
 - 密钥信息
 
 普通使用的话，建议直接用完整备份；如果只是想迁移 Prompt 或 Skill，再用部分备份。
+
+<Image src={BackupCategoriesShot} alt="部分备份分类，包括记忆" loading="lazy" />
 
 ## 加密备份
 
@@ -93,6 +101,7 @@ WebDAV 页面会列出服务器上已有的快照。每份快照都可以恢复�
 | 工作区文件 | 对话中生成或保存到 `/workspaces/` 的文件 |
 | 普通设置 | 主题、默认模型、自定义指引、MCP 的非密钥配置等 |
 | 技能与提示词 | `~/.cebian/skills/` 和 `~/.cebian/prompts/` 里的文件 |
+| 记忆 | 长期记忆内容 |
 | 密钥信息 | Provider API Key、OAuth token、MCP token、WebDAV 凭据等 |
 
 备份不会包含浏览器 Cookie 和网站登录态。所以恢复到新设备后，有些模型订阅或网站登录可能还需要重新授权。

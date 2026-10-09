@@ -5,7 +5,11 @@ group: guides
 order: 1
 ---
 
-import Placeholder from '@/components/Placeholder.astro';
+import { Image } from 'astro:assets';
+import RecordingOptionsShot from '@/assets/docs/recording-options.png';
+import FileAttachmentShot from '@/assets/docs/file-attachment.png';
+import FileDropzoneShot from '@/assets/docs/file-dropzone.png';
+
 import LucideIcon from '@/components/docs/LucideIcon.astro';
 import QA from '@/components/docs/QA.astro';
 import QAItem from '@/components/docs/QAItem.astro';
@@ -55,6 +59,8 @@ import recordReplay from '@/assets/demo/record-replay.mp4';
 
 ### 同时录制网络请求
 
+<Image src={RecordingOptionsShot} alt="录制选项：页面操作和网络请求" loading="lazy" />
+
 录制按钮旁的小箭头打开「录制选项」，可以勾选「页面操作」和「网络请求」（选择会被记住，网络请求默认关闭；两项都不勾时无法开始录制）。打开网络请求后，页面在你操作时发出的接口调用、页面加载以及 WebSocket / EventSource 连接也会被记下来，和操作按时间排在同一条时间线上，模型能看出「点了这个按钮之后调了哪个接口、返回了什么」。
 
 适合这些场景：
@@ -96,6 +102,14 @@ import recordReplay from '@/assets/demo/record-replay.mp4';
 上传后，文件会作为附件跟随下一条消息发送。普通文本文件会直接交给模型阅读；图片同样需要当前模型支持多模态输入。
 
 > 单条消息最多可以带 10 个附件。很大的文件建议先截取相关片段再上传。
+
+上传后，文件会显示为附件标签，发送前可以检查。
+
+<Image src={FileAttachmentShot} alt="输入框上方的演示文件附件" loading="lazy" />
+
+也可以把文件拖到聊天消息区或输入框，看到「松开以添加附件」后松开；不支持拖入文件夹。
+
+<Image src={FileDropzoneShot} alt="拖入文件时的聊天区域高亮与松开以添加附件提示" loading="lazy" />
 
 ## <LucideIcon name="smartphone" />移动端模式
 
