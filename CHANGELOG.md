@@ -20,14 +20,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### 新增 / Added
 
-- 新增模型：Claude Sonnet 5.5（Anthropic、GitHub Copilot），GPT-6.1 Sol（OpenAI、OpenAI Codex、GitHub Copilot）；其余提供商的内置模型列表也同步到了最新
+- 新增模型：Claude Sonnet 5.5（Anthropic、GitHub Copilot），Claude Haiku 5.5（Anthropic、OpenRouter、Vercel AI Gateway），GPT-6.1 Sol（OpenAI、OpenAI Codex、GitHub Copilot），Mistral Large 4（Mistral、OpenRouter、Vercel AI Gateway）；其余提供商的内置模型列表也同步到了最新
 - 设置页的 MCP 服务器卡片会显示最近一次连接失败的原因（如鉴权失败、服务器拒绝）；打开该页时会在后台试连已启用的服务器，不必先开一个对话才知道能不能连上 ([#81](https://github.com/maotoumao/Cebian/issues/81))
 - 自定义提供商的模型新增「工具调用」开关：只支持对话、不支持 function calling 的模型关掉它后即可正常使用，请求不再携带工具。同一对话里从能调用工具的模型切换过来也能继续，之前的工具调用会以文字形式保留在上下文中。记忆整理要靠工具完成，不会使用这类模型 ([#83](https://github.com/maotoumao/Cebian/issues/83))
 - 录制可以同时记录网络请求：录制按钮旁的「录制选项」里可勾选「页面操作」与「网络请求」（网络请求默认关闭）。接口调用、页面加载与 WebSocket / EventSource 会和操作排在同一条时间线上发给模型，完整记录（含请求与响应内容）在发送时保存为 HAR 文件，放在该对话工作目录的 `recordings/` 下。能识别出的令牌、密码等敏感值会被打码，Cookie 从不记录，静态资源不录，已识别的常见统计 / 监控服务的请求会被过滤。Chrome 录制期间会显示调试提示条；Firefox 首次使用需授予权限，且只记录请求信息（含请求体）、不含响应内容 ([#16](https://github.com/maotoumao/Cebian/issues/16))
 - 输入框旁的「上下文用量」小窗新增「立即压缩」：上下文增长到压一次能明显减少占用时出现，可以在达到自动压缩阈值之前，手动把较早的历史压成摘要以节省后续的 token；关掉自动压缩时同样可用，压缩中可随时停止 ([#85](https://github.com/maotoumao/Cebian/issues/85))
 - 自定义提供商的模型列表支持多选：点「选择」后可勾选或全选模型，一次删除 ([#86](https://github.com/maotoumao/Cebian/issues/86))
 
-- Added models: Claude Sonnet 5.5 (Anthropic, GitHub Copilot) and GPT-6.1 Sol (OpenAI, OpenAI Codex, GitHub Copilot); the built-in model lists of the other providers are refreshed too
+- Added models: Claude Sonnet 5.5 (Anthropic, GitHub Copilot), Claude Haiku 5.5 (Anthropic, OpenRouter, Vercel AI Gateway), GPT-6.1 Sol (OpenAI, OpenAI Codex, GitHub Copilot) and Mistral Large 4 (Mistral, OpenRouter, Vercel AI Gateway); the built-in model lists of the other providers are refreshed too
 - MCP server cards in Settings now show why the last connection attempt failed (e.g. rejected credentials or a refused request); opening the page also tries to connect enabled servers in the background, so you no longer have to start a chat to find out whether a server works ([#81](https://github.com/maotoumao/Cebian/issues/81))
 - Custom provider models gain a "Tool calling" switch: turn it off for chat-only models without function calling support and they work normally, with requests carrying no tools. A chat can also switch to such a model from one that used tools; earlier tool calls stay in the context as text. Memory organizing needs tools, so it never uses such a model ([#83](https://github.com/maotoumao/Cebian/issues/83))
 - Recordings can capture network requests too: "Recording options" next to the record button lets you choose "Page actions" and "Network requests" (network requests are off by default). API calls, page loads and WebSocket / EventSource traffic go to the model on the same timeline as your actions, and the full log (including request and response contents) is saved as a HAR file in the chat's workspace under `recordings/` when you send. Recognizable tokens, passwords and other secrets are redacted, cookies are never recorded, static assets aren't recorded and recognized requests to common analytics and monitoring services are filtered out. Chrome shows a debugging bar while recording; in Firefox the first use asks for a permission, and only request details (including request bodies) are recorded, without response contents ([#16](https://github.com/maotoumao/Cebian/issues/16))
@@ -37,7 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### 变更 / Changed
 
 - OpenAI Codex 下的 GPT-6 Sol / Luna 现在可以选择「关闭思考」档
-- 部分模型的可选思考档随上游调整：例如 Anthropic 的 Claude Opus 5 不再提供「关闭思考」，Kimi Coding Plan 改为低 / 高 / 最高三档，Google 的 Gemini 3.1 Pro Preview 新增「中」档。之前选的档位不再可用时，会自动调整到该模型支持的最接近档位
+- 部分模型的可选思考档随上游调整：例如 Anthropic 的 Claude Opus 5 不再提供「关闭思考」，Kimi Coding Plan 改为低 / 高 / 最高三档，Google 的 Gemini 3.1 Pro Preview 新增「中」档，Mistral 的 Magistral Medium 只保留「关闭 / 高」两档。之前选的档位不再可用时，会自动调整到该模型支持的最接近档位
 - 修改 MCP 服务器或搜索引擎设置后，正在进行中的任务从下一次模型请求起就使用新的工具集，不必等到下一轮对话
 - 修改自定义提供商的模型设置（上下文窗口、最大输出、推理、多模态、工具调用）后，已打开的对话从下一条消息（含重试、编辑重发）起就按新设置请求，不必新开对话
 - 自定义提供商的「自动获取」改为先在弹窗中勾选要添加的模型（可搜索、可全选），不再把提供商返回的全部模型一次性加入列表；已在列表里的模型默认勾选，删掉的模型不会因再次获取而回来 ([#86](https://github.com/maotoumao/Cebian/issues/86))
@@ -46,7 +46,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 官网增加三语搜索标题与摘要、产品与文档结构化数据、分享大图，并按真实内容历史提供 sitemap 更新时间；导航名称与文档地址保持不变。
 
 - Under OpenAI Codex, GPT-6 Sol and Luna now offer the "off" thinking level
-- Some models' thinking levels follow upstream changes: for example, Claude Opus 5 on Anthropic no longer offers "off", the Kimi Coding Plan now offers low / high / max, and Gemini 3.1 Pro Preview on Google gains "medium". A previously selected level that is no longer available is adjusted to the closest level the model supports
+- Some models' thinking levels follow upstream changes: for example, Claude Opus 5 on Anthropic no longer offers "off", the Kimi Coding Plan now offers low / high / max, Gemini 3.1 Pro Preview on Google gains "medium", and Magistral Medium on Mistral now offers only "off" / "high". A previously selected level that is no longer available is adjusted to the closest level the model supports
 - After you change MCP servers or search-engine settings, a task already in progress picks up the new tool set from its next model request instead of waiting for the next turn
 - After you change a custom provider model's settings (context window, max output, reasoning, multimodal, tool calling), chats that are already open use them from the next message (including retries and edits) instead of requiring a new chat
 - "Auto-fetch" for a custom provider now opens a dialog to pick which models to add, with search and select all, instead of adding every model the provider returns. Models already in the list start checked, so models you removed no longer come back on the next fetch ([#86](https://github.com/maotoumao/Cebian/issues/86))
@@ -56,9 +56,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### 移除 / Removed
 
-- 内置模型列表移除了上游已下架的模型，例如 DeepSeek 的 DeepSeek V4 Flash，GitHub Copilot 的 Claude Opus 4.5 / 4.6、Claude Sonnet 4 / 4.5、GPT-4.1、GPT-5.2、GPT-5.2 Codex 与 Gemini 3.1 Pro Preview，以及 Moonshot 的 Kimi K2 预览版、K2 Thinking、K2 Turbo 与 K2.5。之前选用（或设为新对话默认）这些模型的对话，需要换一个模型才能继续
+- 内置模型列表移除了上游已下架的模型，例如 DeepSeek 的 DeepSeek V4 Flash，GitHub Copilot 的 Claude Opus 4.5 / 4.6、Claude Sonnet 4 / 4.5、GPT-4.1、GPT-5.2、GPT-5.2 Codex 与 Gemini 3.1 Pro Preview，Moonshot 的 Kimi K2 预览版、K2 Thinking、K2 Turbo 与 K2.5，Together 的 DeepSeek V4 Pro（已改名为 DeepSeek V4 Pro 0813），以及 Vercel AI Gateway 的 Kimi K2 Thinking。之前选用（或设为新对话默认）这些模型的对话，需要换一个模型才能继续
 
-- Models retired upstream are removed from the built-in lists — for example DeepSeek V4 Flash under DeepSeek; Claude Opus 4.5 / 4.6, Claude Sonnet 4 / 4.5, GPT-4.1, GPT-5.2, GPT-5.2 Codex and Gemini 3.1 Pro Preview under GitHub Copilot; and the Kimi K2 previews, K2 Thinking, K2 Turbo and K2.5 under Moonshot. Chats that used one of these models (or had it as the default for new chats) need a different model to continue
+- Models retired upstream are removed from the built-in lists — for example DeepSeek V4 Flash under DeepSeek; Claude Opus 4.5 / 4.6, Claude Sonnet 4 / 4.5, GPT-4.1, GPT-5.2, GPT-5.2 Codex and Gemini 3.1 Pro Preview under GitHub Copilot; the Kimi K2 previews, K2 Thinking, K2 Turbo and K2.5 under Moonshot; DeepSeek V4 Pro under Together (renamed DeepSeek V4 Pro 0813); and Kimi K2 Thinking under Vercel AI Gateway. Chats that used one of these models (or had it as the default for new chats) need a different model to continue
 
 ### 修复 / Fixed
 

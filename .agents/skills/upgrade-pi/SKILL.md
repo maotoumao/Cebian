@@ -39,7 +39,7 @@ description: 升级pi-agent-core和pi-ai到最新版本
 
 6. **版本范围用 `~`**。`package.json` 里两个包写 `~x.y.z`（只放行 patch），minor 升级必须走本流程，避免一次 `pnpm install` 悄悄带进破坏性变更并与精确 pin 的 `typebox` 错位。
 
-7. **已知上游行为**（已核实至 1.0.0，后续升级时重新核对）：Copilot 下的 GPT-6 Sol / Luna 可选「关闭思考」，但 Responses 适配器对 `github-copilot` 不发送 `effort: "none"`，由 Copilot 服务端决定；Copilot 的 Gemini 条目 `supportsReasoningEffort: false`，思考档不生效。
+7. **已知上游行为**（已核实至 1.1.0，后续升级时重新核对）：Copilot 下的 GPT-6 Sol / Luna 可选「关闭思考」，但 Responses 适配器对 `github-copilot` 不发送 `effort: "none"`，由 Copilot 服务端决定；Copilot 的 Gemini 条目 `supportsReasoningEffort: false`，思考档不生效。
 
 ## 工作流
 
