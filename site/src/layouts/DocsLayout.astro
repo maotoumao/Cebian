@@ -8,6 +8,8 @@ interface Props {
   lang: Lang;
   title: string;
   description: string;
+  seoTitle?: string;
+  seoDescription?: string;
   /** 无 locale 前缀的当前路径，如 "/docs/getting-started/introduction" */
   path: string;
   /** 当前文档的标题渲染出的 h2/h3，用于「本页」目录 */
@@ -16,7 +18,7 @@ interface Props {
   noindex?: boolean;
 }
 
-const { lang, title, description, path, headings, noindex } = Astro.props;
+const { lang, title, description, seoTitle, seoDescription, path, headings, noindex } = Astro.props;
 const t = getDict(lang);
 
 const docs = await getDocsFor(lang);
@@ -26,7 +28,7 @@ const { prev, next } = adjacentDocs(docs, t.docs.groups, path);
 const isCurrent = (m: DocMeta) => m.path === path;
 const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
 ---
-<BaseLayout lang={lang} title={`${title} — ${t.docs.title} — ${t.site.name}`} description={description} path={path} ogType="article" noindex={noindex}>
+<BaseLayout lang={lang} title={seoTitle ?? `${title} — ${t.docs.title} — ${t.site.name}`} description={seoDescription ?? description} path={path} ogType="article" noindex={noindex} breadcrumbTitle={title}>
   <div class="docs">
     <!-- 左侧分组导航 -->
     <nav class="docs-side" aria-label={t.docs.sidebarHeading}>

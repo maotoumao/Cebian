@@ -21,7 +21,7 @@ const t = getDict(lang);
 // 三个功能行的演示视频，按 features 顺序一一对应。
 const featureVideos = [providerConfig, selectTool, recordReplay];
 ---
-<BaseLayout lang={lang} title={`${t.site.name} — ${t.site.tagline}`} description={t.site.description} path="/">
+<BaseLayout lang={lang} title={t.site.seoTitle} description={t.site.seoDescription} path="/">
   <Hero lang={lang} />
   <TrustBand lang={lang} />
 

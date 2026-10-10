@@ -9,6 +9,7 @@
 import hankenWoff2 from '@fontsource-variable/hanken-grotesk/files/hanken-grotesk-latin-wght-normal.woff2?url';
 import jetbrainsWoff2 from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2?url';
 import '../styles/tokens.css';
+import shareImage from '../assets/og/cebian.png';
 import { LOCALES, LANGS, DEFAULT_LANG, localePath, type Lang } from '../lib/i18n';
 
 const fontFaceCss = `
@@ -35,6 +36,7 @@ interface Props {
   path: string;
   ogType?: 'website' | 'article';
   noindex?: boolean;
+  breadcrumbTitle?: string;
   /** 是否为带 locale 的可索引页。false 用于无前缀的错误页（404），
    *  此时不输出 canonical / hreflang / og:url，避免指向不存在的本地化 URL。 */
   localized?: boolean;
@@ -47,6 +49,7 @@ const {
   path,
   ogType = 'website',
   noindex = false,
+  breadcrumbTitle,
   localized = true,
 } = Astro.props;
 
@@ -54,7 +57,7 @@ const site = Astro.site ?? new URL('https://cebian.catcat.work');
 const meta = LOCALES[lang];
 
 const canonical = new URL(localePath(lang, path), site).toString();
-const ogImage = new URL('/icon/128.png', site).toString();
+const ogImage = new URL(shareImage.src, site).toString();
 
 // hreflang：三语互指 + x-default 指向默认语言（用 DEFAULT_LANG 作单一来源）。
 const alternates = LANGS.map((l) => ({
@@ -62,6 +65,41 @@ const alternates = LANGS.map((l) => ({
   href: new URL(localePath(l, path), site).toString(),
 }));
 const xDefault = new URL(localePath(DEFAULT_LANG, path), site).toString();
+const dict = meta.dict;
+const siteId = new URL('/#website', site).toString();
+const personId = new URL('/#maintainer', site).toString();
+const softwareId = new URL('/#software', site).toString();
+const homeUrl = new URL(localePath(lang, '/'), site).toString();
+const repositoryUrl = 'https://github.com/maotoumao/Cebian';
+const graph: Record<string, unknown>[] = [
+  { '@type': 'WebSite', '@id': siteId, url: new URL('/', site).toString(), name: dict.site.name },
+  { '@type': 'WebPage', '@id': `${canonical}#webpage`, url: canonical,
+    name: title, description, inLanguage: meta.htmlLang, isPartOf: { '@id': siteId } },
+];
+if (path === '/' || path === '/about') {
+  graph.push({ '@type': 'Person', '@id': personId, name: 'maotoumao',
+    url: 'https://github.com/maotoumao' });
+}
+if (path === '/') {
+  graph.push({ '@type': 'SoftwareApplication', '@id': softwareId, name: dict.site.name,
+    url: homeUrl, description: dict.site.seoDescription, applicationCategory: 'BrowserApplication',
+    isAccessibleForFree: true, license: `${repositoryUrl}/blob/master/LICENSE`,
+    author: { '@id': personId }, sameAs: [repositoryUrl],
+    installUrl: `${homeUrl}#install` });
+}
+if (path.startsWith('/docs/')) {
+  graph.push({ '@type': 'BreadcrumbList', '@id': `${canonical}#breadcrumb`,
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: dict.nav.home, item: homeUrl },
+      { '@type': 'ListItem', position: 2, name: dict.docs.title,
+        item: new URL(localePath(lang, '/docs'), site).toString() },
+      { '@type': 'ListItem', position: 3, name: breadcrumbTitle ?? title, item: canonical },
+    ] });
+  graph[1].breadcrumb = { '@id': `${canonical}#breadcrumb` };
+}
+// JSON 数据不可突破 script 标签边界；仅为真实可索引页面输出。
+const structuredData = JSON.stringify({ '@context': 'https://schema.org', '@graph': graph })
+  .replace(/</g, '\\u003c');
 ---
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -93,6 +131,7 @@ const xDefault = new URL(localePath(DEFAULT_LANG, path), site).toString();
 
 <title>{title}</title>
 <meta name="description" content={description} />
+{localized && !noindex && <script type="application/ld+json" set:html={structuredData} />}
 {noindex && <meta name="robots" content="noindex" />}
 
 {localized && (
@@ -118,8 +157,14 @@ const xDefault = new URL(localePath(DEFAULT_LANG, path), site).toString();
 <meta property="og:type" content={ogType} />
 {localized && <meta property="og:url" content={canonical} />}
 <meta property="og:image" content={ogImage} />
+<meta property="og:image:width" content={String(shareImage.width)} />
+<meta property="og:image:height" content={String(shareImage.height)} />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:alt" content={dict.site.shareImageAlt} />
 <meta property="og:locale" content={meta.ogLocale} />
-<meta name="twitter:card" content="summary" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content={ogImage} />
+<meta name="twitter:image:alt" content={dict.site.shareImageAlt} />
 
 <!-- 首屏绘制前定主题，避免闪烁。默认跟随系统。 -->
 <script is:inline>

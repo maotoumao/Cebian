@@ -17,6 +17,9 @@ const docs = defineCollection({
   schema: z.object({
     title: z.string(),
     description: z.string(),
+    /** 搜索摘要与页面导航名称分开，未填写时沿用原字段。 */
+    seoTitle: z.string().optional(),
+    seoDescription: z.string().optional(),
     /** 分组 key（与 i18n 里 docs.groups 的键一致），决定归到侧栏哪一组 */
     group: z.string(),
     /** 组内排序，小的在前 */

@@ -3,6 +3,9 @@ import type { Dict } from '../types';
 export const en: Dict = {
   site: {
     name: 'Cebian',
+    shareImageAlt: "Cebian open-source browser AI with your own model API, MCP, and Skills, alongside the real extension interface.",
+    seoTitle: "Cebian — Open-source AI browser sidebar with MCP and BYOK",
+    seoDescription: "An open-source AI sidebar for Chrome, Edge, and Firefox. Summarize pages, connect your own models, and use MCP tools and Skills. The extension is free; model services may charge.",
     tagline: 'An AI agent that runs in your browser sidebar',
     description:
       "Cebian is an AI agent that lives in the browser sidebar: it reads the page, interacts with the browser, and extends its abilities through MCP and Skills. Conversations and settings are stored in your browser. No Cebian account is needed; you connect directly to your configured models and external services.",
@@ -96,6 +99,7 @@ export const en: Dict = {
       lead: 'Store builds are reviewed and easiest to install; GitHub Release is always the latest. Choose one, then enter your own model API key.',
       latestBadge: 'Latest',
       steps: ['Download zip', 'Unzip to a fixed folder', 'Load in the extensions page'],
+      costNote: "The Cebian extension is free and open source; third-party model APIs or subscriptions may charge separately.",
       goCta: 'Install',
       options: {
         github: {

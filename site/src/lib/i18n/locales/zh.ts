@@ -3,6 +3,9 @@ import type { Dict } from '../types';
 export const zh: Dict = {
   site: {
     name: 'Cebian',
+    shareImageAlt: "Cebian 开源浏览器 AI 助手，支持自带模型 API、MCP 和 Skills；右侧为真实扩展界面。",
+    seoTitle: "Cebian：开源 AI 浏览器侧边栏，支持 MCP 与自带模型 API",
+    seoDescription: "在 Chrome、Edge 和 Firefox 中使用开源 AI 助手：总结网页、连接自己的模型、调用 MCP 工具与 Skills。扩展免费，模型服务可能另收费。",
     tagline: '运行在浏览器侧边栏的 AI Agent',
     description:
       'Cebian 是一个常驻浏览器侧边栏的 AI Agent：它可以读取页面信息、和浏览器进行交互，也支持通过 MCP 和 Skill 扩展 Agent 能力。会话与设置保存在浏览器本地，无需 Cebian 账号，直接连接你配置的模型和外部服务。',
@@ -95,6 +98,7 @@ export const zh: Dict = {
       lead: '商店版本经过审核、安装最省心；GitHub Release 永远是最新版。任选其一，填入自己的模型 API Key 即可。',
       latestBadge: '最新',
       steps: ['下载 zip', '解压到固定目录', '在扩展页加载'],
+      costNote: "Cebian 扩展免费开源；第三方模型的 API 或订阅可能单独收费。",
       goCta: '前往安装',
       options: {
         github: {

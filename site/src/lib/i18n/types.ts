@@ -7,6 +7,9 @@ export interface Dict {
     name: string;
     tagline: string;
     description: string;
+    shareImageAlt: string;
+    seoTitle: string;
+    seoDescription: string;
   };
   nav: {
     home: string;
@@ -83,6 +86,7 @@ export interface Dict {
       lead: string;
       latestBadge: string;
       steps: string[];
+      costNote: string;
       goCta: string;
       options: {
         github: { title: string; desc: string };

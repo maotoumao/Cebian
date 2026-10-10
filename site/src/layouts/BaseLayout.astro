@@ -13,17 +13,18 @@ interface Props {
   path: string;
   ogType?: 'website' | 'article';
   noindex?: boolean;
+  breadcrumbTitle?: string;
   /** 隐藏 Nav/Footer（错误页等用）。 */
   bare?: boolean;
 }
 
-const { lang, title, description, path, ogType, noindex, bare = false } = Astro.props;
+const { lang, title, description, path, ogType, noindex, breadcrumbTitle, bare = false } = Astro.props;
 const htmlLang = LOCALES[lang].htmlLang;
 ---
 <!doctype html>
 <html lang={htmlLang}>
   <head>
-    <BaseHead lang={lang} title={title} description={description} path={path} ogType={ogType} noindex={noindex} />
+    <BaseHead lang={lang} title={title} description={description} path={path} ogType={ogType} noindex={noindex} breadcrumbTitle={breadcrumbTitle} />
   </head>
   <body>
     {!bare && <Nav lang={lang} path={path} />}

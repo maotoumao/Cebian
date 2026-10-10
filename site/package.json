@@ -9,7 +9,9 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "gen:zhtw": "node scripts/gen-zhtw.mjs"
+    "gen:zhtw": "node scripts/gen-zhtw.mjs",
+    "gen:og": "node scripts/generate-og.mjs",
+    "test:seo": "node --test scripts/sitemap-lastmod.test.mjs test/seo.test.mjs"
   },
   "dependencies": {
     "@astrojs/mdx": "^6.0.3",

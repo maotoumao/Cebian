@@ -43,6 +43,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 自定义提供商的「自动获取」改为先在弹窗中勾选要添加的模型（可搜索、可全选），不再把提供商返回的全部模型一次性加入列表；已在列表里的模型默认勾选，删掉的模型不会因再次获取而回来 ([#86](https://github.com/maotoumao/Cebian/issues/86))
 - 文档补充真实扩展配图，覆盖上下文压缩、模型管理、备份、VFS 和输入工具，同步简体中文、繁体中文与英文说明。
 - 更新三语使用文档与隐私说明，明确语音识别和联网功能的数据流向、备份恢复规则、浏览器差异及各项功能的使用限制。
+- 官网增加三语搜索标题与摘要、产品与文档结构化数据、分享大图，并按真实内容历史提供 sitemap 更新时间；导航名称与文档地址保持不变。
 
 - Under OpenAI Codex, GPT-6 Sol and Luna now offer the "off" thinking level
 - Some models' thinking levels follow upstream changes: for example, Claude Opus 5 on Anthropic no longer offers "off", the Kimi Coding Plan now offers low / high / max, and Gemini 3.1 Pro Preview on Google gains "medium". A previously selected level that is no longer available is adjusted to the closest level the model supports
@@ -51,6 +52,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - "Auto-fetch" for a custom provider now opens a dialog to pick which models to add, with search and select all, instead of adding every model the provider returns. Models already in the list start checked, so models you removed no longer come back on the next fetch ([#86](https://github.com/maotoumao/Cebian/issues/86))
 - Documentation gains real extension screenshots for context compaction, model management, backups, VFS, and input tools, with captions in Simplified Chinese, Traditional Chinese, and English.
 - Update the guides in all three languages and the privacy disclosures to clarify speech and network data flows, backup restore rules, browser differences, and feature limits.
+- Add localized search titles and descriptions, product and documentation structured data, a large sharing image, and sitemap dates based on content history; navigation labels and document URLs stay unchanged.
 
 ### 移除 / Removed
 

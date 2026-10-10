@@ -28,6 +28,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          # 页面 lastmod 需要真实文件历史，不能使用浅克隆的边界时间。
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -47,6 +50,9 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Verify SEO output
+        run: pnpm test:seo
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
