@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## 1.8.1 - 2026-10-10
+
 ### 新增 / Added
 
 - 新增模型：Claude Sonnet 5.5（Anthropic、GitHub Copilot），Claude Haiku 5.5（Anthropic、OpenRouter、Vercel AI Gateway），GPT-6.1 Sol（OpenAI、OpenAI Codex、GitHub Copilot），Mistral Large 4（Mistral、OpenRouter、Vercel AI Gateway）；其余提供商的内置模型列表也同步到了最新
