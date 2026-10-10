@@ -18,6 +18,9 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+env:
+  SITE_ORIGIN: https://cebian.catcat.work
+
 defaults:
   run:
     working-directory: site
@@ -54,6 +57,19 @@ jobs:
       - name: Verify SEO output
         run: pnpm test:seo
 
+      - name: Prepare IndexNow ownership and content manifest
+        run: node scripts/indexnow-cli.mjs prepare "$RUNNER_TEMP/indexnow"
+        env:
+          INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
+
+      - name: Save notification manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: indexnow-manifest
+          path: ${{ runner.temp }}/indexnow/manifest.json
+          retention-days: 90
+          if-no-files-found: error
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -69,3 +85,39 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  notify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Download current notification manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: indexnow-manifest
+          path: ${{ runner.temp }}/indexnow
+
+      - name: Verify live changes and notify IndexNow
+        run: node scripts/indexnow-cli.mjs notify "$RUNNER_TEMP/indexnow"
+        env:
+          INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Save IndexNow receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: indexnow-receipt
+          path: ${{ runner.temp }}/indexnow/receipt.json
+          retention-days: 90
+          if-no-files-found: error

@@ -11,7 +11,7 @@
     "astro": "astro",
     "gen:zhtw": "node scripts/gen-zhtw.mjs",
     "gen:og": "node scripts/generate-og.mjs",
-    "test:seo": "node --test scripts/sitemap-lastmod.test.mjs test/seo.test.mjs"
+    "test:seo": "node --test scripts/sitemap-lastmod.test.mjs scripts/indexnow.test.mjs test/seo.test.mjs"
   },
   "dependencies": {
     "@astrojs/mdx": "^6.0.3",
