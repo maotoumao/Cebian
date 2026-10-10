@@ -22,7 +22,9 @@ test('sitemap dates follow page history, not unrelated commits or a build clock'
     put('unrelated.txt', 'unrelated');
     run(['add', '.']); run(['commit', '-qm', 'unrelated'], '2025-02-03T10:00:00Z');
     const lastmod = createLastmod(site);
-    assert.equal(lastmod('https://cebian.catcat.work/zh/docs/guides/example/'), '2025-01-02T10:00:00+00:00');
+    // Git 版本可能将 UTC 输出为 Z 或 +00:00；核验真实时刻而非等价的格式差异。
+    assert.equal(Date.parse(lastmod('https://cebian.catcat.work/zh/docs/guides/example/')),
+      Date.parse('2025-01-02T10:00:00Z'));
     assert.equal(lastmod('https://cebian.catcat.work/zh/docs/guides/missing/'), undefined);
     assert.equal(lastmod('https://cebian.catcat.work/not-a-route/'), undefined);
     assert.equal(lastmod('https://cebian.catcat.work/'), undefined);
