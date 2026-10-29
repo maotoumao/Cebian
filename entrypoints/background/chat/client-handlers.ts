@@ -66,6 +66,17 @@ function cancelGrace(sessionId: string): void {
 
 // ─── Handlers ───
 
+/** 发送失败回给发起端口。排队 / 插话失败时那一轮可能还在跑（issue #96），带上
+ *  `runContinues`，免得页面把运行态清掉、停止键随之消失。 */
+function postPromptError(port: chrome.runtime.Port, sessionId: string, err: unknown): void {
+  post(port, {
+    type: 'error',
+    sessionId,
+    error: err instanceof Error ? err.message : String(err),
+    ...(sessionManager.isBusy(sessionId) ? { runContinues: true as const } : {}),
+  });
+}
+
 /** 冷加载的会话行 → `session_loaded` 快照：给 transcript 附上逐位对齐的树 entryId
  *  （消息编辑按它定位）。副本，不改 record 本体。 */
 function toSessionSnapshot(loaded: LoadedSession): SessionSnapshot {
@@ -142,6 +153,8 @@ const chatClientHandlers: ClientHandlerMap = {
       // 终止，所以「关掉侧边栏过一会儿再点开长会话」走的正是这条路。
       if (loaded) sessionManager.pushStoredContextUsage(msg.sessionId, loaded.record);
     }
+    // 排队列表独立于 agent 是否在跑（停止后队列还在），两条路径都补发一帧（issue #96）。
+    post(port, { type: 'queue_updated', sessionId: msg.sessionId, ...sessionManager.getQueueState(msg.sessionId) });
   },
 
   unsubscribe(port) {
@@ -157,16 +170,26 @@ const chatClientHandlers: ClientHandlerMap = {
     // navigate to /chat/<id> immediately.
     // model / thinkingLevel 是本轮携带的「该会话所用模型 / 思考档」，透传给
     // prompt() 作 override（B1：会话行是真相，全局仅作新对话种子）。
+    // delivery：页面认为会话正忙时携带，后台据此排队或插话（issue #96）。
     sessionManager.prompt(sessionId, msg.text, msg.attachments, {
       model: msg.model,
       thinkingLevel: msg.thinkingLevel,
-    }, msg.slashPrompt).catch((err) => {
-      post(port, {
-        type: 'error',
-        sessionId,
-        error: err.message ?? String(err),
-      });
-    });
+    }, msg.slashPrompt, msg.delivery).catch((err) => postPromptError(port, sessionId, err));
+  },
+
+  queue_remove(_port, msg) {
+    sessionManager.removeQueued(msg.sessionId, msg.id);
+  },
+
+  queue_take(port, msg) {
+    // 取不到（已发出 / 被别的窗口取走或删除）也回包，页面不必靠超时收场
+    const prompt = sessionManager.takeQueued(msg.sessionId, msg.id) ?? null;
+    post(port, { type: 'queue_taken', sessionId: msg.sessionId, id: msg.id, prompt });
+  },
+
+  queue_send_now(port, msg) {
+    setViewing(port, msg.sessionId);
+    sessionManager.sendQueuedNow(msg.sessionId, msg.id).catch((err) => postPromptError(port, msg.sessionId, err));
   },
 
   cancel(_port, msg) {

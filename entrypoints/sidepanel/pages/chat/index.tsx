@@ -40,7 +40,7 @@ import { useBackgroundAgent } from '@/hooks/useBackgroundAgent';
 import { useStickToBottom } from '@/hooks/useStickToBottom';
 import { useFileDropZone, type FileDrop } from '@/hooks/useFileDropZone';
 import { useStorageItem } from '@/hooks/useStorageItem';
-import { lastSelectedModel, lastSelectedThinkingLevel as thinkingLevelStorage, providerCredentials, customProviders, type ModelIdentity, type ThinkingLevel } from '@/lib/persistence/storage';
+import { lastSelectedModel, lastSelectedThinkingLevel as thinkingLevelStorage, providerCredentials, customProviders, type FollowUpDelivery, type ModelIdentity, type ThinkingLevel } from '@/lib/persistence/storage';
 import { hasUsableModel } from '@/lib/providers/usable-models';
 import type { Attachment } from '@/lib/agent/attachments';
 import type { SlashPrompt } from '@/lib/ai-config/slash-prompt';
@@ -128,6 +128,9 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     pendingPermissions,
     send,
     cancel,
+    removeQueued,
+    takeQueued,
+    sendQueuedNow,
     retry,
     editMessage,
     switchBranch,
@@ -164,7 +167,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
     }, [navigate]),
   });
 
-  const { messages, branchInfo, isAgentRunning, isCompacting, sessionId: activeSessionId, sessionTitle, lastError, contextUsage } = state;
+  const { messages, branchInfo, isAgentRunning, isCompacting, sessionId: activeSessionId, sessionTitle, lastError, contextUsage, queue, queuePaused } = state;
 
   // Mirror activeSessionId into a ref so the subscribe-effect can read the
   // latest value WITHOUT re-running when activeSessionId changes. Putting
@@ -227,6 +230,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
       attachments: Attachment[] | undefined,
       expectedSessionId: string | null,
       slashPrompt: SlashPrompt | undefined,
+      delivery: FollowUpDelivery | undefined,
     ) => {
       // 切换到已有会话但其会话行尚未加载完（sessionLoading）时拒绝派发：此刻
       // turnModel 还是上一个会话的本地草稿，若此时发送会把旧模型携带给新会话、
@@ -237,8 +241,9 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
       const result = await send(text, attachments, expectedSessionId, {
         model: turnModel ?? undefined,
         thinkingLevel: turnThinking,
-      }, slashPrompt);
-      if (result.status === 'dispatched') {
+      }, slashPrompt, delivery);
+      // 排队 / 插话的消息此刻还不在对话里，不必拉到底
+      if (result.status === 'dispatched' && !delivery) {
         scrollToBottom({ force: true });
       }
       return result;
@@ -680,6 +685,11 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
         agentBusy={isAgentRunning}
         onCompact={compact}
         onDispatchingChange={setComposerDispatching}
+        queue={queue}
+        queuePaused={queuePaused}
+        onRemoveQueued={removeQueued}
+        onTakeQueued={takeQueued}
+        onSendQueuedNow={sendQueuedNow}
       />
 
       {fileDrop.isOver && (

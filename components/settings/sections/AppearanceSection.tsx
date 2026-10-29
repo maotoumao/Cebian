@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Slider } from '@/components/ui/slider';
 import { AgentMessage, AgentTextBlock, UserMessageBubble } from '@/components/chat/Message';
 import { LocalFontPicker } from '@/components/settings/appearance/LocalFontPicker';
+import { InlineRadioGroup, type RadioOption } from '@/components/settings/InlineRadioGroup';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import {
   CHAT_FONT_SCALE_STEP,
@@ -21,13 +21,6 @@ import { chatAppearanceStyle } from '@/lib/ui/chat-appearance';
 import { isLocalFontAccessSupported } from '@/lib/ui/local-fonts';
 import { getActiveLanguagePreference, setLanguagePreference, t } from '@/lib/i18n';
 import { UI_LOCALES, toLanguageTag, type LanguagePreference } from '@/lib/i18n/locales';
-
-/** 单选项：`lang` 只在选项文字与界面语言不同（如语言自称）时给出。 */
-interface RadioOption<T extends string> {
-  value: T;
-  getLabel: () => string;
-  lang?: string;
-}
 
 // 语言名用自称（English / 简体中文 / 繁體中文），三份 locale 文件取值一致；「跟随浏览器」才翻译。
 // Record 覆盖全部偏好值：新增语言忘了配标签会编译失败。
@@ -159,44 +152,6 @@ function useEditableChatAppearance(): [ChatAppearance | null, (patch: Partial<Ch
   );
 
   return [local, update];
-}
-
-/** 横排单选组：一行几个短选项（语言 / 主题 / 字体预设）。 */
-function InlineRadioGroup<T extends string>({
-  value,
-  options,
-  onChange,
-  labelId,
-  describedBy,
-  disabled,
-}: {
-  value: T;
-  options: RadioOption<T>[];
-  onChange: (value: T) => void;
-  labelId: string;
-  describedBy?: string;
-  disabled?: boolean;
-}) {
-  const idPrefix = useId();
-  return (
-    <RadioGroup
-      value={value}
-      onValueChange={(v) => onChange(v as T)}
-      aria-labelledby={labelId}
-      aria-describedby={describedBy}
-      disabled={disabled}
-      className="flex flex-wrap gap-x-5 gap-y-2"
-    >
-      {options.map((o) => (
-        <div key={o.value} className="flex items-center gap-2">
-          <RadioGroupItem value={o.value} id={`${idPrefix}-${o.value}`} />
-          <Label htmlFor={`${idPrefix}-${o.value}`} lang={o.lang} className="text-sm font-normal">
-            {o.getLabel()}
-          </Label>
-        </div>
-      ))}
-    </RadioGroup>
-  );
 }
 
 /**

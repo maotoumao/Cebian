@@ -14,6 +14,7 @@ import {
   compactionModel,
   compactionSettings,
   autoTitleSettings,
+  followUpDelivery,
   chatAppearance,
   customProviders,
   userInstructions,
@@ -285,6 +286,7 @@ export const BACKUP_REGISTRY: BackupEntry<any>[] = [
   entry({ item: compactionModel, storageClass: 'settings' }),
   entry({ item: compactionSettings, storageClass: 'settings' }),
   entry({ item: autoTitleSettings, storageClass: 'settings' }),
+  entry({ item: followUpDelivery, storageClass: 'settings' }),
   // 对话区外观（字号 / 字体，无密钥）。无 fillMissing：merge 下本地没存过才从备份补入整个对象。
   entry({ item: chatAppearance, storageClass: 'settings' }),
   entry({

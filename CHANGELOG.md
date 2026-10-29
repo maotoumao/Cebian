@@ -18,6 +18,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 新增 / Added
+
+- 任务运行中也能接着发消息，用法与 Codex 一致：按 Enter 排队，当前任务正常跑完后按顺序自动发出；按 Shift+⌘+Enter（Windows / Linux 上为 Shift+Ctrl+Enter）插话，在当前这一步结束后插入正在进行的任务。排队的消息显示在输入框上方，可以立即发送、编辑或删除。任务运行中输入框里有文字时，停止按钮会换成发送按钮，这时按 Esc 停止任务；任务出错或被停止时队列会保留并暂停，不会自动发出。Enter 默认排队还是插话，可以在设置 → 对话 →「任务运行中发送消息」里切换 ([#96](https://github.com/maotoumao/Cebian/issues/96))
+
+- You can keep sending messages while a task is running, the same way as in Codex: press Enter to queue a message, and queued messages are sent in order once the current task finishes normally; press Shift+⌘+Enter (Shift+Ctrl+Enter on Windows / Linux) to steer, inserting the message into the running task as soon as the current step finishes. Queued messages appear above the input box, where you can send one now, edit it or delete it. While a task is running and the input has text, the stop button turns into the send button and Esc stops the task; if the task fails or you stop it, the queue is kept and paused instead of sending on its own. Whether Enter queues or steers can be changed in Settings → Chat → "Sending while a task runs" ([#96](https://github.com/maotoumao/Cebian/issues/96))
+
+### 修复 / Fixed
+
+- 深色模式下，文件页「预览 / 源码」切换按钮看不清当前选中的是哪一个；鼠标悬停在另一个上时，看起来也像已经切换了过去
+
+- In dark mode, the "Preview / Source" toggle on the file page made it hard to tell which one was selected, and hovering over the other one looked as if it had been switched to
+
 ## 1.8.2 - 2026-10-24
 
 ### 新增 / Added

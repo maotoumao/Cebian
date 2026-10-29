@@ -300,6 +300,19 @@ export const lastSelectedThinkingLevel = storage.defineItem<ThinkingLevel>(
   { fallback: 'medium' },
 );
 
+/**
+ * 任务运行中发送消息的交付方式（对齐 Codex 的 follow-up behavior）：
+ * - `queue`：排队，等当前任务正常跑完再作为新一轮发送；
+ * - `steer`：插话，在下一个工具边界插入当前任务。
+ */
+export type FollowUpDelivery = 'queue' | 'steer';
+
+/** 任务运行中按 Enter 的默认交付方式；Shift+⌘/Ctrl+Enter 用另一种。 */
+export const followUpDelivery = storage.defineItem<FollowUpDelivery>(
+  'local:followUpDelivery',
+  { fallback: 'queue' },
+);
+
 /** 录制选项（录操作 / 网络请求），记住上次的选择。 */
 export const recorderOptions = storage.defineItem<RecorderOptions>(
   'local:recorderOptions',

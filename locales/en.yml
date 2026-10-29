@@ -309,6 +309,11 @@ settings:
       hint: "After the first reply, replace the default title (the first message, truncated) with a short AI-generated title."
       model: "Title model"
       followMain: "Same as conversation model"
+    followUp:
+      label: "Sending while a task runs"
+      hint: "What Enter does while the agent is working. Queue sends your message after the current task finishes; Steer adds it to the current task as soon as the current step finishes. Shift+Ctrl+Enter (Shift+⌘+Enter on Mac) does the other one."
+      queue: "Queue"
+      steer: "Steer"
     search:
       title: "Web search"
       hint: "Set the order in which search engines are tried; the first enabled engine is preferred. The AI may pick another engine first based on its best-for hint. When a search is blocked, returns nothing, or fails, Cebian tries the remaining enabled engines in order."
@@ -646,6 +651,26 @@ chat:
     imageStripped: "Removed image attachments — the current model doesn't support multimodal input"
     noPrompts: "No prompts yet — create one from AI config"
     noMatch: "No matches"
+    stop: "Stop"
+    # Sending while the agent is working (issue #96)
+    followUp:
+      queue: "Queue message"
+      steer: "Steer: insert into the current task"
+      # Shortcut hint, keyed by which action Enter does (the setting).
+      # $1 = shortcut for that action ("Enter"), $2 = shortcut for the other one (e.g. "Shift+Ctrl+Enter")
+      shortcutHint:
+        queue: "$1 to queue · $2 to steer · Esc to stop"
+        steer: "$1 to steer · $2 to queue · Esc to stop"
+    queue:
+      queued: "Queued"
+      steering: "Steering"
+      sendNow: "Send now"
+      paused: "Paused — the last run didn't finish normally. Queued messages won't send on their own."
+      # $1 = attachment count
+      attachmentCount:
+        1: "1 attachment"
+        n: "$1 attachments"
+      slashConflict: "Remove the prompt in the box first — the queued message has its own"
     iframeEnterHint: "⏎ enter"
     # Voice input (local-first speech recognition with cloud fallback)
     voiceStart: "Voice input"
@@ -1098,6 +1123,8 @@ errors:
   pageActionGone: "This action no longer exists."
   pageActionSaveFailed: "Could not save the action."
   compactionSettingsSaveFailed: "Could not save the compaction settings. Try again."
+  followUpSettingSaveFailed: "Could not save the \"Sending while a task runs\" setting. Try again."
+  queuedMessageGone: "This message is no longer in the queue — it may have been sent or removed in another window."
   appearanceSaveFailed: "Could not save the appearance settings. Try again."
   languageSwitchFailed: "Could not switch the language. Try again."
   localFontsPermissionDenied: "Access to installed fonts is blocked. Allow it for Cebian in Chrome settings, then try again."

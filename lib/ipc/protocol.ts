@@ -18,7 +18,7 @@
 
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { SessionPlacement, SessionRecord } from '@/lib/persistence/db';
-import type { ModelIdentity, ThinkingLevel } from '@/lib/persistence/storage';
+import type { FollowUpDelivery, ModelIdentity, ThinkingLevel } from '@/lib/persistence/storage';
 import type { Attachment } from '@/lib/agent/attachments';
 import type { SlashPrompt } from '@/lib/ai-config/slash-prompt';
 import type { RecordedSession, RecorderOptions } from '@/lib/recorder/types';
@@ -53,6 +53,28 @@ export interface TurnSettings {
   thinkingLevel?: ThinkingLevel;
 }
 
+/**
+ * 任务运行中发出、暂由后台保管的一条消息（issue #96）：就是一次 `prompt` 的原始输入。
+ * 排队项在派发时才走 `prompt()` 的完整流程（写 HAR、压缩、换模型），所以这里存原始附件。
+ */
+export interface QueuedPrompt {
+  id: string;
+  text: string;
+  attachments: Attachment[];
+  slashPrompt?: SlashPrompt;
+  turn: TurnSettings;
+}
+
+/** 排队列表的展示摘要。不带附件正文（录制 / 图片可能很大）；编辑要完整内容时经
+ *  `queue_take` 取回。`steering` = 已插入当前任务、等下一个工具边界被模型读到。 */
+export interface QueuedPromptView {
+  id: string;
+  text: string;
+  slashPromptName?: string;
+  attachmentCount: number;
+  status: 'queued' | 'steering';
+}
+
 // ─── Client → Background (requests) ───
 
 export type ClientMessage =
@@ -71,8 +93,17 @@ export type ClientMessage =
        *  UI 传而非后台按名字回读文件：模板变量要 chrome.tabs / scripting / 剪贴板，
        *  是侧边栏专有能力，后台引不得（见 lib/ai-config/template-vars-sidepanel.ts）。 */
       slashPrompt?: SlashPrompt;
+      /** 任务运行中发送时的交付方式（issue #96）：排队或插话。只在页面认为会话正忙时
+       *  携带；后台到达时会话已空闲则按普通发送处理。缺省 = 旧语义。 */
+      delivery?: FollowUpDelivery;
     } & TurnSettings)
   | { type: 'cancel'; sessionId: string }
+  /** 删除一条排队 / 插话中的消息。 */
+  | { type: 'queue_remove'; sessionId: string; id: string }
+  /** 取回一条排队消息去编辑：后台把它移出队列，只给发起端口回 `queue_taken`（取不到也回）。 */
+  | { type: 'queue_take'; sessionId: string; id: string }
+  /** 立即发送一条排队消息：会话空闲时直接派发，运行中则转为插话。 */
+  | { type: 'queue_send_now'; sessionId: string; id: string }
   /** Re-run the last user turn for `sessionId`. The background drops any
    *  trailing assistant / toolResult messages (typically a failed turn or
    *  one the user is unhappy with) and resumes the agent loop from the most
@@ -156,6 +187,9 @@ export const CLIENT_MESSAGE_TYPES = [
   'unsubscribe',
   'prompt',
   'cancel',
+  'queue_remove',
+  'queue_take',
+  'queue_send_now',
   'retry',
   'edit_message',
   'resolve_tool',
@@ -280,7 +314,14 @@ export type ServerMessage =
    *  storage，而那两帧必须同步发出（晚一帧会被流式帧盖掉）。前端只更新占用、不动消息。
    *  推送点：message_end / agent_end / subscribe / 切分支 / 换模型。 */
   | { type: 'context_usage'; sessionId: string; contextUsage: ContextUsage }
-  | { type: 'error'; sessionId: string | null; error: string }
+  /** 会话的排队列表快照（issue #96）。队列变化时广播给观众，订阅时补发一帧。
+   *  `paused` = 上一轮异常结束（出错 / 停止 / 上下文到顶），队列不会自动发出。 */
+  | { type: 'queue_updated'; sessionId: string; queue: QueuedPromptView[]; paused: boolean }
+  /** `queue_take` 的回复，只回发起端口：被取回的完整内容，页面把它放回输入框；`null` =
+   *  这条已不在队列里（已发出，或被别的窗口取走 / 删除）。 */
+  | { type: 'queue_taken'; sessionId: string; id: string; prompt: QueuedPrompt | null }
+  /** `runContinues`：出错的是一次排队 / 插话，会话那一轮还在跑——页面只报错、不清运行态。 */
+  | { type: 'error'; sessionId: string | null; error: string; runContinues?: true }
   | { type: 'tool_pending'; sessionId: string; toolName: string; toolCallId: string; args: any }
   | { type: 'tool_resolved'; sessionId: string; toolName: string }
   | { type: 'session_loaded'; sessionId: string; session: SessionSnapshot | null }

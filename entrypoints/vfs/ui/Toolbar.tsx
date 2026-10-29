@@ -26,9 +26,14 @@ function ModeButton({ active, onClick, icon, label }: { active: boolean; onClick
       type="button"
       aria-pressed={active}
       onClick={onClick}
+      // 深色下 card 与外框的 muted 几乎同色，选中项另加边框与更深的底色（做法同 shadcn Tabs）。
+      // 未选中项悬停给一层比选中项淡得多的底（深浅两色都加），否则只有文字变亮，看着和选中项一样。
+      // 边框常驻（不选中时透明），切换不跳动。
       className={
-        'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[5px] text-xs transition-colors ' +
-        (active ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground')
+        'inline-flex items-center gap-1.5 px-2.5 py-px rounded-[5px] border text-xs transition-colors ' +
+        (active
+          ? 'border-transparent bg-card text-foreground shadow-xs dark:border-input dark:bg-input/60'
+          : 'border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground')
       }
     >
       {icon}

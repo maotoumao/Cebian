@@ -9,11 +9,14 @@ import {
   type BroadcastMessage,
   type ClientMessage,
   type ContextUsage,
+  type QueuedPrompt,
+  type QueuedPromptView,
   type ServerMessage,
   type SessionSnapshot,
   type TurnSettings,
 } from '@/lib/ipc/protocol';
 import type { Attachment } from '@/lib/agent/attachments';
+import type { FollowUpDelivery } from '@/lib/persistence/storage';
 import { buildSlashPromptBlock, type SlashPrompt } from '@/lib/ai-config/slash-prompt';
 import { wrapUserRequest } from '@/lib/agent/prompt-envelope';
 import { applyStreamOps } from '@/lib/agent/stream-replica';
@@ -45,6 +48,10 @@ export interface AgentPortState {
   lastError: string | null;
   /** 当前上下文占用；后台在全量边界后单独补帧下发。`null` = 还没收到过。 */
   contextUsage: ContextUsage | null;
+  /** 任务运行中发出、由后台保管的排队 / 插话消息（issue #96），以后台 `queue_updated` 为准。 */
+  queue: QueuedPromptView[];
+  /** 上一轮异常结束，队列不会自动发出。 */
+  queuePaused: boolean;
 }
 
 // ─── Pending interactive tool info (for UI rendering) ───
@@ -60,6 +67,13 @@ export interface PendingToolInfo {
 export type PromptDispatchResult =
   | { status: 'dispatched' }
   | { status: 'notDispatched'; reason: 'empty' | 'unavailable' };
+
+/** 取回一条排队消息的结果：`gone` = 已不在队列（已发出 / 被别的窗口取走或删除），
+ *  `unavailable` = 没连上后台或等回包时端口断了。 */
+export type QueueTakeResult =
+  | { status: 'taken'; prompt: QueuedPrompt }
+  | { status: 'gone' }
+  | { status: 'unavailable' };
 
 const PROMPT_RECONNECT_TIMEOUT_MS = 1_500;
 
@@ -90,6 +104,8 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     connected: false,
     lastError: null,
     contextUsage: null,
+    queue: [],
+    queuePaused: false,
   });
 
   const [pendingTools, setPendingTools] = useState<Map<string, PendingToolInfo>>(new Map());
@@ -104,6 +120,12 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
   // 分叉在途标记（issue #60）：分叉要复制树路径与整个工作区、不是瞬时的，而按钮没有
   // 乐观隐藏，双击会建出两个副本。回包（成功 / 失败）或端口断开时清掉。
   const forkPendingRef = useRef(false);
+  // 在途的「取回排队消息去编辑」：按排队项 id 等后台的 `queue_taken` 回包（后台总会回）。
+  // 同一条重复点击复用同一个 promise；端口断开时以 unavailable 收场。
+  const takeRequestsRef = useRef<Map<string, {
+    promise: Promise<QueueTakeResult>;
+    resolve: (result: QueueTakeResult) => void;
+  }>>(new Map());
   // 本次 subscribe 之后收到的当前会话改名。冷加载快照（session_loaded / 首帧 session_state）
   // 是后台在收到 subscribe 时读的行，若别的窗口在这之后改了名，广播先到、快照后到，快照里的
   // 旧标题会把新名盖回去——快照到达时若已有更新的改名，以改名为准。
@@ -341,8 +363,25 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
         case 'error':
           if (msg.sessionId && !isCurrentSession(msg.sessionId)) break;
           console.error('[AgentPort] Error:', msg.error);
+          // 排队 / 插话失败时那一轮还在跑：不动运行态。错误条只在空闲时显示，改用 toast
+          if (msg.runContinues) {
+            toast.error(msg.error);
+            break;
+          }
           setState(prev => ({ ...prev, isAgentRunning: false, isCompacting: false, lastError: msg.error }));
           break;
+
+        case 'queue_updated':
+          if (!isCurrentSession(msg.sessionId)) break;
+          setState(prev => ({ ...prev, queue: msg.queue, queuePaused: msg.paused }));
+          break;
+
+        case 'queue_taken': {
+          const request = takeRequestsRef.current.get(msg.id);
+          takeRequestsRef.current.delete(msg.id);
+          request?.resolve(msg.prompt ? { status: 'taken', prompt: msg.prompt } : { status: 'gone' });
+          break;
+        }
 
         case 'recorder_status':
           recorderChannel.publishStatus({
@@ -390,6 +429,12 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
 
     scheduleRetryRef.current = scheduleRetry;
 
+    function settleTakeWaiters() {
+      const requests = Array.from(takeRequestsRef.current.values());
+      takeRequestsRef.current.clear();
+      for (const request of requests) request.resolve({ status: 'unavailable' });
+    }
+
     function connect() {
       if (unmounted) return;
       const sessionToRestore = sessionIdRef.current;
@@ -422,6 +467,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           sessionListChannel.setPort(null);
           // 在途分叉的回包随端口一起丢了，别让标记把后续分叉永久卡死。
           forkPendingRef.current = false;
+          settleTakeWaiters();
           setState(prev => ({ ...prev, connected: false }));
         }
         scheduleRetry();
@@ -459,6 +505,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
       const waiters = Array.from(connectedWaitersRef.current);
       connectedWaitersRef.current.clear();
       for (const resolve of waiters) resolve(false);
+      settleTakeWaiters();
       portRef.current?.disconnect();
       portRef.current = null;
       recorderChannel.setPort(null);
@@ -496,6 +543,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     expectedSessionId: string | null,
     turn?: TurnSettings,
     slashPrompt?: SlashPrompt,
+    delivery?: FollowUpDelivery,
   ): boolean => {
     if (sessionIdRef.current !== expectedSessionId) return false;
 
@@ -506,7 +554,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     const sessionId = existingSessionId ?? crypto.randomUUID();
 
     try {
-      port.postMessage({ type: 'prompt', sessionId, text, attachments, slashPrompt, model: turn?.model, thinkingLevel: turn?.thinkingLevel });
+      port.postMessage({ type: 'prompt', sessionId, text, attachments, slashPrompt, delivery, model: turn?.model, thinkingLevel: turn?.thinkingLevel });
     } catch {
       if (portRef.current === port) {
         portRef.current = null;
@@ -523,6 +571,10 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     if (!existingSessionId) {
       sessionIdRef.current = sessionId;
     }
+
+    // 排队 / 插话：消息进后台队列，以 queue_updated 显示在输入框上方；真正进转录时才出现在
+    // 对话里，所以这里不加乐观气泡、也不动运行态
+    if (delivery) return true;
 
     // Optimistically add user message to local state for immediate UI feedback
     setState(prev => {
@@ -563,13 +615,14 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     expectedSessionId: string | null = sessionIdRef.current,
     turn?: TurnSettings,
     slashPrompt?: SlashPrompt,
+    delivery?: FollowUpDelivery,
   ): Promise<PromptDispatchResult> => {
     const trimmed = text.trim();
     // 挂了斜杠提示词时空文本也算有内容——提示词本身就是这一轮的请求（issue #53）。
     if (!trimmed && !slashPrompt) return { status: 'notDispatched', reason: 'empty' };
 
     const startedSessionId = expectedSessionId;
-    if (dispatchPrompt(trimmed, attachments, startedSessionId, turn, slashPrompt)) return { status: 'dispatched' };
+    if (dispatchPrompt(trimmed, attachments, startedSessionId, turn, slashPrompt, delivery)) return { status: 'dispatched' };
 
     const connected = await waitForConnected(PROMPT_RECONNECT_TIMEOUT_MS);
     if (!connected || sessionIdRef.current !== startedSessionId) {
@@ -579,7 +632,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
       return { status: 'notDispatched', reason: 'unavailable' };
     }
 
-    if (dispatchPrompt(trimmed, attachments, startedSessionId, turn, slashPrompt)) return { status: 'dispatched' };
+    if (dispatchPrompt(trimmed, attachments, startedSessionId, turn, slashPrompt, delivery)) return { status: 'dispatched' };
 
     setState(prev => ({ ...prev, lastError: t('chat.session.notConnected') }));
     return { status: 'notDispatched', reason: 'unavailable' };
@@ -588,6 +641,31 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
   const cancel = useCallback(() => {
     const sessionId = sessionIdRef.current;
     if (sessionId) postMessage({ type: 'cancel', sessionId });
+  }, [postMessage]);
+
+  // ─── 排队消息（issue #96）：都以后台广播的 queue_updated 收敛，不做乐观更新 ───
+
+  const removeQueued = useCallback((id: string) => {
+    const sessionId = sessionIdRef.current;
+    if (sessionId) postMessage({ type: 'queue_remove', sessionId, id });
+  }, [postMessage]);
+
+  const sendQueuedNow = useCallback((id: string) => {
+    const sessionId = sessionIdRef.current;
+    if (sessionId) postMessage({ type: 'queue_send_now', sessionId, id });
+  }, [postMessage]);
+
+  /** 取回一条排队消息的完整内容去编辑（后台同时把它移出队列）。 */
+  const takeQueued = useCallback((id: string): Promise<QueueTakeResult> => {
+    const inFlight = takeRequestsRef.current.get(id);
+    if (inFlight) return inFlight.promise;
+    const sessionId = sessionIdRef.current;
+    if (!sessionId || !portRef.current) return Promise.resolve({ status: 'unavailable' });
+    let resolve!: (result: QueueTakeResult) => void;
+    const promise = new Promise<QueueTakeResult>((r) => { resolve = r; });
+    takeRequestsRef.current.set(id, { promise, resolve });
+    postMessage({ type: 'queue_take', sessionId, id });
+    return promise;
   }, [postMessage]);
 
   /** 编辑一条已发送的 user 消息并从该点重新生成（issue #44）。乐观更新：本地按
@@ -735,6 +813,8 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           lastError: null,
           // 不清的话切过去的一瞬间会显示上一个会话的占用，等后台补帧才纠正。
           contextUsage: null,
+          queue: [],
+          queuePaused: false,
         }
       : { ...prev, sessionId });
     postMessage({ type: 'subscribe', sessionId });
@@ -752,6 +832,8 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
       connected: true,
       lastError: null,
       contextUsage: null,
+      queue: [],
+      queuePaused: false,
     });
     setPendingTools(new Map());
     setPendingPermissions(new Map());
@@ -806,6 +888,9 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     pendingPermissions,
     send,
     cancel,
+    removeQueued,
+    takeQueued,
+    sendQueuedNow,
     retry,
     editMessage,
     switchBranch,

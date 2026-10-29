@@ -8,10 +8,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { ModelSelector } from '@/components/chat/ModelSelector';
 import { SearchEngineList } from '@/components/settings/search/SearchEngineList';
 import { SearchEngineEditor } from '@/components/settings/search/SearchEngineEditor';
+import { InlineRadioGroup, type RadioOption } from '@/components/settings/InlineRadioGroup';
 import type { SettingsOutletContext } from '@/components/settings/SettingsLayout';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import {
   autoTitleSettings,
+  followUpDelivery,
+  type FollowUpDelivery,
   compactionModel,
   compactionSettings,
   providerCredentials,
@@ -207,11 +210,49 @@ function CompactionPanel() {
   );
 }
 
+const FOLLOW_UP_OPTIONS: RadioOption<FollowUpDelivery>[] = [
+  { value: 'queue', getLabel: () => t('settings.chat.followUp.queue') },
+  { value: 'steer', getLabel: () => t('settings.chat.followUp.steer') },
+];
+
+/** 「任务运行中发送消息」：Enter 默认排队还是插话（issue #96）。 */
+function FollowUpDeliveryPanel() {
+  const labelId = useId();
+  const hintId = useId();
+  // undefined = 还没读出来，期间禁用、不让操作
+  const [delivery] = useStorageItem(followUpDelivery, undefined);
+  // 直接写 storage、由 watch 推回界面（同 SearchEnginesPanel）：写失败时选项不会停在假状态
+  const write = (next: FollowUpDelivery) => {
+    void followUpDelivery.setValue(next).catch((err) => {
+      console.warn('[chat] update follow-up delivery failed:', err);
+      toast.error(t('errors.followUpSettingSaveFailed'));
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label id={labelId} className="text-sm">{t('settings.chat.followUp.label')}</Label>
+      <InlineRadioGroup
+        value={delivery ?? 'queue'}
+        options={FOLLOW_UP_OPTIONS}
+        onChange={write}
+        labelId={labelId}
+        describedBy={hintId}
+        disabled={delivery === undefined}
+      />
+      <p id={hintId} className="text-xs text-muted-foreground">
+        {t('settings.chat.followUp.hint')}
+      </p>
+    </div>
+  );
+}
+
 /**
- * 「对话」主面板：每次对话怎么运作。四块内容都只影响对话本身，故合为一节：
+ * 「对话」主面板：每次对话怎么运作。五块内容都只影响对话本身，故合为一节：
  * - 自定义指引：追加到系统提示词末尾的用户规则。
  * - 上下文压缩：总开关 + 触发阈值 + 压缩专用模型，见 `CompactionPanel`。
  * - 自动标题：首轮结束后用一次短补全替换默认标题（可关；model null = 跟随对话主模型）。
+ * - 任务运行中发送消息：Enter 默认排队还是插话，见 `FollowUpDeliveryPanel`。
  * - 联网搜索：`web_search` 工具用哪些引擎、按什么顺序回退。
  */
 function ChatPanel({ onEditEngine }: { onEditEngine: (id: string) => void }) {
@@ -283,6 +324,8 @@ function ChatPanel({ onEditEngine }: { onEditEngine: (id: string) => void }) {
           </div>
         )}
       </div>
+
+      <FollowUpDeliveryPanel />
 
       <SearchEnginesPanel onEditEngine={onEditEngine} />
     </div>

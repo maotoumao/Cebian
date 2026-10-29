@@ -61,7 +61,14 @@ import {
   type PermissionDecision,
   type ToolGate,
 } from '@/lib/agent/tool-permissions';
-import type { BroadcastMessage, ContextUsage, TurnSettings } from '@/lib/ipc/protocol';
+import type {
+  BroadcastMessage,
+  ContextUsage,
+  QueuedPrompt,
+  QueuedPromptView,
+  TurnSettings,
+} from '@/lib/ipc/protocol';
+import { PromptQueue } from './prompt-queue';
 import { replaceUserText, truncateForRetry, sanitizeAgentMessages } from '@/lib/agent/message-helpers';
 import { collectTitleSource, defaultSessionTitle } from '@/lib/agent/session-title';
 import { generateSessionTitle } from './title-generator';
@@ -80,6 +87,7 @@ import {
   userInstructions as userInstructionsStorage,
   memorySettings,
   searchEnginesConfig,
+  type FollowUpDelivery,
   type ModelIdentity,
   type ThinkingLevel,
 } from '@/lib/persistence/storage';
@@ -203,6 +211,8 @@ interface AgentSession {
    * run 中途、phase 必须保持 `running`，所以单独用这个标志点亮界面的「正在压缩」。
    */
   compactingInTurn: boolean;
+  /** `cancel()` 正在拆这个会话（abort 之后、出表之前）。见 `canSteer` / 队列出队。 */
+  stopping?: true;
   /**
    * 会话树句柄（transcript 的持久化真相）。行不存在的会话（`sessionCreated=false`）
    * 没有树，所有树操作按 `sessionCreated` 守卫跳过。
@@ -227,6 +237,17 @@ class SessionManager {
   private sessions = new Map<string, AgentSession>();
   /** Guards against concurrent getOrCreateAgent calls for the same session. */
   private creating = new Map<string, Promise<AgentSession>>();
+  /**
+   * 各会话运行中发送的消息队列（issue #96）。独立于 `sessions`：停止任务会把 AgentSession
+   * 出表，而队列要留下等用户处理。纯内存，空了就删；会话被删除时一并丢弃。
+   */
+  private queues = new Map<string, PromptQueue>();
+  /**
+   * 已进入 `prompt()`、还没等到 `agent_start` 的会话 → 那次调用的令牌。这段窗口里 phase
+   * 仍是 idle，靠它把会话视为忙（见 `isBusy`）。`agent_start` 时清掉；没跑起来的那次在
+   * `prompt()` 收尾时清掉自己那一枚。
+   */
+  private pendingStarts = new Map<string, object>();
   /** True iff we're currently holding a SW keep-alive token. Tracked so
    *  acquire/release stay balanced even across error paths. */
   private keepAliveHeld = false;
@@ -923,6 +944,15 @@ class SessionManager {
         agentSession.phase = 'running';
         broadcastToViewers(sessionId, { type: 'agent_start', sessionId });
         this.updateKeepAlive();
+        this.pendingStarts.delete(sessionId);
+        this.resumeQueue(sessionId);
+        break;
+
+      case 'message_start':
+        // 插话消息被 loop 投进转录：从排队列表里移出（按引用匹配，只认交给 steer 的那个对象）
+        if (event.message.role === 'user' && this.queues.get(sessionId)?.consumeSteered(event.message)) {
+          this.broadcastQueue(sessionId);
+        }
         break;
 
       case 'message_update':
@@ -979,6 +1009,7 @@ class SessionManager {
         void this.maybeGenerateTitle(agentSession, messages).catch((err) => {
           console.warn('[auto-title] unexpected failure:', err);
         });
+        this.settleQueueAfterRun(agentSession);
         break;
       }
     }
@@ -991,14 +1022,56 @@ class SessionManager {
    *  行是真相）。缺省时回退全局 lastSelectedModel 充当「新对话默认种子」（向后兼容）。
    *
    *  `slashPrompt` 是本轮携带的斜杠提示词，在 user 消息信封里自成一块，不与用户
-   *  自己敲的话混在一起（见 lib/ai-config/slash-prompt.ts）。 */
+   *  自己敲的话混在一起（见 lib/ai-config/slash-prompt.ts）。
+   *
+   *  `delivery`：页面认为会话正忙时携带（issue #96）。会话确实还忙就排队 / 插话；已经
+   *  空闲了（页面视图过期）则当普通发送。
+   *
+   *  返回这条消息是否已交出去（交给 agent、提交进转录，或收进队列）。 */
   async prompt(
     sessionId: string,
     text: string,
     attachments: Attachment[] = [],
     turn?: TurnSettings,
     slashPrompt?: SlashPrompt,
-  ): Promise<void> {
+    delivery?: FollowUpDelivery,
+  ): Promise<boolean> {
+    // 不带 delivery 却撞上一轮正在准备（典型：自动出队刚取走最后一条，页面看着空闲）：
+    // 普通发送此刻必然与它撞车，改为排队。
+    if ((delivery && this.isBusy(sessionId)) || (!delivery && this.pendingStarts.has(sessionId))) {
+      const prompt: QueuedPrompt = { id: crypto.randomUUID(), text, attachments, slashPrompt, turn: turn ?? {} };
+      await this.acceptFollowUp(sessionId, prompt, delivery ?? 'queue');
+      return true;
+    }
+
+    // 从这里（同步，先于任何 await）到 agent_start，会话看着空闲、其实已有一轮在准备：
+    // 记下令牌，让运行中发来的消息和出队派发都把这段窗口当忙。
+    const token = {};
+    this.pendingStarts.set(sessionId, token);
+    try {
+      return await this.startPrompt(sessionId, text, attachments, turn, slashPrompt);
+    } finally {
+      // 令牌还在 = 这次没跑起来（被取消、上下文到顶、撞上进行中的一轮、抛错）。会话就此
+      // 空闲的话，队列里的消息没有收尾会来发，暂停交给用户处理。
+      if (this.pendingStarts.get(sessionId) === token) {
+        this.pendingStarts.delete(sessionId);
+        const queue = this.queues.get(sessionId);
+        if (queue && !queue.isEmpty && !this.isBusy(sessionId)) {
+          queue.paused = true;
+          this.broadcastQueue(sessionId);
+        }
+      }
+    }
+  }
+
+  /** 普通发送：建会话、换模型、组装消息、轮首压缩，然后派发给 agent。返回值同 `prompt()`。 */
+  private async startPrompt(
+    sessionId: string,
+    text: string,
+    attachments: Attachment[],
+    turn?: TurnSettings,
+    slashPrompt?: SlashPrompt,
+  ): Promise<boolean> {
     // Persist + broadcast 'session_created' for brand-new sessions BEFORE any
     // agent setup work (model resolve, tool factory, MCP, createAgent — easily
     // several hundred ms). Without this the UI stays on /chat/new with an empty
@@ -1059,7 +1132,7 @@ class SessionManager {
       // phase-guard pattern; the in-flight work's broadcasts reconcile every
       // viewing window to the correct state.
       console.debug('[session-manager] prompt: phase busy, ignored', sessionId, agentSession.phase);
-      return;
+      return false;
     }
 
     // 会话挂着顶上来的兜底模型（会话行的模型已失效）而本轮没带来任何模型：派发就等于
@@ -1150,10 +1223,10 @@ class SessionManager {
       // API call, and let `maybeCompact`'s persist resurrect the deleted row.
       // If the entry is gone (or was replaced), the user already stopped this
       // turn — bail; `cancel()` already broadcast the authoritative end state.
-      if (this.sessions.get(sessionId) !== agentSession) return;
+      if (this.sessions.get(sessionId) !== agentSession) return false;
 
       const refreshedSystemPrompt = await composeSystemPrompt(sessionId, memoryEnabled);
-      if (this.sessions.get(sessionId) !== agentSession) return;
+      if (this.sessions.get(sessionId) !== agentSession) return false;
       agentSession.preamble.systemPrompt = refreshedSystemPrompt;
 
       // If any interactive tool OR a permission prompt is pending, the agent is
@@ -1192,7 +1265,7 @@ class SessionManager {
         // 先后进入压缩并互相覆盖 compactionController——取消只找得到后一个，而任一路的
         // finally 都会把它清掉，于是另一路变成不可取消的孤儿。
         const compaction = resolveCompactionSettings(await compactionSettings.getValue());
-        if (this.sessions.get(sessionId) !== agentSession) return;
+        if (this.sessions.get(sessionId) !== agentSession) return false;
 
         // Before a fresh turn, compact the transcript if the context is over
         // threshold (state layer: generate + insert summary + persist +
@@ -1207,7 +1280,7 @@ class SessionManager {
           // 销毁时则没有提交，以消息是否真的在转录里为准
           if (cancelled) {
             handedOff = agentSession.agent.state.messages.includes(pendingUserMessage);
-            return;
+            return handedOff;
           }
         }
         // 进行中的一轮还没结束（过期的 IPC）时下面的 prompt 会同步抛错，消息不进转录。判断与
@@ -1218,6 +1291,245 @@ class SessionManager {
     } finally {
       if (!handedOff) await discardRecordingHars(sessionId, writtenHars);
     }
+    return handedOff;
+  }
+
+  // ─── 运行中发送的消息队列（issue #96）───
+
+  /** 会话是否正忙、收不了一次普通发送（也供 IPC 层判断出错时那一轮是否还在跑）：有一轮在准备（还没 agent_start）、在跑，或 pi 还没
+   *  收掉刚结束的那一轮（agent_end 收尾窗口：phase 已回 idle，直接 prompt 会抛 already
+   *  processing）。 */
+  isBusy(sessionId: string): boolean {
+    if (this.pendingStarts.has(sessionId)) return true;
+    const live = this.sessions.get(sessionId);
+    return !!live && (live.phase !== 'idle' || live.agent.state.isStreaming);
+  }
+
+  /** 能否把消息插进这一轮：agent 在跑、没被停止、仍是会话当前的那个。 */
+  private canSteer(agentSession: AgentSession): boolean {
+    return (
+      this.sessions.get(agentSession.sessionId) === agentSession &&
+      agentSession.phase === 'running' &&
+      !agentSession.stopping
+    );
+  }
+
+  private queueFor(sessionId: string): PromptQueue {
+    let queue = this.queues.get(sessionId);
+    if (!queue) {
+      queue = new PromptQueue();
+      this.queues.set(sessionId, queue);
+    }
+    return queue;
+  }
+
+  /** 把会话的排队列表推给观众；队列空了顺手出表。 */
+  private broadcastQueue(sessionId: string): void {
+    const queue = this.queues.get(sessionId);
+    if (queue?.isEmpty) this.queues.delete(sessionId);
+    broadcastToViewers(sessionId, { type: 'queue_updated', sessionId, ...this.getQueueState(sessionId) });
+  }
+
+  /** 新一轮开始：解除暂停。 */
+  private resumeQueue(sessionId: string): void {
+    const queue = this.queues.get(sessionId);
+    if (queue?.paused) {
+      queue.paused = false;
+      this.broadcastQueue(sessionId);
+    }
+  }
+
+  /**
+   * 收下一条运行中发来的消息。插话只在 agent 真在跑时才交给 `agent.steer()`；准备 / 压缩
+   * 阶段、或组装插话期间这一轮已经结束，都改为排队。
+   */
+  private async acceptFollowUp(sessionId: string, prompt: QueuedPrompt, delivery: FollowUpDelivery): Promise<void> {
+    const live = this.sessions.get(sessionId);
+    if (delivery === 'steer' && live && this.canSteer(live)) {
+      // 组装失败（写 HAR / 读记忆出错）也改为排队：输入框已经清空，这条不能丢
+      try {
+        if (await this.steerPrompt(live, prompt)) return;
+      } catch (err) {
+        console.warn('[queue] steer failed, queued instead:', err);
+      }
+    }
+    this.enqueueFollowUp(sessionId, prompt);
+  }
+
+  /** 排进队尾，并补上没人会来处理它的两种情况：会话正被停止 / 已没有任何一轮在进行（暂停），
+   *  或这一轮在组装期间彻底结束了（它收尾时的出队已经跑过，补一次出队）。 */
+  private enqueueFollowUp(sessionId: string, prompt: QueuedPrompt): void {
+    const queue = this.queueFor(sessionId);
+    queue.enqueue(prompt);
+    const live = this.sessions.get(sessionId);
+    const idle = !this.isBusy(sessionId);
+    if (live?.stopping || (!live && idle)) queue.paused = true;
+    this.broadcastQueue(sessionId);
+    if (live && !live.stopping && idle) void this.drainQueue(live);
+  }
+
+  /**
+   * 把一条消息插进正在跑的这一轮：组装方式与 `prompt()` 相同（HAR 落盘、记忆注入），然后
+   * `agent.steer()`，loop 在下一个工具边界投进转录。不应用这条消息的模型 / 思考档——不在
+   * 一轮中途换模型。返回 false 表示没插进去（这一轮已结束或会话被停止），由调用方改为排队。
+   */
+  private async steerPrompt(agentSession: AgentSession, prompt: QueuedPrompt): Promise<boolean> {
+    const { sessionId } = agentSession;
+    const { attachments: sentAttachments, written } = await saveRecordingHars(sessionId, prompt.attachments);
+    let steered = false;
+    try {
+      const memoryEnabled = (await memorySettings.getValue()).enabled;
+      const enriched = await composeUserMessage(prompt.text, sentAttachments, memoryEnabled, prompt.slashPrompt);
+      if (!this.canSteer(agentSession)) return false;
+      const content: any[] = [{ type: 'text', text: enriched }];
+      content.push(...extractImages(prompt.attachments));
+      const message = { role: 'user', content, timestamp: Date.now() } as AgentMessage;
+      agentSession.agent.steer(message);
+      this.queueFor(sessionId).addSteering(prompt, message, written);
+      steered = true;
+      this.broadcastQueue(sessionId);
+      return true;
+    } finally {
+      if (!steered) await discardRecordingHars(sessionId, written);
+    }
+  }
+
+  /**
+   * 一轮结束后处理队列：没被消费的插话退回队首（pi 在最后一个边界之后不会再取）；这一轮
+   * 异常结束（出错 / 中断 / 上下文到顶的说明消息，都是 error / aborted 收尾）就暂停，否则
+   * 接着发下一条。
+   */
+  private settleQueueAfterRun(agentSession: AgentSession): void {
+    const { sessionId, agent } = agentSession;
+    const queue = this.queues.get(sessionId);
+    // 正被停止：停止流程自己收尾队列（暂停、退回插话），这里不能再出队
+    if (!queue || agentSession.stopping) return;
+    if (queue.hasSteering) this.settleSteering(agentSession, queue);
+    const last = agent.state.messages.at(-1) as AssistantMessage | undefined;
+    // 只置不清：清暂停是下一轮 agent_start 的事，免得覆盖收尾期间别处设的暂停
+    if (last?.role === 'assistant' && (last.stopReason === 'error' || last.stopReason === 'aborted')) {
+      queue.paused = true;
+    }
+    this.broadcastQueue(sessionId);
+    void this.drainQueue(agentSession);
+  }
+
+  /** 这一轮不会再从 agent 插话队列取消息了（结束或停止）：把还没被取走的插话退回成排队项。
+   *  按 agent 插话队列的现状区分，已被 loop 取走的算已消费。 */
+  private settleSteering(agentSession: AgentSession, queue: PromptQueue): void {
+    const inAgent = new Set(agentSession.agent.peekQueuedMessages());
+    agentSession.agent.clearSteeringQueue();
+    void discardRecordingHars(agentSession.sessionId, queue.settleSteering(inAgent));
+  }
+
+  /** 会话空闲且队列没暂停时，取队首发出去。 */
+  private async drainQueue(agentSession: AgentSession): Promise<void> {
+    const { sessionId } = agentSession;
+    // agent_end 的监听器跑完、pi 收掉这一轮之后才能 prompt
+    await agentSession.agent.waitForIdle();
+    if (this.sessions.get(sessionId) !== agentSession || agentSession.stopping || this.isBusy(sessionId)) return;
+    const queue = this.queues.get(sessionId);
+    if (!queue || queue.paused) return;
+    const next = queue.takeNext();
+    if (!next) return;
+    this.broadcastQueue(sessionId);
+    // 同步进入 prompt()：它在第一个 await 之前就记下准备令牌，另一路出队随即视会话为忙
+    await this.dispatchQueued(sessionId, next);
+  }
+
+  /** 把一条排队消息当普通发送派发。没交出去（被取消、撞上别的一轮、派发前就报错）时放回
+   *  队首并暂停：不丢用户的原文，剩下的也不会接连失败。 */
+  private async dispatchQueued(sessionId: string, prompt: QueuedPrompt): Promise<void> {
+    let handedOff = false;
+    try {
+      handedOff = await this.prompt(sessionId, prompt.text, prompt.attachments, prompt.turn, prompt.slashPrompt);
+    } catch (err) {
+      broadcastToViewers(sessionId, {
+        type: 'error',
+        sessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      // 会话在派发期间被删除了就不放回，免得给已删会话重建一个孤儿队列
+      // 查不了会话行时按「还在」处理：宁可多留一条，也不丢用户的原文
+      if (!handedOff && (await sessionStore.loadMeta(sessionId).catch(() => true))) {
+        const queue = this.queueFor(sessionId);
+        queue.restore(prompt);
+        queue.paused = true;
+        this.broadcastQueue(sessionId);
+      }
+    }
+  }
+
+  /** 排队列表快照（订阅时补发、变化时广播）。 */
+  getQueueState(sessionId: string): { queue: QueuedPromptView[]; paused: boolean } {
+    const queue = this.queues.get(sessionId);
+    return { queue: queue?.view() ?? [], paused: queue?.paused ?? false };
+  }
+
+  /** 删除一条排队 / 插话中的消息。 */
+  removeQueued(sessionId: string, id: string): void {
+    const queue = this.queues.get(sessionId);
+    if (!queue) return;
+    const live = this.sessions.get(sessionId);
+    const inAgent = new Set(live?.agent.peekQueuedMessages() ?? []);
+    // 已被 loop 取走、只是还没投进转录的插话撤不回来：留着「插话中」，等它投进转录时移出，
+    // 列表才与转录一致
+    const steered = queue.steeringMessageOf(id);
+    if (steered && !inAgent.has(steered)) return;
+    const removed = queue.remove(id);
+    if (!removed) return;
+    if (removed.steering && live) {
+      // pi 的插话队列只能整体清空：清掉再把其余插话按原顺序交回。几步都是同步的，loop 取
+      // 队列不会夹在中间。
+      live.agent.clearSteeringQueue();
+      for (const message of queue.steeringMessagesIn(inAgent)) live.agent.steer(message);
+      void discardRecordingHars(sessionId, removed.steering.writtenHars);
+    }
+    this.broadcastQueue(sessionId);
+  }
+
+  /** 取回一条排队消息去编辑（插话中的取不回）。 */
+  takeQueued(sessionId: string, id: string): QueuedPrompt | undefined {
+    const prompt = this.queues.get(sessionId)?.takeQueued(id);
+    if (prompt) this.broadcastQueue(sessionId);
+    return prompt;
+  }
+
+  /**
+   * 立即发送一条排队消息：
+   * - 会话空闲 → 直接派发；
+   * - agent 停下来等工具 / 授权 → 也走普通发送，即现有的「插话 + 取消卡片」；
+   * - 正在跑 → 转为插话，插不进去就放回原位；
+   * - 一轮在准备 / 压缩 / 收尾中 → 留在队列，等它收尾时出队。
+   */
+  async sendQueuedNow(sessionId: string, id: string): Promise<void> {
+    const queue = this.queues.get(sessionId);
+    if (!queue) return;
+    const live = this.sessions.get(sessionId);
+    const waitingForUser = !!live && (live.toolCtx.hasPending() || !!live.permissionBridge.getPending());
+    if (this.isBusy(sessionId) && !waitingForUser) {
+      if (!live || !this.canSteer(live)) return;
+      const prompt = queue.takeQueued(id);
+      if (!prompt) return;
+      let steered = false;
+      try {
+        steered = await this.steerPrompt(live, prompt);
+      } finally {
+        if (!steered) {
+          this.queueFor(sessionId).restore(prompt);
+          this.broadcastQueue(sessionId);
+          // 插话期间这一轮结束了：它收尾时的出队没看到这条，补一次
+          if (!this.isBusy(sessionId)) void this.drainQueue(live);
+        }
+      }
+      return;
+    }
+    const prompt = queue.takeQueued(id);
+    if (!prompt) return;
+    this.broadcastQueue(sessionId);
+    // 同步进入 prompt()，准备令牌随即记下：重复点击 / 另一窗口同时点会走上面的忙碌分支
+    await this.dispatchQueued(sessionId, prompt);
   }
 
   /**
@@ -2241,6 +2553,14 @@ class SessionManager {
     const agentSession = this.sessions.get(sessionId);
     if (!agentSession) return;
 
+    // 停止只停这一轮：队列保留但暂停，没被消费的插话退回成排队项（issue #96）。
+    const queue = this.queues.get(sessionId);
+    if (queue) {
+      this.settleSteering(agentSession, queue);
+      queue.paused = true;
+      this.broadcastQueue(sessionId);
+    }
+
     if (agentSession.phase === 'preparing') {
       // Signal the preparation to bail at its checkpoint, AND stop the agent
       // if it has already entered `continue()`. Cleanup and broadcast are
@@ -2266,6 +2586,10 @@ class SessionManager {
     }
 
     // phase === 'running' or 'idle' — standard teardown path.
+    //
+    // 从这里到出表要等 agent 收尾（几个 await），这期间会话还在表里、phase 也可能还是
+    // running：标记一下，别把消息插进 / 从队列派发进一个正被拆掉的 agent。
+    agentSession.stopping = true;
     //
     // Snapshot message-count BEFORE abort so we can tell, after the dust
     // settles, whether pi-agent-core's `handleRunFailure` actually appended
@@ -2398,6 +2722,8 @@ class SessionManager {
 
   /** Destroy an `AgentSession` entirely */
   destroySession(sessionId: string): void {
+    // 会话被删除：队列一并丢弃（插话写下的 HAR 随工作目录删掉，不用单独清）
+    this.queues.delete(sessionId);
     const agentSession = this.sessions.get(sessionId);
     if (agentSession) {
       // Abort in-flight async tails so they can't resurrect a just-deleted
