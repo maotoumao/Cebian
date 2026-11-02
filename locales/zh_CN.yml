@@ -304,6 +304,11 @@ settings:
       hint: "首轮回复结束后，用 AI 生成的简短标题替换默认标题（首条消息截断）。"
       model: "生成标题的模型"
       followMain: "与对话模型相同"
+    followUp:
+      label: "任务运行中发送消息"
+      hint: "智能体工作时按 Enter 的效果。排队：等当前任务跑完再发出；插话：当前这一步结束后插入当前任务。Shift+Ctrl+Enter（Mac 上为 Shift+⌘+Enter）执行另一种。"
+      queue: "排队"
+      steer: "插话"
     search:
       title: "联网搜索"
       hint: "设置搜索引擎的尝试顺序，第一个启用的引擎为首选。AI 可根据适用场景优先选择其他引擎；搜索被拦截、没有结果或执行失败时，Cebian 会按顺序尝试其余已启用的引擎。"
@@ -641,6 +646,26 @@ chat:
     imageStripped: "已移除图片附件——当前模型不支持多模态输入"
     noPrompts: "暂无 Prompt，前往 AI 配置创建"
     noMatch: "无匹配结果"
+    stop: "停止"
+    # 智能体工作时发送消息（issue #96）
+    followUp:
+      queue: "排队发送"
+      steer: "插话：插入当前任务"
+      # 快捷键提示，按 Enter 执行的动作（设置项）区分。
+      # $1 = 该动作的快捷键（"Enter"），$2 = 另一种动作的快捷键（如 "Shift+Ctrl+Enter"）
+      shortcutHint:
+        queue: "$1 排队 · $2 插话 · Esc 停止"
+        steer: "$1 插话 · $2 排队 · Esc 停止"
+    queue:
+      queued: "排队中"
+      steering: "插话中"
+      sendNow: "立即发送"
+      paused: "已暂停：上一轮没有正常结束，排队的消息不会自动发出。"
+      # $1 = 附件数
+      attachmentCount:
+        1: "1 个附件"
+        n: "$1 个附件"
+      slashConflict: "请先移除输入框里的提示词——排队的消息自带一个"
     iframeEnterHint: "⏎ 点击进入"
     # 语音输入（本地优先、云端兜底的语音识别）
     voiceStart: "语音输入"
@@ -1084,6 +1109,8 @@ errors:
   pageActionGone: "找不到该操作。"
   pageActionSaveFailed: "保存失败，请重试。"
   compactionSettingsSaveFailed: "保存上下文压缩设置失败，请重试。"
+  followUpSettingSaveFailed: "保存任务运行中发送消息的设置失败，请重试。"
+  queuedMessageGone: "这条消息已不在队列中，可能已发出或在其他窗口被删除。"
   appearanceSaveFailed: "保存外观设置失败，请重试。"
   languageSwitchFailed: "切换语言失败，请重试。"
   localFontsPermissionDenied: "读取本机字体的权限被拒绝。请在 Chrome 设置里允许 Cebian 使用本机字体，然后重试。"

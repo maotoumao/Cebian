@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback, useImperativeHandle, forwardRef, type KeyboardEvent } from 'react';
-import { Send, Square, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X, FileType, Film, Network } from 'lucide-react';
+import { Send, Square, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X, FileType, Film, Network, ListPlus, CornerDownRight } from 'lucide-react';
 import { showDialog } from '@/lib/ui/dialog';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -11,9 +11,10 @@ import { ThinkingLevelSelector } from '@/components/chat/ThinkingLevelSelector';
 import { RecordButton } from '@/components/chat/RecordButton';
 import { MicButton } from '@/components/chat/MicButton';
 import { ContextUsageIndicator } from '@/components/chat/ContextUsageIndicator';
+import { QueuedMessages } from '@/components/chat/QueuedMessages';
 import { useStorageItem } from '@/hooks/useStorageItem';
-import { providerCredentials, customProviders as customProvidersStorage, type ThinkingLevel, type ModelIdentity } from '@/lib/persistence/storage';
-import type { ContextUsage } from '@/lib/ipc/protocol';
+import { providerCredentials, customProviders as customProvidersStorage, followUpDelivery, type FollowUpDelivery, type ThinkingLevel, type ModelIdentity } from '@/lib/persistence/storage';
+import type { ContextUsage, QueuedPromptView } from '@/lib/ipc/protocol';
 import { getSupportedThinkingLevels, clampThinkingLevel } from '@earendil-works/pi-ai';
 import { resolveModel } from '@/lib/providers/resolve-model';
 import { isUsableModel } from '@/lib/providers/usable-models';
@@ -33,10 +34,10 @@ import { appendTranscript, cleanTranscript } from '@/lib/speech/transcript';
 import { openPermissionPage, openPermissionSettings, queryPermission } from '@/lib/ui/user-permission';
 import { useMobileEmulation } from '@/hooks/useMobileEmulation';
 import { useChatAppearance } from '@/hooks/useChatAppearance';
-import { downloadFile, formatCompactCount } from '@/lib/utils';
+import { downloadFile, formatCompactCount, isApplePlatform } from '@/lib/utils';
 import { recordingMetaText, recordingTitle } from '@/components/chat/recording-meta';
 import { t } from '@/lib/i18n';
-import type { PromptDispatchResult } from '@/hooks/useBackgroundAgent';
+import type { PromptDispatchResult, QueueTakeResult } from '@/hooks/useBackgroundAgent';
 
 interface ChatInputProps {
   onSend: (
@@ -44,6 +45,8 @@ interface ChatInputProps {
     attachments: Attachment[] | undefined,
     expectedSessionId: string | null,
     slashPrompt: SlashPrompt | undefined,
+    /** 任务运行中发送时的交付方式（排队 / 插话）；空闲时为 undefined（普通发送）。 */
+    delivery: FollowUpDelivery | undefined,
   ) => Promise<PromptDispatchResult>;
   onOpenSettings?: () => void;
   isAgentRunning?: boolean;
@@ -67,6 +70,13 @@ interface ChatInputProps {
   onCompact?: () => void;
   /** 发送进行中（上锁到派发完成）的起止通知。聊天页据此决定拖放区此刻能不能接收文件。 */
   onDispatchingChange?: (dispatching: boolean) => void;
+  /** 后台保管的排队 / 插话消息（issue #96），显示在输入框上方。 */
+  queue?: QueuedPromptView[];
+  queuePaused?: boolean;
+  onRemoveQueued?: (id: string) => void;
+  /** 取回一条排队消息的完整内容（后台同时移出队列）。 */
+  onTakeQueued?: (id: string) => Promise<QueueTakeResult>;
+  onSendQueuedNow?: (id: string) => void;
 }
 
 /** 暴露给父组件的 imperative handle：允许欢迎页等外部入口填入文本并聚焦输入框，
@@ -78,7 +88,7 @@ export interface ChatInputHandle {
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
-  { onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId, model: currentModel, thinkingLevel: currentThinkingLevel, onModelChange, onThinkingChange, contextUsage, agentBusy, onCompact, onDispatchingChange },
+  { onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId, model: currentModel, thinkingLevel: currentThinkingLevel, onModelChange, onThinkingChange, contextUsage, agentBusy, onCompact, onDispatchingChange, queue = [], queuePaused = false, onRemoveQueued, onTakeQueued, onSendQueuedNow },
   ref,
 ) {
   const [value, setValue] = useState('');
@@ -115,6 +125,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
 
   const [providers] = useStorageItem(providerCredentials, {});
   const [customProviderList] = useStorageItem(customProvidersStorage, []);
+  // 任务运行中按 Enter 的交付方式（设置项）；Shift+⌘/Ctrl+Enter 用另一种（issue #96）
+  const [defaultDelivery] = useStorageItem(followUpDelivery, 'queue');
+  const otherDelivery: FollowUpDelivery = defaultDelivery === 'queue' ? 'steer' : 'queue';
+  const otherShortcut = isApplePlatform() ? 'Shift+⌘+Enter' : 'Shift+Ctrl+Enter';
 
   // 当前模型解析成 pi-ai Model（内置 + 自定义统一走 resolveModel）。是否支持图片 /
   // 支持哪些思考档 等能力派生共用这一次解析，避免多份内联解析各自漂移
@@ -371,6 +385,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
 
   // 只挂了提示词、一个字没打也算可发——提示词本身就是这一轮的请求。
   const canSend = value.trim().length > 0 || slashPrompt !== null;
+  // 发送 / 停止共用一个按钮位（与 Claude / Codex 一致）：运行中输入框空着是停止键，打了字
+  // 就变成按设置排队 / 插话的发送键，这时停止走 Esc。
+  const showStop = isAgentRunning && !canSend;
 
   // Recorder integration. The captured session lands in attachments via
   // the channel subscription in useComposerAttachments — NOT via
@@ -378,7 +395,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   // so any in-flight session delivery completes before we read attachments.
   const recorder = useRecorder();
 
-  const handleSend = async () => {
+  /** `delivery`：任务运行中发送时的交付方式；空闲时不传。 */
+  const handleSend = async (delivery?: FollowUpDelivery) => {
     if (!canSend) return;
     if (isDispatchingRef.current) return;
     // 没选模型 → 引导去选；选了但已失效（下架 / 凭据被删）→ 说明原因并让用户重选。
@@ -432,7 +450,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       if (sessionIdRef.current !== dispatchSessionId) return;
 
       const outgoing = getAttachments();
-      const result = await onSend(text, outgoing.length > 0 ? outgoing : undefined, dispatchSessionId, slashPrompt ?? undefined);
+      const result = await onSend(text, outgoing.length > 0 ? outgoing : undefined, dispatchSessionId, slashPrompt ?? undefined, delivery);
       if (result.status !== 'dispatched') return;
       if (sessionIdRef.current !== dispatchSessionId) return;
 
@@ -486,11 +504,13 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         if (target) handlePromptSelect(target);
         return;
       }
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        setShowSlash(false);
-        return;
-      }
+    }
+    // 菜单开着就关菜单，没有候选（「还没有提示词」/ 无匹配）时也一样；preventDefault 让
+    // footer 上的 Esc 停止不再接手
+    if (isSlashMenuVisible && e.key === 'Escape') {
+      e.preventDefault();
+      setShowSlash(false);
+      return;
     }
 
     // 光标停在最前面再按退格 = 摘掉挂着的提示词。标记就在文字前面，「往前删」删到的
@@ -571,10 +591,69 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       }
     }
 
+    // 任务运行中：Enter 按设置排队 / 插话，Shift+⌘/Ctrl+Enter 用另一种；空闲时两者都是普通发送
+    if (e.key === 'Enter' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      // 斜杠菜单开着时不发：`/xxx` 还没选成提示词，原样发出去不是用户想要的
+      if (!isDispatching && !isSlashMenuVisible) void handleSend(isAgentRunning ? otherDelivery : undefined);
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (!isAgentRunning && !isDispatching) handleSend();
+      if (!isDispatching) void handleSend(isAgentRunning ? defaultDelivery : undefined);
     }
+  };
+
+  // 编辑一条排队消息：从后台取回完整内容并入输入框（已有内容时换行追加、附件合并）。
+  // 取回即移出队列，所以凡是并不进来的情况都要在取回之前拦下。
+  const editingQueuedRef = useRef(false);
+  const handleEditQueued = async (item: QueuedPromptView) => {
+    // 连点时第二次会拿到同一份取回结果，内容就会被并进来两遍
+    if (isDispatchingRef.current || editingQueuedRef.current || !onTakeQueued) return;
+    if (item.slashPromptName && slashPrompt) {
+      toast.warning(t('chat.composer.queue.slashConflict'));
+      return;
+    }
+    if (item.attachmentCount > freeSlots()) {
+      toast.warning(t('chat.composer.maxAttachments', [MAX_ATTACHMENT_COUNT]));
+      return;
+    }
+    editingQueuedRef.current = true;
+    let result: QueueTakeResult;
+    try {
+      result = await onTakeQueued(item.id);
+    } finally {
+      editingQueuedRef.current = false;
+    }
+    if (result.status !== 'taken') {
+      toast.error(result.status === 'gone' ? t('errors.queuedMessageGone') : t('chat.session.notConnected'));
+      return;
+    }
+    const taken = result.prompt;
+    if (taken.text) setValue((prev) => (prev.trim() ? `${prev}\n${taken.text}` : taken.text));
+    setHistoryIndex(null);
+    if (taken.slashPrompt) {
+      slashPromptSeqRef.current++;
+      setSlashPrompt(taken.slashPrompt);
+    }
+    const restored = supportsImageRef.current
+      ? taken.attachments
+      : taken.attachments.filter((a) => a.type !== 'image');
+    if (restored.length < taken.attachments.length) toast.info(t('chat.composer.imageStripped'));
+    if (restored.length > 0) updateAttachments((prev) => [...prev, ...restored]);
+    focusCaretAtEnd();
+  };
+
+  // 任务运行中按 Esc 停止（与 Claude / Codex 一致）：输入框有内容时停止键让位给发送键，靠它停。
+  // 挂在 footer 上，焦点在输入区任一控件（工具栏、排队列表）都生效。不接手的情况：
+  // 已被处理过的（斜杠菜单关菜单、Radix 弹层关闭都会 preventDefault）、从门户弹层冒泡上来的、
+  // 输入法组字中、拾取元素中（document 上的监听负责取消拾取）。
+  const handleFooterKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key !== 'Escape' || e.defaultPrevented || e.nativeEvent.isComposing) return;
+    if (!e.currentTarget.contains(e.target as Node)) return;
+    if (!isAgentRunning || isPicking) return;
+    e.preventDefault();
+    onCancel?.();
   };
 
   const handleInput = (val: string) => {
@@ -806,7 +885,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   useImperativeHandle(ref, () => ({ fill, addFiles: addDroppedFiles }));
 
   return (
-    <footer className="px-4 py-4 border-t border-border bg-background relative">
+    <footer className="px-4 py-4 border-t border-border bg-background relative" onKeyDown={handleFooterKeyDown}>
       {/* Slash menu — dynamic VFS prompts */}
       {isSlashMenuVisible && (
         <div
@@ -843,6 +922,22 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             </div>
           )}
         </div>
+      )}
+
+      <QueuedMessages
+        queue={queue}
+        paused={queuePaused}
+        disabled={isDispatching}
+        onSendNow={(id) => onSendQueuedNow?.(id)}
+        onEdit={(item) => void handleEditQueued(item)}
+        onRemove={(id) => onRemoveQueued?.(id)}
+      />
+      {isAgentRunning && canSend && (
+        <p className="mb-1.5 px-1 text-xs text-muted-foreground">
+          {defaultDelivery === 'queue'
+            ? t('chat.composer.followUp.shortcutHint.queue', ['Enter', otherShortcut])
+            : t('chat.composer.followUp.shortcutHint.steer', ['Enter', otherShortcut])}
+        </p>
       )}
 
       <div className="border border-border rounded-xl bg-card focus-within:border-border/80 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
@@ -1069,20 +1164,34 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 disabled={isDispatching}
               />
             )}
-            {isAgentRunning ? (
+            {showStop ? (
               <Button
                 variant="destructive"
                 size="icon-xs"
                 onClick={() => onCancel?.()}
+                title={t('chat.composer.stop')}
+                aria-label={t('chat.composer.stop')}
                 className="size-7 hover:shadow-xs"
               >
                 <Square className="size-3.5" fill="currentColor" />
+              </Button>
+            ) : isAgentRunning ? (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => void handleSend(defaultDelivery)}
+                disabled={isDispatching}
+                title={t(defaultDelivery === 'queue' ? 'chat.composer.followUp.queue' : 'chat.composer.followUp.steer')}
+                aria-label={t(defaultDelivery === 'queue' ? 'chat.composer.followUp.queue' : 'chat.composer.followUp.steer')}
+                className="size-7 bg-foreground text-background hover:bg-primary hover:text-primary-foreground hover:shadow-xs disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                {defaultDelivery === 'queue' ? <ListPlus className="size-3.5" /> : <CornerDownRight className="size-3.5" />}
               </Button>
             ) : (
               <Button
                 variant="ghost"
                 size="icon-xs"
-                onClick={handleSend}
+                onClick={() => void handleSend()}
                 disabled={!canSend || isDispatching}
                 aria-label={t('common.send')}
                 className="size-7 bg-foreground text-background hover:bg-primary hover:text-primary-foreground hover:shadow-xs disabled:opacity-30 disabled:cursor-not-allowed"

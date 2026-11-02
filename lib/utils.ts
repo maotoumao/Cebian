@@ -186,6 +186,13 @@ export function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
+/** 是否 Apple 平台：快捷键提示据此显示 ⌘ 而不是 Ctrl。没有 navigator 的上下文返回 false。 */
+export function isApplePlatform(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const { userAgentData } = navigator as Navigator & { userAgentData?: { platform?: string } };
+  return /mac|iphone|ipad/i.test(userAgentData?.platform || navigator.platform);
+}
+
 /** 值是否为需要深入遍历的普通对象（字面量 / Object.create(null)）。Date、Map 等非普通对象
  *  原样保留，由调用方决定如何处理 */
 function isPlainObject(value: unknown): value is Record<string, unknown> {

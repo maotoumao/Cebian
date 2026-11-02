@@ -304,6 +304,11 @@ settings:
       hint: "首輪回覆結束後，用 AI 產生的簡短標題取代預設標題（首則訊息截斷）。"
       model: "產生標題的模型"
       followMain: "與對話模型相同"
+    followUp:
+      label: "任務執行中傳送訊息"
+      hint: "智慧型代理工作時按 Enter 的效果。排隊：等目前任務完成再傳出；插話：目前這一步結束後插入目前任務。Shift+Ctrl+Enter（Mac 上為 Shift+⌘+Enter）執行另一種。"
+      queue: "排隊"
+      steer: "插話"
     search:
       title: "網路搜尋"
       hint: "設定搜尋引擎的嘗試順序，第一個啟用的引擎為首選。AI 可依適用情境優先選擇其他引擎；搜尋遭到攔截、沒有結果或執行失敗時，Cebian 會依序嘗試其餘已啟用的引擎。"
@@ -641,6 +646,26 @@ chat:
     imageStripped: "已移除圖片附件——當前模型不支援多模態輸入"
     noPrompts: "尚無 Prompt，前往 AI 設定建立"
     noMatch: "無相符結果"
+    stop: "停止"
+    # 智慧型代理工作時傳送訊息（issue #96）
+    followUp:
+      queue: "排隊傳送"
+      steer: "插話：插入目前任務"
+      # 快捷鍵提示，依 Enter 執行的動作（設定項）區分。
+      # $1 = 該動作的快捷鍵（"Enter"），$2 = 另一種動作的快捷鍵（如 "Shift+Ctrl+Enter"）
+      shortcutHint:
+        queue: "$1 排隊 · $2 插話 · Esc 停止"
+        steer: "$1 插話 · $2 排隊 · Esc 停止"
+    queue:
+      queued: "排隊中"
+      steering: "插話中"
+      sendNow: "立即傳送"
+      paused: "已暫停：上一輪沒有正常結束，排隊的訊息不會自動傳出。"
+      # $1 = 附件數
+      attachmentCount:
+        1: "1 個附件"
+        n: "$1 個附件"
+      slashConflict: "請先移除輸入框裡的提示詞——排隊的訊息自帶一個"
     iframeEnterHint: "⏎ 點擊進入"
     # 語音輸入（本地優先、雲端兜底的語音辨識）
     voiceStart: "語音輸入"
@@ -1083,6 +1108,8 @@ errors:
   pageActionGone: "找不到該操作。"
   pageActionSaveFailed: "儲存失敗，請重試。"
   compactionSettingsSaveFailed: "儲存上下文壓縮設定失敗，請重試。"
+  followUpSettingSaveFailed: "儲存任務執行中傳送訊息的設定失敗，請重試。"
+  queuedMessageGone: "這則訊息已不在佇列中，可能已傳出或在其他視窗被刪除。"
   appearanceSaveFailed: "儲存外觀設定失敗，請重試。"
   languageSwitchFailed: "切換語言失敗，請重試。"
   localFontsPermissionDenied: "讀取本機字型的權限被拒絕。請在 Chrome 設定裡允許 Cebian 使用本機字型，然後重試。"

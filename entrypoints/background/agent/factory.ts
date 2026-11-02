@@ -181,6 +181,9 @@ function createCebianAgent(options: CreateAgentOptions): Agent {
       messages,
     },
 
+    // 运行中的插话（issue #96）在同一个工具边界一次全部投进去，而不是一个边界只投一条。
+    steeringMode: 'all',
+
     // 每次请求前（含每个 run 的首次）装上 system 头。返回的 context 会替换 loop 本次及
     // 之后请求所用的 context，所以 run 中途改写的 preamble 在下一个 turn 生效。
     prepareRequest: ({ context, model: requestModel }) => {
