@@ -240,6 +240,11 @@ settings:
     toolbar:
       label: "劃詞工具列"
       hint: "選取文字時顯示快速工具列。"
+      placement:
+        label: "位置"
+        above: "選取範圍上方"
+        below: "選取範圍下方"
+        hint: "這一側放不下時，會自動改顯示在另一側。"
     model:
       label: "工具列模型"
       hint: "劃詞工具列使用的模型。通常選擇速度快、成本低的模型即可，預設與對話模型相同。"

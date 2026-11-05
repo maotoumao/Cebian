@@ -240,6 +240,11 @@ settings:
     toolbar:
       label: "划词工具条"
       hint: "选中文本时显示快捷工具条。"
+      placement:
+        label: "位置"
+        above: "选区上方"
+        below: "选区下方"
+        hint: "这一侧放不下时，会自动出现在另一侧。"
     model:
       label: "工具条模型"
       hint: "划词工具条使用的模型。通常选择速度快、成本低的模型即可，默认与对话模型相同。"

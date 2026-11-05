@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { ModelSelector } from '@/components/chat/ModelSelector';
+import { InlineRadioGroup, type RadioOption } from '@/components/settings/InlineRadioGroup';
 import { PageScopeEditor } from '@/components/settings/page-interaction/PageScopeEditor';
 import { ToolbarActionList } from '@/components/settings/page-interaction/ToolbarActionList';
 import { ToolbarActionEditor } from '@/components/settings/page-interaction/ToolbarActionEditor';
@@ -17,6 +18,7 @@ import {
   providerCredentials,
   customProviders as customProvidersStorage,
   type PageInteractionSettings,
+  type ToolbarPlacement,
 } from '@/lib/persistence/storage';
 import { getBuiltinDefaultSystemPrompt, listPageActions } from '@/lib/page-actions/actions';
 import { resolvePageScope, type PageScope } from '@/lib/page-actions/match';
@@ -29,6 +31,12 @@ import {
 } from '@/lib/page-actions/edit-config';
 import { isBuiltinPageActionId, type PageActionDraft, type PageActionsConfig } from '@/lib/page-actions/types';
 import { t } from '@/lib/i18n';
+import { cn } from '@/lib/utils';
+
+const TOOLBAR_PLACEMENT_OPTIONS: RadioOption<ToolbarPlacement>[] = [
+  { value: 'above', getLabel: () => t('settings.pageInteraction.toolbar.placement.above') },
+  { value: 'below', getLabel: () => t('settings.pageInteraction.toolbar.placement.below') },
+];
 
 /** 悬浮球 / 工具条的生效范围字段。两块 UI 的干扰场景不同（用户要求分开配置），故各挂
  *  一份；缩进一级表示它从属上面那个开关。 */
@@ -57,6 +65,8 @@ function PageInteractionPanel({ onEditAction }: { onEditAction: (id: string) => 
   const [providers] = useStorageItem(providerCredentials, {});
   const [customProviderList] = useStorageItem(customProvidersStorage, []);
   const [storedActions, setStoredActions] = useStorageItem(pageActionsConfig, undefined);
+  const placementLabelId = useId();
+  const placementHintId = useId();
 
   const settings = resolvePageInteractionSettings(stored);
   const patch = (next: Partial<PageInteractionSettings>) =>
@@ -116,6 +126,22 @@ function PageInteractionPanel({ onEditAction }: { onEditAction: (id: string) => 
             onCheckedChange={(v) => patch({ showSelectionToolbar: v })}
             className="shrink-0"
           />
+        </div>
+        <div className={cn('pl-1 space-y-1.5', !settings.showSelectionToolbar && 'opacity-50')}>
+          <Label id={placementLabelId} className="text-xs font-normal text-muted-foreground">
+            {t('settings.pageInteraction.toolbar.placement.label')}
+          </Label>
+          <InlineRadioGroup
+            value={settings.toolbarPlacement}
+            options={TOOLBAR_PLACEMENT_OPTIONS}
+            onChange={(v) => patch({ toolbarPlacement: v })}
+            labelId={placementLabelId}
+            describedBy={placementHintId}
+            disabled={!settings.showSelectionToolbar}
+          />
+          <p id={placementHintId} className="text-xs text-muted-foreground">
+            {t('settings.pageInteraction.toolbar.placement.hint')}
+          </p>
         </div>
         <PageScopeField
           scope={settings.toolbarPages}

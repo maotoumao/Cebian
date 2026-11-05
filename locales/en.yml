@@ -245,6 +245,11 @@ settings:
     toolbar:
       label: "Selection toolbar"
       hint: "Show a quick-action toolbar when you select text on a page."
+      placement:
+        label: "Position"
+        above: "Above the selection"
+        below: "Below the selection"
+        hint: "If there isn't room on that side, it appears on the other side."
     model:
       label: "Toolbar model"
       hint: "The model used by all toolbar actions. A fast, low-cost model is usually enough. Defaults to the conversation model."

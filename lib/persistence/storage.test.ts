@@ -136,6 +136,22 @@ describe('resolvePageInteractionSettings — 页面生效范围', () => {
   });
 });
 
+describe('resolvePageInteractionSettings — 工具条位置', () => {
+  it('旧装机缺字段时回退选区上方', () => {
+    expect(resolvePageInteractionSettings(undefined).toolbarPlacement).toBe('above');
+    expect(resolvePageInteractionSettings({ showSelectionToolbar: true }).toolbarPlacement).toBe('above');
+  });
+
+  it('合法值原样保留', () => {
+    expect(resolvePageInteractionSettings({ toolbarPlacement: 'below' }).toolbarPlacement).toBe('below');
+    expect(resolvePageInteractionSettings({ toolbarPlacement: 'above' }).toolbarPlacement).toBe('above');
+  });
+
+  it('非法值（如备份里的脏数据）回退选区上方', () => {
+    expect(resolvePageInteractionSettings({ toolbarPlacement: 'left' } as never).toolbarPlacement).toBe('above');
+  });
+});
+
 describe('resolveChatAppearance', () => {
   const DEFAULT = { fontScalePercent: 100, fontPreset: 'default', customFontName: '' };
 

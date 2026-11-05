@@ -466,6 +466,9 @@ export const memoryOrganizeState = storage.defineItem<MemoryOrganizeState>(
 
 // ─── 页面交互（悬浮球 + 划词工具条） ───
 
+/** 划词工具条相对选区的首选位置；该侧放不下时自动翻到另一侧。 */
+export type ToolbarPlacement = 'above' | 'below';
+
 /**
  * 注入页面的交互功能设置：贴边悬浮球（单击拉起侧边栏）与划词工具条（复制 / 解释 /
  * 翻译）。两块 UI 各有显示开关；工具条的 AI 单独配置，缺省回退对话主模型。
@@ -477,6 +480,8 @@ export interface PageInteractionSettings {
   showFloatingBall: boolean;
   /** 划词工具条显示开关。默认 true */
   showSelectionToolbar: boolean;
+  /** 划词工具条放在选区上方还是下方。默认 'above' */
+  toolbarPlacement: ToolbarPlacement;
   /** 工具条专用模型；缺省回退主模型 */
   toolbarModel?: ModelIdentity;
   /** 悬浮球的页面生效范围（include 空 = 所有页面，exclude 优先扣除） */
@@ -489,6 +494,7 @@ export interface PageInteractionSettings {
 const DEFAULT_PAGE_INTERACTION: PageInteractionSettings = {
   showFloatingBall: true,
   showSelectionToolbar: true,
+  toolbarPlacement: 'above',
   ballPages: { include: [], exclude: [] },
   toolbarPages: { include: [], exclude: [] },
 };
@@ -530,6 +536,8 @@ export function resolvePageInteractionSettings(
   return {
     showFloatingBall: merged.showFloatingBall,
     showSelectionToolbar: merged.showSelectionToolbar,
+    // 备份恢复原样写回存储值，可能带进非法值；不认识的一律回退默认。
+    toolbarPlacement: merged.toolbarPlacement === 'below' ? 'below' : 'above',
     ...(merged.toolbarModel ? { toolbarModel: merged.toolbarModel } : {}),
     ballPages: scopeOf('ballPages', legacy?.ballHiddenPages),
     toolbarPages: scopeOf('toolbarPages', legacy?.toolbarHiddenPages),

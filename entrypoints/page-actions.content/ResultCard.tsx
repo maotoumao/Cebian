@@ -15,6 +15,8 @@ import { copyText } from './clipboard';
 
 const GAP = 8;
 const CARD_WIDTH = 360;
+/** 卡片的最小可用高度：锚定位与 maxHeight 都按它保底，保证卡片至少这么高露在视口里。 */
+const MIN_CARD_HEIGHT = 140;
 
 type Status = 'streaming' | 'done' | 'error';
 
@@ -107,6 +109,15 @@ function HeaderIcon({ status }: { status: Status }) {
   return null;
 }
 
+/**
+ * 选区首行与末行的视口矩形（单行选区两者相同）。贴着选区放 UI 时，放上方对齐首行、
+ * 放下方对齐末行，才不会盖住多行选区中间的文字。
+ */
+export interface SelectionLines {
+  first: DOMRect;
+  last: DOMRect;
+}
+
 interface ResultCardProps {
   actionId: PageActionId;
   /** 卡片标题：发起方已解析好的动作显示名（内置跟随界面语言，自定义为用户起的名）。 */
@@ -114,8 +125,8 @@ interface ResultCardProps {
   text: string;
   /** 点击那刻采集的页面侧模板变量（context / page_url / page_title）。 */
   vars: Record<string, string>;
-  /** 触发时选区的视口矩形，用于锚定卡片。 */
-  anchorRect: DOMRect;
+  /** 触发时选区的首末行矩形，用于锚定卡片。 */
+  lines: SelectionLines;
   onClose: () => void;
 }
 
@@ -125,7 +136,7 @@ interface ResultCardProps {
  * 页内渲染 markdown；富文本交给「在侧边栏继续」）。「短暂调用」：动作本身不落库、
  * 历史查不到；只有点「在侧边栏继续」才把本次交互固化成会话。
  */
-export function ResultCard({ actionId, title, text, vars, anchorRect, onClose }: ResultCardProps) {
+export function ResultCard({ actionId, title, text, vars, lines, onClose }: ResultCardProps) {
   const [content, setContent] = useState('');
   // 后处理脚本的产物：非 null 即替换展示与复制内容（原始输出仍用于「在侧边栏继续」，
   // 那是模型真正说过的话，固化成历史才不会错位）。
@@ -185,22 +196,26 @@ export function ResultCard({ actionId, title, text, vars, anchorRect, onClose }:
     return () => document.removeEventListener('pointerdown', onDown, true);
   }, []);
 
-  // 按选区算一次锚定位（仅依赖 anchorRect，不随 content / status 重算）：空间够就放下方
-  // （top 固定、向下生长），否则放上方并锚底边（bottom 固定、向上生长）——流式增高不跳。
+  // 按选区算一次锚定位（仅依赖 lines，不随 content / status 重算）：空间够就放末行下方
+  // （top 固定、向下生长），否则放首行上方并锚底边（bottom 固定、向上生长）——流式增高不跳。
+  // 选区首末行可能都在视口外（长选区自动滚动后），锚定边要夹在视口内，至少露出
+  // MIN_CARD_HEIGHT；两侧都放不下时宁可盖住部分选区，也不能让卡片开到屏幕外。
   useLayoutEffect(() => {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const w = Math.min(CARD_WIDTH, vw - 2 * GAP);
-    const cx = anchorRect.left + anchorRect.width / 2;
-    const left = Math.max(GAP, Math.min(cx - w / 2, vw - w - GAP));
-    const spaceBelow = vh - anchorRect.bottom - GAP;
-    const spaceAbove = anchorRect.top - GAP;
+    const { first, last } = lines;
+    const leftFor = (rect: DOMRect) =>
+      Math.max(GAP, Math.min(rect.left + rect.width / 2 - w / 2, vw - w - GAP));
+    const clampEdge = (edge: number) => Math.max(GAP, Math.min(edge, vh - MIN_CARD_HEIGHT - GAP));
+    const spaceBelow = vh - last.bottom - GAP;
+    const spaceAbove = first.top - GAP;
     if (spaceBelow >= spaceAbove) {
-      setPlacement({ left, top: anchorRect.bottom + GAP });
+      setPlacement({ left: leftFor(last), top: clampEdge(last.bottom + GAP) });
     } else {
-      setPlacement({ left, bottom: vh - anchorRect.top + GAP });
+      setPlacement({ left: leftFor(first), bottom: clampEdge(vh - first.top + GAP) });
     }
-  }, [anchorRect]);
+  }, [lines]);
 
   // 展示与复制都用后处理后的文本（没配脚本或脚本失败时就是原始输出）。
   const shown = transformed ?? content;
@@ -271,7 +286,7 @@ export function ResultCard({ actionId, title, text, vars, anchorRect, onClose }:
       : vh - 2 * GAP;
   const style: CSSProperties = {
     ...cardStyle,
-    maxHeight: Math.max(140, anchorMaxHeight),
+    maxHeight: Math.max(MIN_CARD_HEIGHT, anchorMaxHeight),
     // 首帧尚未算出位置时先隐藏，避免闪到 (0,0)。
     visibility: anchored ? 'visible' : 'hidden',
     ...(dragPos

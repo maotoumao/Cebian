@@ -22,13 +22,12 @@ import { matchesPageScope } from '@/lib/page-actions/match';
 import { t } from '@/lib/i18n';
 import { copyText } from './clipboard';
 import { gatherPageVars } from './context';
-import { ResultCard } from './ResultCard';
+import { ResultCard, type SelectionLines } from './ResultCard';
 import { useCurrentUrl } from './useCurrentUrl';
 
-/** 选区锚点：选中的文本 + 其在视口中的包围盒。 */
-interface SelectionAnchor {
+/** 选区锚点：选中的文本 + 其首末行在视口中的矩形。 */
+interface SelectionAnchor extends SelectionLines {
   text: string;
-  rect: DOMRect;
 }
 
 /** 工具条相对视口的固定位置。 */
@@ -93,7 +92,9 @@ function getActiveSelection(): SelectionAnchor | null {
     if (selectionStart != null && selectionEnd != null && selectionEnd > selectionStart) {
       const text = active.value.slice(selectionStart, selectionEnd);
       if (text.trim()) {
-        return { text, rect: getInputSelectionRect(active, selectionStart, selectionEnd) };
+        // 输入框内只估算出一个矩形，首末行共用。
+        const rect = getInputSelectionRect(active, selectionStart, selectionEnd);
+        return { text, first: rect, last: rect };
       }
     }
   }
@@ -101,11 +102,17 @@ function getActiveSelection(): SelectionAnchor | null {
   if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
     const text = sel.toString();
     if (text.trim()) {
-      // 锚在选区末行（最后一个 client rect），多行选区时更贴合鼠标释放处。
+      // 取首末行（第一个 / 最后一个 client rect）：放上方对齐首行、放下方对齐末行，
+      // 多行选区时才不会盖住中间选中的文字。三击选段落时末尾常带一个落在下一行行首的
+      // 零宽矩形，选区跨过空的块元素（如 clearfix）时还会带零高矩形，按它们对齐会偏到
+      // 没选中的位置，故先滤掉宽或高为 0 的矩形。
       const range = sel.getRangeAt(0);
-      const rects = range.getClientRects();
-      const rect = rects.length > 0 ? rects[rects.length - 1] : range.getBoundingClientRect();
-      return { text, rect };
+      const rects = Array.from(range.getClientRects()).filter((r) => r.width > 0 && r.height > 0);
+      if (rects.length > 0) {
+        return { text, first: rects[0], last: rects[rects.length - 1] };
+      }
+      const rect = range.getBoundingClientRect();
+      return { text, first: rect, last: rect };
     }
   }
   return null;
@@ -113,7 +120,7 @@ function getActiveSelection(): SelectionAnchor | null {
 
 /**
  * 监听文档选区变化，产出当前锚点（无选区时为 null）。selectionchange 做去抖，
- * mouseup / keyup 立即刷新；scroll / resize 时刷新锚点位置（选区仍在则更新 rect，
+ * mouseup / keyup 立即刷新；scroll / resize 时刷新锚点位置（选区仍在则更新首末行矩形，
  * 消失则清空 → 隐藏）。
  */
 function useSelectionAnchor(enabled: boolean): SelectionAnchor | null {
@@ -317,14 +324,14 @@ export function SelectionToolbar() {
   const [dragPos, setDragPos] = useState<Position | null>(null);
   const [copied, setCopied] = useState(false);
   // 当前打开的结果卡（解释 / 翻译 / 总结）；非 null 时展示卡片、隐藏工具条。
-  // text / context / rect 在点击时捕获，卡片独立于后续选区变化。
+  // text / context / lines 在点击时捕获，卡片独立于后续选区变化。
   const [action, setAction] = useState<{
     id: PageActionId;
     label: string;
     text: string;
     /** 点击那刻的页面侧模板变量（context / page_url / page_title）。 */
     vars: Record<string, string>;
-    rect: DOMRect;
+    lines: SelectionLines;
   } | null>(null);
   // 拖拽 / 复制反馈的清理句柄：组件卸载（含拖拽中途）时统一收尾，避免残留监听 / 定时器。
   const dragCleanupRef = useRef<(() => void) | null>(null);
@@ -356,7 +363,9 @@ export function SelectionToolbar() {
     setCopied(false);
   }, [selectionText]);
 
-  // 锚定定位：测量工具条尺寸，居中于选区上方（放不下则移到下方），并夹在视口内。
+  // 锚定定位：测量工具条尺寸，按设置居中于选区首行上方或末行下方（放不下则翻到另一侧），
+  // 并夹在视口内。依赖 toolbarPlacement，设置改了已显示的工具条也立即挪位置。
+  const { toolbarPlacement } = settings;
   useLayoutEffect(() => {
     if (!anchor || !barRef.current) {
       setComputed(null);
@@ -367,12 +376,17 @@ export function SelectionToolbar() {
     const h = el.offsetHeight;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const cx = anchor.rect.left + anchor.rect.width / 2;
-    const left = Math.max(GAP, Math.min(cx - w / 2, vw - w - GAP));
-    let top = anchor.rect.top - h - GAP;
-    if (top < GAP) top = Math.min(anchor.rect.bottom + GAP, vh - h - GAP);
-    setComputed({ left, top });
-  }, [anchor]);
+    const leftFor = (rect: DOMRect) =>
+      Math.max(GAP, Math.min(rect.left + rect.width / 2 - w / 2, vw - w - GAP));
+    const above = { left: leftFor(anchor.first), top: anchor.first.top - h - GAP };
+    const below = { left: leftFor(anchor.last), top: anchor.last.bottom + GAP };
+    const fitsAbove = above.top >= GAP;
+    const fitsBelow = below.top <= vh - h - GAP;
+    // 首选一侧放得下就用它，否则翻到另一侧；两侧都放不下时落在另一侧并夹进视口。
+    const pos =
+      toolbarPlacement === 'below' ? (fitsBelow ? below : above) : fitsAbove ? above : below;
+    setComputed({ left: pos.left, top: Math.max(GAP, Math.min(pos.top, vh - h - GAP)) });
+  }, [anchor, toolbarPlacement]);
 
   const startDrag = useCallback(
     (e: ReactPointerEvent) => {
@@ -418,7 +432,13 @@ export function SelectionToolbar() {
     (id: PageActionId, label: string) => {
       if (!anchor) return;
       // 点击时选区仍在（onMouseDown preventDefault），此刻采集页面侧变量。
-      setAction({ id, label, text: anchor.text, vars: gatherPageVars(), rect: anchor.rect });
+      setAction({
+        id,
+        label,
+        text: anchor.text,
+        vars: gatherPageVars(),
+        lines: { first: anchor.first, last: anchor.last },
+      });
     },
     [anchor],
   );
@@ -435,7 +455,7 @@ export function SelectionToolbar() {
         title={action.label}
         text={action.text}
         vars={action.vars}
-        anchorRect={action.rect}
+        lines={action.lines}
         onClose={() => setAction(null)}
       />
     );
