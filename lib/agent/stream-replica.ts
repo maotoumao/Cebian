@@ -12,8 +12,9 @@ import { parseStreamingJson } from '@earendil-works/pi-ai';
 import type { ToolCall } from '@earendil-works/pi-ai';
 import type { BroadcastMessage, StreamOp } from '@/lib/ipc/protocol';
 
-/** 流式中的 toolCall 块带 partialJson 累积字段（pi-ai 的 provider 在运行时
- *  写入、公开类型未声明）。副本自己维护同名字段并据此重算 arguments。 */
+/** 流式中的 toolCall 块带 partialJson 累积字段：这是 Cebian 流式协议自己的字段
+ *  （background 的 stream-broadcast 注入快照、tail_append 追加），pi 的公开类型
+ *  未声明。副本自己维护同名字段并据此重算 arguments。 */
 type StreamingToolCall = ToolCall & { partialJson?: string };
 
 /** 内容块的宽松结构视图（AgentMessage['content'] 元素的运行时形态）。 */

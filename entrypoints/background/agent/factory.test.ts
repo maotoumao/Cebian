@@ -3,7 +3,6 @@ import { fakeBrowser } from 'wxt/testing/fake-browser';
 import type { Agent, AgentEvent, AgentMessage, AgentTool } from '@earendil-works/pi-agent-core';
 import {
   createAssistantMessageEventStream,
-  Type,
   type Api,
   type AssistantMessage,
   type Message,
@@ -12,6 +11,7 @@ import {
 } from '@earendil-works/pi-ai';
 import { streamSimple } from '@earendil-works/pi-ai/compat';
 import { getBuiltinModels, type BuiltinProvider } from '@earendil-works/pi-ai/providers/all';
+import { Type } from 'typebox';
 import { createCompactionSummaryMessage } from '@/lib/agent/compaction-summary';
 import { toModel } from '@/lib/providers/custom-models';
 import { resolveModel } from '@/lib/providers/resolve-model';

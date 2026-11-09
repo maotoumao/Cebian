@@ -93,19 +93,18 @@ describe('stream-broadcast 生产端 → stream-replica 应用端（端到端契
     expect(tail(replica).content[0].text).toBe('AB');
   });
 
-  it('工具参数：provider 无关（partialArgs 风格的 partial 也能续写）+ 跨工具交错', () => {
+  it('工具参数：块上不带累计字段也能续写 + 跨工具交错', () => {
     const partial = makePartial();
     const jsonA = '{"x":1}';
     const jsonB = '{"y":"z"}';
 
-    // 模拟 openai-completions 风格：累计串放在 partialArgs，块上没有 partialJson
-    partial.content.push({ type: 'toolCall', id: 'a', name: 'ta', arguments: {}, partialArgs: '' });
+    // pi 1.5 起所有 provider 都不在块上留累计的原始参数文本，续写基底只能来自 stream-broadcast 注入的 partialJson
+    partial.content.push({ type: 'toolCall', id: 'a', name: 'ta', arguments: {} });
     queueStreamEvent(S, { type: 'toolcall_start', contentIndex: 0, partial } as never);
-    partial.content[0].partialArgs = jsonA.slice(0, 4);
     queueStreamEvent(S, { type: 'toolcall_delta', contentIndex: 0, delta: jsonA.slice(0, 4), partial } as never);
 
     // 工具 B 开始（结构帧覆盖缓冲），A 的续写基底必须存活在注入的 partialJson 里
-    partial.content.push({ type: 'toolCall', id: 'b', name: 'tb', arguments: {}, partialArgs: '' });
+    partial.content.push({ type: 'toolCall', id: 'b', name: 'tb', arguments: {} });
     queueStreamEvent(S, { type: 'toolcall_start', contentIndex: 1, partial } as never);
 
     // A、B 交错续流
@@ -121,7 +120,7 @@ describe('stream-broadcast 生产端 → stream-replica 应用端（端到端契
   it('mid-stream subscribe：flush → 快照（snapshotStreamingTail 注入基底）→ 后续 delta 续写正确', () => {
     const partial = makePartial();
     const json = '{"path":"a.txt"}';
-    partial.content.push({ type: 'toolCall', id: 'a', name: 'w', arguments: {}, partialArgs: '' });
+    partial.content.push({ type: 'toolCall', id: 'a', name: 'w', arguments: {} });
     queueStreamEvent(S, { type: 'toolcall_start', contentIndex: 0, partial } as never);
     queueStreamEvent(S, { type: 'toolcall_delta', contentIndex: 0, delta: json.slice(0, 9), partial } as never);
 

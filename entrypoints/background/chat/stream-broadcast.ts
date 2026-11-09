@@ -11,10 +11,9 @@
 //   它会吞掉缓冲里此前的所有增量——快照本身已包含它们。
 //
 // 工具参数的累计 JSON 由**本模块自己维护**（argsAccum，按块下标），并在每个
-// 快照发出前注入 toolCall 块的 `partialJson` 字段：pi 各 provider 的累计
-// scratch 字段并不统一（anthropic 用 partialJson、openai/mistral 用
-// partialArgs、pi-messages 干脆存在消息外部），应用端的续写基底不能依赖
-// 任何 provider 私有字段——协议字段协议自己填。
+// 快照发出前注入 toolCall 块的 `partialJson` 字段：pi 的 toolCall 内容块上不带
+// 累计的原始参数文本（pi 1.5 起各 provider 都把它留在块外部），应用端的续写基底
+// 只能来自协议字段——协议字段协议自己填。
 //
 // 时间窗合并：空窗期的第一帧立即发（leading，首个 token 即时可见），窗口内
 // 增量进缓冲，到期发一帧（trailing）并续窗；一个整窗都没有新增量才退出。

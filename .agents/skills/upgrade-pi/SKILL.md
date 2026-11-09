@@ -22,11 +22,13 @@ description: 升级pi-agent-core和pi-ai到最新版本
 ## 硬性约束（务必遵守）
 
 1. **两个包锁步升级到同一版本**。lockfile 里 pi-agent-core 依赖同版本 pi-ai；只升其中一个会造成版本错配。
-2. **`typebox` 跟随 pi，绝不单独升**。本项目 [package.json](../../../package.json) 把 `typebox` **精确锁死**（无 `^`），就是为了和 pi 内部捆绑的 typebox 完全一致——两边 `TSchema` 类型标识必须是同一份，否则本项目用 `Type.Object(...)` 造出来的 schema 传给 pi 校验会类型不兼容，还可能产生两份 typebox 副本。
-   - 升级 pi 后，去 [pnpm-lock.yaml](../../../pnpm-lock.yaml) 查 pi 实际解析的 `typebox` 版本；**只有当它变了**，才把项目的 `typebox` 精确 pin 改成同一版本。
-   - 参考：pi 的 typebox 迁移发生在 0.69.0（`@sinclair/typebox` 0.34.x → `typebox` 1.x）；0.86.0 起精确依赖 `typebox 1.3.27`。
+2. **`typebox` 是本项目自己的依赖，不再跟随 pi**。pi 1.5.0 起 pi-ai / pi-agent-core 既不依赖也不再 re-export TypeBox，工具参数改由自带的 `@earendil-works/pi-schema` 校验，`Tool` / `AgentTool` 的参数接受任意 JSON Schema 对象。本项目的 `Type` 一律从 `typebox` 导入，不要从 pi-ai 导入。
+   - `AgentTool` 的 `params` 类型由 pi-schema 识别 TypeBox schema 上的 `'~kind'` / `'~optional'` 等标记推导（Enum / Tuple / Intersect 会推成 `unknown`）。单独升级 `typebox` 时要确认这些标记还在，`pnpm compile` 会兜住类型退化。
+   - 历史：pi 0.69.0 迁到 `typebox` 1.x，0.86.0 起精确依赖 `typebox 1.3.27`，1.5.0 去掉该依赖。
+
 3. 本项目实际用法（评估破坏性变更时以这些为准）：
-   - `Type` / `Static` / `TSchema`：[lib/tools/*](../../../lib/tools)、[lib/mcp/client.ts](../../../lib/mcp/client.ts) 里的 `typebox/value` 校验器。
+   - `Type` / `Static` / `TSchema`（来自 `typebox`）：[lib/tools/*](../../../lib/tools)、[lib/mcp/client.ts](../../../lib/mcp/client.ts) 里的 `typebox/value` 校验器。
+   - 工具参数校验在 pi 内部：pi-schema 的 `compile(schema, { coerce: true })`，MCP 工具的纯 JSON Schema 也走同一套宽松类型转换。
    - agent runtime：[hooks/useBackgroundAgent.ts](../../../hooks/useBackgroundAgent.ts)、[lib/agent/](../../../lib/agent)、`AgentTool` 协议（tool 抛错=失败、返回=成功）。
 
 4. **会话树与压缩依赖的 harness 已 vendor，不随 pi 升级**。pi 1.0.0 删除了整个实验性 harness（Session 层、压缩函数、`session/testing`、`compactionSummary` 等自定义消息类型），本项目把用到的部分冻结在 0.84.4 快照，放在 [lib/shims/pi-harness/](../../../lib/shims/pi-harness)（原因、偏离与维护约定见其 README）。升级 pi 时：
@@ -37,9 +39,9 @@ description: 升级pi-agent-core和pi-ai到最新版本
    - 重点读 agent-loop 的 `declareToolChanges`、`prepareRequest`、`prepareNextTurn`（Agent 选项名为 `prepareNextTurnWithContext`）、`finishTurn` 有没有改语义或时序。
    - [factory.test.ts](../../../entrypoints/background/agent/factory.test.ts) 会兜住「每次请求都有头、system 消息永不进 state」这条不变式，必须保持全绿。
 
-6. **版本范围用 `~`**。`package.json` 里两个包写 `~x.y.z`（只放行 patch），minor 升级必须走本流程，避免一次 `pnpm install` 悄悄带进破坏性变更并与精确 pin 的 `typebox` 错位。
+6. **版本范围用 `~`**。`package.json` 里两个包写 `~x.y.z`（只放行 patch），minor 升级必须走本流程，避免一次 `pnpm install` 悄悄带进破坏性变更。
 
-7. **已知上游行为**（已核实至 1.4.0，后续升级时重新核对）：Copilot 下的 GPT-6 Sol / Luna 可选「关闭思考」，但 Responses 适配器对 `github-copilot` 不发送 `effort: "none"`，由 Copilot 服务端决定；Copilot 的 Gemini 条目（1.4.0 为 `gemini-3.8-flash`、`gemini-4-argon`）`supportsReasoningEffort: false`，思考档不生效。
+7. **已知上游行为**（已核实至 1.5.0，后续升级时重新核对）：Copilot 下的 GPT-6 Sol / Luna / GPT-6.1 Terra 可选「关闭思考」，但 Responses 适配器对 `github-copilot` 不发送 `effort: "none"`，由 Copilot 服务端决定；Copilot 的 Gemini 条目（1.5.0 为 `gemini-3.8-flash`、`gemini-4-argon`）`supportsReasoningEffort: false`，思考档不生效。
 
 8. **请求不带 pi 的归因**。pi-agent-core 1.4 起 agent loop 默认带 `PI_ATTRIBUTION`（OpenRouter 的 `X-OpenRouter-Title: pi`、NVIDIA 的 `X-BILLING-INVOKE-ORIGIN: Pi` 等）；[factory.ts](../../../entrypoints/background/agent/factory.ts) 传 `identity: { attribution: null }` 关掉，OpenRouter 的 Cebian 归因仍由 `lib/providers/resolve-model.ts` 写进 `model.headers`。升级时核对 `ClientIdentity` / `mergeClientIdentity` 的语义没变，`factory.test.ts` 的「请求归因」用例会兜住。
 
@@ -48,4 +50,4 @@ description: 升级pi-agent-core和pi-ai到最新版本
 1. `pnpm outdated` 看两个包的 Current / Latest。
 2. 逐版本读上面两个 CHANGELOG（把 Current→Latest 之间每个版本都覆盖到），重点抓 `Breaking Changes` 和公开 API 改动。
 3. 交叉验证：CHANGELOG 与 npm 版本历史日期是否一致；破坏性变更是否命中本项目实际用法（别人眼里的 breaking 我们可能没用到）。
-4. 给结论 + 和我讨论：能否升、要不要顺带动 `typebox`（按上面约束判断）、升级后需要手动回归哪些链路（发消息 / 流式思考 / 工具调用 / 中止 abort / 模型切换 / 压缩 / 分支回卷）。默认**不改 package.json**，确认后再动。
+4. 给结论 + 和我讨论：能否升、升级后需要手动回归哪些链路（发消息 / 流式思考 / 工具调用 / 中止 abort / 模型切换 / 压缩 / 分支回卷）。默认**不改 package.json**，确认后再动。

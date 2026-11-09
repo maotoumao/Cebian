@@ -22,17 +22,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - 任务运行中也能接着发消息，用法与 Codex 一致：按 Enter 排队，当前任务正常跑完后按顺序自动发出；按 Shift+⌘+Enter（Windows / Linux 上为 Shift+Ctrl+Enter）插话，在当前这一步结束后插入正在进行的任务。排队的消息显示在输入框上方，可以立即发送、编辑或删除。任务运行中输入框里有文字时，停止按钮会换成发送按钮，这时按 Esc 停止任务；任务出错或被停止时队列会保留并暂停，不会自动发出。Enter 默认排队还是插话，可以在设置 → 对话 →「任务运行中发送消息」里切换 ([#96](https://github.com/maotoumao/Cebian/issues/96))
 - 划词工具条可以设为出现在选区上方或下方：在设置 → 页面交互 →「划词工具条」下选择「位置」，选定的一侧放不下时会自动换到另一侧 ([#93](https://github.com/maotoumao/Cebian/issues/93))
+- 新增模型：GPT-6.1 Terra（OpenAI、OpenAI Codex、GitHub Copilot、OpenRouter、Vercel AI Gateway，可以关闭思考），Kimi K3.1 Pro（Kimi Coding Plan、Moonshot、Moonshot (CN)、OpenRouter、Vercel AI Gateway）与 Kimi K3.1 Pro Highspeed（Kimi Coding Plan、Moonshot、Moonshot (CN)、Vercel AI Gateway），MiniMax-M3.1-Flash（Fireworks、Hugging Face、NVIDIA NIM、OpenRouter），OpenAI 的 Chat Latest 与 GPT-5.6 Cyber，Google 的 Gemini Robotics-ER 2 Preview；其余提供商的内置模型列表也同步到了最新
 
 - You can keep sending messages while a task is running, the same way as in Codex: press Enter to queue a message, and queued messages are sent in order once the current task finishes normally; press Shift+⌘+Enter (Shift+Ctrl+Enter on Windows / Linux) to steer, inserting the message into the running task as soon as the current step finishes. Queued messages appear above the input box, where you can send one now, edit it or delete it. While a task is running and the input has text, the stop button turns into the send button and Esc stops the task; if the task fails or you stop it, the queue is kept and paused instead of sending on its own. Whether Enter queues or steers can be changed in Settings → Chat → "Sending while a task runs" ([#96](https://github.com/maotoumao/Cebian/issues/96))
 - The selection toolbar can now appear above or below the selection: choose its "Position" under Settings → Page interaction → "Selection toolbar". If there isn't room on that side, it switches to the other side ([#93](https://github.com/maotoumao/Cebian/issues/93))
+- Added models: GPT-6.1 Terra (OpenAI, OpenAI Codex, GitHub Copilot, OpenRouter, Vercel AI Gateway; thinking can be turned off), Kimi K3.1 Pro (Kimi Coding Plan, Moonshot, Moonshot (CN), OpenRouter, Vercel AI Gateway) and Kimi K3.1 Pro Highspeed (Kimi Coding Plan, Moonshot, Moonshot (CN), Vercel AI Gateway), MiniMax-M3.1-Flash (Fireworks, Hugging Face, NVIDIA NIM, OpenRouter), Chat Latest and GPT-5.6 Cyber on OpenAI, and Gemini Robotics-ER 2 Preview on Google; the built-in model lists of the other providers are refreshed too
+
+### 变更 / Changed
+
+- 部分模型的可选思考档随上游调整：Mistral 的 Mistral Large 4 不再提供「关闭」，改为「低 / 中 / 高」三档；Fireworks 的 Qwen Max Latest（Qwen3.8 Max）改为「关闭 / 低 / 中 / 极高」。之前选的档位不再可用时，会自动调整为该模型支持的档位
+- 部分模型的上下文窗口随上游更新：例如 OpenRouter 上 Xiaomi 的 MiMo-V2.5-Pro 从 1M 降至 262K、Mistral Small 3.2 24B 从 256K 降至 128K，Nemotron 3 Super 从 262K 增至 1M、Ling 3.1 Flash 从 262K 增至 1M，Vercel AI Gateway 的 Mistral Large 4 从 512K 增至 1M；上下文用量和自动压缩按新的窗口计算
+- 模型调用工具（包括 MCP 工具）时，本该是数组的参数只给了单个值，会先自动包成数组再调用，不再判为调用失败。参数校验失败时返回给模型的错误说明也换了写法
+
+- Some models' thinking levels follow upstream changes: Mistral Large 4 on Mistral no longer offers "Off" and now offers "Low" / "Medium" / "High", and Qwen Max Latest (Qwen3.8 Max) on Fireworks now offers "Off" / "Low" / "Medium" / "Extra High". A previously selected level that is no longer available is adjusted to one the model supports
+- Some models' context windows follow upstream updates: for example, on OpenRouter Xiaomi's MiMo-V2.5-Pro shrinks from 1M to 262K and Mistral Small 3.2 24B from 256K to 128K, while Nemotron 3 Super grows from 262K to 1M and Ling 3.1 Flash from 262K to 1M; Mistral Large 4 on Vercel AI Gateway grows from 512K to 1M. Context usage and auto-compaction follow the new windows
+- When a model calls a tool (MCP tools included) and passes a single value where an array is expected, the value is now wrapped into an array before the call instead of failing it. The error text sent back to the model when argument validation fails is also worded differently
+
+### 移除 / Removed
+
+- 内置模型列表移除了上游已下架或不再作为对话模型提供的模型，例如 OpenAI 的 GPT-Realtime-2.1，Google 的 Gemini 3.1 Flash Live Preview 与 Nano Banana 2 Lite，Mistral 的 Devstral 系列、Mistral Large 2.1、Mistral Nemo 与 Pixtral Large，NVIDIA NIM 的 GLM-5.3，Hugging Face 的 GLM-4.5、MiMo-V2-Flash 与 Qwen3-Next-80B-A3B-Thinking，以及 OpenRouter（如 GPT-3.5 Turbo、GPT-4 Turbo、o1、o3 Mini、o4 Mini）和 Vercel AI Gateway 上的一批模型。之前选用（或设为新对话默认）这些模型的对话，需要换一个模型才能继续
+
+- Models retired upstream, or no longer offered as chat models, are removed from the built-in lists — for example GPT-Realtime-2.1 under OpenAI; Gemini 3.1 Flash Live Preview and Nano Banana 2 Lite under Google; the Devstral models, Mistral Large 2.1, Mistral Nemo and Pixtral Large under Mistral; GLM-5.3 under NVIDIA NIM; GLM-4.5, MiMo-V2-Flash and Qwen3-Next-80B-A3B-Thinking under Hugging Face; plus a number of models on OpenRouter (such as GPT-3.5 Turbo, GPT-4 Turbo, o1, o3 Mini and o4 Mini) and Vercel AI Gateway. Chats that used one of these models (or had it as the default for new chats) need a different model to continue
 
 ### 修复 / Fixed
 
 - 深色模式下，文件页「预览 / 源码」切换按钮看不清当前选中的是哪一个；鼠标悬停在另一个上时，看起来也像已经切换了过去
 - 选中多行文字时，划词工具条会挡住选中的内容；结果卡出现在选区上方时也会挡住，选区很长时还可能开到屏幕外 ([#93](https://github.com/maotoumao/Cebian/issues/93))
+- 模型调用工具时参数很长（例如一次写入很大的文件），生成过程不再越来越慢、内存占用也不再越涨越高
+- Anthropic 账号所在组织把思考强度上限设在「高」以下时，较新的 Claude 模型（Claude Opus 5 / 5.5、Sonnet 5.5、Haiku 5.5、Fable 5.1）即使选了「低」或「中」思考也不再报 `Invalid effort level`
+- 同一对话里先用其他模型调用过工具、再换到 OpenAI 的 GPT-5.4 或 GPT-5.5 时，不再报 `Missing namespace for function_call`
+- OpenRouter 上的 Claude 最新版别名（如 Anthropic: Claude Sonnet Latest）每次调用工具后不再丢掉之前的思考内容
+- 通过 Google 接口使用 Gemini 模型时，工具参数里限定的固定取值（例如操作类型只能是几个指定值）现在会被模型遵守，传错取值的情况会减少
 
 - In dark mode, the "Preview / Source" toggle on the file page made it hard to tell which one was selected, and hovering over the other one looked as if it had been switched to
 - When selecting several lines of text, the selection toolbar covered part of the selected text; the result card did too when it opened above the selection, and for very long selections it could open off-screen ([#93](https://github.com/maotoumao/Cebian/issues/93))
+- Generation no longer gets slower and slower, with memory use climbing, when a model calls a tool with very long arguments, such as writing a very large file in one go
+- Newer Claude models (Claude Opus 5 / 5.5, Sonnet 5.5, Haiku 5.5, Fable 5.1) no longer fail with `Invalid effort level` at "Low" or "Medium" thinking when the Anthropic account's organization caps effort below "High"
+- GPT-5.4 and GPT-5.5 on OpenAI no longer fail with `Missing namespace for function_call` when you switch to them in a chat where another model has already called tools
+- The latest-version Claude aliases on OpenRouter (such as Anthropic: Claude Sonnet Latest) no longer lose their earlier thinking after each tool call
+- Gemini models used through the Google API now respect fixed values in tool parameters (such as an action that must be one of a few given values), so they pass invalid values less often
 
 ## 1.8.2 - 2026-10-24
 

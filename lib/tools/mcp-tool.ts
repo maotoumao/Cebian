@@ -1,4 +1,3 @@
-import type { TSchema } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import type { MCPServerConfig } from '@/lib/persistence/storage';
 import type { MCPTool } from '@/lib/mcp/client';
@@ -78,7 +77,7 @@ export function isMcpAppResult(details: unknown): details is {
 export function createMCPAgentTool(
   server: MCPServerConfig,
   mcpTool: MCPTool,
-): AgentTool<TSchema> {
+): AgentTool<MCPTool['inputSchema']> {
   const slug = slugifyServerName(server.name);
   // Sanitize remote tool name: providers (OpenAI/Anthropic/Gemini) require
   // ^[a-zA-Z0-9_-]+$. Keep the combined name within OpenAI's 64-char limit:
@@ -91,10 +90,9 @@ export function createMCPAgentTool(
   const name = `mcp__${slug}__${safeName}`;
   const label = `${server.name} / ${mcpTool.name}`;
   const description = `[MCP: ${server.name}] ${mcpTool.description ?? mcpTool.name}`;
-  // MCP tool inputSchema is JSON Schema; TypeBox TSchema is structurally
-  // compatible (it's JSON Schema with extra metadata). The cast is safe at
-  // the boundary — the agent runtime treats the schema opaquely.
-  const parameters = mcpTool.inputSchema as unknown as TSchema;
+  // MCP 的 inputSchema 是普通 JSON Schema，AgentTool 直接接受；pi 推不出它的参数类型
+  // （params 为 unknown），execute 里自行收窄。
+  const parameters = mcpTool.inputSchema;
 
   // Type-guard the UI metadata at construction time: only treat the tool
   // as MCP-App-capable when `_meta.ui.resourceUri` is a non-empty string.
