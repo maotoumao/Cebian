@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## 1.8.3 - 2026-11-09
+
 ### 新增 / Added
 
 - 任务运行中也能接着发消息，用法与 Codex 一致：按 Enter 排队，当前任务正常跑完后按顺序自动发出；按 Shift+⌘+Enter（Windows / Linux 上为 Shift+Ctrl+Enter）插话，在当前这一步结束后插入正在进行的任务。排队的消息显示在输入框上方，可以立即发送、编辑或删除。任务运行中输入框里有文字时，停止按钮会换成发送按钮，这时按 Esc 停止任务；任务出错或被停止时队列会保留并暂停，不会自动发出。Enter 默认排队还是插话，可以在设置 → 对话 →「任务运行中发送消息」里切换 ([#96](https://github.com/maotoumao/Cebian/issues/96))
