@@ -83,6 +83,10 @@ interface ChatInputProps {
  *  同时仍由 ChatInput 持有 value 状态。 */
 export interface ChatInputHandle {
   fill: (text: string) => void;
+  /** 划词引用（issue #103）：把选中的文本以 markdown 引注块形式追加进输入框，
+   *  已有内容时换行隔开，不覆盖。与 `fill` 的整框替换相对——引用是往草稿里
+   *  添上下文，不是重起草。 */
+  appendQuote: (quote: string) => void;
   /** 聊天页拖放区放下的文件；`folders` 是被排除的文件夹名，只用来提示。 */
   addFiles: (files: readonly File[], folders: readonly string[]) => void;
 }
@@ -682,6 +686,18 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     focusCaretAtEnd();
   }, [focusCaretAtEnd]);
 
+  // 划词引用追加（issue #103）：引注块逐行 `> ` 前缀，已有内容时换行隔开。
+  const appendQuote = useCallback((quote: string) => {
+    const block = quote
+      .split('\n')
+      .map((line) => `> ${line}`)
+      .join('\n');
+    setValue((prev) => (prev.trim() ? `${prev.trimEnd()}\n\n${block}` : block));
+    setShowSlash(false);
+    setHistoryIndex(null);
+    focusCaretAtEnd();
+  }, [focusCaretAtEnd]);
+
   // Scan prompts when slash menu opens
   useEffect(() => {
     if (!showSlash) return;
@@ -882,7 +898,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   };
 
   // 不传依赖：addDroppedFiles 每次渲染都会换新，句柄跟着重建拿到最新闭包，重建一个小对象的开销可以忽略
-  useImperativeHandle(ref, () => ({ fill, addFiles: addDroppedFiles }));
+  useImperativeHandle(ref, () => ({ fill, appendQuote, addFiles: addDroppedFiles }));
 
   return (
     <footer className="px-4 py-4 border-t border-border bg-background relative" onKeyDown={handleFooterKeyDown}>

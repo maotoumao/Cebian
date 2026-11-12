@@ -18,6 +18,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 新增 / Added
+
+- 对话里选中一段文字时会浮出「引用」小工具条，点一下把选中的文字以 markdown 引注块形式追加进输入框（已有内容时换行隔开），方便让模型针对那段文字提问 ([#103](https://github.com/maotoumao/Cebian/issues/103))
+
+- Selecting text in a conversation shows a small "Quote" toolbar; clicking it appends the selected text to the input box as a markdown quote block (on a new line when the box already has content), so you can direct the model at that exact passage ([#103](https://github.com/maotoumao/Cebian/issues/103))
+
 ## 1.8.3 - 2026-11-09
 
 ### 新增 / Added

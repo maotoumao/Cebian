@@ -633,6 +633,9 @@ chat:
     elementPickNavigated: "頁面已跳轉，元素選取已取消"
     imageAlreadyAdded: "此圖片已新增"
     screenshotFailed: "螢幕截圖失敗"
+    # 對話內劃詞引用（issue #103）
+    quote: "引用到對話"
+    quoteDismiss: "關閉"
     # $1 = 附件上限個數
     maxAttachments: "最多新增 $1 個附件"
     # $1 = 未新增的檔案數

@@ -638,6 +638,9 @@ chat:
     elementPickNavigated: "Element picker cancelled — the page navigated"
     imageAlreadyAdded: "Image already added"
     screenshotFailed: "Screenshot failed"
+    # Text selection in the conversation (issue #103)
+    quote: "Quote to chat"
+    quoteDismiss: "Dismiss"
     # $1 = max attachment count
     maxAttachments: "Up to $1 attachments"
     # $1 = number of files not added
