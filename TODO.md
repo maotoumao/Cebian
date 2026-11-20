@@ -151,6 +151,9 @@ message-helpers / tool-permissions —— 四个都确有 UI + background 双边
 > 接口几乎每个 minor 都有破坏性变更，IndexedDB 后端只在 fake-indexeddb 下测过、没有 schema
 > 升级路径。可以开始评估的信号：README 去掉 Experimental，durable / chord 连续数个 minor
 > 无 Breaking，IndexedDB 后端进 spec 并有迁移与真实浏览器测试，#11026 等关闭。
+> 2026-11-20 按 pi 1.6.0 复查：仍不满足——README 仍标 Experimental，1.5.0（`Storage.commit()`
+> / watch API）与 1.6.0（工具 `execute()` 可 park、任务版本升级后旧版 Harness 打开新库会
+> 卡住新任务）连续两个 minor 都有 Breaking，#11026 仍开着。
 > 下文保留为历史记录。
 >
 > **进展（2026-08）**：树化迁移已完成——存储层换成会话树（`DexieSessionStorage`

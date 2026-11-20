@@ -1,9 +1,9 @@
 // 把发给 LLM 的消息改写成不含工具协议的纯对话，给关掉了「工具调用」的模型用（#83）。
 //
-// 只要请求里出现过工具调用或工具结果，pi-ai 的 openai-completions 就会带上 `tools: []` 并
-// 发出 `role: 'tool'` 消息——只支持对话的上游照样拒绝。同一会话先用支持工具的模型调过工具、
-// 再切到纯对话模型时就会走到这里。作用在 convertToLlm 的产出上：压缩摘要的保留区已经展开，
-// 看到的就是最终要发出的消息；只改请求视图，不动 `state.messages`、不落库。
+// 只要请求里出现过工具调用或工具结果，pi-ai 的 openai-completions 就会照原样发出 assistant
+// 的 `tool_calls` 与 `role: 'tool'` 消息——只支持对话的上游照样拒绝。同一会话先用支持工具的
+// 模型调过工具、再切到纯对话模型时就会走到这里。作用在 convertToLlm 的产出上：压缩摘要的
+// 保留区已经展开，看到的就是最终要发出的消息；只改请求视图，不动 `state.messages`、不落库。
 
 import type {
   AssistantMessage,

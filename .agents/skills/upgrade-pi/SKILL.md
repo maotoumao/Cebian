@@ -41,7 +41,7 @@ description: 升级pi-agent-core和pi-ai到最新版本
 
 6. **版本范围用 `~`**。`package.json` 里两个包写 `~x.y.z`（只放行 patch），minor 升级必须走本流程，避免一次 `pnpm install` 悄悄带进破坏性变更。
 
-7. **已知上游行为**（已核实至 1.5.0，后续升级时重新核对）：Copilot 下的 GPT-6 Sol / Luna / GPT-6.1 Terra 可选「关闭思考」，但 Responses 适配器对 `github-copilot` 不发送 `effort: "none"`，由 Copilot 服务端决定；Copilot 的 Gemini 条目（1.5.0 为 `gemini-3.8-flash`、`gemini-4-argon`）`supportsReasoningEffort: false`，思考档不生效。
+7. **已知上游行为**（已核实至 1.6.0，后续升级时重新核对）：Copilot 下的 GPT-6 Sol / Luna / GPT-6.1 Terra 可选「关闭思考」，但 Responses 适配器对 `github-copilot` 不发送 `effort: "none"`，由 Copilot 服务端决定。1.6.0 起 Copilot 的 Gemini 与 `kimi-k3` 改为 `supportsReasoningEffort: true`，**都没有 off 档**：`gemini-3.8-flash` / `gemini-4-argon` / `gemini-4-carbon` 为 low / medium / high，`gemini-4-hydrogen` / `gemini-4-neon` 多一档 xhigh，`kimi-k3` 为 low / high / max（carbon / hydrogen / neon 为 1.6.0 新增）；存的 off 由 `clampThinkingLevel` 夹到 low（1.5.0 及以前这些条目不发思考档）。
 
 8. **请求不带 pi 的归因**。pi-agent-core 1.4 起 agent loop 默认带 `PI_ATTRIBUTION`（OpenRouter 的 `X-OpenRouter-Title: pi`、NVIDIA 的 `X-BILLING-INVOKE-ORIGIN: Pi` 等）；[factory.ts](../../../entrypoints/background/agent/factory.ts) 传 `identity: { attribution: null }` 关掉，OpenRouter 的 Cebian 归因仍由 `lib/providers/resolve-model.ts` 写进 `model.headers`。升级时核对 `ClientIdentity` / `mergeClientIdentity` 的语义没变，`factory.test.ts` 的「请求归因」用例会兜住。
 

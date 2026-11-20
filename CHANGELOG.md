@@ -18,6 +18,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 新增 / Added
+
+- 新增模型：Claude Fable 5.2（Anthropic、GitHub Copilot、OpenRouter、Vercel AI Gateway），GPT-6.2 Astra 与 GPT-6.2 Sol（OpenAI、OpenAI Codex、GitHub Copilot、OpenRouter、Vercel AI Gateway），Gemini 4 Carbon / Hydrogen / Neon（Google、GitHub Copilot、OpenRouter、Vercel AI Gateway），GitHub Copilot 的 MAI Code 2 与 MAI Code 2 Flash，OpenAI 的 GPT-6 Cyber，Kimi K3.1 Pro（Fireworks、Hugging Face、Together），Qwen4 Max（OpenRouter、Vercel AI Gateway）；其余提供商的内置模型列表也同步到了最新
+
+- Added models: Claude Fable 5.2 (Anthropic, GitHub Copilot, OpenRouter, Vercel AI Gateway), GPT-6.2 Astra and GPT-6.2 Sol (OpenAI, OpenAI Codex, GitHub Copilot, OpenRouter, Vercel AI Gateway), Gemini 4 Carbon / Hydrogen / Neon (Google, GitHub Copilot, OpenRouter, Vercel AI Gateway), MAI Code 2 and MAI Code 2 Flash on GitHub Copilot, GPT-6 Cyber on OpenAI, Kimi K3.1 Pro (Fireworks, Hugging Face, Together), and Qwen4 Max (OpenRouter, Vercel AI Gateway); the built-in model lists of the other providers are refreshed too
+
+### 变更 / Changed
+
+- GitHub Copilot 的 Gemini 3.8 Flash、Gemini 4 Argon 与 Kimi K3 现在会真正按所选思考档思考（之前选了也不生效），可选档位改为「低 / 中 / 高」（Kimi K3 为「低 / 高 / 最大」），不再提供「关闭」；Mistral 的 Mistral Large (latest) 现在是思考模型，可选「低 / 中 / 高」（没有「关闭」），上下文窗口从 262K 增至 1M。之前选的档位不再可用时，会自动调整为该模型支持的档位
+- 部分模型的上下文窗口随上游更新：例如 OpenRouter 上 Llama 4 Maverick 从 128K 增至 524K、Nemotron 3 Super 从 1M 降至 262K、Qwen3 235B A22B 2507 从 262K 降至 131K，Vercel AI Gateway 上 Qwen3.8 Max 从 262K 增至 1M、Qwen3.8 27B 从 1M 降至 262K、MiniMax M3 从 512K 增至 1M，Google 的 Deep Research 预览模型从 131K 增至 1M；上下文用量和自动压缩按新的窗口计算
+
+- GitHub Copilot's Gemini 3.8 Flash, Gemini 4 Argon and Kimi K3 now actually think at the selected thinking level (previously the selection had no effect); their levels are now "Low" / "Medium" / "High" ("Low" / "High" / "Max" for Kimi K3) and "Off" is no longer offered. Mistral Large (latest) on Mistral is now a thinking model with "Low" / "Medium" / "High" (no "Off"), and its context window grows from 262K to 1M. A previously selected level that is no longer available is adjusted to one the model supports
+- Some models' context windows follow upstream updates: for example, on OpenRouter Llama 4 Maverick grows from 128K to 524K, Nemotron 3 Super shrinks from 1M to 262K and Qwen3 235B A22B 2507 from 262K to 131K; on Vercel AI Gateway Qwen3.8 Max grows from 262K to 1M, Qwen3.8 27B shrinks from 1M to 262K and MiniMax M3 grows from 512K to 1M; Google's Deep Research preview models grow from 131K to 1M. Context usage and auto-compaction follow the new windows
+
+### 移除 / Removed
+
+- 内置模型列表移除了上游已下架的模型，例如 OpenRouter 上的 Seed 1.6 / Seed 1.6 Flash / Seed-2.0-Code、Mercury 2 / 2.5 / 3、MiniMax M1 / M2 / M2.1、Grok Build 0.1 与 Step 3.5 Flash，Vercel AI Gateway 上的 Qwen3 235B、Qwen3 Coder、Seed 1.6 / 1.8、MiMo V2.5 / V2.5 Pro 与 Grok Build 0.1，Fireworks 的 GPT OSS 120B、Inkling 与 Nemotron 3 Ultra，以及 NVIDIA NIM 的 Kimi K2.6、DeepSeek V4.1 Flash 与 Llama 3.2 Vision 系列。之前选用（或设为新对话默认）这些模型的对话，需要换一个模型才能继续
+
+- Models retired upstream are removed from the built-in lists — for example Seed 1.6 / Seed 1.6 Flash / Seed-2.0-Code, Mercury 2 / 2.5 / 3, MiniMax M1 / M2 / M2.1, Grok Build 0.1 and Step 3.5 Flash on OpenRouter; Qwen3 235B, Qwen3 Coder, Seed 1.6 / 1.8, MiMo V2.5 / V2.5 Pro and Grok Build 0.1 on Vercel AI Gateway; GPT OSS 120B, Inkling and Nemotron 3 Ultra on Fireworks; and Kimi K2.6, DeepSeek V4.1 Flash and the Llama 3.2 Vision models on NVIDIA NIM. Chats that used one of these models (or had it as the default for new chats) need a different model to continue
+
+### 修复 / Fixed
+
+- 修复停止任务后，模型同一批发起、还没来得及执行的工具调用卡片一直转圈：现在显示为已中止的失败结果
+- 修复 GitHub Copilot 上的 GPT、Grok 与 MAI Code 模型调用工具时，会把没填的可选参数补成空字符串或编造的值
+- 修复 Groq 上的 Qwen 等推理模型报 `400 Unexpected message role`：走 Chat Completions 接口时，除 OpenAI 官方接口外，系统提示词改用 `system` 角色发送
+- 修复 Claude 调用定义里带 `$defs` 引用的工具（常见于 MCP 服务器）时参数出错，例如把对象传成 JSON 字符串，部分兼容 Anthropic 的网关还会直接拒绝请求
+- 修复 OpenRouter 上输出上限接近上下文窗口的模型（如 DeepSeek Flash）报 400「超过最大上下文长度」
+
+- Fixed tool calls that the model requested in the same batch but that had not started yet spinning forever after you stop a task; they now show as aborted, failed results
+- Fixed GitHub Copilot's GPT, Grok and MAI Code models filling optional tool arguments they left out with empty strings or invented values
+- Fixed reasoning models such as Qwen on Groq failing with `400 Unexpected message role`: on Chat Completions endpoints other than OpenAI's own API, the system prompt is now sent with the `system` role
+- Fixed Claude passing wrong arguments to tools whose definitions use `$defs` references (common in MCP servers), for example a JSON string instead of an object; some Anthropic-compatible gateways also rejected such requests outright
+- Fixed OpenRouter rejecting models whose output limit is close to their context window (such as DeepSeek Flash) with a 400 "maximum context length" error
+
 ## 1.8.3 - 2026-11-09
 
 ### 新增 / Added
