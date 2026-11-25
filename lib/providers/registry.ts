@@ -38,3 +38,16 @@ export const APIKEY_PROVIDERS = [
   { provider: 'xiaomi-token-plan-cn', label: 'Xiaomi MiMo Plan (CN)' },
   { provider: 'zai', label: 'zAI' },
 ] as const;
+
+/**
+ * 用专用鉴权接口验证 API key 的 provider（provider → GET 地址）。其余 provider 的连通性测试
+ * 拿最便宜的模型发一次补全；OpenCode Go 最便宜的是有地区限制的免费模型，不少付费模型还要
+ * 先在工作区隐私设置里放开，探测补全常把有效的 key 判成「未验证」。usage 接口只校验 key、
+ * 不消耗额度：401 = key 无效，403 = 不在 Go 订阅范围（响应里带原因）。
+ *
+ * 调用约定（verifyKeyAtEndpoint）：GET + `Authorization: Bearer <key>`，2xx 即有效，失败时
+ * 从响应体 `{ error: { message } }` 取原因。新加的 provider 接口不符合这个约定就得另写校验。
+ */
+export const API_KEY_CHECK_URLS: Partial<Record<string, string>> = {
+  'opencode-go': 'https://opencode.ai/inference/go/v1/usage',
+};

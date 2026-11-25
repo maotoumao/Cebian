@@ -9,8 +9,56 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
 import { isCustomProvider } from "@/lib/providers/custom-models";
+import { API_KEY_CHECK_URLS } from "@/lib/providers/registry";
 import { t } from "@/lib/i18n";
 import type { ApiKeyCredential } from "@/lib/persistence/storage";
+
+/** 拿 provider 的某个模型发一次极短补全，回复里有 "ok" 即视为 key 有效。 */
+async function verifyKeyByCompletion(model: Model<Api>, apiKey: string): Promise<void> {
+  const result = await complete(
+    model,
+    {
+      messages: [
+        { role: "user", content: "Reply only: ok", timestamp: Date.now() },
+      ],
+    },
+    // 一次性请求：随机会话标识 + 不写缓存（同标题生成）。要求每个请求带会话标识的 provider
+    // （如 OpenCode 的 x-opencode-session，#105）缺了会 400，探测会误判失败
+    { apiKey, maxTokens: 5, sessionId: crypto.randomUUID(), cacheRetention: "none" },
+  );
+
+  // complete() resolves (not rejects) with an Error on failure
+  if (result instanceof Error) {
+    throw result;
+  }
+
+  const text = result.content
+    .filter((b) => b.type === "text")
+    .map((b) => ("text" in b ? b.text : ""))
+    .join("");
+
+  if (!text.toLowerCase().includes("ok")) {
+    // 仅为进入 catch 走「失败也保存」分支；无具体原因，toast 只显示标题。
+    throw new Error();
+  }
+}
+
+/**
+ * 用 provider 的鉴权接口校验 key（约定见 API_KEY_CHECK_URLS）：2xx 即有效，否则带上服务端
+ * 给的原因抛错。10 秒超时与 fetchRemoteModels 一致，挂起也会落到「保存 + 未验证」。
+ */
+async function verifyKeyAtEndpoint(url: string, apiKey: string): Promise<void> {
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (res.ok) return;
+  const body: unknown = await res.json().catch(() => undefined);
+  const message = (body as { error?: { message?: unknown } } | undefined)?.error?.message;
+  throw new Error(
+    typeof message === "string" && message ? message : t('errors.network.requestFailed', [res.status]),
+  );
+}
 
 interface ProviderApiKeyItemProps {
   provider: string;
@@ -59,31 +107,12 @@ export function ProviderApiKeyItem({
     setSaving(true);
 
     try {
-      const result = await complete(
-        cheapestModel,
-        {
-          messages: [
-            { role: "user", content: "Reply only: ok", timestamp: Date.now() },
-          ],
-        },
-        // 随机会话标识 + 不写缓存（一次性请求）：OpenCode Go 缺 x-opencode-session 直接 400
-        // （#105），连通性测试会误判失败
-        { apiKey: key, maxTokens: 5, sessionId: crypto.randomUUID(), cacheRetention: "none" },
-      );
-
-      // complete() resolves (not rejects) with an Error on failure
-      if (result instanceof Error) {
-        throw result;
-      }
-
-      const text = result.content
-        .filter((b) => b.type === "text")
-        .map((b) => ("text" in b ? b.text : ""))
-        .join("");
-
-      if (!text.toLowerCase().includes("ok")) {
-        // 仅为进入 catch 走「失败也保存」分支；无具体原因，toast 只显示标题。
-        throw new Error();
+      // 有专用鉴权接口的 provider 走接口，其余拿最便宜的模型发一次补全
+      const checkUrl = API_KEY_CHECK_URLS[provider];
+      if (checkUrl) {
+        await verifyKeyAtEndpoint(checkUrl, key);
+      } else {
+        await verifyKeyByCompletion(cheapestModel, key);
       }
 
       onSave({ authType: "apiKey", apiKey: key, verified: true });
