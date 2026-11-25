@@ -35,7 +35,16 @@ async function generateSessionTitle(params: GenerateSessionTitleParams): Promise
   const result = await complete(
     params.model,
     { systemPrompt, messages: [{ role: 'user', content: userContent, timestamp: Date.now() }] },
-    { apiKey: params.apiKey, maxTokens: TITLE_MAX_TOKENS, signal: params.signal },
+    // 一次性请求，做法同 pi 的压缩摘要：随机会话标识 + 不写缓存。OpenCode Go 缺
+    // x-opencode-session 直接 400（#105）；不复用所在会话的 ID——提示词与主对话不同，蹭不到
+    // 缓存，还会覆盖 Anthropic 按会话记的 thread 状态。
+    {
+      apiKey: params.apiKey,
+      maxTokens: TITLE_MAX_TOKENS,
+      signal: params.signal,
+      sessionId: crypto.randomUUID(),
+      cacheRetention: 'none',
+    },
   );
   if (result instanceof Error) throw result;
   if (result.stopReason === 'aborted') return null;

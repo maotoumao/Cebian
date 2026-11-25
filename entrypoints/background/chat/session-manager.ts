@@ -835,6 +835,7 @@ class SessionManager {
       preamble,
       thinkingLevel: clampThinkingLevel(resolved.model, (thinkingLvl || 'medium') as ThinkingLevel),
       messages,
+      sessionId,
       beforeToolCall,
       // 轮内上下文管理。两者都按 sessionId 反查 AgentSession（同 beforeToolCall 的
       // 做法）——agent 先于 AgentSession 构造，这里还拿不到它的引用。

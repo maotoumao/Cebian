@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
+import type { Api, Model } from '@earendil-works/pi-ai';
+import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all';
 import { serializeConversation } from '@/lib/shims/pi-harness/compaction/utils';
 import { convertToLlm } from '@/lib/shims/pi-harness/messages';
 import { estimateMessageTokens, estimateTextTokens } from '@/lib/agent/context-tokens';
@@ -9,6 +11,7 @@ import {
   planCompaction,
   planManualCompaction,
   resolveCompactionBudget,
+  runCompaction,
   splitForSummary,
   summaryChunkBudget,
 } from '@/lib/agent/compaction';
@@ -686,5 +689,35 @@ describe('measureContextUsage', () => {
 
   it('空会话为 0', () => {
     expect(measure([]).tokens).toBe(0);
+  });
+});
+
+describe('runCompaction · 会话标识 (#105)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // 摘要请求不走 provider 的 api 包装，而是经 pi 的 Models 集合发出；OpenCode Go 的
+  // x-opencode-session 由 Models 按 provider 补上。守住这条路径，免得压缩在 Go 上 400。
+  it('OpenCode Go 的摘要请求带 x-opencode-session', async () => {
+    const model = (getBuiltinModels('opencode-go') as Model<Api>[]).find((m) => m.api === 'openai-completions');
+    if (!model) throw new Error('no openai-completions model in opencode-go');
+    const headers: Headers[] = [];
+    const controller = new AbortController();
+    vi.stubGlobal('fetch', async (_url: unknown, init?: RequestInit) => {
+      headers.push(new Headers(init?.headers));
+      // 抓到第一次请求就取消，免得走重试等待
+      controller.abort();
+      throw new DOMException('aborted', 'AbortError');
+    });
+    const result = await runCompaction({
+      messagesToSummarize: [{ role: 'user', content: [{ type: 'text', text: 'hi' }], timestamp: Date.now() }],
+      model,
+      apiKey: 'test-key',
+      signal: controller.signal,
+    });
+    expect(result).toBeNull();
+    expect(headers.length).toBeGreaterThan(0);
+    expect(headers[0].get('x-opencode-session')).toBeTruthy();
   });
 });

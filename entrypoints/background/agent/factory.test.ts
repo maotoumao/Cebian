@@ -461,3 +461,49 @@ describe('createCebianAgent · 请求归因', () => {
     expect(headers.get('X-BILLING-INVOKE-ORIGIN')).toBeNull();
   });
 });
+
+describe('createCebianAgent · 会话标识 (#105)', () => {
+  beforeEach(() => {
+    fakeBrowser.reset();
+  });
+
+  // OpenCode 内置 provider 按会话标识填 x-opencode-session，OpenCode Go 缺了服务端直接 400
+  function opencodeGoModel(): Model<Api> {
+    const found = (getBuiltinModels('opencode-go') as Model<Api>[]).find((m) => m.api === 'openai-completions');
+    if (!found) throw new Error('no openai-completions model in opencode-go');
+    return found;
+  }
+
+  it('OpenCode Go 请求带上会话的 x-opencode-session', async () => {
+    const agent = createCebianAgent({
+      model: opencodeGoModel(),
+      preamble: { systemPrompt: 'base', tools: [] },
+      thinkingLevel: 'off',
+      sessionId: 'session-105',
+    });
+    const { headers } = await captureRequest(agent, 'hi');
+    expect(headers.get('x-opencode-session')).toBe('session-105');
+  });
+
+  it('未传 sessionId 时生成随机标识，同一 agent 的请求共用一个', async () => {
+    const agent = createCebianAgent({
+      model: opencodeGoModel(),
+      preamble: { systemPrompt: 'base', tools: [] },
+      thinkingLevel: 'off',
+    });
+    const first = (await captureRequest(agent, 'hi')).headers.get('x-opencode-session');
+    const second = (await captureRequest(agent, 'again')).headers.get('x-opencode-session');
+    expect(first).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(second).toBe(first);
+
+    // 另一个 agent 拿到不同的标识，临时 agent 之间不会串用同一个会话
+    const other = createCebianAgent({
+      model: opencodeGoModel(),
+      preamble: { systemPrompt: 'base', tools: [] },
+      thinkingLevel: 'off',
+    });
+    const otherId = (await captureRequest(other, 'hi')).headers.get('x-opencode-session');
+    expect(otherId).toBeTruthy();
+    expect(otherId).not.toBe(first);
+  });
+});

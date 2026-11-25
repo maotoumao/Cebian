@@ -29,6 +29,7 @@ export const APIKEY_PROVIDERS = [
   { provider: 'moonshotai-cn', label: 'Moonshot (CN)' },
   { provider: 'nvidia', label: 'NVIDIA NIM' },
   { provider: 'openai', label: 'OpenAI', pinned: true },
+  { provider: 'opencode-go', label: 'OpenCode Go' },
   { provider: 'openrouter', label: 'OpenRouter', pinned: true },
   { provider: 'together', label: 'Together AI' },
   { provider: 'vercel-ai-gateway', label: 'Vercel AI Gateway' },

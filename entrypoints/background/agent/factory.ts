@@ -133,6 +133,14 @@ interface CreateAgentOptions {
   thinkingLevel: ThinkingLevel;
   messages?: AgentMessage[];
   /**
+   * 随每次请求交给 pi-ai 的会话标识，同一会话的请求共用一个。OpenCode 拿它作
+   * `x-opencode-session` 头做路由与缓存（OpenCode Go 缺了直接 400，#105）；OpenAI 系当 prompt cache
+   * key、部分兼容端点当会话亲和头，同一会话的请求因此更容易命中缓存；Anthropic 官方接口
+   * 据此开启 message threads（续接上一轮回复、只发增量，前缀对不上时 pi 自动新开 thread）。
+   * 不传则给这个 agent 生成一个随机 ID（临时 agent 如记忆整理用）。
+   */
+  sessionId?: string;
+  /**
    * Optional pre-execution gate. pi-agent-core calls it after a tool's args
    * are validated and before `execute()`; returning `{ block: true, reason }`
    * blocks the call and emits an error tool result. Used to require user
@@ -161,6 +169,7 @@ function createCebianAgent(options: CreateAgentOptions): Agent {
     preamble,
     thinkingLevel,
     messages = [],
+    sessionId = crypto.randomUUID(),
     beforeToolCall,
     prepareNextTurnWithContext,
     finishTurn,
@@ -180,6 +189,8 @@ function createCebianAgent(options: CreateAgentOptions): Agent {
       thinkingLevel,
       messages,
     },
+
+    sessionId,
 
     // 运行中的插话（issue #96）在同一个工具边界一次全部投进去，而不是一个边界只投一条。
     steeringMode: 'all',

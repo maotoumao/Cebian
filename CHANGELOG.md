@@ -21,16 +21,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### 新增 / Added
 
 - 新增模型：Claude Fable 5.2（Anthropic、GitHub Copilot、OpenRouter、Vercel AI Gateway），GPT-6.2 Astra 与 GPT-6.2 Sol（OpenAI、OpenAI Codex、GitHub Copilot、OpenRouter、Vercel AI Gateway），Gemini 4 Carbon / Hydrogen / Neon（Google、GitHub Copilot、OpenRouter、Vercel AI Gateway），GitHub Copilot 的 MAI Code 2 与 MAI Code 2 Flash，OpenAI 的 GPT-6 Cyber，Kimi K3.1 Pro（Fireworks、Hugging Face、Together），Qwen4 Max（OpenRouter、Vercel AI Gateway）；其余提供商的内置模型列表也同步到了最新
+- 新增 OpenCode Go 提供商：在「设置 → AI 提供商」填入 API Key 即可使用，每个对话带着自己的会话标识，OpenCode 能按对话路由并复用缓存。之前用自定义提供商接入、遇到 `MissingSessionID` 报错的，可以改用它 ([#105](https://github.com/maotoumao/Cebian/issues/105))
 
 - Added models: Claude Fable 5.2 (Anthropic, GitHub Copilot, OpenRouter, Vercel AI Gateway), GPT-6.2 Astra and GPT-6.2 Sol (OpenAI, OpenAI Codex, GitHub Copilot, OpenRouter, Vercel AI Gateway), Gemini 4 Carbon / Hydrogen / Neon (Google, GitHub Copilot, OpenRouter, Vercel AI Gateway), MAI Code 2 and MAI Code 2 Flash on GitHub Copilot, GPT-6 Cyber on OpenAI, Kimi K3.1 Pro (Fireworks, Hugging Face, Together), and Qwen4 Max (OpenRouter, Vercel AI Gateway); the built-in model lists of the other providers are refreshed too
+- Added the OpenCode Go provider: enter your API key under "Settings → AI providers" to use it. Each chat sends its own session ID, so OpenCode can route it and reuse its prompt cache. If you added it as a custom provider and hit `MissingSessionID` errors, switch to this provider ([#105](https://github.com/maotoumao/Cebian/issues/105))
 
 ### 变更 / Changed
 
 - GitHub Copilot 的 Gemini 3.8 Flash、Gemini 4 Argon 与 Kimi K3 现在会真正按所选思考档思考（之前选了也不生效），可选档位改为「低 / 中 / 高」（Kimi K3 为「低 / 高 / 最大」），不再提供「关闭」；Mistral 的 Mistral Large (latest) 现在是思考模型，可选「低 / 中 / 高」（没有「关闭」），上下文窗口从 262K 增至 1M。之前选的档位不再可用时，会自动调整为该模型支持的档位
 - 部分模型的上下文窗口随上游更新：例如 OpenRouter 上 Llama 4 Maverick 从 128K 增至 524K、Nemotron 3 Super 从 1M 降至 262K、Qwen3 235B A22B 2507 从 262K 降至 131K，Vercel AI Gateway 上 Qwen3.8 Max 从 262K 增至 1M、Qwen3.8 27B 从 1M 降至 262K、MiniMax M3 从 512K 增至 1M，Google 的 Deep Research 预览模型从 131K 增至 1M；上下文用量和自动压缩按新的窗口计算
+- 同一对话的请求现在带上会话标识：OpenAI、OpenRouter、Fireworks 等提供商更容易命中提示词缓存；直连 Anthropic 官方接口时，能续接上一轮的后续请求只发送新增内容 ([#105](https://github.com/maotoumao/Cebian/issues/105))
 
 - GitHub Copilot's Gemini 3.8 Flash, Gemini 4 Argon and Kimi K3 now actually think at the selected thinking level (previously the selection had no effect); their levels are now "Low" / "Medium" / "High" ("Low" / "High" / "Max" for Kimi K3) and "Off" is no longer offered. Mistral Large (latest) on Mistral is now a thinking model with "Low" / "Medium" / "High" (no "Off"), and its context window grows from 262K to 1M. A previously selected level that is no longer available is adjusted to one the model supports
 - Some models' context windows follow upstream updates: for example, on OpenRouter Llama 4 Maverick grows from 128K to 524K, Nemotron 3 Super shrinks from 1M to 262K and Qwen3 235B A22B 2507 from 262K to 131K; on Vercel AI Gateway Qwen3.8 Max grows from 262K to 1M, Qwen3.8 27B shrinks from 1M to 262K and MiniMax M3 grows from 512K to 1M; Google's Deep Research preview models grow from 131K to 1M. Context usage and auto-compaction follow the new windows
+- Requests in the same chat now carry a session ID: providers such as OpenAI, OpenRouter and Fireworks reuse the prompt cache more often, and on Anthropic's own API, follow-up requests that can continue the previous turn only send what's new ([#105](https://github.com/maotoumao/Cebian/issues/105))
 
 ### 移除 / Removed
 

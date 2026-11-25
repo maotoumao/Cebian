@@ -66,7 +66,9 @@ export function ProviderApiKeyItem({
             { role: "user", content: "Reply only: ok", timestamp: Date.now() },
           ],
         },
-        { apiKey: key, maxTokens: 5 },
+        // 随机会话标识 + 不写缓存（一次性请求）：OpenCode Go 缺 x-opencode-session 直接 400
+        // （#105），连通性测试会误判失败
+        { apiKey: key, maxTokens: 5, sessionId: crypto.randomUUID(), cacheRetention: "none" },
       );
 
       // complete() resolves (not rejects) with an Error on failure

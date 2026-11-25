@@ -106,8 +106,14 @@ describe('page-action runner prompt contract', () => {
           expect.objectContaining({ role: 'user', content: 'selected text' }),
         ],
       },
-      expect.objectContaining({ apiKey: 'api-key' }),
+      // sessionId：OpenCode Go 缺 x-opencode-session 直接 400（#105）
+      expect.objectContaining({
+        apiKey: 'api-key',
+        sessionId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/),
+      }),
     );
+    // 划词保留默认缓存策略（Anthropic 的 cache_control 仍生效），不像标题生成那样关掉
+    expect(mocks.stream.mock.calls[0][2]).not.toHaveProperty('cacheRetention');
     expect(onDelta).toHaveBeenCalledWith('answer');
   });
 

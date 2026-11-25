@@ -116,7 +116,8 @@ export async function runPageActionStream(
         },
       ],
     },
-    { apiKey, signal: handlers.signal },
+    // 每次动作一个随机会话标识：OpenCode Go 缺 x-opencode-session 直接 400（#105）
+    { apiKey, signal: handlers.signal, sessionId: crypto.randomUUID() },
   );
 
   let output = '';
